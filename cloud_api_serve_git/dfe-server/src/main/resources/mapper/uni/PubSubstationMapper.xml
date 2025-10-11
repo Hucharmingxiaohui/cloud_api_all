@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.PubSubstationMapper">
+
+
+    <resultMap id="pubSubstationTree" type="com.df.server.vo.Tree.DeptTreeNode">
+        <result property="name" column="dept_name"/>
+        <result property="code" column="dept_id"/>
+        <collection property="children" ofType="com.df.server.vo.Tree.SubStationTreeNode">
+            <result property="name" column="sub_name"/>
+            <result property="code" column="sub_code"/>
+        </collection>
+    </resultMap>
+    <select id="pubSubstationTree" resultMap="pubSubstationTree">
+        select
+            sub.sub_code,
+            sub.sub_name,
+            sub.dept_id,
+            dept.dept_name
+        from df_pub_substation sub
+        join sys_dept dept on sub.dept_id = dept.dept_id
+        order by sub.vlevel desc,sub.id
+    </select>
+    <select id="getOneStation" resultType="com.df.server.entity.uni.PubSubstationEntity">
+        select
+            *
+        from df_pub_substation sub
+        limit 1
+    </select>
+
+</mapper>

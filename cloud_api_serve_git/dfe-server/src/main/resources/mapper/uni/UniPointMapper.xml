@@ -1,0 +1,491 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniPointMapper">
+
+    <select id="getPageList" resultType="com.df.server.vo.UniPoint.UniPointVO">
+        select
+        a.id,
+        a.point_code,
+        a.point_name,
+        a.point_type,
+        a.sub_code,
+        a.sys_code,
+        a.area_id,
+        a.area_name,
+        a.bay_id,
+        a.bay_name,
+        a.device_id,
+        a.device_name,
+        a.component_id,
+        a.component_name,
+        a.material_id,
+        a.device_type, <!--表计类型 ，详见字典表类型meter_type-->
+        a.meter_type, <!--表计类型 ，详见字典表类型meter_type-->
+        a.appearance_type, <!--外观类型，详见字典表类型appearance_type-->
+        a.save_type_list,<!--多个逗号隔开，采集保存文件类型，详见字典表类型save_type-->
+        a.recognition_type_list,<!--识别类型，详见字典表类型recognition_type-->
+        a.phase,<!--相位，详见字典表类型phase-->
+        a.point_des,
+        a.mapfile_id,
+        a.map_pos,
+        a.lower_value,
+        a.upper_value,
+        a.video_pos,
+        a.is_whitelist,
+        a.isfocus,
+        a.task_type,<!--巡视任务类型，详见字典表类型task_type-->
+        a.task_sub_type,<!--多个逗号隔开，所属巡视任务子类型，详见字典表类型task_sub_type_3，task_sub_type_4，task_sub_type_5-->
+        a.is_obj,
+        a.level,<!--重要等级，详见字典表类型patrol_point_level-->
+        a.point_analyse_category,<!--智能分析大类，详见字典表类型point_analyse_category-->
+        a.point_analyse_type,<!--智能分析子类，多个用英文逗号分割，详见字典表类型point_analyse_type、qxsb_type、point_analyse_type_pb-->
+        a.base_image_path,
+        a.is_redundancy,
+        a.robot_pos,
+        a.robot_code,
+        s.sub_name as substationName,
+        r.robot_name
+        from df_uni_point a
+            join (
+                select m.id
+                from df_uni_point m
+                <where>
+                    <if test="subCode != null and subCode != ''">
+                        and m.sub_code = #{subCode,jdbcType=VARCHAR}
+                    </if>
+                    <if test="pointCode != null and pointCode != ''">
+                        and m.point_code = #{pointCode,jdbcType=VARCHAR}
+                    </if>
+                    <if test="pointName != null and pointName != ''">
+                        and m.point_name like CONCAT('%', #{pointName,jdbcType=VARCHAR}, '%')
+                    </if>
+                    <if test="areaId != null and areaId != ''">
+                        and m.area_id = #{areaId,jdbcType=VARCHAR}
+                    </if>
+                    <if test="bayId != null and bayId != ''">
+                        and m.bay_id = #{bayId,jdbcType=VARCHAR}
+                    </if>
+                    <if test="deviceId != null and deviceId != ''">
+                        and m.device_id = #{deviceId,jdbcType=VARCHAR}
+                    </if>
+                    <if test="componentId != null and componentId != ''">
+                        and m.component_id = #{componentId,jdbcType=VARCHAR}
+                    </if>
+                    <if test="deviceType != null">
+                        and m.device_type = #{deviceType,jdbcType=INTEGER}
+                    </if>
+                    <if test="meterType != null">
+                        and m.meter_type = #{meterType,jdbcType=INTEGER}
+                    </if>
+
+                    <if test="recognitionTypeSearchList != null and recognitionTypeSearchList.size() != 0">
+                        and
+                        <foreach collection="recognitionTypeSearchList" item="arecognitionType" index="idx" open="(" close=")"
+                                 separator=",">
+                            find_in_set(#{arecognitionType,jdbcType=VARCHAR}, m.recognition_type_list)
+                        </foreach>
+                    </if>
+                </where>
+                order by m.id
+                <if test="start != null and size != null">
+                    limit #{start},#{size}
+                </if>
+        ) j on a.id = j.id
+        left join df_pub_substation s on a.sub_code = s.sub_code
+        left join df_uni_robot r on a.robot_code = r.robot_code
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(*)
+        from df_uni_point m
+        <where>
+            <if test="subCode != null and subCode != ''">
+                and m.sub_code = #{subCode,jdbcType=VARCHAR}
+            </if>
+            <if test="pointCode != null and pointCode != ''">
+                and m.point_code = #{pointCode,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and m.point_name like CONCAT('%', #{pointName,jdbcType=VARCHAR}, '%')
+            </if>
+            <if test="areaId != null and areaId != ''">
+                and m.area_id = #{areaId,jdbcType=VARCHAR}
+            </if>
+            <if test="bayId != null and bayId != ''">
+                and m.bay_id = #{bayId,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceId != null and deviceId != ''">
+                and m.device_id = #{deviceId,jdbcType=VARCHAR}
+            </if>
+            <if test="componentId != null and componentId != ''">
+                and m.component_id = #{componentId,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceType != null">
+                and m.device_type = #{deviceType,jdbcType=INTEGER}
+            </if>
+            <if test="meterType != null">
+                and m.meter_type = #{meterType,jdbcType=INTEGER}
+            </if>
+
+            <if test="recognitionTypeSearchList != null and recognitionTypeSearchList.size() != 0">
+                and
+                <foreach collection="recognitionTypeSearchList" item="arecognitionType" index="idx" open="(" close=")"
+                         separator=",">
+                    find_in_set(#{arecognitionType,jdbcType=VARCHAR}, m.recognition_type_list)
+                </foreach>
+            </if>
+
+        </where>
+    </select>
+
+    <resultMap id="pointTree" type="com.df.server.vo.Tree.SubStationTreeNode">
+        <result property="name" column="sub_name"/>
+        <result property="code" column="sub_code"/>
+        <collection property="children" ofType="com.df.server.vo.Tree.UniAreaTreeNode">
+            <result property="name" column="area_name"/>
+            <result property="code" column="area_id"/>
+            <result property="areaId" column="area_id"/>
+            <collection property="children" ofType="com.df.server.vo.Tree.UniBayTreeNode">
+                <result property="name" column="bay_name"/>
+                <result property="code" column="bay_id"/>
+                <result property="bayId" column="bay_id"/>
+                <collection property="children" ofType="com.df.server.vo.Tree.UniDeviceTreeNode">
+                    <result property="name" column="device_name"/>
+                    <result property="code" column="device_id"/>
+                    <result property="deviceId" column="device_id"/>
+                    <collection property="children" ofType="com.df.server.vo.Tree.UniPointTreeNode">
+                        <result property="name" column="point_name"/>
+                        <result property="code" column="point_code"/>
+                        <result property="pointCode" column="point_code"/>
+                        <result property="baseImageStatus" column="baseImageStatus"/>
+                        <result property="recognitionType" column="recognition_type_list"/>
+                        <result property="pointAnalyseCategory" column="point_analyse_category"/>
+                    </collection>
+                </collection>
+            </collection>
+        </collection>
+    </resultMap>
+    <select id="pointTree" resultMap="pointTree">
+        select
+            a.point_code,
+            a.point_name,
+            b.sub_name,
+            a.sub_code,
+            a.area_id,
+            a.area_name,
+            a.bay_id,
+            a.bay_name,
+            a.device_id,
+            a.device_name,
+            a.recognition_type_list,
+            a.point_analyse_category,
+            IF(a.base_image_path is null  or  a.base_image_path ='',1,0) as baseImageStatus
+        from df_uni_point a
+            join (
+                        select ap.id from df_uni_point ap
+                        <!--left join df_correction_task_plan_point c on c.point_code = ap.point_code
+                        where ap.point_type = 1 and c.id is null-->
+                        where ap.point_type = 2
+                        <if test="subCode != null and subCode != ''">
+                            and ap.sub_code  =#{subCode,jdbcType=VARCHAR}
+                        </if>
+                        <if test="pointName != null and pointName != ''">
+                            and ap.point_name like concat('%',#{pointName,jdbcType=VARCHAR},'%')
+                        </if>
+
+        ) m on a.id = m.id
+        left join df_pub_substation b on  a.sub_code = b.sub_code
+        order by convert(a.area_name using gbk) collate gbk_chinese_ci,
+                 convert(a.bay_name using gbk) collate gbk_chinese_ci,
+                 convert(a.device_name using gbk) collate gbk_chinese_ci,
+                 convert(a.point_name using gbk) collate gbk_chinese_ci
+    </select>
+
+    <select id="getPointEntityByCode" resultType="com.df.server.entity.uni.UniPointEntity">
+        select * from df_uni_point
+        where sub_code = #{subCode,jdbcType=VARCHAR} and point_code = #{pointCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="listPointExport" resultType="com.df.server.dto.uniPoint.UniPointImportExcel">
+        select
+        po.*
+        from
+        df_uni_point po
+        join (
+        select
+        a.id
+        from df_uni_point a
+        <where>
+            <if test="pointCode != null and pointCode != ''">
+                and a.point_code = #{pointCode,jdbcType=VARCHAR}
+            </if>
+            <if test="subCode != null and subCode != ''">
+                and a.sub_code = #{subCode,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and a.point_name like concat('%',#{pointName,jdbcType=VARCHAR}, '%')
+            </if>
+
+
+            <if test="areaId != null and areaId != ''">
+                and a.area_id = #{areaId,jdbcType=VARCHAR}
+            </if>
+
+            <if test="bayId != null and bayId != ''">
+                and a.bay_id = #{bayId,jdbcType=VARCHAR}
+            </if>
+
+            <if test="deviceId != null and deviceId != ''">
+                and a.device_id = #{deviceId,jdbcType=VARCHAR}
+            </if>
+
+            <if test="componentId != null and componentId != ''">
+                and a.component_id = #{componentId,jdbcType=VARCHAR}
+            </if>
+
+            <if test="deviceType != null">
+                and a.device_type = #{deviceType,jdbcType=INTEGER}
+            </if>
+            <if test="meterType != null">
+                and a.meter_type = #{meterType,jdbcType=INTEGER}
+            </if>
+
+            <if test="recognitionTypeSearchList != null and recognitionTypeSearchList.size() != 0">
+                and
+                <foreach collection="recognitionTypeSearchList" item="arecognitionType" index="idx" open="(" close=")"
+                         separator=",">
+                    find_in_set(#{arecognitionType,jdbcType=VARCHAR}, a.recognition_type_list)
+                </foreach>
+            </if>
+
+
+        </where>
+        order by a.id desc
+        ) m on po.id = m.id
+        order by m.id desc
+    </select>
+
+    <resultMap id="pointLevelTree" type="com.df.server.vo.Tree.SubStationTreeNode">
+        <result property="name" column="sub_name"/>
+        <result property="code" column="sub_code"/>
+        <collection property="children" ofType="com.df.server.vo.Tree.UniAreaTreeNode">
+            <result property="name" column="area_name"/>
+            <result property="code" column="area_id"/>
+            <result property="areaId" column="area_id"/>
+            <collection property="children" ofType="com.df.server.vo.Tree.UniBayTreeNode">
+                <result property="name" column="bay_name"/>
+                <result property="code" column="bay_id"/>
+                <result property="bayId" column="bay_id"/>
+                <collection property="children" ofType="com.df.server.vo.Tree.UniDeviceTreeNode">
+                    <result property="name" column="device_name"/>
+                    <result property="code" column="device_id"/>
+                    <result property="deviceId" column="device_id"/>
+                    <collection property="children" ofType="com.df.server.vo.Tree.UniComponentTreeNode">
+                        <result property="name" column="component_name"/>
+                        <result property="code" column="component_id"/>
+                        <result property="componentId" column="component_id"/>
+                        <collection property="children" ofType="com.df.server.vo.Tree.UniPointTreeNode">
+                            <result property="name" column="point_name"/>
+                            <result property="code" column="point_code"/>
+                            <result property="pointCode" column="point_code"/>
+                        </collection>
+                    </collection>
+                </collection>
+            </collection>
+        </collection>
+    </resultMap>
+    <select id="pointLevelTree" resultMap="pointLevelTree">
+        <if test="level lt 4">
+            select
+            sub.sub_code,
+            sub.sub_name,
+            2 as level,
+            1 as flevel
+            from df_pub_substation sub
+            <where>
+                <if test="subCode != null and subCode != ''">
+                    and sub.sub_code = #{subCode,jdbcType=VARCHAR}
+                </if>
+            </where>
+            order by
+            convert(sub.sub_name using gbk) collate gbk_chinese_ci
+        </if>
+        <if test="level gt 3">
+            select
+            sub.sub_code,
+            sub.sub_name,
+            2 as level,
+            1 as flevel
+            <if test="level gt 3">
+                ,area.area_id,
+                area.area_name
+            </if>
+            <if test="level gt 4">
+                ,bay.bay_id,
+                bay.bay_name
+            </if>
+            <if test="level gt 5">
+                ,device.device_id,
+                device.device_name
+            </if>
+            <if test="level gt 6">
+                ,com.component_id,
+                com.component_name
+            </if>
+            <if test="level gt 7">
+                ,po.point_code,
+                po.point_name,
+                8 as plevel
+            </if>
+            from df_uni_point po
+            join df_pub_substation sub on po.sub_code = sub.sub_code
+            <if test="level gt 3">
+                join df_uni_area area on area.area_id = po.area_id and area.sub_code = po.sub_code
+            </if>
+            <if test="level gt 4">
+                join df_uni_bay bay on bay.bay_id = po.bay_id and bay.sub_code = po.sub_code
+            </if>
+            <if test="level gt 5">
+                join df_uni_device device on device.device_id = po.device_id and device.sub_code = po.sub_code
+            </if>
+            <if test="level gt 6">
+                join df_uni_component com on com.component_id = po.component_id and com.sub_code = po.sub_code
+            </if>
+            <where>
+                <if test="subCode != null and subCode != ''">
+                    and po.sub_code = #{subCode,jdbcType=VARCHAR}
+                </if>
+                <if test="taskType != null">
+                    and po.task_type = #{taskType,jdbcType=INTEGER}
+                </if>
+                <if test="taskSubTypeList != null and taskSubTypeList.size() != 0">
+                    and
+                    <foreach collection="taskSubTypeList" item="item" index="index" open="(" separator="or" close=")">
+                        find_in_set(#{item}, po.task_sub_type)
+                    </foreach>
+                </if>
+            </where>
+            order by
+            <if test="level gt 3">
+                convert(area.area_name using gbk) collate gbk_chinese_ci
+            </if>
+            <if test="level gt 4">
+                ,convert(bay.bay_name using gbk) collate gbk_chinese_ci
+            </if>
+            <if test="level gt 5">
+                , convert(device.device_name using gbk) collate gbk_chinese_ci
+            </if>
+            <if test="level gt 6">
+                ,convert(com.component_name using gbk) collate gbk_chinese_ci
+            </if>
+            <if test="level gt 7">
+                , convert(po.point_name using gbk) collate gbk_chinese_ci
+            </if>
+        </if>
+    </select>
+
+    <update id="updatePointRobotPos">
+        update df_uni_point set
+        video_pos = #{videoPos,jdbcType=VARCHAR},
+        robot_pos = #{devicePos,jdbcType=VARCHAR},
+        robot_code = #{robotCode,jdbcType=VARCHAR}
+        where sub_code = #{subCode} and point_code = #{pointCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="updatePointUavPos">
+        update df_uni_point set
+         wayline_pos = #{waylinePos},
+         wayline_point_pos = #{waylinePointPos}
+        where sub_code = #{subCode} and point_code = #{pointCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="clearRobotPos">
+        update df_uni_point set video_pos = null,robot_pos = null,robot_code = null
+        where robot_pos = #{devicePos,jdbcType=VARCHAR} and robot_code = #{robotCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="clearUavPos">
+        update df_uni_point set wayline_pos = null,wayline_point_pos = null
+        where wayline_pos = #{waylinePos} and wayline_point_pos = #{waylinePointPos}
+    </update>
+
+    <select id="listPlanPoint" resultType="com.df.server.entity.uni.UniTaskPlanItemPointEntity">
+        select
+        sub_code,
+        point_code,
+        point_type as data_type,
+        if(locate(',',save_type_list)>0,left(save_type_list,locate(',',save_type_list)-1),save_type_list) as file_type,
+        robot_code,
+        robot_pos
+        from df_uni_point
+        <where>
+            <!--1间隔 2主设备 3设备点位 4设备部件-->
+            <if test="deviceLevel == 1">
+                and bay_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 2">
+                and device_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 3">
+                and point_code in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 4">
+                and component_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <select id="listPlanPoint2" resultType="com.df.server.dto.JobPlan.JobPlanItemPointDTO">
+        select
+        sub_code,
+        point_code,
+        point_type as data_type,
+        wayline_pos,
+        wayline_point_pos
+        from df_uni_point
+        <where>
+            <!--1间隔 2主设备 3设备点位 4设备部件-->
+            <if test="deviceLevel == 1">
+                and bay_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 2">
+                and device_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 3">
+                and point_code in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+            <if test="deviceLevel == 4">
+                and component_id in
+                <foreach collection="deviceList" open="(" close=")" separator="," item="item">
+                    #{item}
+                </foreach>
+            </if>
+        </where>
+    </select>
+
+    <select id="choseWaylinePos" resultType="com.df.server.dto.JobPlan.JobPlanItemPointDTO">
+        select DISTINCT wayline_pos from df_uni_point
+    </select>
+</mapper>

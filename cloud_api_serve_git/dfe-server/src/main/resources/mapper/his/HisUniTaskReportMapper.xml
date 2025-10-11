@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.his.HisUniTaskReportMapper">
+
+    <insert id="insert" keyColumn="id" keyProperty="id"  useGeneratedKeys="true">
+        <!--@mbg.generated-->
+        insert into cloud_sample.df_his_uni_task_report
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="name != null">
+                name,
+            </if>
+            <if test="taskPatrolledId != null">
+                task_patrolled_id,
+            </if>
+            <if test="confirmUser != null">
+                confirm_user,
+            </if>
+            <if test="confirmTime != null">
+                confirm_time,
+            </if>
+            <if test="pdfFile != null">
+                pdf_file,
+            </if>
+            <if test="wordFile != null">
+                word_file,
+            </if>
+            <if test="isConfirm != null">
+                is_confirm,
+            </if>
+            <if test="env != null">
+                env,
+            </if>
+            <if test="reportStatus != null">
+                report_status,
+            </if>
+            <if test="reportStartTime != null">
+                report_start_time,
+            </if>
+            <if test="reportEndTime != null">
+                report_end_time,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="name != null">
+                #{name,jdbcType=VARCHAR},
+            </if>
+            <if test="taskPatrolledId != null">
+                #{taskPatrolledId,jdbcType=VARCHAR},
+            </if>
+            <if test="confirmUser != null">
+                #{confirmUser,jdbcType=VARCHAR},
+            </if>
+            <if test="confirmTime != null">
+                #{confirmTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="pdfFile != null">
+                #{pdfFile,jdbcType=VARCHAR},
+            </if>
+            <if test="wordFile != null">
+                #{wordFile,jdbcType=VARCHAR},
+            </if>
+            <if test="isConfirm != null">
+                #{isConfirm,jdbcType=INTEGER},
+            </if>
+            <if test="env != null">
+                #{env,jdbcType=VARCHAR},
+            </if>
+            <if test="reportStatus != null">
+                #{reportStatus,jdbcType=INTEGER},
+            </if>
+            <if test="reportStartTime != null">
+                #{reportStartTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="reportEndTime != null">
+                #{reportEndTime,jdbcType=TIMESTAMP},
+            </if>
+        </trim>
+    </insert>
+
+    <select id="getById" resultType="com.df.server.entity.his.HisUniTaskReportEntity">
+        select * from  cloud_sample.df_his_uni_task_report
+        where id = #{reportId,jdbcType=INTEGER}
+    </select>
+
+    <update id="updateFile">
+        update cloud_sample.df_his_uni_task_report set word_file = #{wordFile,jdbcType=VARCHAR},report_status = 3,report_end_time = now()
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <delete id="deleteByTaskPatrolledId">
+        delete from cloud_sample.df_his_uni_task_report
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </delete>
+
+    <select id="getByTaskId" resultType="com.df.server.entity.his.HisUniTaskReportEntity">
+        select * from  cloud_sample.df_his_uni_task_report
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </select>
+
+    <delete id="deleteById">
+        delete from cloud_sample.df_his_uni_task_report
+        where id = #{reportId,jdbcType=INTEGER}
+    </delete>
+</mapper>

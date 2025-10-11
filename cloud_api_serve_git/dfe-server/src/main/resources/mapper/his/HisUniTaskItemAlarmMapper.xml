@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.his.HisUniTaskItemAlarmMapper">
+    <select id="getPageList"  resultType="com.df.server.vo.HisUniTaskItemAlarm.HisUniTaskItemAlarmVO">
+        select a.*,b.point_name,c.robot_name as patroldeviceName ,d1.dict_label as alarmTypeName ,
+        d2.dict_label as recognitionTypeName,
+        f.file_path as filePathUrl,
+        f.recg_file_path as recgFilePathUrl
+        from
+        cloud_sample.df_his_uni_task_item_alarm a
+        join (
+            select k.id from cloud_sample.df_his_uni_task_item_alarm k
+            <where>
+                <if test="taskPatrolledId != null and taskPatrolledId != ''">
+                    and k.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+                </if>
+                <if test="alarmLevel != null">
+                    and k.alarm_level = #{alarmLevel,jdbcType=INTEGER}
+                </if>
+                <if test="alarmType != null">
+                    and k.alarm_type = #{alarmType,jdbcType=INTEGER}
+                </if>
+                <if test="isConfirm != null">
+                    and k.is_confirm = #{isConfirm,jdbcType=INTEGER}
+                </if>
+                <if test="confirmResult != null">
+                    and k.confirm_result = #{confirmResult,jdbcType=INTEGER}
+                </if>
+                <if test="alarmTimeStart != null and alarmTimeEnd != null">
+                    and k.alarm_time between #{alarmTimeStart,jdbcType=TIMESTAMP} and  #{alarmTimeEnd,jdbcType=TIMESTAMP}
+                </if>
+            </where>
+            order by id desc
+            limit #{start},#{size}
+        ) m on a.id = m.id
+        left join df_uni_point b on a.point_code = b.point_code
+        left join df_uni_robot c on a.patroldevice_code = c.robot_code
+        left join sys_dict_data d1 on a.alarm_type = d1.dict_value and d1.dict_type = 'alarm_type'
+        left join sys_dict_data d2 on a.recognition_type = d2.dict_value and d2.dict_type = 'recognition_type'
+        left join cloud_sample.df_his_uni_task_item_file f on a.request_id = f.request_id
+        order by a.id desc
+        <!-- 此处编写自定义SQL -->
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(1) from cloud_sample.df_his_uni_task_item_alarm k
+        <where>
+            <if test="taskPatrolledId != null and taskPatrolledId != ''">
+                and k.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+            </if>
+            <if test="alarmLevel != null">
+                and k.alarm_level = #{alarmLevel,jdbcType=INTEGER}
+            </if>
+            <if test="alarmType != null">
+                and k.alarm_type = #{alarmType,jdbcType=INTEGER}
+            </if>
+            <if test="isConfirm != null">
+                and k.is_confirm = #{isConfirm,jdbcType=INTEGER}
+            </if>
+            <if test="confirmResult != null">
+                and k.confirm_result = #{confirmResult,jdbcType=INTEGER}
+            </if>
+            <if test="alarmTimeStart != null and alarmTimeEnd != null">
+                and k.alarm_time between #{alarmTimeStart,jdbcType=TIMESTAMP} and  #{alarmTimeEnd,jdbcType=TIMESTAMP}
+            </if>
+        </where>
+        <!-- 此处编写自定义SQL,查询总数 -->
+    </select>
+
+    <insert id="insertDfHisUniTaskItemAlarm" keyColumn="id" keyProperty="id" useGeneratedKeys="true">
+        <!--@mbg.generated-->
+        insert into cloud_sample.df_his_uni_task_item_alarm
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="requestId != null">
+                request_id,
+            </if>
+            <if test="taskPatrolledId != null">
+                task_patrolled_id,
+            </if>
+            <if test="pointCode != null">
+                point_code,
+            </if>
+            <if test="taskCode != null">
+                task_code,
+            </if>
+            <if test="planNo != null">
+                plan_no,
+            </if>
+            <if test="subCode != null">
+                sub_code,
+            </if>
+            <if test="patroldeviceCode != null">
+                patroldevice_code,
+            </if>
+            <if test="alarmTime != null">
+                alarm_time,
+            </if>
+            <if test="alarmLevel != null">
+                alarm_level,
+            </if>
+            <if test="alarmType != null">
+                alarm_type,
+            </if>
+            <if test="recognitionType != null">
+                recognition_type,
+            </if>
+            <if test="value != null">
+                `value`,
+            </if>
+            <if test="valueUnit != null">
+                value_unit,
+            </if>
+            <if test="unit != null">
+                unit,
+            </if>
+            <if test="alarmContent != null">
+                alarm_content,
+            </if>
+            <if test="isConfirm != null">
+                is_confirm,
+            </if>
+            <if test="confirmResult != null">
+                confirm_result,
+            </if>
+            <if test="confirmUser != null">
+                confirm_user,
+            </if>
+            <if test="confirmComment != null">
+                confirm_comment,
+            </if>
+            <if test="isDefect != null">
+                is_defect,
+            </if>
+            <if test="alarmFrequency != null">
+                alarm_frequency,
+            </if>
+            <if test="confirmTime != null">
+                confirm_time,
+            </if>
+            <if test="objId != null">
+                obj_id,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="requestId != null">
+                #{requestId,jdbcType=VARCHAR},
+            </if>
+            <if test="taskPatrolledId != null">
+                #{taskPatrolledId,jdbcType=VARCHAR},
+            </if>
+            <if test="pointCode != null">
+                #{pointCode,jdbcType=VARCHAR},
+            </if>
+            <if test="taskCode != null">
+                #{taskCode,jdbcType=VARCHAR},
+            </if>
+            <if test="planNo != null">
+                #{planNo,jdbcType=VARCHAR},
+            </if>
+            <if test="subCode != null">
+                #{subCode,jdbcType=VARCHAR},
+            </if>
+            <if test="patroldeviceCode != null">
+                #{patroldeviceCode,jdbcType=VARCHAR},
+            </if>
+            <if test="alarmTime != null">
+                #{alarmTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="alarmLevel != null">
+                #{alarmLevel,jdbcType=INTEGER},
+            </if>
+            <if test="alarmType != null">
+                #{alarmType,jdbcType=INTEGER},
+            </if>
+            <if test="recognitionType != null">
+                #{recognitionType,jdbcType=INTEGER},
+            </if>
+            <if test="value != null">
+                #{value,jdbcType=VARCHAR},
+            </if>
+            <if test="valueUnit != null">
+                #{valueUnit,jdbcType=VARCHAR},
+            </if>
+            <if test="unit != null">
+                #{unit,jdbcType=VARCHAR},
+            </if>
+            <if test="alarmContent != null">
+                #{alarmContent,jdbcType=VARCHAR},
+            </if>
+            <if test="isConfirm != null">
+                #{isConfirm,jdbcType=INTEGER},
+            </if>
+            <if test="confirmResult != null">
+                #{confirmResult,jdbcType=INTEGER},
+            </if>
+            <if test="confirmUser != null">
+                #{confirmUser,jdbcType=VARCHAR},
+            </if>
+            <if test="confirmComment != null">
+                #{confirmComment,jdbcType=VARCHAR},
+            </if>
+            <if test="isDefect != null">
+                #{isDefect,jdbcType=INTEGER},
+            </if>
+            <if test="alarmFrequency != null">
+                #{alarmFrequency,jdbcType=INTEGER},
+            </if>
+            <if test="confirmTime != null">
+                #{confirmTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="objId != null">
+                #{objId,jdbcType=VARCHAR},
+            </if>
+        </trim>
+    </insert>
+
+    <update id="confirmAll">
+        update cloud_sample.df_his_uni_task_item_alarm
+        set confirm_time = now(),is_confirm = 1
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <update id="confirmAlarm">
+        update cloud_sample.df_his_uni_task_item_alarm
+        set confirm_time = now(),is_confirm = 1,confirm_result = #{confirmResult,jdbcType=INTEGER}
+        <if test="alarmConfirmComment != null and alarmConfirmComment != ''">
+            ,confirm_comment = #{alarmConfirmComment,jdbcType=VARCHAR}
+        </if>
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR} and point_code =#{pointCode,jdbcType=VARCHAR}
+    </update>
+</mapper>

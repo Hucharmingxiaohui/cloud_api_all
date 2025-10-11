@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.df.server.mapper.his.HisUniTaskMapper">
+
+    <insert id="insertHisUniTask" keyColumn="id" keyProperty="id" useGeneratedKeys="true">
+        <!--@mbg.generated-->
+        insert into cloud_sample.df_his_uni_task
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="subCode != null">
+                sub_code,
+            </if>
+            <if test="taskCode != null">
+                task_code,
+            </if>
+            <if test="taskName != null">
+                task_name,
+            </if>
+            <if test="taskPatrolledId != null">
+                task_patrolled_id,
+            </if>
+            <if test="planNo != null">
+                plan_no,
+            </if>
+            <if test="planType != null">
+                plan_type,
+            </if>
+            <if test="taskType != null">
+                task_type,
+            </if>
+            <if test="taskSubType != null">
+                task_sub_type,
+            </if>
+            <if test="planStartTime != null">
+                plan_start_time,
+            </if>
+            <if test="startTime != null">
+                start_time,
+            </if>
+            <if test="endTime != null">
+                end_time,
+            </if>
+            <if test="runState != null">
+                run_state,
+            </if>
+            <if test="taskProgress != null">
+                task_progress,
+            </if>
+            <if test="taskEstimatedTime != null">
+                task_estimated_time,
+            </if>
+            <if test="description != null">
+                description,
+            </if>
+            <if test="allPointCnt != null">
+                all_point_cnt,
+            </if>
+            <if test="failPointCnt != null">
+                fail_point_cnt,
+            </if>
+            <if test="normalPointCnt != null">
+                normal_point_cnt,
+            </if>
+            <if test="exceptionPointCnt != null">
+                exception_point_cnt,
+            </if>
+            <if test="warnPointCnt != null">
+                warn_point_cnt,
+            </if>
+            <if test="repairCnt != null">
+                repair_cnt,
+            </if>
+            <if test="isConfirm != null">
+                is_confirm,
+            </if>
+            <if test="confirmUsrNo != null">
+                confirm_usr_no,
+            </if>
+            <if test="confirmDate != null">
+                confirm_date,
+            </if>
+            <if test="reportOk != null">
+                report_ok,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="subCode != null">
+                #{subCode,jdbcType=VARCHAR},
+            </if>
+            <if test="taskCode != null">
+                #{taskCode,jdbcType=VARCHAR},
+            </if>
+            <if test="taskName != null">
+                #{taskName,jdbcType=VARCHAR},
+            </if>
+            <if test="taskPatrolledId != null">
+                #{taskPatrolledId,jdbcType=VARCHAR},
+            </if>
+            <if test="planNo != null">
+                #{planNo,jdbcType=VARCHAR},
+            </if>
+            <if test="planType != null">
+                #{planType,jdbcType=VARCHAR},
+            </if>
+            <if test="taskType != null">
+                #{taskType,jdbcType=INTEGER},
+            </if>
+            <if test="taskSubType != null">
+                #{taskSubType,jdbcType=VARCHAR},
+            </if>
+            <if test="planStartTime != null">
+                #{planStartTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="startTime != null">
+                #{startTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="endTime != null">
+                #{endTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="runState != null">
+                #{runState,jdbcType=INTEGER},
+            </if>
+            <if test="taskProgress != null">
+                #{taskProgress,jdbcType=VARCHAR},
+            </if>
+            <if test="taskEstimatedTime != null">
+                #{taskEstimatedTime,jdbcType=VARCHAR},
+            </if>
+            <if test="description != null">
+                #{description,jdbcType=VARCHAR},
+            </if>
+            <if test="allPointCnt != null">
+                #{allPointCnt,jdbcType=INTEGER},
+            </if>
+            <if test="failPointCnt != null">
+                #{failPointCnt,jdbcType=INTEGER},
+            </if>
+            <if test="normalPointCnt != null">
+                #{normalPointCnt,jdbcType=INTEGER},
+            </if>
+            <if test="exceptionPointCnt != null">
+                #{exceptionPointCnt,jdbcType=INTEGER},
+            </if>
+            <if test="warnPointCnt != null">
+                #{warnPointCnt,jdbcType=INTEGER},
+            </if>
+            <if test="repairCnt != null">
+                #{repairCnt,jdbcType=INTEGER},
+            </if>
+            <if test="isConfirm != null">
+                #{isConfirm,jdbcType=INTEGER},
+            </if>
+            <if test="confirmUsrNo != null">
+                #{confirmUsrNo,jdbcType=INTEGER},
+            </if>
+            <if test="confirmDate != null">
+                #{confirmDate,jdbcType=TIMESTAMP},
+            </if>
+            <if test="reportOk != null">
+                #{reportOk,jdbcType=INTEGER},
+            </if>
+        </trim>
+    </insert>
+
+    <select id="scanWaitExecuteTask" resultType="com.df.server.entity.his.HisUniTaskEntity">
+        select *
+        from cloud_sample.df_his_uni_task
+        where run_state = 5<!--任务状态: 1已执行 2 正在执行 3暂停  4 终止 5未执行 6超期-->
+        order by id desc
+        limit 1
+    </select>
+
+    <update id="startTask">
+        update cloud_sample.df_his_uni_task
+        set run_state  = 2,
+            start_time = NOW()
+        where task_patrolled_id = #{waiteTaskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getRunningTask" resultType="com.df.server.vo.his.HisUniTaskVO">
+        select a.* ,b.sub_name,d1.dict_label as taskTypeName
+        from cloud_sample.df_his_uni_task a
+        left join df_pub_substation b on a.sub_code = b.sub_code
+        left join sys_dict_data d1 on d1.dict_value = a.task_type and d1.dict_type = 'task_type'
+        where a.run_state in (2,3)
+        order by a.id desc
+        limit 1
+    </select>
+
+    <select id="getByTaskPatrolledId" resultType="com.df.server.entity.his.HisUniTaskEntity">
+        select *
+        from cloud_sample.df_his_uni_task
+        where task_patrolled_id = #{waiteTaskPatrolledId,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateProgressAndPointNum">
+        update cloud_sample.df_his_uni_task
+        set warn_point_cnt      = #{warnNum,jdbcType=INTEGER},
+            fail_point_cnt      = #{failNum,jdbcType=INTEGER},
+            normal_point_cnt    = #{normalNum,jdbcType=INTEGER},
+            exception_point_cnt = #{exceptionNum,jdbcType=INTEGER},
+            task_progress       = #{vTaskProgress,jdbcType=VARCHAR}
+        <if test="runstate != null">
+            ,run_state = #{runstate,jdbcType=INTEGER}
+        </if>
+        <if test="runstate != null and runstate == 1">
+            ,end_time = now()
+        </if>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <update id="pauseTask">
+        update cloud_sample.df_his_uni_task
+        set run_state = 3
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <update id="recoverTask">
+        update cloud_sample.df_his_uni_task
+        set run_state = 2
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <update id="stopTask">
+        update cloud_sample.df_his_uni_task
+        set run_state = 4, end_time = now()
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getPageList" resultType="com.df.server.vo.his.HisUniTaskVO">
+        select a.* ,b.sub_name,d1.dict_label as taskTypeName
+        from cloud_sample.df_his_uni_task a
+        left join df_pub_substation b on a.sub_code = b.sub_code
+        left join sys_dict_data d1 on d1.dict_value = a.task_type and d1.dict_type = 'task_type'
+        <where>
+            <if test="planNo != null and planNo != ''">
+                and a.task_code = #{planNo,jdbcType=VARCHAR}
+            </if>
+            <if test="taskName != null and taskName != ''">
+                and a.task_name like concat('%',#{taskName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="taskType != null">
+                and a.task_type = #{taskType,jdbcType=INTEGER}
+            </if>
+            <if test="runState != null">
+                and a.run_state = #{runState,jdbcType=INTEGER}
+            </if>
+            <if test="startTime != null and endTime != null">
+                and a.start_time between #{startTime,jdbcType=TIMESTAMP} and #{endTime,jdbcType=TIMESTAMP}
+            </if>
+        </where>
+        order by a.id desc
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(*)
+        from cloud_sample.df_his_uni_task a
+        <where>
+            <if test="planNo != null and planNo != ''">
+                and a.task_code = #{planNo,jdbcType=VARCHAR}
+            </if>
+            <if test="taskName != null and taskName != ''">
+                and a.task_name like concat('%',#{taskName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="taskType != null">
+                and a.task_type = #{taskType,jdbcType=INTEGER}
+            </if>
+            <if test="runState != null">
+                and a.run_state = #{runState,jdbcType=INTEGER}
+            </if>
+            <if test="startTime != null and endTime != null">
+                and a.start_time between #{startTime,jdbcType=TIMESTAMP} and #{endTime,jdbcType=TIMESTAMP}
+            </if>
+        </where>
+    </select>
+
+    <select id="getInfo" resultType="com.df.server.vo.his.HisUniTaskVO">
+        select
+            a.* ,
+            b.sub_name,
+            d1.dict_label as taskTypeName
+        from cloud_sample.df_his_uni_task a
+        left join df_pub_substation b on a.sub_code = b.sub_code
+        left join sys_dict_data d1 on d1.dict_value = a.task_type and d1.dict_type = 'task_type'
+        where a.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </select>
+
+    <update id="confirmTask">
+        update cloud_sample.df_his_uni_task
+        set confirm_date = now(),is_confirm = 1
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getLastTask" resultType="com.df.server.vo.his.HisUniTaskVO">
+        select a.* ,b.sub_name,d1.dict_label as taskTypeName
+        from cloud_sample.df_his_uni_task a
+                 left join df_pub_substation b on a.sub_code = b.sub_code
+                 left join sys_dict_data d1 on d1.dict_value = a.task_type and d1.dict_type = 'task_type'
+        order by a.id desc
+        limit 1
+    </select>
+</mapper>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniPatrolSystemMapper">
+    <select id="getPageList"
+            resultType="com.df.server.vo.UniPatrolSystem.UniPatrolSystemVO">
+        select
+            dups.*,
+            dus.sub_name
+        from df_uni_patrol_system dups
+                 left join df_pub_substation dus on dups.sub_code = dus.sub_code
+        <where>
+            <if test="sysName != null and sysName != ''">
+                and dups.sys_name like concat('%', #{sysName,jdbcType=VARCHAR}, '%')
+            </if>
+            <if test="sysType != null and sysType != ''">
+                and dups.sys_type =#{sysType,jdbcType=VARCHAR}
+            </if>
+        </where>
+        order by dups.id
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(1) from df_uni_patrol_system dups
+        <where>
+            <if test="sysName != null and sysName != ''">
+                and dups.sys_name like concat('%', #{sysName,jdbcType=VARCHAR}, '%')
+            </if>
+            <if test="sysType != null and sysType != ''">
+                and dups.sys_type =#{sysType,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <select id="listLowerSystem" resultType="com.df.server.vo.UniPatrolSystem.UniPatrolSystemVO">
+        select
+            *
+        from
+            df_uni_patrol_system
+        where
+            sys_type in ('edge','robot','uav')
+            <if test="subCode != null and subCode != ''">
+                and sub_code = #{subCode,jdbcType=VARCHAR}
+            </if>
+    </select>
+
+    <select id="getVideoSysCode" resultType="java.lang.String">
+        select
+            sys_code
+        from
+            df_uni_patrol_system
+        where sys_type = 'robot'
+    </select>
+
+    <select id="listPatrolSysBySysCode" resultType="com.df.server.vo.UniPatrolSystem.UniPatrolSystemVO">
+        select
+            *
+        from
+        df_uni_patrol_system
+        where
+        sys_code =#{sysCode,jdbcType=VARCHAR}
+    </select>
+
+    <select id="listPointSystem" resultType="com.df.server.vo.UniPatrolSystem.UniPatrolSystemVO">
+        select *
+        from df_uni_patrol_system
+        where sys_type in ('edge', 'robot', 'uav', 'video')
+        <if test="subCode != null and subCode != ''">
+            and sub_code = #{subCode,jdbcType=VARCHAR}
+        </if>
+    </select>
+</mapper>

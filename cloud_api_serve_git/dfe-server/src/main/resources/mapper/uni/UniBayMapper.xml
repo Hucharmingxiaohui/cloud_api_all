@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniBayMapper">
+
+    <select id="getByName" resultType="com.df.server.entity.uni.UniBayEntity">
+        select * from
+            df_uni_bay
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        and area_id = #{areaId,jdbcType=VARCHAR}
+        and bay_name =#{bayName,jdbcType=VARCHAR}
+    </select>
+
+    <select id="listByAreaId" resultType="com.df.server.vo.UniBay.UniBayVO">
+        select * from
+        df_uni_bay
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        and area_id = #{areaId,jdbcType=VARCHAR}
+        order by
+        convert(bay_name using gbk) collate gbk_chinese_ci
+    </select>
+</mapper>

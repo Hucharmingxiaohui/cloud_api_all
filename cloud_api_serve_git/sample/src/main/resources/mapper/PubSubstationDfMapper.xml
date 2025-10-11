@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper">
+    <select id="getSubstationsByParam" resultType="com.dji.sample.df.electricInspectionDf.model.PubSubstationDfEntity" parameterType="map">
+        SELECT * FROM pub_substation_df
+        <where>
+            <if test="subName!=null and subName!=''">
+                and sub_name LIKE concat('%', #{subName},'%')
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+
+    <select id="getSubstationsByParamCount" resultType="int">
+        SELECT COUNT(*) FROM pub_substation_df
+        <where>
+            <if test="subName!=null and subName!=''">
+                and sub_name LIKE concat('%', #{subName},'%')
+            </if>
+        </where>
+    </select>
+</mapper>

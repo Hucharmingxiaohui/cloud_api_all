@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniComponentMapper">
+
+    <select id="getByName" resultType="com.df.server.entity.uni.UniComponentEntity">
+        select *
+        from
+        df_uni_component
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        and device_id =#{deviceId,jdbcType=VARCHAR}
+        and component_name =#{componentName,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getByComponentId" resultType="com.df.server.entity.uni.UniComponentEntity">
+        select *
+        from
+        df_uni_component
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        and component_id =#{componentId,jdbcType=VARCHAR}
+    </select>
+
+    <select id="listByDeviceId" resultType="com.df.server.vo.UniComponent.UniComponentVO">
+        select *
+        from
+        df_uni_component
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        and device_id =#{deviceId,jdbcType=VARCHAR}
+        order by
+        convert(component_name using gbk) collate gbk_chinese_ci
+    </select>
+</mapper>

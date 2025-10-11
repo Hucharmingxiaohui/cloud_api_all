@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniTaskPlanItemPointMapper">
+    <select id="getPageList"  resultType="com.df.server.vo.UniTaskPlanItemPoint.UniTaskPlanItemPointVO">
+        select
+        a.*,
+        b.area_name,
+        b.bay_name,
+        b.device_name,
+        b.component_name,
+        b.point_name,
+        b.point_code,
+        b.recognition_type_list,
+        c.dict_label as recognition_type_name,
+        d.dict_label as file_type_name
+        from df_uni_task_plan_item_point a
+            join df_uni_point b on a.sub_code  = b.sub_code and a.point_code = b.point_code
+            left join sys_dict_data c on b.recognition_type_list = c.dict_value and c.dict_type = 'recognition_type'
+            left join sys_dict_data d on b.save_type_list = d.dict_value and d.dict_type = 'save_type'
+        <where>
+            <if test="planNo != null and planNo != ''">
+                and a.plan_no = #{planNo,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and b.point_name like concat('%',#{pointName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="saveTypeList != null and saveTypeList != ''">
+                and b.save_type_list = #{saveTypeList,jdbcType=VARCHAR}
+            </if>
+            <if test="recognitionTypeList != null and recognitionTypeList != ''">
+                and b.recognition_type_list = #{recognitionTypeList,jdbcType=VARCHAR}
+            </if>
+        </where>
+        order by convert(b.area_name using gbk) collate gbk_chinese_ci,
+        convert(b.bay_name using gbk) collate gbk_chinese_ci,
+        convert(b.device_name using gbk) collate gbk_chinese_ci,
+        convert(b.point_name using gbk) collate gbk_chinese_ci
+        <!-- 此处编写自定义SQL -->
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select
+            count(*)
+        from df_uni_task_plan_item_point a
+        join df_uni_point b on a.sub_code  = b.sub_code and a.point_code = b.point_code
+        left join sys_dict_data c on b.recognition_type_list = c.dict_value and c.dict_type = 'recognition_type'
+        left join sys_dict_data d on b.save_type_list = d.dict_value and d.dict_type = 'save_type'
+        <where>
+            <if test="planNo != null and planNo != ''">
+                and a.plan_no = #{planNo,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and b.point_name like concat('%',#{pointName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="saveTypeList != null and saveTypeList != ''">
+                and b.save_type_list = #{saveTypeList,jdbcType=VARCHAR}
+            </if>
+            <if test="recognitionTypeList != null and recognitionTypeList != ''">
+                and b.recognition_type_list = #{recognitionTypeList,jdbcType=VARCHAR}
+            </if>
+        </where>
+    </select>
+
+    <delete id="deletePlanPoints">
+        delete
+        from df_uni_task_plan_item_point
+        where plan_no = #{planNo,jdbcType=VARCHAR};
+    </delete>
+</mapper>

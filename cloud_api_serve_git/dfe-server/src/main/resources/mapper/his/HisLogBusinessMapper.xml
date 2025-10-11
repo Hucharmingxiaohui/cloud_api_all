@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.his.HisLogBusinessMapper">
+
+    <insert id="insertHisLogBusiness">
+        insert into cloud_sample.sys_his_log_business
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="hisLogBusinessEntity.subCode != null and hisLogBusinessEntity.subCode != ''">
+                sub_code,
+            </if>
+            <if test="hisLogBusinessEntity.logTitle != null and hisLogBusinessEntity.logTitle != ''">
+                log_title,
+            </if>
+            <if test="hisLogBusinessEntity.logType != null and hisLogBusinessEntity.logType != ''">
+                log_type,
+            </if>
+            <if test="hisLogBusinessEntity.logInfo != null and hisLogBusinessEntity.logInfo != ''">
+                log_info,
+            </if>
+            <if test="hisLogBusinessEntity.operUserName != null and hisLogBusinessEntity.operUserName != ''">
+                oper_user_name,
+            </if>
+            <if test="hisLogBusinessEntity.operRealName != null and hisLogBusinessEntity.operRealName != ''">
+                oper_real_name,
+            </if>
+            <if test="hisLogBusinessEntity.operIp != null and hisLogBusinessEntity.operIp != ''">
+                oper_ip,
+            </if>
+            <if test="hisLogBusinessEntity.operStatus != null and hisLogBusinessEntity.operStatus != ''">
+                oper_status,
+            </if>
+            <if test="hisLogBusinessEntity.operTime != null">
+                oper_time,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="hisLogBusinessEntity.subCode != null and hisLogBusinessEntity.subCode != ''">
+                #{hisLogBusinessEntity.subCode,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.logTitle != null and hisLogBusinessEntity.logTitle != ''">
+                #{hisLogBusinessEntity.logTitle,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.logType != null and hisLogBusinessEntity.logType != ''">
+                #{hisLogBusinessEntity.logType,jdbcType=INTEGER},
+            </if>
+            <if test="hisLogBusinessEntity.logInfo != null and hisLogBusinessEntity.logInfo != ''">
+                #{hisLogBusinessEntity.logInfo,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.operUserName != null and hisLogBusinessEntity.operUserName != ''">
+                #{hisLogBusinessEntity.operUserName,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.operRealName != null and hisLogBusinessEntity.operRealName != ''">
+                #{hisLogBusinessEntity.operRealName,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.operIp != null and hisLogBusinessEntity.operIp != ''">
+                #{hisLogBusinessEntity.operIp,jdbcType=VARCHAR},
+            </if>
+            <if test="hisLogBusinessEntity.operStatus != null and hisLogBusinessEntity.operStatus != ''">
+                #{hisLogBusinessEntity.operStatus,jdbcType=INTEGER},
+            </if>
+            <if test="hisLogBusinessEntity.operTime != null">
+                #{hisLogBusinessEntity.operTime,jdbcType=TIMESTAMP},
+            </if>
+        </trim>
+    </insert>
+
+</mapper>

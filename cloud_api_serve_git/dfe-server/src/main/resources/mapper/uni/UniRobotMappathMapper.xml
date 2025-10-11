@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniRobotMappathMapper">
+
+    <select id="listMapCoordinatePixel" resultType="com.df.server.vo.UniRobotMappath.UniRobotMappathVO">
+        select * from df_uni_robot_mappath
+        where robot_code = #{robotCode,jdbcType=VARCHAR} order by node_no asc
+    </select>
+
+    <delete id="clearMap">
+        delete from df_uni_robot_mappath
+        where robot_code = #{robotCode,jdbcType=VARCHAR}
+    </delete>
+</mapper>

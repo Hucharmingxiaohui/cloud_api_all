@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.df.server.mapper.his.HisUniTaskItemPointsMapper">
+
+    <select id="listPointsToHisTask" resultType="com.df.server.vo.UniPoint.UniPointVO">
+        select
+        b.point_code,
+        b.point_name,
+        b.point_type,
+        b.recognition_type_list,
+        b.save_type_list,
+        b.robot_pos,
+        b.robot_code,
+        r.robot_name
+        from df_uni_task_plan_item_point a
+        join df_uni_point b on a.sub_code = b.sub_code and a.point_code = b.point_code
+        left join df_uni_robot r on b.robot_code = r.robot_code
+        where plan_no =  #{planNo,jdbcType=VARCHAR}
+    </select>
+
+    <select id="listTaskPatroldeviceCode" resultType="java.lang.String">
+        select patroldevice_code from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{waiteTaskPatrolledId,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getHisPointByRobotResult" resultType="com.df.server.entity.his.HisUniTaskItemPointsEntity">
+        select * from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+        and preset_no = #{robotPos,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getHisPointByUavResult" resultType="com.df.server.entity.his.HisUniTaskItemPointsEntity">
+        select * from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{jobId,jdbcType=VARCHAR}
+        and preset_no = #{pointPos,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateRunTime">
+        update cloud_sample.df_his_uni_task_item_points set capture_time  = now(),run_time=now()
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+        and preset_no = #{robotPos,jdbcType=VARCHAR}
+    </update>
+
+    <update id="finishResult">
+        update cloud_sample.df_his_uni_task_item_points
+        set
+            is_finished = #{isFinished,jdbcType=INTEGER},
+            finished_time = #{finishedTime,jdbcType=TIMESTAMP},
+            valid = #{valid,jdbcType=INTEGER},
+            point_val = #{pointVal,jdbcType=VARCHAR},
+            point_unit = #{pointValUnit,jdbcType=VARCHAR},
+            point_val_unit = #{pointValUnit,jdbcType=VARCHAR},
+            is_alarm = #{isAlarm}
+        where request_id = #{requestId,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getByRequestId" resultType="com.df.server.entity.his.HisUniTaskItemPointsEntity">
+        select * from  cloud_sample.df_his_uni_task_item_points
+        where request_id = #{requestId,jdbcType=VARCHAR}
+    </select>
+
+    <select id="getStatisticsPointAlarmNum" resultType="java.lang.Integer">
+        select count(*) from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR} and is_alarm = 1
+    </select>
+
+    <select id="getStatisticsPointNum" resultType="java.lang.Integer">
+        select count(*) from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR} and valid = #{valid}
+    </select>
+
+    <select id="countFinishNum" resultType="java.lang.Integer">
+        select count(*) from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR} and is_finished = 1
+    </select>
+
+    <select id="getPageList" resultType="com.df.server.vo.his.HisUniTaskItemPointsVO">
+        select b.area_id,
+               b.area_name,
+               b.bay_id,
+               b.bay_name,
+               b.device_id,
+               b.device_name,
+               b.component_id,
+               b.component_name,
+               b.point_code,
+               b.point_name,
+               a.point_val,
+               a.point_val_unit,
+               a.valid,
+               a.is_alarm,
+               a.set_val,
+               a.confirm_result,
+               a.patroldevice_name,
+               a.manual_hand,
+               a.confirm_time,
+               a.run_time,
+               a.is_finished,
+               t4.dict_label as conclusion,
+               f.file_path,
+               f.recg_file_path
+        from cloud_sample.df_his_uni_task_item_points a
+                 join df_uni_point b on a.point_code = b.point_code
+        left join cloud_sample.df_his_uni_task_item_file f on a.request_id = f.request_id
+        left join cloud_sample.df_his_uni_task_item_alarm c on a.task_patrolled_id = c.task_patrolled_id and a.point_code = c.point_code
+        left join sys_dict_data t4 on t4.dict_value = c.alarm_type and t4.dict_type='alarm_type'
+        <where>
+            <if test="taskPatrolledId != null and taskPatrolledId != ''">
+                and a.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+            </if>
+            <if test="areaId != null and areaId != ''">
+                and b.area_id = #{areaId,jdbcType=VARCHAR}
+            </if>
+            <if test="bayId != null and bayId != ''">
+                and b.bay_id = #{bayId,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceId != null and deviceId != ''">
+                and b.device_id = #{deviceId,jdbcType=VARCHAR}
+            </if>
+            <if test="componentId != null and componentId != ''">
+                and b.component_id = #{componentId,jdbcType=VARCHAR}
+            </if>
+            <if test="pointCode != null and pointCode != ''">
+                and a.point_code = #{pointCode,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and b.point_name like concat('%',#{pointName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="valid != null">
+                and a.valid = #{valid,jdbcType=INTEGER}
+            </if>
+            <if test="isAlarm != null">
+                and a.is_alarm = #{isAlarm,jdbcType=INTEGER}
+            </if>
+            <if test="isFinished != null">
+                and a.is_finished = #{isFinished,jdbcType=INTEGER}
+            </if>
+            <if test="isFinishedCapture != null and isFinishedCapture == 1">
+                and a.capture_time is not null
+            </if>
+        </where>
+        order by a.preset_no desc
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(*)
+        from cloud_sample.df_his_uni_task_item_points a
+        join df_uni_point b on a.point_code = b.point_code
+        <where>
+            <if test="taskPatrolledId != null and taskPatrolledId != ''">
+                and a.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+            </if>
+            <if test="areaId != null and areaId != ''">
+                and b.area_id = #{areaId,jdbcType=VARCHAR}
+            </if>
+            <if test="bayId != null and bayId != ''">
+                and b.bay_id = #{bayId,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceId != null and deviceId != ''">
+                and b.device_id = #{deviceId,jdbcType=VARCHAR}
+            </if>
+            <if test="componentId != null and componentId != ''">
+                and b.component_id = #{componentId,jdbcType=VARCHAR}
+            </if>
+            <if test="pointCode != null and pointCode != ''">
+                and a.point_code = #{pointCode,jdbcType=VARCHAR}
+            </if>
+            <if test="pointName != null and pointName != ''">
+                and b.point_name like concat('%',#{pointName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="valid != null">
+                and a.valid = #{valid,jdbcType=INTEGER}
+            </if>
+            <if test="isAlarm != null">
+                and a.is_alarm = #{isAlarm,jdbcType=INTEGER}
+            </if>
+            <if test="isFinished != null">
+                and a.is_finished = #{isFinished,jdbcType=INTEGER}
+            </if>
+            <if test="isFinishedCapture != null and isFinishedCapture == 1">
+                and a.capture_time is not null
+            </if>
+        </where>
+    </select>
+
+    <select id="getHisPointDetail" resultType="com.df.server.vo.his.HisUniTaskItemPointsVO">
+        select b.area_id,
+               b.area_name,
+               b.bay_id,
+               b.bay_name,
+               b.device_id,
+               b.device_name,
+               b.component_id,
+               b.component_name,
+               b.point_code,
+               b.point_name,
+               a.recognition_type,
+               a.point_val,
+               a.point_val_unit,
+               a.valid,
+               a.is_alarm,
+               a.set_val,
+               a.confirm_result,
+               a.patroldevice_name,
+               a.manual_hand,
+               a.set_val,
+               a.confirm_time,
+               d.file_path,
+               d.recg_file_path,
+               s.sub_name,
+               t4.dict_label as conclusion,
+               t5.dict_label as recognition_type_name
+        from cloud_sample.df_his_uni_task_item_points a
+        left join df_uni_point b on a.point_code = b.point_code
+        left join cloud_sample.df_his_uni_task_item_alarm c on a.request_id = c.request_id
+        left join cloud_sample.df_his_uni_task_item_file d on a.request_id = d.request_id
+        left join df_pub_substation s on a.sub_code = s.sub_code
+        left join sys_dict_data t4 on t4.dict_value = c.alarm_type and t4.dict_type = 'alarm_type'
+        left join sys_dict_data t5 on t5.dict_value = a.recognition_type and t5.dict_type = 'recognition_type'
+        where a.task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+          and a.point_code = #{pointCode,jdbcType=VARCHAR}
+    </select>
+
+    <update id="abnormalHandle">
+        update cloud_sample.df_his_uni_task_item_points
+        set confirm_time = now()
+        <if test="pointValueUnit != null and pointValueUnit != ''">
+            ,point_val_unit =#{pointValueUnit,jdbcType=VARCHAR}
+        </if>
+        <if test="setVal != null and setVal != ''">
+            ,set_val = #{setVal,jdbcType=VARCHAR}
+        </if>
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+        and point_code =#{pointCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="confirm">
+        update cloud_sample.df_his_uni_task_item_points
+        set confirm_time = now()
+        where task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+        <if test="pointCode != null and pointCode != ''">
+            and point_code = #{pointCode}
+        </if>
+    </update>
+
+    <select id="getUnConfirmNum" resultType="int">
+       select count(*) from
+           cloud_sample.df_his_uni_task_item_points
+        where confirm_time is null and task_patrolled_id = #{taskPatrolledId,jdbcType=VARCHAR}
+    </select>
+
+    <select id="selectPointAndFile" resultType="com.df.server.dto.HisUniTaskItemPoints.HisUniTaskItemFileReport">
+        select dhutip.*, dhutif.*
+        , dup.bay_name
+        , dup.device_name , dup.component_name
+        , dup.point_code , dup.point_name, dup.area_name, dup.level
+        from cloud_sample.df_his_uni_task_item_points dhutip
+        <!-- 不能时inner join结果文件表：实际业务中可能不存在 -->
+        left join cloud_sample.df_his_uni_task_item_file dhutif on dhutif.request_id = dhutip.request_id
+        inner join df_uni_point dup on dup.point_code = dhutip.point_code
+        where dhutip.task_patrolled_id = #{task_patrolled_id}
+    </select>
+
+    <select id="getLastItems" resultType="com.df.server.entity.his.HisUniTaskItemPointsEntity">
+        select * from cloud_sample.df_his_uni_task_item_points
+        where sub_code = #{subCode,jdbcType=VARCHAR} and point_code = #{pointCode,jdbcType=VARCHAR}
+        order by id desc limit 1
+    </select>
+
+    <select id="listTaskRobotPosList" resultType="java.lang.Integer">
+        select preset_no from cloud_sample.df_his_uni_task_item_points
+        where task_patrolled_id = #{waiteTaskPatrolledId,jdbcType=VARCHAR} and preset_no is not null
+        order by preset_no
+    </select>
+</mapper>

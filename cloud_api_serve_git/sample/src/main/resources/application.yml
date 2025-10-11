@@ -1,0 +1,278 @@
+server:
+  port: 6789
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    allow-circular-references: true
+  application:
+    name: cloud-api-sample
+  datasource:
+    druid:
+      type: com.alibaba.druid.pool.DruidDataSource
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://172.20.63.227:9200/cloud_sample?useSSL=false&allowPublicKeyRetrieval=true
+      username: root
+      password: dfe@1500
+      initial-size: 10
+      min-idle: 10
+      max-active: 20
+      max-wait: 60000
+
+  redis:
+    host: 172.20.63.227
+    port: 9201
+    database: 0
+    username:
+    password: dfe2k_1500
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 2GB
+# 巡视
+  http-client:
+    pool:
+      #连接池的最大连接数，0代表不限；如果取0，需要考虑连接泄露导致系统崩溃的后果
+      maxTotalConnect: 1000
+      #每个路由的最大连接数,如果只调用一个地址,可以将其设置为最大连接数
+      maxConnectPerRoute: 200
+      # 指客户端和服务器建立连接的超时时间,ms , 最大约21秒,因为内部tcp在进行三次握手建立连接时,默认tcp超时时间是20秒
+      connectTimeout: 3000
+      # 指客户端从服务器读取数据包的间隔超时时间,不是总读取时间,也就是socket timeout,ms
+      readTimeout: 5000
+      # 从连接池获取连接的timeout,不宜过大,ms
+      connectionRequestTimout: 200
+      # 重试次数
+      retryTimes: 2
+      charset: UTF-8
+      # 长连接保持时间 单位s,不宜过长
+      keepAliveTime: 10
+jwt:
+  issuer: DJI
+  subject: CloudApiSample
+  secret: CloudApiSample
+  age: 86400
+
+mqtt:
+  # @see com.dji.sample.component.mqtt.model.MqttUseEnum
+  # BASIC parameters are required.
+  #  设置网络地址不然clound连接不到
+  BASIC:
+    protocol: MQTT # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
+    #    联网
+    host: 172.20.63.227
+    port: 9205
+    username: df1560
+    password: dfe2k_1500
+    client-id: 123456
+    # If the protocol is ws/wss, this value is required.
+    path:
+  DRC:
+    protocol: WS # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
+    #联网地址
+    host: 172.20.63.227
+    port: 9207
+    path: /mqtt
+    username: df1560
+    password: dfe2k_1500
+
+cloud-sdk:
+  mqtt:
+    # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
+    inbound-topic: sys/product/+/status,thing/product/+/requests
+
+url:
+  manage:
+    prefix: manage
+    version: /api/v1
+  map:
+    prefix: map
+    version: /api/v1
+  media:
+    prefix: media
+    version: /api/v1
+  wayline:
+    prefix: wayline
+    version: /api/v1
+  storage:
+    prefix: storage
+    version: /api/v1
+  control:
+    prefix: control
+    version: /api/v1
+
+# Tutorial: https://www.alibabacloud.com/help/en/object-storage-service/latest/use-a-temporary-credential-provided-by-sts-to-access-oss
+#oss:
+#  enable: true
+#  provider: ALIYUN # @see com.dji.sample.component.OssConfiguration.model.enums.OssTypeEnum
+#  endpoint: https://oss-cn-hangzhou.aliyuncs.com
+#  expire: 3600
+#  region: cn-hangzhou # cn-hangzhou
+#  role-session-name: cloudApi
+#  role-arn: acs:ram::1545648436482997:role/b612 # acs:ram::123456789:role/stsrole
+#  bucket: test9870
+#  object-dir-prefix: s1
+
+#oss:
+#  enable: true
+#  provider: aws
+#  endpoint: https://s3.us-east-1.amazonaws.com
+#  access-key:
+#  secret-key:
+#  expire: 3600
+#  region: us-east-1
+#  role-session-name: cloudApi
+#  role-arn:
+#  bucket: cloudapi-bucket
+#  object-dir-prefix: wayline
+#
+oss:
+  enable: true
+  provider: minio
+  endpoint: http://172.20.63.227:9202
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: djicloud
+  expire: 3600
+  region: us-east-1
+  object-dir-prefix: wayline
+
+logging:
+  level:
+    com.dji: debug
+  file:
+    name: logs/cloud-api-sample.log
+
+ntp:
+  server:
+    host: localhost
+#  cloud-api
+# To create a license for an application: https://developer.dji.com/user/apps/#all
+cloud-api:
+  app:
+    id: 143742
+    key: a3c1804b348e340ff0b133e3466350f
+    license: wlKjGJuazaLbacm0Yf+HDAPhBredlzGoWJeChjaXXeWsAeI3WlYcutkRlFbvJIPfR1bNCohPTQlaXFp39QRCDomq6OYQXrigBUeEH+drJztq9xB0CZHwNTok/o1TtOI+z61uvkgkePBEb6yaRJVM7rOLk8T7vTACw4bJ4fZrSzA=
+
+livestream:
+  url:
+    # It is recommended to use a program to create Token. https://github.com/AgoraIO/Tools/blob/master/DynamicKey/AgoraDynamicKey/java/src/main/java/io/agora/media/RtcTokenBuilder2.java
+    agora:
+      channel: kkone
+      token: 007eJxTYNi68ajYk1ULcj9KCISxecl4X/LKCuHPrtU3vr7ziPHEf38VGFIszc1SDS2S0xKTDU1MTUwtzYzMDSwsEi0MDNKSjQ0Mf63/ldoQyMjwinMBMyMDBIL4rAzZ2fl5qQwMAFrHICI=
+      uid:  654321
+
+    # RTMP  Note: This IP is the address of the streaming server. If you want to see livestream on web page, you need to convert the RTMP stream to WebRTC stream.
+    rtmp:
+      url: rtmp://172.20.63.227:2035/live/ # Example: 'rtmp://192.168.1.1/live/'
+    rtsp:
+      username: 1
+      password: 1
+      port: 8554
+
+    # GB28181 Note:If you don't know what these parameters mean, you can go to Pilot2 and select the GB28181 page in the cloud platform. Where the parameters same as these parameters.
+    gb28181:
+      serverIP: 172.20.63.227
+      serverPort: 8086
+      serverID: 1
+      agentID: 1
+      agentPassword: 1
+      localPort: 8086
+      channel: 1
+
+    # Webrtc: Only supports using whip standard
+    whip:
+      url: http://172.20.63.227:1985/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
+
+#配置动态航线文件夹参数
+singlePointUrl: D:\KmzKml\
+#配置生成航线
+createKmzUrl: D:\KmzKml\KMZ
+#上级对接
+switch:
+#  centerNormalTcpEnable: true
+#  centerOtherTcpEnable: true
+#  centerNormalTcpMsgEnable: true
+#  centerOtherTcpMsgEnable: true
+  centerNormalTcpEnable: false
+  centerOtherTcpEnable: false
+  centerNormalTcpMsgEnable: false
+  centerOtherTcpMsgEnable: false
+
+#国网规范对接上级配置
+centernormal:
+  serverIp: 127.0.0.1
+  serverPort: 10011
+  stationCode: test1
+  serverCode: Region01
+
+#国网规范对接上级ftp
+centerftpsnormal:
+  ftpIp: 172.20.63.136
+  ftpPort: 10012
+  userName: dfftp
+  password: dfe2k_1500
+  implicit: true
+  #静态文件存放位置，Linux配：/df1560/admin_files
+  fileSavePath: D:/Temp/df1560/admin_files
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+    map-underscore-to-camel-case: true
+  mapper-locations: classpath*:/mapper/**/*.xml
+#  config-location: classpath:mybatis/mybatis-config.xml
+  global-config:
+    banner: false
+    db-config:
+      id-type: AUTO
+  configuration-properties:
+    hdb: cloud_sample
+
+
+#  巡视
+#FTPS相关配置
+ftps:
+  ftpIp: 127.20.63.150
+  ftpPort: 10012
+  userName: dfftp
+  password: dfe2k_1500
+  #false显式，true隐式
+  implicit: true
+
+#视频服务相关配置
+video:
+  #配置参数 (udp)
+  sipserverPath: http://127.0.0.1:7002
+  #录像回放的TCP请求配置参数
+  sipserverTcpPath: http://127.0.0.1:7003
+
+#视频任务抓拍分析配置
+vtask:
+  enabled: true
+  #分析服务地址
+  analyseUrl: http://172.20.63.136:20011/picAnalyse
+  #本地部署IP（配置的IP要求分析服务能访问到）
+  localIp: 172.20.63.56
+other:
+  logFilePath: /dfe-patrol-dog/logs
+#本地文件相关配置
+file:
+  #文件url请求头部
+  fileUrl: /dog/images/
+  #静态文件存放位置，Linux配：/e2100/admin_files
+  fileSavePath: D:/Temp/df1560/admin_files
+  #巡视报告模板
+  taskReportTempFile: ${file.fileSavePath}/ftl/report-moban.docx
+  #巡视报告模板
+  taskReportMoreTempFile: ${file.fileSavePath}/ftl/report-moban-more.docx
+  #巡视报告模板-excel
+  taskReportExcelTempFile: ${file.fileSavePath}/ftl/report-excel-templates.xls
+  #巡视报告模板-excel
+  taskReportExcelMoreTempFile: ${file.fileSavePath}/ftl/report-excel-more-templates.xls
+

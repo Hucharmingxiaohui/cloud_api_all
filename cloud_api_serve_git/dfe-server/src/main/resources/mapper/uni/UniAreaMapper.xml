@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniAreaMapper">
+
+    <select id="listBySubCode" resultType="com.df.server.vo.UniArea.UniAreaVO">
+        select *
+        from
+            df_uni_area
+        where sub_code =#{subCode,jdbcType=VARCHAR}
+        order by convert(area_name using gbk) collate gbk_chinese_ci
+    </select>
+</mapper>

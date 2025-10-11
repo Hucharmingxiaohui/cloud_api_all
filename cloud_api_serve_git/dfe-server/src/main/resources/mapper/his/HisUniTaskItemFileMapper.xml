@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.df.server.mapper.his.HisUniTaskItemFileMapper">
+    <insert id="insert" parameterType="com.df.server.entity.his.HisUniTaskItemFileEntity">
+        insert into cloud_sample.df_his_uni_task_item_file(request_id,file_type,file_path)
+        values (#{requestId},#{fileType},#{filePath})
+    </insert>
+
+    <select id="getByRequestId" resultType="com.df.server.entity.his.HisUniTaskItemFileEntity">
+        select * from cloud_sample.df_his_uni_task_item_file
+        where request_id = #{requestId,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateById">
+        <!--@mbg.generated-->
+        update cloud_sample.df_his_uni_task_item_file
+        <set>
+            <if test="fileTime != null">
+                file_time = #{fileTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="fileNo != null">
+                file_no = #{fileNo,jdbcType=INTEGER},
+            </if>
+            <if test="fileType != null">
+                file_type = #{fileType,jdbcType=VARCHAR},
+            </if>
+            <if test="filePath != null">
+                file_path = #{filePath,jdbcType=VARCHAR},
+            </if>
+            <if test="recgFilePath != null">
+                recg_file_path = #{recgFilePath,jdbcType=VARCHAR},
+            </if>
+            <if test="recgFilePathPress != null">
+                recg_file_path_press = #{recgFilePathPress,jdbcType=VARCHAR},
+            </if>
+            <if test="rectangle != null">
+                rectangle = #{rectangle,jdbcType=VARCHAR},
+            </if>
+            <if test="filePathOther != null">
+                file_path_other = #{filePathOther,jdbcType=VARCHAR},
+            </if>
+            <if test="filePathOtherPress != null">
+                file_path_other_press = #{filePathOtherPress,jdbcType=VARCHAR},
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

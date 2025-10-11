@@ -1,0 +1,61 @@
+{
+    "asset": {
+        "generator": "http://cesium.xin",
+        "version": "1.1"
+    },
+    "extensions": {
+        "3DTILES_content_gltf": {
+            "extensionsRequired": [
+                "KHR_spz_gaussian_splats_compression"
+            ],
+            "extensionsUsed": [
+                "KHR_spz_gaussian_splats_compression"
+            ]
+        }
+    },
+    "extensionsUsed": [
+        "3DTILES_content_gltf"
+    ],
+    "geometricError": 1000,
+    "root": {
+        "boundingVolume": {
+            "box": [
+                0.5971174240112305,
+                2.7177114486694336,
+                4.527433514595032,
+                7.522775650024414,
+                0,
+                0,
+                0,
+                16.262818336486816,
+                0,
+                0,
+                0,
+                7.592733263969421
+            ]
+        },
+        "content": {
+            "uri": "0.glb"
+        },
+        "geometricError": 7.784303384110912,
+        "refine": "REPLACE",
+        "transform": [
+            -0.913545457642601,
+            -0.4067366430758001,
+            0,
+            0,
+            0.26144527457462063,
+            -0.5872157010580831,
+            0.766044443118978,
+            0,
+            -0.3115783452410838,
+            0.6998164213636981,
+            0.6427876096865393,
+            0,
+            -1990046.580588473,
+            4469717.8017840525,
+            4077992.000076477,
+            1
+        ]
+    }
+}

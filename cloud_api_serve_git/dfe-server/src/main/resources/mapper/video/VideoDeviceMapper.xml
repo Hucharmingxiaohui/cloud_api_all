@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.video.VideoDeviceMapper">
+    <select id="getPageList" resultType="com.df.server.vo.VideoDevice.VideoDeviceVO">
+        select t1.*, t1.des as device_name, t2.sub_name
+        from df_video_device t1
+        left join df_pub_substation t2 on t1.sub_code = t2.sub_code
+        <where>
+            <if test="subCode != null and subCode != ''">
+                and t1.sub_code = #{subCode,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceName != null and deviceName != ''">
+                and t1.des like concat('%', #{deviceName,jdbcType=VARCHAR}, '%')
+            </if>
+            <if test="status != null">
+                and t1.status = #{status}
+            </if>
+            <if test="type != null">
+                and t1.type = #{type}
+            </if>
+        </where>
+        order by t1.id desc
+        limit #{start,jdbcType=INTEGER},#{size,jdbcType=INTEGER}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(*)
+        from df_video_device t1
+        <where>
+            <if test="subCode != null and subCode != ''">
+                and t1.sub_code = #{subCode,jdbcType=VARCHAR}
+            </if>
+            <if test="deviceName != null and deviceName != ''">
+                and t1.des like concat('%', #{deviceName,jdbcType=VARCHAR}, '%')
+            </if>
+            <if test="status != null">
+                and t1.status = #{status}
+            </if>
+            <if test="type != null">
+                and t1.type = #{type}
+            </if>
+        </where>
+    </select>
+
+    <select id="listSips" resultType="com.df.server.vo.VideoDevice.VideoSipServiceVO">
+        select *
+        from df_video_sip_service
+        where des = 'SIPS'
+    </select>
+
+    <insert id="insertNewDeice">
+        insert into df_video_device
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="code != null and code != ''">
+                code,
+            </if>
+            <if test="des != null and des != ''">
+                des,
+            </if>
+            <if test="type != null">
+                type,
+            </if>
+            <if test="subCode != null and subCode != ''">
+                sub_code,
+            </if>
+            <if test="ip != null and ip != ''">
+                ip,
+            </if>
+            <if test="port != null">
+                port,
+            </if>
+            <if test="username != null and username != ''">
+                username,
+            </if>
+            <if test="password != null and password != ''">
+                password,
+            </if>
+            <if test="deviceType != null and deviceType != ''">
+                device_type,
+            </if>
+            <if test="extraInfo != null and extraInfo != ''">
+                extra_info,
+            </if>
+            <if test="sipCode != null and sipCode != ''">
+                sip_code,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="code != null and code != ''">
+                #{code,jdbcType=VARCHAR},
+            </if>
+            <if test="des != null and des != ''">
+                #{des,jdbcType=VARCHAR},
+            </if>
+            <if test="type != null">
+                #{type,jdbcType=INTEGER},
+            </if>
+            <if test="subCode != null and subCode != ''">
+                #{subCode,jdbcType=VARCHAR},
+            </if>
+            <if test="ip != null and ip != ''">
+                #{ip,jdbcType=VARCHAR},
+            </if>
+            <if test="port != null">
+                #{port,jdbcType=INTEGER},
+            </if>
+            <if test="username != null and username != ''">
+                #{username,jdbcType=VARCHAR},
+            </if>
+            <if test="password != null and password != ''">
+                #{password,jdbcType=VARCHAR},
+            </if>
+            <if test="deviceType != null and deviceType != ''">
+                #{deviceType,jdbcType=VARCHAR},
+            </if>
+            <if test="extraInfo != null and extraInfo != ''">
+                #{extraInfo,jdbcType=VARCHAR},
+            </if>
+            <if test="sipCode != null and sipCode != ''">
+                #{sipCode,jdbcType=VARCHAR},
+            </if>
+        </trim>
+    </insert>
+
+    <select id="countByCode" resultType="int">
+        select count(*) from df_video_device where code = #{code,jdbcType=VARCHAR}
+    </select>
+
+    <update id="updateCameraDeviceCode">
+        update df_video_camera set device_code  = #{newCode,jdbcType=VARCHAR}
+        where device_code = #{oldCode,jdbcType=VARCHAR}
+    </update>
+
+    <delete id="deleteCamerasByDeviceCode">
+        delete from  df_video_camera
+        where device_code = #{deviceCode,jdbcType=VARCHAR}
+    </delete>
+
+    <insert id="insertDeviceBatch">
+        insert into df_video_device
+        (code, des, type, sub_code, ip, port, username, password, device_type, extra_info, sip_code)
+        values
+        <foreach collection="list" item="item" index="index" separator=",">
+            (#{item.code},#{item.des},#{item.type},#{item.subCode},#{item.ip},#{item.port},#{item.username},
+            #{item.password},#{item.deviceType},#{item.extraInfo},#{item.sipCode})
+        </foreach>
+    </insert>
+
+    <select id="exportDevices" resultType="com.df.server.vo.VideoDevice.VideoDeviceExcel">
+        select t1.*
+        from df_video_device t1
+        <where>
+            <if test="subCode != null and subCode != ''">
+                and t1.sub_code = #{subCode}
+            </if>
+            <if test="deviceName != null and deviceName != ''">
+                and t1.des like concat('%', #{deviceName}, '%')
+            </if>
+            <if test="status != null">
+                and t1.status = #{status}
+            </if>
+            <if test="type != null">
+                and t1.type = #{type}
+            </if>
+        </where>
+    </select>
+
+    <resultMap id="videoDeviceTree" type="com.df.server.vo.Tree.SubStationTreeNode">
+        <result property="name" column="sub_name"/>
+        <result property="code" column="sub_code"/>
+        <collection property="children" ofType="com.df.server.vo.Tree.VideoDeviceTreeNode">
+            <result property="name" column="des"/>
+            <result property="code" column="code"/>
+        </collection>
+    </resultMap>
+    <select id="devicesTree" resultMap="videoDeviceTree">
+        select b.sub_code,
+               b.sub_name,
+               a.code,
+               a.des
+        from df_video_device a left join
+            df_pub_substation b on a.sub_code = b.sub_code
+        order by convert(b.sub_name using gbk) collate gbk_chinese_ci,
+                 convert(a.des using gbk) collate gbk_chinese_ci
+    </select>
+
+    <delete id="clearDevice">
+        call  DeleteCameraInfoBySubCode(#{subCode,jdbcType=VARCHAR})
+    </delete>
+</mapper>

@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.df.server.mapper.uni.UniTaskPlanMapper">
+    <select id="getPageList" resultType="com.df.server.vo.UniTaskPlan.UniTaskPlanVO">
+        select
+            p.* ,
+            a.sub_name,
+            d.dict_label as taskTypeName
+        from df_uni_task_plan p
+        left join df_pub_substation a on  p.sub_code = a.sub_code
+        left join sys_dict_data d on p.task_type = d.dict_value and d.dict_type ='task_type'
+        <where>
+            <if test="planName != null and planName != ''">
+                and p.plan_name like concat('%', #{planName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="taskType != null and taskType != ''">
+                and p.task_type = #{taskType,jdbcType=VARCHAR}
+            </if>
+            <if test="executeType != null and executeType != ''">
+                and p.execute_type = #{executeType,jdbcType=VARCHAR}
+            </if>
+            <if test="planNo != null and planNo != ''">
+                and p.plan_no like concat('%', #{planNo,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="priority != null">
+                and p.priority = #{priority,jdbcType=INTEGER}
+            </if>
+            <if test="isaudit != null">
+                and p.isaudit = #{isaudit,jdbcType=INTEGER}
+            </if>
+            <if test="isenable != null">
+                and p.isenable = #{isenable,jdbcType=INTEGER}
+            </if>
+            <if test="createSource != null">
+                and p.create_source = #{createSource,jdbcType=INTEGER}
+            </if>
+        </where>
+        order by id desc
+        <!-- 此处编写自定义SQL -->
+        limit #{start},#{size}
+    </select>
+
+    <select id="getPageTotal" resultType="java.lang.Integer">
+        select count(1) from df_uni_task_plan p
+        <where>
+            <if test="planName != null and planName != ''">
+                and p.plan_name like concat('%', #{planName,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="taskType != null and taskType != ''">
+                and p.task_type = #{taskType,jdbcType=VARCHAR}
+            </if>
+            <if test="executeType != null and executeType != ''">
+                and p.execute_type = #{executeType,jdbcType=VARCHAR}
+            </if>
+            <if test="planNo != null and planNo != ''">
+                and p.plan_no like concat('%', #{planNo,jdbcType=VARCHAR},'%')
+            </if>
+            <if test="priority != null">
+                and p.priority = #{priority,jdbcType=INTEGER}
+            </if>
+            <if test="isaudit != null">
+                and p.isaudit = #{isaudit,jdbcType=INTEGER}
+            </if>
+            <if test="isenable != null">
+                and p.isenable = #{isenable,jdbcType=INTEGER}
+            </if>
+            <if test="createSource != null">
+                and p.create_source = #{createSource,jdbcType=INTEGER}
+            </if>
+        </where>
+        <!-- 此处编写自定义SQL,查询总数 -->
+    </select>
+
+    <update id="updatePlanType">
+        update df_uni_task_plan set plan_type = #{planType,jdbcType=VARCHAR}
+        where plan_no =#{planNo,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getInfoByParams" resultType="com.df.server.vo.UniTaskPlan.UniTaskPlanVO">
+        select
+        p.* ,
+        a.sub_name,
+        d.dict_label as taskTypeName
+        from df_uni_task_plan p
+        left join df_pub_substation a on  p.sub_code = a.sub_code
+        left join sys_dict_data d on p.task_type = d.dict_value and d.dict_type ='task_type'
+        where p.plan_no = #{planNo,jdbcType=VARCHAR}
+    </select>
+
+    <delete id="deleteByParams">
+        delete
+        from df_uni_task_plan
+        where plan_no =#{planNo,jdbcType=VARCHAR};
+    </delete>
+
+    <update id="enableByPlanNo">
+        update df_uni_task_plan set isenable = #{isenable,jdbcType=INTEGER}
+        where plan_no = #{planNo,jdbcType=VARCHAR}
+    </update>
+
+    <update id="auditByPlanNo">
+        update df_uni_task_plan set isaudit = #{isaudit,jdbcType=INTEGER}
+        where plan_no = #{planNo,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getScheduledPlan" resultType="com.df.server.entity.uni.UniTaskPlanEntity">
+        select *
+        from df_uni_task_plan
+        where isenable = 0
+          and isaudit = 1
+          and (
+            (
+                last_execute_time is null
+                    and now() >= fixed_start_time
+                )
+                or
+            (
+                (
+                    invalid_start_time is null
+                        or invalid_end_time is null
+                        or
+                    (
+                        invalid_start_time is not null
+                            and invalid_end_time is not null
+                            and (now() not between invalid_start_time and invalid_end_time)
+                        )
+                    )
+                    and
+                (
+                    (
+                        cycle_type is not null
+                            and (now() between cycle_start_time and cycle_end_time)
+                            and curtime() >= cycle_execute_time
+                            and find_in_set(month(now()), cycle_month)
+                            and (last_execute_time is null or
+                                 timestampdiff(day,last_execute_time, now()) >= 1)
+                            and
+                        (
+                            (cycle_type = 1 and find_in_set(weekday(now()) + 1, cycle_week))
+                                or
+                            (cycle_type = 2 and find_in_set(day(now()),cycle_day))
+                            )
+                        )
+                        or
+                    (
+                        cycle_type is null
+                            and interval_type is not null
+                            and (now() between interval_start_time and interval_end_time)
+                            and
+                        (
+                            (
+                                interval_type = 1 and curtime() >= interval_execute_time
+                                    and
+                                (
+                                    (last_execute_time IS NULL)
+                                        or
+                                    (
+                                        (last_execute_time is not null) and
+                                        (timestampdiff(hour,last_execute_time, NOW()) >= interval_number)
+                                        )
+                                    )
+                                )
+                                or
+                            (
+                                interval_type = 2 and curtime() >= interval_execute_time
+                                    and
+                                (
+                                    (last_execute_time is null)
+                                        or
+                                    ((last_execute_time is not null) and
+                                     (timestampdiff(day,last_execute_time, now()) >= interval_number))
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+    </select>
+
+    <update id="updatePlanLastExecuteTime">
+        update df_uni_task_plan set last_execute_time = #{planStartTime,jdbcType=TIMESTAMP}
+        where plan_no = #{planNo,jdbcType=VARCHAR}
+    </update>
+</mapper>

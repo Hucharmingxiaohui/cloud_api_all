@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.dji.sample.df.electricInspectionDf.dao.PubWaylinePointDfMapper">
+    <select id="getPointsByParam" resultType="com.dji.sample.df.electricInspectionDf.model.PubWaylinePointDfEntity" parameterType="map">
+        SELECT * FROM pub_wayline_point_df
+        <where>
+            <if test="subCode!=null and subCode!=''">
+                and sub_code = #{subCode}
+            </if>
+            <if test="deviceType!=null and deviceType!=''">
+                and device_type = #{deviceType}
+            </if>
+            <if test="pointAnalyseType!=null and pointAnalyseType!=''">
+                and point_analyse_type = #{pointAnalyseType}
+            </if>
+            <if test="pointName!=null and pointName!=''">
+                and point_name LIKE concat('%', #{pointName},'%')
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+
+    <select id="getPointsByParamCount" resultType="int">
+        SELECT COUNT(*) FROM pub_wayline_point_df
+        <where>
+            <if test="subCode!=null and subCode!=''">
+                and sub_code = #{subCode}
+            </if>
+            <if test="deviceType!=null and deviceType!=''">
+                and device_type = #{deviceType}
+            </if>
+            <if test="pointAnalyseType!=null and pointAnalyseType!=''">
+                and point_analyse_type = #{pointAnalyseType}
+            </if>
+            <if test="pointName!=null and pointName!=''">
+                and point_name LIKE concat('%', #{pointName},'%')
+            </if>
+        </where>
+    </select>
+</mapper>

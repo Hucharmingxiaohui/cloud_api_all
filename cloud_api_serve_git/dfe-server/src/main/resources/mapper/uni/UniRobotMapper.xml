@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.df.server.mapper.uni.UniRobotMapper">
+
+    <select id="selectBySubCode" parameterType="java.lang.String" resultType="com.df.server.entity.uni.UniRobotEntity">
+        select *
+        from df_uni_robot
+        where sub_code = #{subCode}
+    </select>
+
+    <select id="listRobotByCodeSet" resultType="com.df.server.entity.uni.UniRobotEntity">
+        select *
+        from df_uni_robot
+        where robot_code in
+        <foreach collection="collection" close=")" index="idx" item="code" open="(" separator=",">
+            #{code,jdbcType=VARCHAR}
+        </foreach>
+    </select>
+
+    <select id="countUnRunningRobot" resultType="int">
+        select count(*) from df_uni_robot
+        where run_state = 1 and robot_code in
+        <foreach collection="collection" separator="," open="(" item="code" index="idx" close=")">
+            #{code,jdbcType=VARCHAR}
+        </foreach>
+     </select>
+
+    <update id="updateReceiveDTO">
+        update df_uni_robot
+        set status_update_time = now(),online_state = 1
+        <if test="battery_soc != null">
+            ,battery_left = #{battery_soc,jdbcType=INTEGER}
+        </if>
+        <if test="state != null and state == 0">
+            ,run_state = 1
+        </if>
+        <if test="state != null and (state == 1 or state == 2)">
+            ,run_state = 2
+        </if>
+        <if test="max_temperature != null">
+            ,motor_temp = #{max_temperature,jdbcType=INTEGER}
+        </if>
+        where robot_code = #{robotCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="updateCoordinate">
+        update df_uni_robot
+        set
+        coordinate_update_time = now(),
+        coordinate_pixel = #{coordinatePixel,jdbcType=VARCHAR},
+        online_state = 1
+        where robot_code = #{robotCode,jdbcType=VARCHAR}
+    </update>
+
+    <select id="getDogInfo" resultType="com.df.server.vo.UniRobot.UniRobotVO">
+        select * from  df_uni_robot limit 1
+    </select>
+
+    <update id="updateMap">
+        update df_uni_robot
+        set file_path = #{mapPath,jdbcType=VARCHAR}
+        where robot_code = #{robotCode,jdbcType=VARCHAR}
+    </update>
+
+    <update id="updateRobotOnlineState">
+        update df_uni_robot set comm_state = #{commState},online_state = #{online}
+        where robot_code is not null
+    </update>
+</mapper>
