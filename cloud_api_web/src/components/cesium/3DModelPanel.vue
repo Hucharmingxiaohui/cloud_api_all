@@ -19,12 +19,6 @@
           <LivestreamOthers :sn = "livestream.dorne_sn"></LivestreamOthers>
         </div>
     </div>
-    <!-- <button @click="tt">开始</button>
-    <el-slider v-model="value1" @change="test" :min="-50" :max="50"  style="width: 100px;"/>
-    <el-slider v-model="value2" @change="test" :min="-50" :max="50"  style="width: 100px;"/>
-    <el-slider v-model="value3" @change="test" :min="-50" :max="50"  style="width: 100px;"/>
-    <el-slider v-model="heading" @change="test" :min="-180" :max="180"  style="width: 100px;"/>
-    <el-slider v-model="heading" @change="test" :min="-180" :max="180"  style="width: 100px;"/> -->
   </div>
   </div>
 </template>

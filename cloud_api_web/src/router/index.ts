@@ -261,6 +261,11 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('/@/components/cesium/modelPanel.vue'),
       },
       {
+        path: '/fanMgt',
+        name: 'fanMgt',
+        component: () => import('/@/components/fanMgt/index.vue'),
+      },
+      {
         path: '/task/createPlan',
         name: 'createPlan',
         component: () => import('/@/components/task/CreatePlan.vue'),
@@ -323,7 +328,7 @@ const routes: Array<RouteRecordRaw> = [
 ]
 const isLoading = ref(false)
 const router = createRouter({
-  history: createWebHashHistory(import.meta.env.BASE_URL),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes,
   scrollBehavior () {
     return { top: 0 }

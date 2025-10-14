@@ -13,23 +13,14 @@
         </div> -->
       </div>
       <div class="box-right">
-        <!-- <div style="width: 100%; height: 100%; border: 2px solid white;">
-          <ThreeDModel />
-        </div> -->
-        <ttt />
+        <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+        <div style="width: 100%; height: 100%; border: 2px solid white;">
+          <ThreeDModel v-if="isFlatMap" />
+          <TwoDModel v-else />
+        </div>
 
       </div>
     </div>
-    <!-- <div class="live" v-if="showLive" v-drag-window>
-      <div class="drag-title" style="height: 40px; color: aliceblue">无人机视频</div>
-      <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeVideo"><CloseOutlined /></a>
-      <LiveOthers :sn="osdVisible.gateway_sn"></LiveOthers>
-    </div> -->
-    <!-- <div class="docklive" v-if="showDockLive" v-drag-window>
-      <div class="drag-title" style="height: 40px; color: aliceblue">机场视频</div>
-      <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeDockVideo"><CloseOutlined /></a>
-      <LiveDock></LiveDock>
-    </div> -->
   </div>
 </template>
 
@@ -47,11 +38,7 @@ import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusM
 import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
-import { CloseOutlined } from '@ant-design/icons-vue'
-import LiveResults from '/@/components/livestream-results.vue'
-import LiveOthers from '/@/components/livestream-others.vue'
-import LiveDock from '/@/components/livestream-dock.vue'
-import ttt from '/@/components/g-map/mapPanel.vue'
+import TwoDModel from '/@/components/g-map/mapPanel.vue'
 import ThreeDModel from '/@/components/cesium/3DModelPanel.vue'
 import tsaPanel from '/@/components/tsaPanel.vue'
 // import ttt from '/@/components/GMap.vue'
@@ -68,6 +55,7 @@ const showDockLive = ref<boolean>(false)
 const router = useRouter()
 let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
+const isFlatMap = ref(false) // 是否二维地图
 
 // 无人机视频---------------------------------------------------
 const toggleDroneVideo = () => {
@@ -322,6 +310,20 @@ watch(() => store?.state.deviceState, data => {
   padding: 15px;
   .operation {
     margin-bottom: 20px;
+  }
+  .map-switch{
+    position: absolute;
+    right: 30px;
+    top: 20px;
+    color: rgb(17, 193, 224);
+    font-size: 20px;
+    height: 30px;
+    width: 30px;
+    border-radius: 50%;
+    background: #075f8e;
+    text-align: center;
+    z-index: 2000;
+    cursor: pointer;
   }
   .map-container {
     flex-grow: 1;

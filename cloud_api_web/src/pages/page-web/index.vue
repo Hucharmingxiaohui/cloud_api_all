@@ -9,35 +9,19 @@
       <h4 style="text-align: left; margin: 0; color: #fff; font-weight: 600">
         登录：
       </h4>
-      <el-form
-        :model="formState"
-        :rules="loginRules"
-        ref="loginForm"
-        class="login-form"
-        @keyup.enter="onSubmit"
-      >
+      <el-form :model="formState" :rules="loginRules" ref="loginForm" class="login-form" @keyup.enter="onSubmit">
         <el-form-item prop="username">
-          <el-input
-            v-model="formState.username"
-            type="text"
-            auto-complete="off"
-            placeholder="用户名"
-            style="position: relative"
-          >
-          <template v-slot:prefix>
-            <i class="login-tagger">
-              <img src="../../assets/icons/login-user.png" />
-            </i>
-          </template>
+          <el-input v-model="formState.username" type="text" auto-complete="off" placeholder="用户名"
+            style="position: relative">
+            <template v-slot:prefix>
+              <i class="login-tagger">
+                <img src="../../assets/icons/login-user.png" />
+              </i>
+            </template>
           </el-input>
         </el-form-item>
         <el-form-item prop="password">
-          <el-input
-            v-model="formState.password"
-            type="password"
-            auto-complete="off"
-            placeholder="密码"
-          >
+          <el-input v-model="formState.password" type="password" auto-complete="off" placeholder="密码">
             <template v-slot:prefix>
               <i class="login-tagger">
                 <img src="../../assets/icons/locked.png" />
@@ -46,19 +30,13 @@
           </el-input>
         </el-form-item>
         <el-form-item style="width: 100%">
-          <el-button
-            :loading="loading"
-            :disabled="loginBtnDisabled"
-            size="medium"
-            type="primary"
-            style="
+          <el-button :loading="loading" :disabled="loginBtnDisabled" size="medium" type="primary" style="
               width: 100%;
               background: #1ab394;
               border-radius: 3px;
               height: 38px;
               border-color: #1ab394;
-            "
-            @click="onSubmit">
+            " @click="onSubmit">
             <span v-if="!loading" style="position: relative; bottom: 2px"> 登 录</span>
             <span v-else>登 录 中...</span>
           </el-button>
@@ -77,7 +55,7 @@ import { ELocalStorageKey, ERouterName, EUserType } from '/@/types'
 import router from '/@/router'
 import { CURRENT_CONFIG } from '/@/api/http/config'
 import { log } from 'console'
-
+import axios from 'axios'
 const root = getRoot()
 
 const formState: UnwrapRef<LoginBody> = reactive({
@@ -112,6 +90,36 @@ const onSubmit = async (e: any) => {
   }
   try {
     loading.value = true
+    // const params = {
+    //   username: 'adminPC',
+    //   password: 'adminPC',
+    //   flag: 1
+    // }
+    // axios({
+    //   url: import.meta.env.VITE_BACK + '/api/get3Dwaylines',
+    //   method: 'post',
+    //   timeout: 10000,
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Test-Debug': 'true' // 添加调试头
+    //   },
+    //   data: params,
+    // }).then(rs => {
+    //   console.log('完整响应:', rs)
+    // }).catch(error => {
+    //   if (error.code === 'ECONNABORTED') {
+    //     console.error('请求超时，请检查：')
+    //     console.error('1. 后端服务是否运行')
+    //     console.error('2. 网络防火墙设置')
+    //     console.error('3. 代理配置是否正确')
+    //   }
+    //   console.error('错误详情:', {
+    //     config: error.config,
+    //     request: error.request,
+    //     response: error.response
+    //   })
+    // })
+
     const result = await login(formState)
     if (result.code === 0) {
       localStorage.setItem(ELocalStorageKey.Token, result.data.access_token)
@@ -134,7 +142,7 @@ const onSubmit = async (e: any) => {
 </script>
 
 <style lang="scss" scoped>
-@import '/@/styles/index.scss';
+@use '/@/styles/index.scss';
 // .login {
 //   background-image: url('/@/assets/icons/login.png');
 //   background-color: rgb(36, 118, 231);
@@ -157,9 +165,11 @@ const onSubmit = async (e: any) => {
   background-size: 100% 100%;
   background-position: center;
   text-align: center;
+
   .header {
     position: relative;
     bottom: 200px;
+
     .name {
       font-size: 45px;
       color: #fff;
@@ -169,23 +179,27 @@ const onSubmit = async (e: any) => {
     }
   }
 }
-:deep(.el-input__wrapper){
+
+:deep(.el-input__wrapper) {
   background: rgba(59, 116, 255, 0.15);
   box-shadow: inset 0 0 0.9375rem 0.0625rem rgba(34, 135, 255, 0.5);
   border: 0.0625rem solid #719fff;
 }
-:deep(.el-input__inner){
+
+:deep(.el-input__inner) {
   color: #ffffff;
   //改变浏览器自动填充的颜色
   -webkit-text-fill-color: #ededed !important;
   background-color: transparent !important;
   transition: background-color 50000s ease-in-out 0s;
 }
-:deep(.el-input) {
-    height: 38px;
 
-  }
-   //改变input自动填充背景颜色
+:deep(.el-input) {
+  height: 38px;
+
+}
+
+//改变input自动填充背景颜色
 input:-internal-autofill-previewed,
 input:-internal-autofill-selected {
   -webkit-text-fill-color: #808080;
@@ -193,23 +207,25 @@ input:-internal-autofill-selected {
 }
 
 .login-wrapper {
-    position: absolute;
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 3px 0 rgb(12 12 12 / 3%);
-    border-radius: 3px;
-    padding: 30px;
-    height: 317px;
-    width: 380px;
-  }
+  position: absolute;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 3px 0 rgb(12 12 12 / 3%);
+  border-radius: 3px;
+  padding: 30px;
+  height: 317px;
+  width: 380px;
+}
 
-  .login-form {
+.login-form {
   margin-top: 20px;
+
   .input-icon {
     height: 39px;
     width: 14px;
     margin-left: 2px;
   }
+
   .login-tagger {
     position: absolute;
     left: 285px;

@@ -244,6 +244,7 @@ const options3 = [
   { key: 15, label: '成员管理', path: '/member', icon: 'CalendarOutlined' },
   { key: 16, label: '固件管理', path: '/' + ERouterName.FIRMWARES, icon: 'GroupOutlined' },
   { key: 17, label: '模型管理', path: '/modelManage', icon: 'CalendarOutlined' },
+  { key: 18, label: '风机管理', path: '/fanMgt', icon: 'CalendarOutlined' },
 ]
 
 const options4 = [
@@ -398,7 +399,7 @@ function goHome () {
         height: 50px;
         overflow-wrap: break-word;
         color: rgba(175, 193, 222, 1);
-        font-size: 42px;
+        font-size: 30px;
         font-family: YouSheBiaoTiHei-Regular;
         font-weight: normal;
         text-align: center;

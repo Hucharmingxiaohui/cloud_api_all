@@ -269,7 +269,7 @@ const onSwitch = () => {
 </script>
 
 <style lang="scss" scoped>
-@import '/@/styles/index.scss';
+@use '/@/styles/index.scss';
 
 // 下拉框
 .select-operation {

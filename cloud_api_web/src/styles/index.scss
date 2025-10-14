@@ -1,3 +1,5 @@
-@import './common.scss';
-@import 'flex.style.scss';
-@import 'fonts.scss';
+@use './variables' as *;
+// 然后导入其他文件（它们会继承变量作用域）
+@use './common';
+@use './flex.style';
+@use './fonts';
