@@ -1,11 +1,7 @@
 <template>
   <div class="container">
     <div class="operation">
-      <el-form
-        :inline="true"
-        :model="queryForm"
-        label-position="right"
-      >
+      <el-form :inline="true" :model="queryForm" label-position="right">
         <el-form-item label="风机名称:" prop="turbine_name">
           <el-input
             v-model="queryForm.turbine_name"
@@ -25,7 +21,7 @@
             class="new_btn"
             type="primary"
             style="width: 70px;"
-            :icon ="Search"
+            :icon="Search"
             @click="getWindTurbineConfig()"
           >
             <span style="margin-left: 5px; font-size: 14px;">查询</span>
@@ -34,7 +30,7 @@
             class="new_btn"
             type="primary"
             style="width: 70px;"
-            :icon ="Refresh"
+            :icon="Refresh"
             @click="handleRest()"
           >
             <span style="margin-left: 5px; font-size: 14px;">重置</span>
@@ -115,6 +111,22 @@
               <div class="ellipsis">{{ scope.row.uav_blade_distance }}</div>
             </template>
           </el-table-column>
+          <el-table-column label="风机底部高度(米)">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.blade_bottom_height }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="单个扇叶的点数">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.blade_points }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="塔筒的点数">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.tower_points }}</div>
+            </template>
+          </el-table-column>
+
           <el-table-column label="操作" width="120">
             <template #default="scope">
               <el-button link type="primary" @click="openEditDialog(scope.row)"
@@ -135,7 +147,12 @@
       width="1200"
       style="background-color: #0A2D63; color: white"
     >
-      <el-form :model="insertForm" label-width="180px" :rules="formRules" ref="formRef">
+      <el-form
+        :model="insertForm"
+        label-width="180px"
+        :rules="formRules"
+        ref="formRef"
+      >
         <el-row :gutter="20">
           <!-- 第一列 -->
           <el-col :span="12">
@@ -176,6 +193,18 @@
             <el-form-item label="飞行最高点经度" prop="peak_longitude" required>
               <el-input
                 v-model="insertForm.peak_longitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="风机底部的高度" prop="peak_longitude" required>
+              <el-input
+                v-model="insertForm.blade_bottom_height"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="单个扇叶的点数" prop="peak_longitude" required>
+              <el-input
+                v-model="insertForm.blade_points"
                 maxlength="50"
               ></el-input>
             </el-form-item>
@@ -235,6 +264,12 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
+            <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
+              <el-input
+                v-model="insertForm.tower_points"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
           </el-col>
         </el-row>
       </el-form>
@@ -250,66 +285,146 @@
       </template>
     </el-dialog>
     <!-- 更新弹窗 -->
-<el-dialog
-  v-model="editDialog"
-  title="编辑风机"
-  width="1200"
-  style="background-color: #0A2D63; color: white"
->
-  <el-form :model="editForm" label-width="180px" :rules="formRules" ref="editFormRef">
-    <el-row :gutter="20">
-      <!-- 第一列 -->
-      <el-col :span="12">
-        <el-form-item label="风机名称" required prop="turbine_name">
-          <el-input v-model="editForm.turbine_name" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="机场经度" prop="airport_longitude" required>
-          <el-input v-model="editForm.airport_longitude" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="机场纬度" prop="airport_latitude" required>
-          <el-input v-model="editForm.airport_latitude" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="机场海拔高度(米)" prop="airport_altitude" required>
-          <el-input v-model="editForm.airport_altitude" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="正对航向角" prop="approach_yaw" required>
-          <el-input v-model="editForm.approach_yaw" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="飞行最高点经度" prop="peak_longitude" required>
-          <el-input v-model="editForm.peak_longitude" maxlength="50"></el-input>
-        </el-form-item>
-      </el-col>
-
-      <!-- 第二列 -->
-      <el-col :span="12">
-        <el-form-item label="飞行最高点纬度" prop="peak_latitude" required>
-          <el-input v-model="editForm.peak_latitude" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="飞行最高点海拔高度(米)" prop="peak_altitude" required>
-          <el-input v-model="editForm.peak_altitude" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="叶片旋转中心高度(米)" prop="blade_center_height" required>
-          <el-input v-model="editForm.blade_center_height" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="停机时叶片1夹角" prop="blade_stop_angle" required>
-          <el-input v-model="editForm.blade_stop_angle" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="单个叶片长度(米)" prop="blade_length" required>
-          <el-input v-model="editForm.blade_length" maxlength="50"></el-input>
-        </el-form-item>
-        <el-form-item label="无人机距离页面距离(米)" prop="uav_blade_distance" required>
-          <el-input v-model="editForm.uav_blade_distance" maxlength="50"></el-input>
-        </el-form-item>
-      </el-col>
-    </el-row>
-  </el-form>
-  <template v-slot:footer>
-    <div class="dialog-footer">
-      <el-button @click="editDialog = false" class="nobtn">取 消</el-button>
-      <el-button type="primary" @click="handleEdit()" class="okbtn">确 定</el-button>
-    </div>
-  </template>
-</el-dialog>
+    <el-dialog
+      v-model="editDialog"
+      title="编辑风机"
+      width="1200"
+      style="background-color: #0A2D63; color: white"
+    >
+      <el-form
+        :model="editForm"
+        label-width="180px"
+        :rules="formRules"
+        ref="editFormRef"
+      >
+        <el-row :gutter="20">
+          <!-- 第一列 -->
+          <el-col :span="12">
+            <el-form-item label="风机名称" required prop="turbine_name">
+              <el-input
+                v-model="editForm.turbine_name"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="机场经度" prop="airport_longitude" required>
+              <el-input
+                v-model="editForm.airport_longitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="机场纬度" prop="airport_latitude" required>
+              <el-input
+                v-model="editForm.airport_latitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="机场海拔高度(米)"
+              prop="airport_altitude"
+              required
+            >
+              <el-input
+                v-model="editForm.airport_altitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="正对航向角" prop="approach_yaw" required>
+              <el-input
+                v-model="editForm.approach_yaw"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="飞行最高点经度" prop="peak_longitude" required>
+              <el-input
+                v-model="editForm.peak_longitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="风机底部的高度" prop="peak_longitude" required>
+              <el-input
+                v-model="editForm.blade_bottom_height"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="单个扇叶的点数" prop="peak_longitude" required>
+              <el-input
+                v-model="editForm.blade_points"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+          </el-col>
+          <!-- 第二列 -->
+          <el-col :span="12">
+            <el-form-item label="飞行最高点纬度" prop="peak_latitude" required>
+              <el-input
+                v-model="editForm.peak_latitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="飞行最高点海拔高度(米)"
+              prop="peak_altitude"
+              required
+            >
+              <el-input
+                v-model="editForm.peak_altitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="叶片旋转中心高度(米)"
+              prop="blade_center_height"
+              required
+            >
+              <el-input
+                v-model="editForm.blade_center_height"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="停机时叶片1夹角"
+              prop="blade_stop_angle"
+              required
+            >
+              <el-input
+                v-model="editForm.blade_stop_angle"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="单个叶片长度(米)" prop="blade_length" required>
+              <el-input
+                v-model="editForm.blade_length"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="无人机距离页面距离(米)"
+              prop="uav_blade_distance"
+              required
+            >
+              <el-input
+                v-model="editForm.uav_blade_distance"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
+              <el-input
+                v-model="editForm.tower_points"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template v-slot:footer>
+        <div class="dialog-footer">
+          <el-button @click="editDialog = false" class="nobtn">取 消</el-button>
+          <el-button type="primary" @click="handleEdit()" class="okbtn"
+            >确 定</el-button
+          >
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -349,7 +464,11 @@ const insertForm = reactive({
   blade_center_height: '',
   blade_stop_angle: '',
   blade_length: '',
-  uav_blade_distance: ''
+  uav_blade_distance: '',
+  blade_bottom_height: '',
+  blade_points: '',
+  tower_points: ''
+
 })
 const editForm = reactive({
   turbine_name: '',
@@ -363,7 +482,10 @@ const editForm = reactive({
   blade_center_height: '',
   blade_stop_angle: '',
   blade_length: '',
-  uav_blade_distance: ''
+  uav_blade_distance: '',
+  blade_bottom_height: '',
+  blade_points: '',
+  tower_points: ''
 })
 
 // 表格
@@ -419,6 +541,18 @@ const formRules = {
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   uav_blade_distance: [
+    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  blade_bottom_height: [
+    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  blade_points: [
+    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  tower_points: [
     { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ]
@@ -534,7 +668,6 @@ function handleRest () {
   queryForm.id = ''
   getWindTurbineConfig()
 }
-
 </script>
 
 <style lang="scss" scoped>
@@ -1091,9 +1224,9 @@ function handleRest () {
     /* Hover时的字体颜色 */
 }
 
-// ::v-deep .el-form-item__label {
-//     color: white;
-// }
+:deep(.el-form-item__label) {
+    color: white;
+}
 
 ::v-deep .el-input__inner {
     color: white;

@@ -222,7 +222,8 @@ const selected = ref<string>(root.$route.path) // 跳转
 const username = ref(localStorage.getItem(ELocalStorageKey.Username)) // 从本地获取登录用户名
 const options1 = [
   // { key: 0, label: '组织管理', path: '/' + ERouterName.Organization, icon: 'ApartmentOutlined' },
-  { key: 0, label: '场站管理', path: '/station', icon: 'ApartmentOutlined' },
+  { key: 0, label: '风机管理', path: '/fanMgt', icon: 'ApartmentOutlined' },
+  // { key: 0, label: '场站管理', path: '/station', icon: 'ApartmentOutlined' },
   { key: 1, label: '设备管理', path: '/' + ERouterName.DEVICES, icon: 'UserOutlined' },
   { key: 2, label: '视频直播', path: '/' + ERouterName.LIVESTREAM, icon: 'VideoCameraOutlined' },
   // { key: 3, label: '地图标注', path: '/' + ERouterName.LAYER, icon: 'EnvironmentOutlined' },
@@ -244,7 +245,7 @@ const options3 = [
   { key: 15, label: '成员管理', path: '/member', icon: 'CalendarOutlined' },
   { key: 16, label: '固件管理', path: '/' + ERouterName.FIRMWARES, icon: 'GroupOutlined' },
   { key: 17, label: '模型管理', path: '/modelManage', icon: 'CalendarOutlined' },
-  { key: 18, label: '风机管理', path: '/fanMgt', icon: 'CalendarOutlined' },
+
 ]
 
 const options4 = [

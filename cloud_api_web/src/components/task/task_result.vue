@@ -63,19 +63,15 @@
                 </div>
               </template>
             </el-table-column> -->
-          <el-table-column label="航点索引">
-            <template #default="scope">
-              <div>航点{{ Number(scope.row.pointPosition) + 1 }}</div>
-            </template>
-          </el-table-column>
           <el-table-column label="采集时间">
             <template #default="scope">
               <div>{{ new Date(scope.row.create_time).toLocaleString() }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="关联点位">
+          <el-table-column label="是否原图">
             <template #default="scope">
-              <div>{{ scope.row.point_name }}</div>
+              <div v-if="scope.row.is_original">是</div>
+              <div v-else>否</div>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="250px">
@@ -88,7 +84,7 @@
       <div class="pagination-container">
         <!-- 分页 -->
         <el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page="currentPage"
-          :page-sizes="[5, 10, 20, 40]" :page-size="pageSize" :total="totalItems"
+          :page-sizes="[10, 20, 40, 100]" :page-size="pageSize" :total="totalItems"
           layout="total, sizes, prev, pager, next, jumper">
         </el-pagination>
       </div>
@@ -115,10 +111,10 @@
             <strong>名称:</strong>
             <input type="text" :value="selectedImage.file_name" class="info-input" readonly />
           </div>
-          <div class="info-row">
+          <!-- <div class="info-row">
             <strong>关联点位:</strong>
             <input type="text" :value="selectedImage.point_name" class="info-input" readonly />
-          </div>
+          </div> -->
           <div class="info-row">
             <strong>照片类型:</strong>
             <input type="text" :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'" class="info-input"
@@ -262,7 +258,7 @@ import { useFormatTask } from './use-format-task'
 import { saveAs } from 'file-saver' // 导入文件保存工具
 import { useRouter } from 'vue-router'
 import { downloadFile } from '/@/utils/common'
-import { downloadMediaFile, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
+import { downloadMediaFile, getFlyTaskResultApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
 import { CloseOutlined } from '@ant-design/icons-vue'
@@ -288,7 +284,8 @@ const origionImageUrls = ref([]) // 临时存放原图下载urls
 
 onMounted(() => {
   const data = JSON.parse(localStorage.getItem('TaskInfo'))
-  jobInfo.job_id = data.job_id
+  jobInfo.job_id = 'e955f015-0846-4304-be4e-d7ade4ef1e8b'
+  // data.job_id
   jobInfo.job_name = data.job_name
   jobInfo.begin_time = data.begin_time
   jobInfo.end_time = data.end_time
@@ -324,9 +321,14 @@ const mediaData = reactive({
  * */
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 async function getFiles () {
-  getTaskResultById(jobInfo.job_id, workspaceId, jobInfo.file_id).then(res => {
-    mediaData.data = transformData(res.data)
-    // console.log('原任务结果', mediaData.data)
+  // getTaskResultById(jobInfo.job_id, workspaceId, jobInfo.file_id).then(res => {
+  //   mediaData.data = transformData(res.data)
+  //   // console.log('原任务结果', mediaData.data)
+  //   getUrls()
+  // })
+  getFlyTaskResultApi(jobInfo.job_id, workspaceId, jobInfo.file_id).then(res => {
+    mediaData.data = res.data
+    console.log('原任务结果', res)
     getUrls()
   })
 }
@@ -836,7 +838,7 @@ const plansData = reactive({
 const open = ref<boolean>(false)
 // ===========================================================前端分页功能实现==================================================
 const currentPage = ref(1)
-const pageSize = ref(5)
+const pageSize = ref(10)
 const totalItems = computed(() => mediaData.data.length)
 const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value

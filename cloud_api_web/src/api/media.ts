@@ -66,6 +66,13 @@ export async function getTaskResultById (job_id: string, workspace_id:string, wa
   return result.data
 }
 
+// 根据任务id和航线id查询结果飞行结果 改
+export async function getFlyTaskResultApi (job_id: string, workspace_id:string, wayline_id:string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/files/getMediaFileByJobId?job_id=${job_id}&workspace_id=${workspace_id}&wayline_id=${wayline_id}`
+  const result = await request.get(url)
+  return result.data
+}
+
 // 测试接口   根据worckspaceId 和fileId生成缩略图
 export async function getThumbnailById (file_id: string, workspace_id:string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX}/files/getThumbnailByJobId?file_id=${file_id}&workspace_id=${workspace_id}`
