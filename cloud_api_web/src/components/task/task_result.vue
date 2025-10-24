@@ -284,7 +284,8 @@ const origionImageUrls = ref([]) // 临时存放原图下载urls
 
 onMounted(() => {
   const data = JSON.parse(localStorage.getItem('TaskInfo'))
-  jobInfo.job_id = 'e955f015-0846-4304-be4e-d7ade4ef1e8b'
+  jobInfo.job_id = data.job_id
+  // 'e955f015-0846-4304-be4e-d7ade4ef1e8b'
   // data.job_id
   jobInfo.job_name = data.job_name
   jobInfo.begin_time = data.begin_time
