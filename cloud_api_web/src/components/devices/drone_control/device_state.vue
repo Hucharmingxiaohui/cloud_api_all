@@ -1,6 +1,5 @@
 <template>
     <div v-if="true">
-
        <!-- 机场信息 -->
        <div class="content_title">机场状态: {{ EDockModeCode[deviceInfo.dock.basic_osd?.mode_code] }}</div>
       <div  class="device-content" style="margin-bottom: 20px;">
@@ -160,6 +159,16 @@ function collapseStatePanel () {
 }
 // 接收到值
 const deviceInfo = ref(props.deviceInfo)
+
+watch(
+  () => props.deviceInfo,
+  (newVal) => {
+    console.log('更新前的值:',deviceInfo.value)
+    deviceInfo.value = newVal
+    console.log('更新后的值:',deviceInfo.value)
+  },
+  { deep: true }
+);
 // dock 控制面板
 const {
   dockControlPanelVisible,
