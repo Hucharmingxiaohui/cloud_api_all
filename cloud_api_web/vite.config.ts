@@ -16,7 +16,9 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
   defineConfig({
     plugins: [
       vue(),
-      cesium(), // 添加 Cesium 插件
+      cesium({
+      injectCss: false, // 关闭自动注入 CSS
+    }),
       eslintPlugin({
         fix: true,
       }),
@@ -116,7 +118,7 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         },
       },
     },
-    base: "./",
+    base: "/",
     build: {
       target: ["es2020"], // 最低支持 es2015
       sourcemap: false,

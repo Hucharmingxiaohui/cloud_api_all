@@ -313,8 +313,7 @@ const _tickUnlisten = null // 退出时要取消 onTick
 
 const manualInput = ref(false) // 控制是否显示手动输入框
 const newWayline = ref('') // 用于存储手动输入的航线名称
-console.log('Cesium版本:', Cesium.VERSION)
-console.log('完整版本信息:', Cesium.version)
+let animationFrameId = null // 存储循环ID
 // 切换手动输入模式
 function toggleManualInput () {
   manualInput.value = !manualInput.value
@@ -495,41 +494,27 @@ function selectModel (val) {
   childMap.value.loadModel(tilesetUrl)
 }
 // -------------------------------------------------------------------------------------场景初始化-----------------------------------------------------------------------------------------
-let voxel = null
+const voxel = null
 onMounted(async () => {
   GetModels()
   init()
 
-  const cesiumElement = document.getElementById('cesiumContainer')
+  // const cesiumElement = document.getElementById('cesiumContainer')
 
-  cesiumElement.addEventListener('contextmenu', handleRightClick)
+  // cesiumElement.addEventListener('contextmenu', handleRightClick)
 
-  voxel = await loadVoxel('model//Vox') // 这里放 header.json/occupancy.bin 的访问路径根
-  // ------------------2025/7/31 useless
-  // if (cesium.viewer) {
-  //   console.log('有大窗口')
-  //   const cesiumElement = document.getElementById('droneCesiumContainer')
-  //   cesiumElement.addEventListener('contextmenu', handleRightClick)
-  //   // 确保只有在Viewer初始化后再添加事件监听器
-  //   // cesium.viewer.camera.changed.addEventListener(updateCameraParameters)
-  // } else {
-  //   console.error('Cesium Viewer not initialized yet!')
-  // }
-
-  // const viewer = childMap.value?.viewer // 这里 `childMap` 引用了 UavCamera 组件
-
-  // if (viewer) {
-  //   console.log('有小窗口')
-  //   // 为无人机视角相机绑定相机变化事件监听器
-  //   viewer.camera.changed.addEventListener(updateCameraParameters)
-  // } else {
-  //   console.error('Cesium Drone Viewer not initialized yet!')
-  // }
-
-  // -----------------
+  // voxel = await loadVoxel('model//Vox') // 这里放 header.json/occupancy.bin 的访问路径根
 })
 
 onBeforeUnmount(() => {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId) // 停止循环
+    animationFrameId = null
+  }
+  if (cesium.viewer && !cesium.viewer.isDestroyed()) {
+    cesium.viewer.destroy()
+    cesium.viewer = null
+  }
   document.removeEventListener('contextmenu', handleRightClick)
 })
 
@@ -604,8 +589,9 @@ function initCesium () {
   cesium.viewer.scene.debugShowFramesPerSecond = true // 显示帧率
 }
 function startRenderLoop () {
+  if (!cesium.viewer || cesium.viewer.isDestroyed()) return
   cesium.viewer.render()
-  requestAnimationFrame(startRenderLoop)
+  animationFrameId = requestAnimationFrame(startRenderLoop)
 }
 //  -------------------------------------------------------------------------------------模型加载-----------------------------------------------------------------------------------------
 // 加载3DTiles模型
