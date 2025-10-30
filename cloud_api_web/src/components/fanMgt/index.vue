@@ -50,90 +50,93 @@
     <div class="content">
       <div class="table-container">
         <el-table :data="tableData" stripe>
-          <el-table-column type="selection" width="55" />
-          <el-table-column label="风机名称">
+          <el-table-column type="index"  align="center" label="序号" width="60" />
+          <el-table-column label="风机名称" style="max-width: 100px;">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.turbine_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场经度">
+          <el-table-column label="机场经度" width="150">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场纬度">
+          <el-table-column label="机场纬度" width="150">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场海拔(米)">
+          <el-table-column label="机场海拔(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="正对航向角">
+          <el-table-column label="正对航向角" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.approach_yaw }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点经度">
+          <el-table-column label="最高点经度" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点纬度">
+          <el-table-column label="最高点纬度" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点海拔(米)">
+          <el-table-column label="最高点海拔(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="叶片中心高度(米)">
+          <el-table-column label="叶片中心高度(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_center_height }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="停机叶片夹角">
+          <el-table-column label="停机叶片夹角" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_stop_angle }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="叶片长度(米)">
+          <el-table-column label="叶片长度(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_length }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="无人机距离(米)">
+          <el-table-column label="无人机距离(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.uav_blade_distance }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="风机底部高度(米)">
+          <el-table-column label="风机底部高度(米)" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_bottom_height }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="单个扇叶的点数">
+          <el-table-column label="单个扇叶的点数" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_points }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="塔筒的点数">
+          <el-table-column label="塔筒的点数" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.tower_points }}</div>
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="120">
+          <el-table-column label="操作" width="150" fixed="right">
             <template #default="scope">
               <el-button link type="primary" @click="openEditDialog(scope.row)"
                 >编辑</el-button
               >
               <el-button link type="danger" @click="handleDelete(scope.row)"
                 >删除</el-button
+              >
+              <el-button link type="primary" @click="handleTask(scope.row)"
+                >执行任务</el-button
               >
             </template>
           </el-table-column>
@@ -433,8 +436,8 @@ import { reactive, ref, computed, onMounted } from 'vue'
 // import { TableState } from 'ant-design-vue/lib/table/interface'
 // import { IPage } from '/@/api/http/type'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { ElButton, ElDialog, ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
-import { addWindTurbineConfigApi, getAllWindTurbineApi, updateWindTurbineConfigApi, deleteWindTurbineApi } from '/@/api/turbine/turbineMgt'
+import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
+import { addWindTurbineConfigApi, executeFlyTaskApi, getAllWindTurbineApi, updateWindTurbineConfigApi, deleteWindTurbineApi } from '/@/api/turbine/turbineMgt'
 // import * as XLSX from 'xlsx'
 // import { message } from 'ant-design-vue'
 
@@ -647,7 +650,6 @@ async function handleDelete (row:any) {
 
   }
 }
-
 // 获取风机信息查询
 function getWindTurbineConfig () {
   try {
@@ -667,6 +669,28 @@ function handleRest () {
   queryForm.turbine_name = ''
   queryForm.id = ''
   getWindTurbineConfig()
+}
+
+/**
+ * 执行飞行任务
+ */
+async function handleTask (row) {
+  try {
+    ElMessageBox.confirm('确定要执行飞行任务吗?', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+      .then(async () => {
+        const res = executeFlyTaskApi({ id: row.id })
+        ElMessage.success('飞行任务发布成功!')
+      })
+      .catch(() => {
+      // ElMessage.info('已取消删除')
+      })
+  } catch (error) {
+
+  }
 }
 </script>
 
@@ -780,17 +804,16 @@ function handleRest () {
 .table-container {
     flex-grow: 1;
     overflow: hidden;
-    height: 70vh;
+    height: 65vh;
     overflow-y: auto;
 }
 
 .ellipsis {
-    white-space: nowrap;
-    /* 防止换行 */
-    overflow: hidden;
-    /* 隐藏超出部分 */
-    text-overflow: ellipsis;
-    /* 显示省略号 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5; /* 限制显示行数 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // 下拉框
@@ -1152,6 +1175,10 @@ function handleRest () {
     border-bottom: none !important;
 }
 
+// 固定列表头
+:deep(.el-table__header-wrapper tr th.el-table-fixed-column--right){
+  background-color: #00399A;
+}
 // 表格最后一条白线
 :deep .el-table__inner-wrapper::before {
     height: 0;

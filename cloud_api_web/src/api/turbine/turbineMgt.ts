@@ -4,6 +4,7 @@ import { TaskType, TaskStatus, OutOfControlAction } from '/@/types/task'
 import { WaylineType } from '/@/types/wayline'
 
 const HTTP_PREFIX = '/api/windTurbine'
+const HTTP_PREFIX_TWO = '/api/WindTurbineWayline'
 
 // 获取航线
 // export const getWaylineFiles = async function (wid: string, body: {}): Promise<IWorkspaceResponse<any>> {
@@ -37,5 +38,12 @@ export const updateWindTurbineConfigApi = async function (data): Promise<IWorksp
 export const deleteWindTurbineApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/delete?id=${id} `
   const result = await request.get(url)
+  return result.data
+}
+
+// 根据风机参数，自动执行飞行任务
+export const executeFlyTaskApi = async function (data: any): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_TWO}/excute`
+  const result = await request.post(url, data)
   return result.data
 }

@@ -115,10 +115,8 @@ async function getLiveHttp () {
     if (res.code === 0) {
       flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
       initFlv()
-      console.log('ttttttttttttttttttttttttttttt')
     }
     if (res.code === 513003) {
-      console.log('sssssssssssssssssssssssssssssssssss')
       isPlay.value = true
       // rtmp://172.20.63.238:2035/live/
       flvURL.value = config.rtmpURL.replace('rtmp://', 'http://').replace(':2035', ':9080') + '7CTDL9K00A0157-165-0-7.flv'

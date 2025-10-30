@@ -18,6 +18,12 @@
         <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
         <span style="margin-left: 5px; font-size: 14px;">查询</span>
       </el-button>
+      <el-button class="new_btn2" type="primary" style="margin-left: 30px; width: 90px;" :icon="Download">
+        下载报告
+      </el-button>
+      <el-button class="new_btn2" type="primary" style="margin-left: 30px; width: 90px;" :icon="Document">
+        查看报告
+      </el-button>
 
       <!-- <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
         @click="CreateThumbnail">
@@ -258,6 +264,7 @@ import { useFormatTask } from './use-format-task'
 import { saveAs } from 'file-saver' // 导入文件保存工具
 import { useRouter } from 'vue-router'
 import { downloadFile } from '/@/utils/common'
+import { Search, Download, Document } from '@element-plus/icons-vue'
 import { downloadMediaFile, getFlyTaskResultApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
@@ -1114,6 +1121,13 @@ function scrollRight () {
     font-family: Google Sans-Medium;
     font-weight: 500;
     margin: 0 10px 0 30px;
+  }
+  .new_btn2 {
+    background-image: linear-gradient(180deg,
+        rgba(70, 145, 217, 1) 0,
+        rgba(21, 81, 181, 1) 100%);
+    border-radius: 4px;
+    height: 37px;
   }
 
   .new_btn {
