@@ -6,10 +6,15 @@
 <mapper namespace="com.dji.sample.df.wind.dao.WindTurbineMapper">
 
     <select id="selectList" resultType="com.dji.sample.df.wind.model.entity.WindTurbine">
-        SELECT * FROM blade_df
+        SELECT * FROM manage_fan
         <where>
             <if test="turbineName!=null and turbineName!=''">
                 and turbine_name LIKE concat('%', #{turbineName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="id!=null and id!=''">
+                and id = #{id}
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">

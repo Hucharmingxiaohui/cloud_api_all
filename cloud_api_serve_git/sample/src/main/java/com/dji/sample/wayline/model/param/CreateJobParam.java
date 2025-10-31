@@ -50,4 +50,6 @@ public class CreateJobParam {
     private List<List<Long>> taskPeriods;
 
     private String planId;
+
+    private String fanName;
 }

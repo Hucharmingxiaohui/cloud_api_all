@@ -26,7 +26,8 @@ public interface IWaylineJobService {
      * @return
      */
     Optional<WaylineJobDTO> createWaylineJob(CreateJobParam param, String workspaceId, String username, Long beginTime, Long endTime);
-
+//   空中下发航线任务创建
+    Optional<WaylineJobDTO> createWaylineJob2(CreateJobParam param, String workspaceId, String username, Long beginTime, Long endTime);
     /**
      * Create a sub-task based on the information of the parent task.
      * @param workspaceId

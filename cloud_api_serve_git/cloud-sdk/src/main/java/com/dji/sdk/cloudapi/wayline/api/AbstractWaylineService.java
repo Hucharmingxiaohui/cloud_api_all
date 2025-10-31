@@ -56,6 +56,12 @@ public abstract class AbstractWaylineService {
         throw new UnsupportedOperationException("flighttaskProgress not implemented");
     }
 
+//  空中航线mqtt接收
+    @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_INFLIGHTTASK_PROGRESS, outputChannel = ChannelName.OUTBOUND_EVENTS)
+    public TopicEventsResponse<MqttReply> inFlighttaskProgress(TopicEventsRequest<InFlighttaskProgress> request, MessageHeaders headers) {
+        throw new UnsupportedOperationException("inflighttaskProgress not implemented");
+    }
+
     /**
      * Notification of task readiness
      * @param request  data

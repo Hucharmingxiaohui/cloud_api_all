@@ -117,6 +117,8 @@ public class ChannelName {
     public static final String INBOUND_EVENTS_DEVICE_EXIT_HOMING_NOTIFY = "inboundEventsDeviceExitHomingNotify";
 
     public static final String INBOUND_EVENTS_FLIGHTTASK_PROGRESS = "inboundEventsFlighttaskProgress";
+//  空中航线
+    public static final String INBOUND_EVENTS_INFLIGHTTASK_PROGRESS = "inboundEventsInFlighttaskProgress";
 
     public static final String INBOUND_EVENTS_FLIGHTTASK_READY = "inboundEventsFlighttaskReady";
 

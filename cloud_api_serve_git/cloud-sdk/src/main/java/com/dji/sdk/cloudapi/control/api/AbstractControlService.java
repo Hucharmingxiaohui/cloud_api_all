@@ -164,6 +164,14 @@ public abstract class AbstractControlService {
                 ControlMethodEnum.FLY_TO_POINT.getMethod(),
                 request);
     }
+//  空中下发航线
+    @CloudSDKVersion(exclude = GatewayTypeEnum.RC)
+    public TopicServicesResponse<ServicesReplyData> inFlightWaylineDeliver(GatewayManager gateway, InFlightWaylineDeliverRequest request) {
+        return servicesPublish.publish(
+                gateway.getGatewaySn(),
+                ControlMethodEnum.IN_FLIGHT_WAYLINE_DELIVER.getMethod(),
+                request);
+    }
 
     /**
      * Quickly update target points

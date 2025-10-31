@@ -115,4 +115,7 @@ public class WaylineJobEntity implements Serializable {
      */
     @TableField("repair_cnt")
     private Integer repairCnt;
+
+    @TableField("fan_name")
+    private String fanName;
 }

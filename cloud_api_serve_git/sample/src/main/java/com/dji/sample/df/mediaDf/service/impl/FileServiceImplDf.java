@@ -155,6 +155,23 @@ public class FileServiceImplDf implements IFileServiceDf {
     }
 
     @Override
+    public List<MediaFileDTO> getUniqueFilesByJobId( String jobId) {
+        return mapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+                        .eq(MediaFileEntity::getJobId, jobId))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        MediaFileEntity::getFileName,
+                        Collectors.minBy(Comparator.comparing(MediaFileEntity::getCreateTime))
+                ))
+                .values()
+                .stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(this::entityConvertToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName) {
         Page<MediaFileEntity> pageData = mapper.selectPage(
                 new Page<MediaFileEntity>(page, pageSize),
@@ -219,7 +236,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Override
     public PointResult getMediaDileByJobId(String job_id, String workspace_id, String wayline_id) throws Exception {
         synchronized (lock){
-            List<MediaFileDTO> mediaFileDTOList = this.getFilesByJobId(job_id);
+            List<MediaFileDTO> mediaFileDTOList = this.getUniqueFilesByJobId(job_id);
             //排序
             for (int i = 0; i < mediaFileDTOList.size()- 1; i++) {
                 // 设置一个标志位，用于检测是否发生了交换
@@ -314,6 +331,75 @@ public class FileServiceImplDf implements IFileServiceDf {
             return pointResult;
         }
     }
+//  最新版接口，不分析航点
+    @Override
+    public List<MediaFileDTO> getMediaDileByJobId3(String job_id, String workspace_id) throws Exception {
+        synchronized (lock) {
+            List<MediaFileDTO> mediaFileDTOList = this.getUniqueFilesByJobId(job_id);
+            //排序
+            for (int i = 0; i < mediaFileDTOList.size() - 1; i++) {
+                // 设置一个标志位，用于检测是否发生了交换
+                boolean swapped = false;
+                // 内层循环，从第一个元素到倒数第i个元素
+                for (int j = 0; j < mediaFileDTOList.size() - i - 1; j++) {
+                    //获取第一张图片的时间数
+                    //获取第j张照片名称
+                    String T1fileName = mediaFileDTOList.get(j).getFileName();
+                    //记录第J张照片时间
+                    String strT1num = "";
+                    //记录下划线
+                    int T1count = 0;
+                    for (int i1 = 0; i1 < T1fileName.length(); i1++) {
+                        if (T1fileName.charAt(i1) == '_') {
+                            T1count++;
+                        }
+                        if (T1count == 1 && T1fileName.charAt(i1) != '_') {
+                            strT1num = strT1num + T1fileName.charAt(i1);
+                        }
+                        if (T1count == 2) {
+                            break;
+                        }
+
+                    }
+                    Long T1num = Long.valueOf(strT1num);
+
+                    //获取第二张图片时间数
+                    String T2fileName = mediaFileDTOList.get(j + 1).getFileName();
+                    //记录第J张照片时间
+                    String strT2num = "";
+                    //记录下划线
+                    int T2count = 0;
+                    for (int i1 = 0; i1 < T2fileName.length(); i1++) {
+                        if (T2fileName.charAt(i1) == '_') {
+                            T2count++;
+                        }
+                        if (T2count == 1 && T2fileName.charAt(i1) != '_') {
+                            strT2num = strT2num + T2fileName.charAt(i1);
+                        }
+                        if (T2count == 2) {
+                            break;
+                        }
+
+
+                    }
+                    Long T2num = Long.valueOf(strT2num);
+                    // 如果当前元素比下一个元素大，则交换它们
+                    if (T1num > T2num) {
+                        MediaFileDTO temp = mediaFileDTOList.get(j);
+                        mediaFileDTOList.set(j, mediaFileDTOList.get(j + 1));
+                        mediaFileDTOList.set(j + 1, temp);
+                        swapped = true;
+                    }
+                }
+                // 如果没有发生交换，说明列表已经有序，提前退出
+                if (!swapped) {
+                    break;
+                }
+            }
+            return mediaFileDTOList;
+        }
+    }
+
 
     @Override
     public PointResult getMediaDileByJobId2(String job_id, String workspace_id, String wayline_id ) throws Exception {

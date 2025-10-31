@@ -92,7 +92,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 //      获取计划的总点位数
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, param.getPlanId()));
-        String[] split = pubWaylineJobPlanDfEntity.getWaylinePointPos().split(",");
+//        String[] split = pubWaylineJobPlanDfEntity.getWaylinePointPos().split(",");
         // Immediate tasks, allocating time on the backend.
         WaylineJobEntity jobEntity = WaylineJobEntity.builder()
                 .name(param.getName())
@@ -110,7 +110,40 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .rthAltitude(param.getRthAltitude())
                 .mediaCount(0)
                 .planId(param.getPlanId())
-                .allPointCnt(split.length)
+                .fanName(param.getFanName())
+//                .allPointCnt(split.length)
+                .build();
+
+        return insertWaylineJob(jobEntity);
+    }
+
+    @Override
+    public Optional<WaylineJobDTO> createWaylineJob2(CreateJobParam param, String workspaceId, String username, Long beginTime, Long endTime) {
+        if (Objects.isNull(param)) {
+            return Optional.empty();
+        }
+//      获取计划的总点位数
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, param.getPlanId()));
+        // Immediate tasks, allocating time on the backend.
+
+        WaylineJobEntity jobEntity = WaylineJobEntity.builder()
+                .name(param.getName())
+                .dockSn(param.getDockSn())
+                .fileId(param.getFileId())
+                .username(username)
+                .workspaceId(workspaceId)
+                .jobId(param.getPlanId())
+                .beginTime(beginTime)
+                .endTime(endTime)
+                .status(WaylineJobStatusEnum.PENDING.getVal())
+                .taskType(param.getTaskType().getType())
+                .waylineType(param.getWaylineType().getValue())
+                .outOfControlAction(param.getOutOfControlAction().getAction())
+                .rthAltitude(param.getRthAltitude())
+                .mediaCount(0)
+                .planId(param.getPlanId())
+//                .allPointCnt(split.length)
                 .build();
 
         return insertWaylineJob(jobEntity);

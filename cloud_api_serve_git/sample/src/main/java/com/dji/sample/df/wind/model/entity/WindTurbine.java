@@ -15,7 +15,7 @@ import java.io.Serializable;
  * 风机参数实体类
  */
 @Data
-@TableName("blade_df")
+@TableName("manage_fan")
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
@@ -58,5 +58,15 @@ public class WindTurbine implements Serializable {
     private Double bladeLength; // 单个叶片长度
 
     @TableField("uav_blade_distance")
-    private Double uavBladeDistance; // 无人机距离叶片距离
+    private Double uavBladeDistance;//无人机距离叶片距离
+
+    @TableField("blade_bottom_height")
+    private Double bladeBottomHeight;//风机底部的高度
+
+    @TableField("blade_points")
+    private Integer bladePoints;//单个扇叶的点数
+
+    @TableField("tower_points")
+    private Integer towerPoints;//塔筒的点数
+
 }

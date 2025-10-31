@@ -13,10 +13,7 @@ import com.dji.sdk.cloudapi.log.FileUploadProgress;
 import com.dji.sdk.cloudapi.map.OfflineMapSyncProgress;
 import com.dji.sdk.cloudapi.media.FileUploadCallback;
 import com.dji.sdk.cloudapi.media.HighestPriorityUploadFlightTaskMedia;
-import com.dji.sdk.cloudapi.wayline.DeviceExitHomingNotify;
-import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
-import com.dji.sdk.cloudapi.wayline.FlighttaskReady;
-import com.dji.sdk.cloudapi.wayline.ReturnHomeInfo;
+import com.dji.sdk.cloudapi.wayline.*;
 import com.dji.sdk.mqtt.ChannelName;
 import com.fasterxml.jackson.core.type.TypeReference;
 
@@ -31,6 +28,8 @@ import java.util.List;
 public enum EventsMethodEnum {
 
     FLIGHTTASK_PROGRESS("flighttask_progress", ChannelName.INBOUND_EVENTS_FLIGHTTASK_PROGRESS, new TypeReference<EventsDataRequest<FlighttaskProgress>>() {}),
+//  空中航线
+    INFLIGHTTASK_PROGRESS("in_flight_wayline_progress", ChannelName.INBOUND_EVENTS_INFLIGHTTASK_PROGRESS, new TypeReference<InFlighttaskProgress>() {}),
 
     DEVICE_EXIT_HOMING_NOTIFY("device_exit_homing_notify", ChannelName.INBOUND_EVENTS_DEVICE_EXIT_HOMING_NOTIFY, new TypeReference<DeviceExitHomingNotify>() {}),
 

@@ -62,6 +62,8 @@ public interface IFileServiceDf {
      * @return
      */
     List<MediaFileDTO> getFilesByJobId( String jobId);
+//
+    List<MediaFileDTO> getUniqueFilesByJobId( String jobId);
 
     PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName);
 
@@ -72,6 +74,8 @@ public interface IFileServiceDf {
     List<MediaFileDTO> getJobIdList(String workspaceId);
     //根据job_id获取详细信息
     PointResult getMediaDileByJobId(String job_id,String workspace_id,String wayline_id) throws Exception;
+    //根据job_id获取详细信息（最新版，不解析航点）
+    List<MediaFileDTO> getMediaDileByJobId3(String job_id,String workspace_id) throws Exception;
 //  获取指定航点的结果照片
     PointResult getMediaDileByJobId2(String job_id,String workspace_id,String wayline_id) throws Exception;
 

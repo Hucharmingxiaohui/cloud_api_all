@@ -234,6 +234,8 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         }
         param.setTaskPeriods(task_periods);
         param.setPlanId(pubWaylineJobPlanDfEntity.getPlanId());
+        param.setFanName(pubWaylineJobPlanDfEntity.getFanName());
+
         System.out.println(param);
         System.out.println("kkkkk");
         //更新状态

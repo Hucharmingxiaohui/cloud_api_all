@@ -93,6 +93,9 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @TableField("wayline_point_pos") // 航点预置位号
     private String waylinePointPos;
 
+    @TableField("fan_name")
+    private String fanName;
+
     @Transient
     @TableField(exist = false)
     private String deviceList;

@@ -17,6 +17,8 @@ public enum ControlMethodEnum {
 
     FLY_TO_POINT("fly_to_point"),
 
+    IN_FLIGHT_WAYLINE_DELIVER("in_flight_wayline_deliver"),
+
     FLY_TO_POINT_STOP("fly_to_point_stop"),
 
     FLY_TO_POINT_UPDATE("fly_to_point_update"),

@@ -97,8 +97,15 @@ public class FileControllerDf {
     public HttpResultResponse getMediaDileByJobId(String job_id,String workspace_id,String wayline_id) throws Exception {
         PointResult pointResult =fileService.getMediaDileByJobId(job_id,workspace_id,wayline_id);
         return HttpResultResponse.success(pointResult).setMessage("查询任务结果成功");
-
     }
+
+    @GetMapping("/getMediaFileByJobId")
+    public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id) throws Exception {
+        List<MediaFileDTO> mediaFileDTOS = fileService.getMediaDileByJobId3(job_id, workspace_id);
+        return HttpResultResponse.success(mediaFileDTOS).setMessage("查询任务结果成功");
+    }
+
+
 //  根据任务获取点位列表
     @GetMapping("/getPointByJobId")
     public HttpResultResponse getPointByJobId(String job_id) throws Exception {

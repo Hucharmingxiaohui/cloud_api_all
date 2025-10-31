@@ -1,8 +1,9 @@
 package com.dji.sample.df.wind.controller;
 
 import com.df.framework.vo.Result;
-import com.dji.sample.df.wind.FlyToFront;
+import com.dji.sample.df.wind.PictureSaveHandler;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
+import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.df.wind.service.WindTurbineService;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,7 +20,10 @@ public class WindTurbineController {
     private WindTurbineService windTurbineService;
 
     @Resource
-    FlyToFront flyToFront;
+    PictureSaveHandler pictureSaveHandler;
+
+    @Resource
+    FjReportService fjReportService;
 
     /**
      * 新增风机参数
@@ -59,12 +63,13 @@ public class WindTurbineController {
     }
 
     /**
-     * 查询所有风机参数
+     * 查询风机列表
      */
     @GetMapping("selectList")
     public Result<List<WindTurbine>> selectList(@RequestParam Map <String, Object> map) {
         List<WindTurbine> list = windTurbineService.selectList(map);
-        flyToFront.flyToFront("风机H",0.0);
+//        fjReportService.genPatrolTaskWordNew(1,null,null);
+//        routePlan.flyToFront("风机H",195.0);
         return Result.success(list);
     }
 
