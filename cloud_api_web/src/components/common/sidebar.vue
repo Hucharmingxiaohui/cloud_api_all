@@ -421,8 +421,6 @@ function goHome () {
 
 }
 
-@import '/@/styles/index.scss';
-
 .fontBold {
   font-weight: 500;
   font-size: 18px;

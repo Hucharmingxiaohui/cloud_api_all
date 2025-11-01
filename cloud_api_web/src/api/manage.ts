@@ -6,7 +6,7 @@ import { log } from 'console'
 
 const HTTP_PREFIX = '/manage/api/v1'
 const HTTP_PREFIX1 = '/pub/api/v1'
-
+const HTTP_PREFIX_TWO = '/fjReport/api/v1'
 // login
 export interface LoginBody {
  username: string,
@@ -287,5 +287,23 @@ export interface updateSubBody {
 export const updateSub = async function (body: updateSubBody): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX1}/pubStation/updateSubStationById`
   const result = await request.put(url, body)
+  return result.data
+}
+
+/**
+ * 任务分析
+ */
+
+// 分析结果
+export async function startTaskAnasisyApi (data): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX_TWO}/pictureSave`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 判断是否已经分析
+export async function isAnalyzedApi (jobId): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX_TWO}/isAnalyzed?jobId=${jobId}`
+  const result = await request.get(url)
   return result.data
 }

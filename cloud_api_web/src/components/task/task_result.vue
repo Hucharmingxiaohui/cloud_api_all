@@ -3,7 +3,12 @@
     <div class="operation">
       <!-- 场站/线路选择框 -->
       <div style="margin: 0 10px;">
-        <el-select v-model="selectedScheme" placeholder="所有类型" class="select-operation" style="width: 200px;">
+        <el-select
+          v-model="selectedScheme"
+          placeholder="所有类型"
+          class="select-operation"
+          style="width: 200px;"
+        >
           <el-option label="所有类型1" value="所有类型1"></el-option>
           <el-option label="所有类型2" value="所有类型2"></el-option>
           <el-option label="所有类型3" value="所有类型3"></el-option>
@@ -11,17 +16,37 @@
       </div>
 
       <div>
-        <el-input v-model="searchTerm" placeholder="请输入名称搜索" style="width: 200px;"></el-input>
+        <el-input
+          v-model="searchTerm"
+          placeholder="请输入名称搜索"
+          style="width: 200px;"
+        ></el-input>
       </div>
       <!-- 查询按钮 -->
-      <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;">
+      <el-button
+        class="new_btn iconfont icon-chaxunhangxian"
+        type="primary"
+        style="margin-left: 30px; width: 70px;"
+      >
         <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
         <span style="margin-left: 5px; font-size: 14px;">查询</span>
       </el-button>
-      <el-button class="new_btn2" type="primary" style="margin-left: 30px; width: 90px;" :icon="Download">
+      <el-button
+        class="new_btn2"
+        type="primary"
+        style="margin-left: 30px; width: 90px;"
+        :icon="Download"
+        @click="createReport()"
+      >
         下载报告
       </el-button>
-      <el-button class="new_btn2" type="primary" style="margin-left: 30px; width: 90px;" :icon="Document">
+      <el-button
+        class="new_btn2"
+        type="primary"
+        style="margin-left: 30px; width: 90px;"
+        :icon="Document"
+        @click="viewReport()"
+      >
         查看报告
       </el-button>
 
@@ -30,15 +55,14 @@
         <span style="margin-left: 5px; font-size: 14px;">测试缩略图</span>
       </el-button> -->
     </div>
-    <div class="content">
+    <div class="content" v-loading="loading">
       <div class="table-container">
         <el-table :data="paginatedData" stripe>
-
           <!-- 多选框 -->
           <el-table-column type="selection" width="55" />
           <!-- 序号列 -->
           <!-- <el-table-column label="序号" type="index" width="80" /> -->
-          <el-table-column label="序号" align='center' width="60">
+          <el-table-column label="序号" align="center" width="60">
             <template #default="scope">
               {{ scope.$index + (currentPage - 1) * pageSize + 1 }}
             </template>
@@ -46,8 +70,12 @@
           <!-- 预览图 -->
           <el-table-column label="预览图" width="150">
             <template #default="scope">
-              <img :src="scope.row.url" alt="预览图" style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
-                @click="openPreviewModal(scope.row)" />
+              <img
+                :src="scope.row.url"
+                alt="预览图"
+                style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
+                @click="openPreviewModal(scope.row)"
+              />
             </template>
           </el-table-column>
           <el-table-column label="名称">
@@ -82,28 +110,55 @@
           </el-table-column>
           <el-table-column label="操作" width="250px">
             <template #default="scope">
-              <el-button size="small" type="text" @click="downloadMediaLocal(scope.row)">下载</el-button>
+              <el-button
+                size="small"
+                type="text"
+                @click="downloadMediaLocal(scope.row)"
+                >下载</el-button
+              >
             </template>
           </el-table-column>
         </el-table>
       </div>
       <div class="pagination-container">
         <!-- 分页 -->
-        <el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page="currentPage"
-          :page-sizes="[10, 20, 40, 100]" :page-size="pageSize" :total="totalItems"
-          layout="total, sizes, prev, pager, next, jumper">
+        <el-pagination
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+          :current-page="currentPage"
+          :page-sizes="[10, 20, 40, 100]"
+          :page-size="pageSize"
+          :total="totalItems"
+          layout="total, sizes, prev, pager, next, jumper"
+        >
         </el-pagination>
       </div>
     </div>
+    <!-- 查看报告 -->
+  <el-dialog title="报告预览" v-model="viewReportVisible" width="1000px" class="view">
+    <div v-loading="viewloading" class="doc-preview-container">
+      <div id="docContainer" class="docx-container"></div>
+    </div>
+  </el-dialog>
+
     <!-- 图片放大弹窗 -->
-    <el-dialog v-model="previewVisible" :before-close="handleClose" width="1000px">
+    <el-dialog
+      v-model="previewVisible"
+      :before-close="handleClose"
+      width="1000px"
+    >
       <div class="preview-modal-content">
         <!-- 左侧显示放大图片 -->
         <!-- <div class="preview-main"> -->
         <!-- 添加“上一张”和“下一张”按钮 -->
         <button class="prev-image" @click="showPreviousImage">‹</button>
-        <img :src="selectedImage.url" alt="放大图" class="preview-image" ref="previewImage"
-          style="object-fit: contain; width: 500px; height: 500px;" />
+        <img
+          :src="selectedImage.url"
+          alt="放大图"
+          class="preview-image"
+          ref="previewImage"
+          style="object-fit: contain; width: 500px; height: 500px;"
+        />
         <button class="next-image" @click="showNextImage">›</button>
         <!-- </div> -->
 
@@ -111,11 +166,21 @@
         <div class="preview-info">
           <div class="info-row">
             <strong>任务名称:</strong>
-            <input type="text" :value="jobInfo.job_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="jobInfo.job_name"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>名称:</strong>
-            <input type="text" :value="selectedImage.file_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="selectedImage.file_name"
+              class="info-input"
+              readonly
+            />
           </div>
           <!-- <div class="info-row">
             <strong>关联点位:</strong>
@@ -123,31 +188,65 @@
           </div> -->
           <div class="info-row">
             <strong>照片类型:</strong>
-            <input type="text" :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'" class="info-input"
-              readonly />
+            <input
+              type="text"
+              :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>航线名称:</strong>
-            <input type="text" :value="jobInfo.file_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="jobInfo.file_name"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>照片分辨率:</strong>
-            <input type="text" :value="`${selectedImage.width} * ${selectedImage.height}`" class="info-input" readonly />
+            <input
+              type="text"
+              :value="`${selectedImage.width} * ${selectedImage.height}`"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row" v-if="selectedImage.file_name.includes('_T')">
             <strong>温度:</strong>
-            <input type="text" :value="getHighestTemp(selectedImage.Temp) + '°C'" class="info-input" readonly />
+            <input
+              type="text"
+              :value="getHighestTemp(selectedImage.Temp) + '°C'"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>拍摄时间:</strong>
-            <input type="text" :value="new Date(selectedImage.create_time).toLocaleString()" class="info-input"
-              readonly />
+            <input
+              type="text"
+              :value="new Date(selectedImage.create_time).toLocaleString()"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>文件大小:</strong>
-            <input type="text" :value="Number(selectedImage.size).toFixed(2) + 'M'" class="info-input" readonly />
+            <input
+              type="text"
+              :value="Number(selectedImage.size).toFixed(2) + 'M'"
+              class="info-input"
+              readonly
+            />
           </div>
-          <button @click="handleTempConfig" class="btn" v-if="selectedImage.file_name.includes('_T')">测温规则配置</button>
+          <button
+            @click="handleTempConfig"
+            class="btn"
+            v-if="selectedImage.file_name.includes('_T')"
+          >
+            测温规则配置
+          </button>
         </div>
       </div>
 
@@ -159,11 +258,23 @@
           <!-- 缩小 -->
           <!-- <el-button icon="el-icon-zoom-out" @click="zoomOut" size="small"></el-button> -->
           <!-- 旋转 -->
-          <el-button icon="el-icon-rotate-left" @click="rotate" size="small">旋转方向</el-button>
+          <el-button icon="el-icon-rotate-left" @click="rotate" size="small"
+            >旋转方向</el-button
+          >
           <!-- 重置方向 -->
-          <el-button icon="el-icon-refresh" @click="resetOrientation" size="small">重置方向</el-button>
+          <el-button
+            icon="el-icon-refresh"
+            @click="resetOrientation"
+            size="small"
+            >重置方向</el-button
+          >
           <!-- 下载 -->
-          <el-button icon="el-icon-download" @click="downloadMediaLocal(selectedImage)" size="small">下载图片</el-button>
+          <el-button
+            icon="el-icon-download"
+            @click="downloadMediaLocal(selectedImage)"
+            size="small"
+            >下载图片</el-button
+          >
         </div>
 
         <!-- 下方显示缩略图 -->
@@ -173,10 +284,19 @@
           <div class="thumbnail-container">
             <!-- <el-row gutter="5">
               <el-col  -->
-            <div v-for="(item, index) in mediaData.data" :key="index" class="thumbnail-item">
-                <!-- <img :src="item.url" alt="缩略图" class="thumbnail-image" :class="{ active: selectedImage === item }" -->
-              <img :src="item.url" alt="" class="thumbnail-image" :class="{ active: selectedImage === item }"
-                @click="selectImage(item)" />
+            <div
+              v-for="(item, index) in mediaData.data"
+              :key="index"
+              class="thumbnail-item"
+            >
+              <!-- <img :src="item.url" alt="缩略图" class="thumbnail-image" :class="{ active: selectedImage === item }" -->
+              <img
+                :src="item.url"
+                alt=""
+                class="thumbnail-image"
+                :class="{ active: selectedImage === item }"
+                @click="selectImage(item)"
+              />
               <!-- </el-col>
             </el-row> -->
             </div>
@@ -188,16 +308,34 @@
     </el-dialog>
     <!-- 红外测温 -->
     <div class="TEMPPanel" v-show="showTempConfig" v-drag-window>
-      <div style="height: 40px; width: 100%; border-bottom: 1px solid #fff; padding-left: 10px;" class="drag-title">红外测温配置
+      <div
+        style="height: 40px; width: 100%; border-bottom: 1px solid #fff; padding-left: 10px;"
+        class="drag-title"
+      >
+        红外测温配置
       </div>
-      <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeTempConfig">
+      <a
+        style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;"
+        @click="closeTempConfig"
+      >
         <CloseOutlined />
       </a>
       <div class="content1">
         <div class="content-left">
-          <el-select v-model="tempType" placeholder="请选择" size="large" class="select-operation" :teleported='false'
-            @change="updateTempType">
-            <el-option v-for="item in tempTypeOption" :key="item.value" :label="item.label" :value="item.value" />
+          <el-select
+            v-model="tempType"
+            placeholder="请选择"
+            size="large"
+            class="select-operation"
+            :teleported="false"
+            @change="updateTempType"
+          >
+            <el-option
+              v-for="item in tempTypeOption"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
           <div class="button-wrapper">
             <!-- 新增字段和输入框 -->
@@ -206,11 +344,24 @@
                 <el-row style="margin-top: 15px;">
                   <!-- 最高温度 -->
                   <el-col :span="24">
-                    <el-form-item label="最高温度°C" style="color: #fff;" v-if="tempType == 2">
-                      <el-input v-model="tt.max_tem" placeholder="最高温度" class="info-input1"></el-input>
+                    <el-form-item
+                      label="最高温度°C"
+                      style="color: #fff;"
+                      v-if="tempType == 2"
+                    >
+                      <el-input
+                        v-model="tt.max_tem"
+                        placeholder="最高温度"
+                        class="info-input1"
+                      ></el-input>
                     </el-form-item>
                     <el-form-item label="温度°C" style="color: #fff;" v-else>
-                      <el-input v-model="tt.point_tem" placeholder="温度" class="info-input1"> </el-input>
+                      <el-input
+                        v-model="tt.point_tem"
+                        placeholder="温度"
+                        class="info-input1"
+                      >
+                      </el-input>
                     </el-form-item>
                   </el-col>
                   <!-- 最高温度坐标 -->
@@ -224,13 +375,29 @@
                   </el-col> -->
                   <!-- 最低温度 -->
                   <el-col :span="24">
-                    <el-form-item label="最低温度°C" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt.min_tem" placeholder="最低温度" class="info-input1"></el-input>
+                    <el-form-item
+                      label="最低温度°C"
+                      :label-style="{ color: 'white' }"
+                      v-if="tempType == 2"
+                    >
+                      <el-input
+                        v-model="tt.min_tem"
+                        placeholder="最低温度"
+                        class="info-input1"
+                      ></el-input>
                     </el-form-item>
                   </el-col>
                   <el-col :span="24">
-                    <el-form-item label="平均温度°C" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt.average_tem" placeholder="最低温度" class="info-input1"></el-input>
+                    <el-form-item
+                      label="平均温度°C"
+                      :label-style="{ color: 'white' }"
+                      v-if="tempType == 2"
+                    >
+                      <el-input
+                        v-model="tt.average_tem"
+                        placeholder="最低温度"
+                        class="info-input1"
+                      ></el-input>
                     </el-form-item>
                   </el-col>
                   <!-- 最低温度坐标 -->
@@ -247,8 +414,13 @@
           </div>
         </div>
         <div class="content-right">
-          <canvas ref="canvas" @mousedown="startDrawing" @mousemove="draw" @mouseup="stopDrawing"
-            style="height: 100%;width: 100%"></canvas>
+          <canvas
+            ref="canvas"
+            @mousedown="startDrawing"
+            @mousemove="draw"
+            @mouseup="stopDrawing"
+            style="height: 100%;width: 100%"
+          ></canvas>
         </div>
       </div>
     </div>
@@ -265,17 +437,21 @@ import { saveAs } from 'file-saver' // 导入文件保存工具
 import { useRouter } from 'vue-router'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document } from '@element-plus/icons-vue'
-import { downloadMediaFile, getFlyTaskResultApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
+import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, createFlyTaskReportApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import { consoleLog } from '/@/utils/logger'
 import { message } from 'ant-design-vue'
+import { renderAsync } from 'docx-preview'
+import { ElMessage } from 'element-plus'
 const router = useRouter()
 const searchTerm = ref('') // 存储搜索关键字
 const selectedScheme = ref<string | null>(null)
 const { formatTaskTime } = useFormatTask()
-
+const viewReportVisible = ref(false)
+const loading = ref(false) // 全局下载loading
+const viewloading = ref(false) // 全局下载loading
 // ===========================================================请求数据===========================================================================================
 const jobInfo = reactive({
   job_id: '',
@@ -324,6 +500,67 @@ const mediaData = reactive({
 })
 
 /**
+ * 生成任务结果报告
+ */
+async function createReport () {
+  try {
+    loading.value = true
+    const response = await createFlyTaskReportApi({
+      jobId: jobInfo.job_id
+    })
+
+    if (response.code === 0) {
+      const res = await downloadFlyTaskReportApi(jobInfo.job_id)
+      if (!res) {
+        loading.value = false
+        return
+      }
+      const data = new Blob([res])
+      downloadFile(data, `${jobInfo.job_name}.docx`)
+    }
+  } catch (error) {
+    console.error('生成报告失败:', error)
+    loading.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 查看报告
+ */
+async function viewReport () {
+  try {
+    viewReportVisible.value = true
+    viewloading.value = true
+    const response = await createFlyTaskReportApi({
+      jobId: jobInfo.job_id
+    })
+
+    if (response.code === 0) {
+      const res = await downloadFlyTaskReportApi(jobInfo.job_id)
+      if (!res) {
+        viewloading.value = false
+        return
+      }
+      const data = new Blob([res])
+      const docContainer = document.getElementById('docContainer')
+
+      // 清空容器
+      docContainer.innerHTML = ''
+
+      // 直接传递Blob对象给renderAsync
+      await renderAsync(data, docContainer)
+    }
+  } catch (error) {
+    console.error('生成报告失败:', error)
+    viewloading.value = false
+  } finally {
+    viewloading.value = false
+  }
+}
+
+/**
  * @description: 获取媒体文件
  * @param {string} workspaceId 工作空间id
  * */
@@ -340,7 +577,6 @@ async function getFiles () {
     getUrls()
   })
 }
-
 // 获取图片的下载路径
 // async function getUrls () {
 //   for (const item of mediaData.data) {
@@ -511,7 +747,7 @@ function getOrigionImage (file_id: string, file_name: string) {
  * @description: 下载图片到本地
  * @param {string} workspaceId 工作空间id
  * */
-const loading = ref(false)
+
 function downloadMediaLocal (media: any) {
   loading.value = true
   // downloadThumbnail(workspaceId, media.file_id).then(res => {
@@ -1029,10 +1265,37 @@ function scrollRight () {
   const container = document.querySelector('.thumbnail-container') as HTMLElement
   container.scrollBy({ left: 100, behavior: 'smooth' }) // 向右滚动 100px
 }
-
 </script>
 
 <style lang="scss" scoped>
+
+.docx-preview-container {
+  width: 100%;
+  height: 600px;
+  overflow: auto;
+  background: #f5f5f5;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.docx-container {
+  background: white;
+  // box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  min-height: 100%;
+  padding: 40px; /* 模拟Word页面边距 */
+  box-sizing: border-box;
+}
+:deep(.docx-wrapper){
+  background: white;
+}
+:deep(.el-dialog__title) {
+    color: white !important;
+  }
+
+:deep(article){
+  padding: 50px;
+}
 .container1 {
   // height: 100%;
   width: 100vw;

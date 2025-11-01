@@ -1,6 +1,7 @@
 import { message } from 'ant-design-vue'
 import request, { CommonListResponse, IPage, IWorkspaceResponse } from '/@/api/http/request'
 const HTTP_PREFIX = '/media/api/v1'
+const HTTP_PREFIX_TWO = '/fjReport/api/v1'
 
 // Get Media Files
 export const getMediaFiles = async function (wid: string, pagination: IPage): Promise<IWorkspaceResponse<any>> {
@@ -71,6 +72,36 @@ export async function getFlyTaskResultApi (job_id: string, workspace_id:string, 
   const url = `${HTTP_PREFIX}/files/getMediaFileByJobId?job_id=${job_id}&workspace_id=${workspace_id}&wayline_id=${wayline_id}`
   const result = await request.get(url)
   return result.data
+}
+
+/**
+ *生成任务结果报告
+ *
+ */
+// 生成报告
+export async function createFlyTaskReportApi (data): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX_TWO}/createTaskReport`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 下载报告
+export const downloadFlyTaskReportApi = async function (jobId: string): Promise<any> {
+  const url = `${HTTP_PREFIX_TWO}/download?jobId=${jobId}`
+  const result = await request.get(url, { responseType: 'blob' })
+  if (result.data.type === 'application/json') {
+    const reader = new FileReader()
+    reader.onload = function (e) {
+      const text = reader.result as string
+      const result = JSON.parse(text)
+      message.error(result.message)
+    }
+    reader.readAsText(result.data, 'utf-8')
+    console.log('json')
+  } else {
+    console.log('nojson')
+    return result.data
+  }
 }
 
 // 测试接口   根据worckspaceId 和fileId生成缩略图

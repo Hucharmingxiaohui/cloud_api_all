@@ -117,6 +117,7 @@
             </el-table-column>
             <el-table-column label="操作">
               <template #default="scope">
+                 <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">分析</el-button>
                 <el-popconfirm v-if="scope.row.status === TaskStatus.Wait " width="220" confirm-button-text="确定"
                   cancel-button-text="取消" icon-color="#626AEF" title="你确定要删除飞行任务吗？"
                   @confirm="onDeleteTask(scope.row.job_id)">
@@ -167,7 +168,7 @@
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
-import { onMounted, provide, reactive, ref } from 'vue'
+import { onMounted, watch, provide, reactive, ref, nextTick } from 'vue'
 import { IPage } from '/@/api/http/type'
 import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, deleteOtherTask } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
@@ -179,7 +180,7 @@ import { getErrorMessage } from '/@/utils/error-code/index'
 import { commonColor } from '/@/utils/color'
 import { ExclamationCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
-import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
+import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
 const router = useRouter()
@@ -188,6 +189,9 @@ const showVideo = ref(false)
 const isResizing = ref(false)
 const videoModal = ref(null)
 let startX, startY, startWidth, startHeight
+
+// 存储已处理的任务ID，避免重复分析
+const analyzedTasks = ref(new Set())
 
 const taskTypeLabels = {
   0: '立即任务',
@@ -240,9 +244,6 @@ function onTaskProgressWs (data: TaskProgressInfo) {
   const { bid, output } = data
   if (output) {
     const { status, progress } = output || {}
-    // console.log('任务进度111111', data)
-    // console.log('任务进度111111', status)
-    // console.log('任务进度222', output)
     const taskItem = plansData.data.find(task => task.job_id === bid)
     if (!taskItem) return
     if (status) {
@@ -250,8 +251,11 @@ function onTaskProgressWs (data: TaskProgressInfo) {
       // 执行中，更新进度
       if (status === TaskProgressStatus.Sent || status === TaskProgressStatus.inProgress) {
         taskItem.progress = progress?.percent || 0
-      } else if ([TaskProgressStatus.Rejected, TaskProgressStatus.Canceled, TaskProgressStatus.Timeout, TaskProgressStatus.Failed, TaskProgressStatus.OK].includes(status)) {
+      } else if ([TaskProgressStatus.Rejected, TaskProgressStatus.Canceled, TaskProgressStatus.Timeout, TaskProgressStatus.Failed].includes(status)) {
         getPlans()
+      } else if ([TaskProgressStatus.OK].includes(status)) {
+        getPlans()
+        checkAnaysisStaus(taskItem)
       }
     }
   }
@@ -303,6 +307,57 @@ function toTaskResult (val) {
   localStorage.setItem('TaskInfo', JSON.stringify(val))
   router.push({ path: '/task/taskResult' })
 }
+
+/**
+ * 保存任务图片并分析
+ */
+async function anaysisTaskResult (row) {
+  try {
+    const res = await startTaskAnasisyApi({ jobId: row.job_id })
+  } catch (error) {
+
+  }
+}
+
+/**
+ * 判断是否已经分析过啦  后续这部分要优化，分析状态要写如表格列表中
+ */
+async function checkAnaysisStaus (row) {
+  try {
+    const res = await isAnalyzedApi(row.job_id)
+    if (res.data === true) {
+      anaysisTaskResult(row)
+    }
+  } catch (error) {
+
+  }
+}
+
+/**
+ * 添加深度监听，当媒体文件状态变为"已上传"时自动分析
+ */
+watch(
+  () => plansData.data,
+  (newData, oldData) => {
+    newData.forEach(row => {
+      const statusInfo = formatMediaTaskStatus(row)
+
+      // 当状态为"已上传"且未分析过时，执行分析
+      if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
+        analyzedTasks.value.add(row.job_id)
+
+        // 使用nextTick确保DOM更新完成后再执行
+        nextTick(() => {
+          anaysisTaskResult(row)
+        })
+      }
+    })
+  },
+  {
+    deep: true,
+    immediate: true // 立即执行一次，处理初始数据
+  }
+)
 
 function closeVideo () {
   showVideo.value = false
