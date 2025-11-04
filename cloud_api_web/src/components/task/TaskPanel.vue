@@ -93,16 +93,22 @@
                 <div>{{ scope.row.username }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="媒体文件上传" >
+            <el-table-column label="媒体文件上传"  width="200">
               <template #default="scope">
                 <div>
                   <div class="flex-display flex-align-center">
                     <span class="circle-icon"
                       :style="{ backgroundColor: formatMediaTaskStatus(scope.row).color }"></span>
                     {{ formatMediaTaskStatus(scope.row).text }}
+                    {{ formatMediaTaskStatus(scope.row).number }}
+                    <!-- <br/> -->
+                    <span v-if="showAnalysisStatus(scope.row.job_id)"
+                      class="analysis-status"
+                      :style="{ color: getAnalysisStatusColor(scope.row.job_id), marginLeft: '8px' }">
+                      {{ getAnalysisStatusText(scope.row.job_id) }}
+                    </span>
                   </div>
                   <div class="pl15">
-                    {{ formatMediaTaskStatus(scope.row).number }}
                     <a-tooltip v-if="formatMediaTaskStatus(scope.row).status === MediaStatus.ToUpload"
                       placement="bottom" arrow-point-at-center>
                       <template #title>
@@ -112,12 +118,14 @@
                         @click="onUploadMediaFileNow(scope.row.job_id)" />
                     </a-tooltip>
                   </div>
+                  <!-- 显示分析状态 -->
+
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="操作">
               <template #default="scope">
-                 <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">分析</el-button>
+                 <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">结果分析</el-button>
                 <el-popconfirm v-if="scope.row.status === TaskStatus.Wait " width="220" confirm-button-text="确定"
                   cancel-button-text="取消" icon-color="#626AEF" title="你确定要删除飞行任务吗？"
                   @confirm="onDeleteTask(scope.row.job_id)">
@@ -134,7 +142,7 @@
                 </el-popconfirm>
                 <!-- <el-button size="small" type="text" @click="toTaskVideo(scope.row)">任务直播</el-button> -->
                 <!-- <el-button size="small" type="text" @click="toTaskResult(scope.row)"> 任务结果 </el-button> -->
-                <el-button size="small" link type="primary" class="preview" @click="toTaskResult(scope.row)">结果</el-button>
+                <el-button size="small" link type="primary" class="preview" @click="toTaskResult(scope.row)">任务结果</el-button>
                 <el-popconfirm v-if="scope.row.status === TaskStatus.Carrying" width="220" confirm-button-text="确定"
                   cancel-button-text="取消" icon-color="#626AEF" title="你确定要挂起飞行任务吗？"
                   @confirm="onSuspendTask(scope.row.job_id)">
@@ -192,6 +200,8 @@ let startX, startY, startWidth, startHeight
 
 // 存储已处理的任务ID，避免重复分析
 const analyzedTasks = ref(new Set())
+// 存储任务分析状态
+const taskAnalysisStatus = ref(new Map()) // Map<job_id, { status: 'analyzing' | 'completed' | 'none', loading: boolean }>()
 
 const taskTypeLabels = {
   0: '立即任务',
@@ -308,6 +318,7 @@ function toTaskResult (val) {
   router.push({ path: '/task/taskResult' })
 }
 
+// ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------
 /**
  * 保存任务图片并分析
  */
@@ -320,16 +331,27 @@ async function anaysisTaskResult (row) {
 }
 
 /**
- * 判断是否已经分析过啦  后续这部分要优化，分析状态要写如表格列表中
+ * 判断是否已经分析过, 并更新状态  后续这部分要优化，分析状态要写入任务结果表格中
  */
 async function checkAnaysisStaus (row) {
   try {
+    // 设置分析中状态
+    taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
+
     const res = await isAnalyzedApi(row.job_id)
-    if (res.data === true) {
-      anaysisTaskResult(row)
+
+    if (res.data !== true) {
+      // 未分析过，开始分析
+      taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
+      await anaysisTaskResult(row)
+    } else {
+      // 已经分析完成
+      taskAnalysisStatus.value.set(row.job_id, { status: 'completed', loading: false })
     }
   } catch (error) {
-
+    console.error('检查分析状态失败:', error)
+    // 分析失败，重置状态
+    taskAnalysisStatus.value.set(row.job_id, { status: 'none', loading: false })
   }
 }
 
@@ -348,7 +370,7 @@ watch(
 
         // 使用nextTick确保DOM更新完成后再执行
         nextTick(() => {
-          anaysisTaskResult(row)
+          checkAnaysisStaus(row)
         })
       }
     })
@@ -358,6 +380,50 @@ watch(
     immediate: true // 立即执行一次，处理初始数据
   }
 )
+
+/**
+ * 获取任务分析状态显示文本
+ */
+function getAnalysisStatusText (jobId) {
+  const statusInfo = taskAnalysisStatus.value.get(jobId)
+  if (!statusInfo) return ''
+
+  switch (statusInfo.status) {
+    case 'analyzing':
+      return '分析中'
+    case 'completed':
+      return '分析完成'
+    default:
+      return ''
+  }
+}
+
+/**
+ * 获取任务分析状态颜色
+ */
+function getAnalysisStatusColor (jobId) {
+  const statusInfo = taskAnalysisStatus.value.get(jobId)
+  if (!statusInfo) return '#666'
+
+  switch (statusInfo.status) {
+    case 'analyzing':
+      return commonColor.WARN // 黄色
+    case 'completed':
+      return commonColor.SUCCESS // 绿色
+    default:
+      return '#666'
+  }
+}
+
+/**
+ * 是否显示分析状态
+ */
+function showAnalysisStatus (jobId) {
+  const statusInfo = taskAnalysisStatus.value.get(jobId)
+  return statusInfo && statusInfo.status !== 'none'
+}
+
+// -------------------------------------------------------------------------------------------------------------------
 
 function closeVideo () {
   showVideo.value = false

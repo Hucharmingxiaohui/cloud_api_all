@@ -508,8 +508,7 @@ async function createReport () {
     const response = await createFlyTaskReportApi({
       jobId: jobInfo.job_id
     })
-
-    if (response.code === 0) {
+    if (response.code === 0 || response.code === 602) {
       const res = await downloadFlyTaskReportApi(jobInfo.job_id)
       if (!res) {
         loading.value = false
@@ -517,6 +516,8 @@ async function createReport () {
       }
       const data = new Blob([res])
       downloadFile(data, `${jobInfo.job_name}.docx`)
+    } else if (response.code === 601) {
+      ElMessage.warning('任务结果分析中,请稍后重试!')
     }
   } catch (error) {
     console.error('生成报告失败:', error)
@@ -537,7 +538,7 @@ async function viewReport () {
       jobId: jobInfo.job_id
     })
 
-    if (response.code === 0) {
+    if (response.code === 0 || response.code === 602) {
       const res = await downloadFlyTaskReportApi(jobInfo.job_id)
       if (!res) {
         viewloading.value = false
@@ -551,6 +552,8 @@ async function viewReport () {
 
       // 直接传递Blob对象给renderAsync
       await renderAsync(data, docContainer)
+    } else if (response.code === 601) {
+      ElMessage.warning('任务结果分析中,请稍后重试!')
     }
   } catch (error) {
     console.error('生成报告失败:', error)

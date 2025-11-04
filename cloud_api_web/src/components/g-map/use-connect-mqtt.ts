@@ -34,13 +34,12 @@ export function useConnectMqtt () {
     // 1.打开小窗
     // 2.设备拥有飞行控制权
     // 3.请求建立mqtt连接的认证信息
-    console.log('111111111111111111111111111111111111111111111111111111')
     if (val) {
       console.log('22222222222222222222222222222222222222222222222222222')
       if (mqttState.value) return
       const result = await postDrc({})
+      console.log('33333333333333333333333333333333', result.data)
       if (result?.code === 0) {
-        console.log('33333333333333333333333333333333', result.data)
         const { address, client_id, username, password, expire_time } = result.data
         // @TODO: 校验 expire_time
         mqttState.value = new UranusMqtt(address, {
