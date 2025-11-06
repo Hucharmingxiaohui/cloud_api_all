@@ -65,7 +65,9 @@ public class ImportKmzNoValiServiceImpl implements ImportKmzNoValiService {
     //按名称查询
     @Override
     public WaylineFileEntity getWaylineByFileName(String fileName) {
-        WaylineFileEntity entity = mapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().eq(WaylineFileEntity::getName,fileName));
+        WaylineFileEntity entity = mapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().eq(WaylineFileEntity::getName,fileName)
+                .orderByDesc(WaylineFileEntity::getUpdateTime)
+                .last("LIMIT 1"));
         return entity;
     }
 

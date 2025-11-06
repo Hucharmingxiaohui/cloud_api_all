@@ -361,6 +361,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
                 System.out.println("JSON Response: " + jsonResponse.toJSONString());
                 String routeName = jsonResponse.getString("routeName");
+                JSONArray points = jsonResponse.getJSONArray("points");
+                redisUtils.set("fanPoints",points.toJSONString());
                 // 项目根目录下的文件路径（根据实际部署环境调整）
                 String projectPath = System.getProperty("user.dir");
                 String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";

@@ -154,7 +154,6 @@ public class SDKWaylineService extends AbstractWaylineService {
                         // 写发送逻辑
                         String url = "http://172.20.63.157:5002/state";
                         JSONObject jsonObject = new JSONObject();
-
                         jsonObject.put("waylineType", "flightTask");
                         jsonObject.put("status", statusEnum);
                         jsonObject.put("wayPoint", currentWaypointIndex);
@@ -275,10 +274,16 @@ public class SDKWaylineService extends AbstractWaylineService {
                     JSONObject jsonObject = new JSONObject();
 
                     String turbineName = redisUtils.get("turbineName").toString();
+                    String jobId = redisUtils.get("jobId").toString();
+                    String windTurbineId = redisUtils.get("windTurbineId").toString();
+                    WindTurbine windTurbine = windTurbineMapper.selectById(windTurbineId);
                     jsonObject.put("waylineType", "inFlightTask");
                     jsonObject.put("status", status);
                     jsonObject.put("wayPoint", currentWaypointIndex);
                     jsonObject.put("flightName", turbineName+"working");
+                    jsonObject.put("jobId", jobId);
+                    jsonObject.put("blade_points", windTurbine.getBladePoints());
+                    jsonObject.put("tower_points", windTurbine.getTowerPoints());
                     String jsonInput = jsonObject.toString();
                     try {
                         URL obj = new URL(url);

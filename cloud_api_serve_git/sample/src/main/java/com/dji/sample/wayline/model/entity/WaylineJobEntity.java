@@ -118,4 +118,10 @@ public class WaylineJobEntity implements Serializable {
 
     @TableField("fan_name")
     private String fanName;
+
+    @TableField("is_analyzed")
+    private Integer isAnalyzed;
+
+    @TableField("is_reported")
+    private Integer isReported;
 }

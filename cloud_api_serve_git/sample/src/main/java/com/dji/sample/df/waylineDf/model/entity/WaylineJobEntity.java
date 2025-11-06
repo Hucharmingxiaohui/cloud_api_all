@@ -82,4 +82,10 @@ public class WaylineJobEntity implements Serializable {
 
     @TableField("parent_id")
     private String parentId;
+
+    @TableField("is_analyzed")
+    private Integer isAnalyzed;
+
+    @TableField("is_reported")
+    private Integer isReported;
 }

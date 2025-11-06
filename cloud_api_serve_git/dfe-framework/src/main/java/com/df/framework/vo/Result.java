@@ -45,7 +45,9 @@ public class Result<T> implements Serializable {
     public enum Type {
         SUCCESS(0, "请求成功"),
         ERROR(500, "请求失败"),
-        WARN(600, "请求告警");
+        WARN(600, "请求告警"),
+        ANALYZING(601, "还在分析"),
+        DUPLICATE(602, "重复生成");
 
         private final int value;
         private final String name;
@@ -53,6 +55,14 @@ public class Result<T> implements Serializable {
         Type(int value, String name) {
             this.value = value;
             this.name = name;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        public String getName() {
+            return name;
         }
     }
 
@@ -94,5 +104,15 @@ public class Result<T> implements Serializable {
     //返回失败结果code自定义, msg自定义，data=null
     public static Result error(String msg, Integer code) {
         return new Result(code, msg, null);
+    }
+
+    // 返回还在分析结果, code=601, msg自定义，data=null
+    public static Result analyzing(String msg) {
+        return new Result(Type.ANALYZING.value, msg, null);
+    }
+
+    // 返回重复生成结果, code=602, msg自定义，data=null
+    public static Result duplicate(String msg) {
+        return new Result(Type.DUPLICATE.value, msg, null);
     }
 }

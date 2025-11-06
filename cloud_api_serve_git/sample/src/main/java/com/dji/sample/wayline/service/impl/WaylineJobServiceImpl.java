@@ -3,6 +3,7 @@ package com.dji.sample.wayline.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.df.framework.redis.RedisUtils;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.Resource;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -76,6 +78,9 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
+    @Resource
+    RedisUtils redisUtils;
+
     private Optional<WaylineJobDTO> insertWaylineJob(WaylineJobEntity jobEntity) {
         int id = mapper.insert(jobEntity);
         if (id <= 0) {
@@ -113,7 +118,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .fanName(param.getFanName())
 //                .allPointCnt(split.length)
                 .build();
-
+        redisUtils.set("jobId",jobEntity.getJobId());
         return insertWaylineJob(jobEntity);
     }
 

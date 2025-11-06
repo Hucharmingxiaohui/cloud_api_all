@@ -68,6 +68,7 @@ public class WindTurbineWaylineController {
     public HttpResultResponse excute(HttpServletRequest request, @RequestBody JSONObject jsonObject1) {
         // 写发送逻辑
         String id = jsonObject1.getString("id");
+        redisUtils.set("windTurbineId", id);
         WindTurbine windTurbine = windTurbineMapper.selectById(id);
 //        WindTurbine windTurbine = windTurbineService.selectByName(windTurbineName);
         String url = "http://172.20.63.157:5001/top";
@@ -119,9 +120,8 @@ public class WindTurbineWaylineController {
                     String projectPath = System.getProperty("user.dir");
                     String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
                     MultipartFile file = convert(filePath);
-//                    MultipartFile file1 = addTimestampToFilename(file);
                     if (Objects.isNull(file)) {
-//                        return log.error("kmz文件未检测到");
+                        return HttpResultResponse.error("kmz文件未检测到");
                     }
 
                     CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
@@ -137,7 +137,7 @@ public class WindTurbineWaylineController {
                     }
                     WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
                     if (Objects.isNull(entity)) {
-//                        return  HttpResultResponse.error("导入外部航线失败");
+                        return  HttpResultResponse.error("导入外部航线失败");
                     }
 
                     PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity=new PubWaylineJobPlanDfEntity();
@@ -220,31 +220,4 @@ public class WindTurbineWaylineController {
     }
 
 
-    public static MultipartFile addTimestampToFilename(MultipartFile file) throws IOException {
-        if (file == null || file.isEmpty()) {
-            return file;
-        }
-
-        String originalName = file.getOriginalFilename();
-        String timestamp = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-
-        // 处理文件名和扩展名
-        int dotIndex = originalName.lastIndexOf(".");
-        String newName = dotIndex > 0
-                ? originalName.substring(0, dotIndex) + "-" + timestamp + originalName.substring(dotIndex)
-                : originalName + "-" + timestamp;
-
-        // 返回新的MultipartFile实现
-        return new MultipartFile() {
-            @Override public String getName() { return file.getName(); }
-            @Override public String getOriginalFilename() { return newName; }
-            @Override public String getContentType() { return file.getContentType(); }
-            @Override public boolean isEmpty() { return file.isEmpty(); }
-            @Override public long getSize() { return file.getSize(); }
-            @Override public byte[] getBytes() throws IOException { return file.getBytes(); }
-            @Override public InputStream getInputStream() throws IOException { return file.getInputStream(); }
-            @Override public void transferTo(File dest) throws IOException, IllegalStateException { file.transferTo(dest); }
-        };
-    }
 }

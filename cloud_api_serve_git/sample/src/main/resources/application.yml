@@ -10,7 +10,7 @@ spring:
     druid:
       type: com.alibaba.druid.pool.DruidDataSource
       driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://172.20.63.227:9200/cloud_sample?useSSL=false&allowPublicKeyRetrieval=true
+      url: jdbc:mysql://172.20.63.157:9200/cloud_sample?useSSL=false&allowPublicKeyRetrieval=true
       username: root
       password: dfe@1500
       initial-size: 10
@@ -19,7 +19,7 @@ spring:
       max-wait: 60000
 
   redis:
-    host: 172.20.63.227
+    host: 172.20.63.157
     port: 9201
     database: 0
     username:
@@ -65,7 +65,7 @@ mqtt:
   BASIC:
     protocol: MQTT # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
     #    联网
-    host: 172.20.63.227
+    host: 172.20.63.157
     port: 9205
     username: df1560
     password: dfe2k_1500
@@ -75,7 +75,7 @@ mqtt:
   DRC:
     protocol: WS # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
     #联网地址
-    host: 172.20.63.227
+    host: 172.20.63.157
     port: 9207
     path: /mqtt
     username: df1560
@@ -134,7 +134,7 @@ url:
 oss:
   enable: true
   provider: minio
-  endpoint: http://172.20.63.227:9202
+  endpoint: http://172.20.63.157:9202
   access-key: minioadmin
   secret-key: minioadmin
   bucket: djicloud
@@ -169,7 +169,7 @@ livestream:
 
     # RTMP  Note: This IP is the address of the streaming server. If you want to see livestream on web page, you need to convert the RTMP stream to WebRTC stream.
     rtmp:
-      url: rtmp://172.20.63.227:2035/live/ # Example: 'rtmp://192.168.1.1/live/'
+      url: rtmp://172.20.63.157:2035/live/ # Example: 'rtmp://192.168.1.1/live/'
     rtsp:
       username: 1
       password: 1
@@ -177,7 +177,7 @@ livestream:
 
     # GB28181 Note:If you don't know what these parameters mean, you can go to Pilot2 and select the GB28181 page in the cloud platform. Where the parameters same as these parameters.
     gb28181:
-      serverIP: 172.20.63.227
+      serverIP: 172.20.63.157
       serverPort: 8086
       serverID: 1
       agentID: 1
@@ -187,7 +187,7 @@ livestream:
 
     # Webrtc: Only supports using whip standard
     whip:
-      url: http://172.20.63.227:1985/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
+      url: http://172.20.63.157:1985/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
 
 #配置动态航线文件夹参数
 singlePointUrl: D:\KmzKml\
@@ -275,4 +275,15 @@ file:
   taskReportExcelTempFile: ${file.fileSavePath}/ftl/report-excel-templates.xls
   #巡视报告模板-excel
   taskReportExcelMoreTempFile: ${file.fileSavePath}/ftl/report-excel-more-templates.xls
+
+
+fjfile:
+  # 巡视图片存放位置
+# win:D:/pictrue/   linux:/home/uav_server/defect_images/
+  filePictrueUrl: D:/pictrue/
+  # 巡视报告位置，
+#  D:/report/, linux配/home/uav_server/report/
+  fileReportPath: D:/report/
+
+
 

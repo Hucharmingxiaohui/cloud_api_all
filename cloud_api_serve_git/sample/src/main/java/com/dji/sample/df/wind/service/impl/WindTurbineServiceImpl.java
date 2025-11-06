@@ -25,6 +25,8 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
     @Override
     public boolean saveWindTurbine(WindTurbine windTurbine) {
         windTurbine.setId(UUID.randomUUID().toString());
+        windTurbine.setApproachYaw(0.0);
+        windTurbine.setBladeStopAngle(0.0);
         int insert = windTurbineMapper.insert(windTurbine);
         if (insert > 0) {
             return true;
