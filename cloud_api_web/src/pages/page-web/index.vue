@@ -57,7 +57,7 @@ import { CURRENT_CONFIG } from '/@/api/http/config'
 import { log } from 'console'
 import axios from 'axios'
 const root = getRoot()
-
+const STORAGE_KEY = 'menu-active-index' // 存储和读取的key
 const formState: UnwrapRef<LoginBody> = reactive({
   username: '',
   password: '',
@@ -119,6 +119,8 @@ const onSubmit = async (e: any) => {
     //     response: error.response
     //   })
     // })
+    // localStorage.setItem(STORAGE_KEY, '2')
+    // root.$router.push(ERouterName.DEVICES)
 
     const result = await login(formState)
     if (result.code === 0) {
@@ -129,7 +131,8 @@ const onSubmit = async (e: any) => {
       localStorage.setItem(ELocalStorageKey.Flag, EUserType.Web.toString())
       localStorage.setItem(ELocalStorageKey.User_Type, result.data.user_type)
       // 跳转到成员页面
-      root.$router.push(ERouterName.NEW_WAYLINE)
+      localStorage.setItem(STORAGE_KEY, '2')
+      root.$router.push(ERouterName.DEVICES)
     } else {
       loading.value = false
       message.error(result.message)

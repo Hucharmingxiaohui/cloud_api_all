@@ -377,7 +377,7 @@ function onSubmit () {
       status: createPlanBody.status,
       username: createPlanBody.username,
       rth_altitude: createPlanBody.rth_altitude,
-      out_of_control: 1,
+      out_of_control: createPlanBody.out_of_control_action,
       enable_status: createPlanBody.enable_status,
       plan_priority: createPlanBody.plan_priority
     }

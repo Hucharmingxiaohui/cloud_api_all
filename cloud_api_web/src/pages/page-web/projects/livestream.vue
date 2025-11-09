@@ -15,8 +15,8 @@
       <div class="box-right">
         <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
         <div style="width: 100%; height: 100%; border: 2px solid white;">
-          <ThreeDModel v-if="isFlatMap" />
-          <TwoDModel v-else />
+          <ThreeDModel v-if="isFlatMap && isMounted" />
+          <TwoDModel v-if="!isFlatMap && isMounted" />
         </div>
 
       </div>
@@ -30,7 +30,7 @@ import {
   NetworkStateQualityEnum, NetworkStateTypeEnum, RainfallEnum, DroneInDockEnum
 } from '/@/types/device'
 import { message } from 'ant-design-vue'
-import { onMounted, watch, ref, reactive, computed } from 'vue'
+import { onMounted, watch, ref, nextTick, reactive, computed } from 'vue'
 import { getRoot } from '/@/root'
 import { useMyStore } from '/@/store'
 import { ELocalStorageKey, ERouterName } from '/@/types/enums'
@@ -38,7 +38,7 @@ import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusM
 import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
-import TwoDModel from '/@/components/g-map/mapPanel.vue'
+import TwoDModel from '/@/components/g-map/mapPanel1.vue'
 import ThreeDModel from '/@/components/cesium/3DModelPanel.vue'
 import tsaPanel from '/@/components/tsaPanel.vue'
 // import ttt from '/@/components/GMap.vue'
@@ -56,6 +56,7 @@ const router = useRouter()
 let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
 const isFlatMap = ref(false) // 是否二维地图
+const isMounted = ref(false) // 是否已经完成初始化
 
 // 无人机视频---------------------------------------------------
 const toggleDroneVideo = () => {
@@ -86,8 +87,7 @@ onMounted(() => {
   watch(() => root.$route.name, (data) => {
     showLive.value = data === ERouterName.LIVING
   }, { deep: true })
-  // 添加树形图数据
-  getTreeData()
+  isMounted.value = true
 })
 
 //= ===========================================添加树形图==========================================================================

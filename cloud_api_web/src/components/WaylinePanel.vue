@@ -157,12 +157,12 @@
         @current-change="handleCurrentChange"></el-pagination>
     </div>
     <!-- 弹窗 -->
-    <div class="live" v-show="showMap" v-drag-window>
+    <div class="live" v-if="showMap" v-drag-window>
       <div style="height: 40px; width: 100%" class="drag-title"></div>
       <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeDrag">
         <CloseOutlined />
       </a>
-      <ttt ref="wayLineid"></ttt>
+      <waylineMap ref="wayLineid"></waylineMap>
     </div>
     <!-- 测温弹窗 -->
   </div>
@@ -194,7 +194,7 @@ import { IPage } from '/@/api/http/type'
 import { CURRENT_CONFIG } from '/@/api/http/config'
 import { load } from '@amap/amap-jsapi-loader'
 import { getRoot } from '/@/root'
-import ttt from '/@/components/g-map/mapPanel.vue'
+import waylineMap from '/@/components/g-map/mapPanel.vue'
 import { useRouter } from 'vue-router'
 import { uuidv4 } from '/@/utils/uuid'
 import { GeojsonCoordinate } from '/@/types/map'

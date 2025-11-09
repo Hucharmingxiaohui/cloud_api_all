@@ -3,174 +3,129 @@
     <div class="block_1">
       <div class="text-wrapper_1 ">
         <a-row class="ant-row">
-          <a-col :span="1" ></a-col>
-          <a-col :span="7" class="text_1" style="display: flex; align-content: center; justify-content: center;">
-            <a-space size="large">
-              <router-link
-                v-for="item in visibleOptions"
-                :key="item.key"
-                :to="item.path"
-                :class="{
-                  'menu-item': true,
-                  // selected: selectedRoute(item),
-                }"
-              >
-              <span @click="selectedRoute(item)" :class="getItemClass(item)" style="color: rgba(175, 193, 222, 1);">{{ item.label }}</span>
-              </router-link>
-            </a-space>
-          </a-col>
-          <a-col :span="1" ></a-col>
+          <a-col :span="1"></a-col>
+          <el-col :span="7" class="text_1">
+            <!-- 左侧菜单 -->
+            <el-menu
+              :default-active="activeIndex"
+              class="el-menu-demo"
+              mode="horizontal"
+              @select="handleSelect"
+            >
+              <template v-for="item in menuOptions" :key="item.index">
+                <el-menu-item :index="item.index" v-if="!item.children">
+                  <router-link :to="item.path">
+                    {{ item.label }}
+                  </router-link>
+                </el-menu-item>
+                <el-sub-menu
+                  v-else
+                  :index="item.index"
+                  popper-class="child-menu-title"
+                >
+                  <template #title>
+                    {{ item.label }}
+                  </template>
+                  <template v-for="child in item.children" :key="child.index">
+                    <el-menu-item :index="child.index">
+                      <router-link :to="child.path">
+                        {{ child.label }}
+                      </router-link>
+                    </el-menu-item>
+                  </template>
+                </el-sub-menu>
+              </template>
+            </el-menu>
+          </el-col>
+          <a-col :span="1"></a-col>
           <a-col :span="6" class="text_2">
-            <span >无人机任务规划与数据采集系统</span>
+            <span>无人机任务规划与数据采集系统</span>
           </a-col>
-          <a-col :span="1" ></a-col>
-          <a-col :span="7" class="text_1" style="display: flex; align-content: center; justify-content: center;">
-            <a-space size="large">
-              <router-link
-                v-for="item in visibleOptions1.slice(0,1)"
-                :key="item.key"
-                :to="item.path"
-                :class="{
-                  'menu-item': true,
-                }"
-              >
-                <span @click="selectedRoute(item)" :class="getItemClass1(item)" style="color: rgba(175, 193, 222, 1);">{{ item.label }}</span>
-              </router-link>
-              <a-dropdown v-if="visibleOptions1.some(item => item.label.includes('任务管理'))">
-                <span :class="getItemClass3()"> 任务管理 </span>
-                <template #overlay>
-                  <a-menu theme="dark" class="flex-column flex-justify-between flex-align-center" >
-                    <a-menu-item
-                      v-for="item in options4"
-                      :key="item.key"
-                    >
-                      <router-link :to="item.path">
-                          <span @click="selectedRoute(item)" :style="selected === item.path ? 'color: #2d8cf0;' : 'color: white'" style="padding: 10px 0; display: block;">{{ item.label }}</span>
+          <a-col :span="1"></a-col>
+          <a-col :span="7" class="text_1">
+            <!-- 右侧菜单 -->
+            <el-menu
+              class="el-menu-demo"
+              mode="horizontal"
+              :default-active="activeIndex"
+              @select="handleSelect"
+            >
+              <template v-for="item in menuRightOptions" :key="item.index">
+                <el-menu-item :index="item.index" v-if="!item.children">
+                  <router-link :to="item.path">
+                    {{ item.label }}
+                  </router-link>
+                </el-menu-item>
+                <el-sub-menu
+                  v-else
+                  :index="item.index"
+                  popper-class="child-menu-title"
+                >
+                  <template #title>
+                    {{ item.label }}
+                  </template>
+                  <template v-for="child in item.children" :key="child.index">
+                    <el-menu-item :index="child.index" v-if="!child.children">
+                      <router-link :to="child.path">
+                        {{ child.label }}
                       </router-link>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-              <a-dropdown v-if="visibleOptions1.some(item => item.label.includes('系统管理'))">
-                <span :class="getItemClass2()"> 系统管理 </span>
-                <template #overlay>
-                  <a-menu theme="dark" class="flex-column flex-justify-between flex-align-center" >
-                    <a-menu-item
-                      v-for="item in options3"
-                      :key="item.key"
-                    >
-                      <router-link :to="item.path">
-                          <span @click="selectedRoute(item)" :style="selected === item.path ? 'color: #2d8cf0;' : 'color: white'" style="padding: 10px 0; display: block;">{{ item.label }}</span>
-                      </router-link>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </a-space>
+                    </el-menu-item>
+                    <el-sub-menu v-else :index="child.index">
+                      <template #title>
+                        {{ child.label }}
+                      </template>
+
+                      <el-menu-item
+                        v-for="grandChild in child.children"
+                        :key="grandChild.index"
+                        :index="grandChild.index"
+                      >
+                        <router-link :to="child.path">
+                          {{ grandChild.label }}
+                        </router-link>
+                      </el-menu-item>
+                    </el-sub-menu>
+                  </template>
+                </el-sub-menu>
+              </template>
+            </el-menu>
           </a-col>
-          <a-col :span="1" class="text_1"  style="margin-top: 30px;">
-          <div>
-            <a-dropdown>
-              <div class="height-100">
-                <span class="fz20 mt20" style="border: 2px solid white; border-radius: 50%; display: inline-flex;"><UserOutlined /></span>
-                <!-- <span class="ml10 mr10" style="float: right;">{{ username }}</span> -->
-              </div>
-              <template #overlay>
-                <a-menu theme="dark" class="flex-column flex-justify-between flex-align-center">
-                  <a-menu-item >
-                    <span class="mr10" style="font-size: 16px;"><ExportOutlined /></span>
-                    <span @click="logout">注销</span>
-                  </a-menu-item>
-                  <!-- <a-menu-item >
+          <a-col :span="1" class="text_1" style="margin-top: 30px;">
+            <div>
+              <a-dropdown>
+                <div class="height-100">
+                  <span
+                    class="fz20 mt20"
+                    style="border: 2px solid white; border-radius: 50%; display: inline-flex;"
+                    ><UserOutlined
+                  /></span>
+                  <!-- <span class="ml10 mr10" style="float: right;">{{ username }}</span> -->
+                </div>
+                <template #overlay>
+                  <a-menu
+                    theme="dark"
+                    class="flex-column flex-justify-between flex-align-center"
+                  >
+                    <a-menu-item>
+                      <span class="mr10" style="font-size: 16px;"
+                        ><ExportOutlined
+                      /></span>
+                      <span @click="logout">注销</span>
+                    </a-menu-item>
+                    <!-- <a-menu-item >
                     <span class="mr10" style="font-size: 16px;"><ExportOutlined /></span>
                     <span @click="goHome">返回</span>
                   </a-menu-item> -->
-                </a-menu>
-              </template>
-            </a-dropdown>
-          </div>
-        </a-col>
-
+                  </a-menu>
+                </template>
+              </a-dropdown>
+            </div>
+          </a-col>
         </a-row>
       </div>
     </div>
     <div class="bottom-bg"></div>
   </div>
-<!-- <div class="header-bg" style="height: 60px;">
-  <a-row>
-    <a-col :span="2"></a-col>
-    <a-col :span="6" style="display: flex; justify-content: center; align-items: center; height: 60px">
-      <a-space class="fz16 height-100" size="large">
-        <router-link
-          v-for="item in visibleOptions"
-          :key="item.key"
-          :to="item.path"
-          :class="{
-            'menu-item': true,
-            // selected: selectedRoute(item),
-          }"
-        >
-        <span @click="selectedRoute(item)"  class="mean-bar"  :style="selected === item.path ? 'color: #2d8cf0;' : 'color: white'">{{ item.label }}</span>
-        </router-link>
-      </a-space>
-    </a-col>
-    <a-col :span="8"  style="display: flex; justify-content: center; align-items: center; font-size: 25px; font-weight: bold; height: 60px;">
-      <span style="white-space: nowrap; overflow: hidden;">无人机管控平台</span>
-    </a-col>
-    <a-col :span="6"  style="display: flex; justify-content: center; align-items: center; height: 60px;">
-      <a-space class="fz16 height-100" size="large">
-        <router-link
-          v-for="item in visibleOptions1.slice(0,2)"
-          :key="item.key"
-          :to="item.path"
-          :class="{
-            'menu-item': true,
-            // selected: selectedRoute(item),
-          }"
-        >
-          <span @click="selectedRoute(item)" class="mean-bar"  :style="selected === item.path ? 'color: #2d8cf0;' : 'color: white'">{{ item.label }}</span>
-        </router-link>
-        <a-dropdown class="mean-bar" v-if="visibleOptions1.some(item => item.label.includes('系统管理'))">
-          <span :style="options3.some(item => item.path.includes(selected)) ? 'color: #2d8cf0;' : 'color: white'"> 系统管理 </span>
-          <template #overlay>
-            <a-menu theme="dark" class="flex-column flex-justify-between flex-align-center" >
-              <a-menu-item
-                v-for="item in options3"
-                :key="item.key"
-              >
-                <router-link :to="item.path">
-                    <span @click="selectedRoute(item)"  class="mean-bar" :style="selected === item.path ? 'color: #2d8cf0;' : 'color: white'">{{ item.label }}</span>
-                </router-link>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-      </a-space>
-    </a-col>
-    <a-col :span="2"  style="display: flex; justify-content: center; align-items: center;">
-      <div>
-        <a-dropdown>
-          <div class="height-100">
-            <span class="fz20 mt20" style="border: 2px solid white; border-radius: 50%; display: inline-flex;"><UserOutlined /></span>
-            <span class="ml10 mr10" style="float: right;">{{ username }}</span>
-          </div>
-          <template #overlay>
-            <a-menu theme="dark" class="flex-column flex-justify-between flex-align-center">
-              <a-menu-item >
-                <span class="mr10" style="font-size: 16px;"><ExportOutlined /></span>
-                <span @click="logout">注销</span>
-              </a-menu-item>
-              <a-menu-item >
-                <span class="mr10" style="font-size: 16px;"><ExportOutlined /></span>
-                <span @click="goHome">返回</span>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
-      </div>
-    </a-col>
-  </a-row>
-</div> -->
 </template>
 
 <script lang="ts" setup>
@@ -179,7 +134,14 @@ import { getRoot } from '/@/root'
 import * as icons from '@ant-design/icons-vue'
 import { ERouterName, ELocalStorageKey } from '/@/types'
 import { UserOutlined, ExportOutlined } from '@ant-design/icons-vue'
-
+import { useRouter, useRoute } from 'vue-router'
+const activeIndex = ref('2')
+const router = useRouter()
+const route = useRoute()
+const STORAGE_KEY = 'menu-active-index' // 存储和读取的key
+const root = getRoot()
+const selected = ref<string>(root.$route.path) // 跳转
+const username = ref(localStorage.getItem(ELocalStorageKey.Username)) // 从本地获取登录用户名
 interface IOptions {
   key: number
   label: string
@@ -194,14 +156,6 @@ interface IOptions {
 
 // 菜单自动隐藏
 const viewportWidth = ref<number>(window.innerWidth)
-const visibleOptions = computed(() => {
-  const maxItems = Math.floor(viewportWidth.value / 4 / 120) // Adjust 150 based on your menu item width
-  return options1.slice(0, maxItems)
-})
-const visibleOptions1 = computed(() => {
-  const maxItems = Math.floor(viewportWidth.value / 4 / 120) // Adjust 150 based on your menu item width
-  return options2.slice(0, maxItems)
-})
 const Icon = (props: {icon: string}) => {
   return createVNode((icons as any)[props.icon])
 }
@@ -212,104 +166,132 @@ const handleResize = () => {
 onMounted(() => {
   window.addEventListener('resize', handleResize)
   handleResize() // Initialize viewportWidth
+  activeIndex.value = localStorage.getItem(STORAGE_KEY) || '2'
+
+  // const path = findPathByIndex(allMenuItems, activeIndex.value)
+  router.push(selected.value)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
 // ----------------------------------------
-const root = getRoot()
-const selected = ref<string>(root.$route.path) // 跳转
-const username = ref(localStorage.getItem(ELocalStorageKey.Username)) // 从本地获取登录用户名
-const options1 = [
-  // { key: 0, label: '组织管理', path: '/' + ERouterName.Organization, icon: 'ApartmentOutlined' },
-  { key: 0, label: '风机管理', path: '/fanMgt', icon: 'ApartmentOutlined' },
-  // { key: 0, label: '场站管理', path: '/station', icon: 'ApartmentOutlined' },
-  { key: 1, label: '设备管理', path: '/' + ERouterName.DEVICES, icon: 'UserOutlined' },
-  { key: 2, label: '视频直播', path: '/' + ERouterName.LIVESTREAM, icon: 'VideoCameraOutlined' },
-  // { key: 3, label: '地图标注', path: '/' + ERouterName.LAYER, icon: 'EnvironmentOutlined' },
-]
-const options2 = [
-  { key: 5, label: '航线管理', path: '/' + ERouterName.NEW_WAYLINE, icon: 'NodeIndexOutlined' },
-  { key: 6, label: '任务管理', path: '/' + ERouterName.FLY_PLAN, icon: 'CalendarOutlined' },
-  { key: 7, label: '系统管理', path: '/' + ERouterName.FLIGHT_AREA, icon: 'GroupOutlined' },
-  // { key: 7, label: '飞行区域', path: '/' + ERouterName.FLIGHT_AREA, icon: 'GroupOutlined' },
-]
-const options3 = [
-  // { key: 8, label: '飞行区域', path: '/' + ERouterName.FLIGHT_AREA, icon: 'GroupOutlined' },
-  // { key: 9, label: '视频管理', path: '/' + ERouterName.Camera_Management, icon: 'GroupOutlined' },
-  { key: 10, label: '系统配置', path: '/' + ERouterName.Setup_Management, icon: 'GroupOutlined' },
-  // { key: 11, label: '媒体文件', path: '/' + ERouterName.MEDIA, icon: 'PictureOutlined' },
-  { key: 12, label: '台账管理', path: '/' + ERouterName.Points_Management, icon: 'PictureOutlined' },
-  { key: 13, label: '主机连接', path: '/' + ERouterName.HOSTCONNECT, icon: 'CalendarOutlined' },
-  { key: 14, label: '日志管理', path: '/' + ERouterName.LOGS, icon: 'CalendarOutlined' },
-  { key: 15, label: '成员管理', path: '/member', icon: 'CalendarOutlined' },
-  { key: 16, label: '固件管理', path: '/' + ERouterName.FIRMWARES, icon: 'GroupOutlined' },
-  { key: 17, label: '模型管理', path: '/modelManage', icon: 'CalendarOutlined' },
 
+// 左侧菜单
+// 菜单配置数据（添加path字段）
+const menuOptions = [
+  {
+    index: '1',
+    label: '变量管理',
+    children: [
+      {
+        index: '1-1',
+        label: '风机管理',
+        path: '/fanMgt'
+      },
+    ]
+  },
+  {
+    index: '2',
+    label: '设备管理',
+    path: '/' + ERouterName.DEVICES,
+
+  },
+  {
+    index: '3',
+    label: '视频直播',
+    path: '/' + ERouterName.LIVESTREAM,
+  },
 ]
 
-const options4 = [
-  // { key: 8, label: '飞行区域', path: '/' + ERouterName.FLIGHT_AREA, icon: 'GroupOutlined' },
-  { key: 17, label: '飞行计划', path: '/' + ERouterName.FLY_PLAN, icon: 'GroupOutlined' },
-  { key: 18, label: '飞行任务', path: '/' + ERouterName.TASK, icon: 'GroupOutlined' },
+const menuRightOptions = [
+  {
+    index: '4',
+    label: '航线管理',
+    path: '/' + ERouterName.NEW_WAYLINE
+  },
+  {
+    index: '5',
+    label: '任务管理',
+    children: [
+      {
+        index: '5-1',
+        label: '飞行计划',
+        path: '/' + ERouterName.FLY_PLAN,
+      },
+      {
+        index: '5-2',
+        label: '飞行任务',
+        path: '/' + ERouterName.TASK
+      },
+    ]
+  },
+  {
+    index: '6',
+    label: '系统管理',
+    children: [{
+      index: '6-1',
+      lable: '日志管理',
+      path: '/' + ERouterName.LOGS
+    },
+    {
+      index: '6-2',
+      lable: '固件管理',
+      path: '/' + ERouterName.FIRMWARES
+    }
+    ]
+  },
 ]
 
-// watch(() => root.$route.path, data => {
-//   console.log('跳转', data)
-// })
+// 合并所有菜单项
+const allMenuItems = [...menuOptions, ...menuRightOptions]
 
-function selectedRoute (item: IOptions) {
-  const path = typeof item.path === 'string' ? item.path : item.path.path
-  selected.value = path
-  // console.log('xxxx', selected.value)
-  return root.$route.path?.indexOf(path) === 0
-}
-
-const getItemClass = (item: any) => {
-  // console.log('asssss', item.path, selected.value)
-  return {
-    'selected-item': selected.value === item.path || (item.path === '/livestream' && selected.value === '/remoteDebug'), // 选中时添加 selected-item 类
-    'unselected-item': selected.value !== item.path, // 未选中时添加 unselected-item 类
+// 查找路径
+function findPathByIndex (items, targetIndex) {
+  for (const item of items) {
+    if (item.index === targetIndex) {
+      return item.path
+    }
+    if (item.children) {
+      const found = findPathByIndex(item.children, targetIndex)
+      if (found) return found
+    }
   }
-}
-const getItemClass1 = (item: any) => {
-  return {
-    'selected-item1': selected.value === item.path, // 选中时添加 selected-item 类
-    'unselected-item': selected.value !== item.path, // 未选中时添加 unselected-item 类
-  }
-}
-const getItemClass2 = () => {
-  return {
-    'selected-item1': options3.some(option => option.path.includes(selected.value)),
-    'unselected-item': !options3.some(option => option.path.includes(selected.value))
-  }
+  return null
 }
 
-const getItemClass3 = () => {
-  return {
-    'selected-item1': options4.some(option => option.path.includes(selected.value)) || selected.value.includes('task'),
-    'unselected-item': !options4.some(option => option.path.includes(selected.value))
-  }
+// 更新菜单激活状态
+function handleSelect (index) {
+  activeIndex.value = index
+  localStorage.setItem(STORAGE_KEY, index)
+  // const path = findPathByIndex(allMenuItems, index)
+  // if (path) {
+  //   router.push(path)
+  // }
 }
-// const getItemStyle1 = () => {
-//   return options3.some(item => item.path.includes(selected.value))
-//     ? {
-//         color: 'rgba(175, 193, 222, 1)', // 选中时文字颜色
-//         transform: 'skew(-20deg)', // 平行四边形效果
-//         padding: '10px 20px',
-//         // border: 'none', // 移除默认边框
-//         border: '2px solid #0B274F',
-//         background: 'linear-gradient(to right, #0B2954 0%, #315F96 35%, #ffffff 50%,#315F96 65%, #0B2954 100%), linear-gradient(to bottom, #0B2954 0%, #1E477A 95%, #ffffff 98%, #062249 100%)', // 顶部渐变
-//         position: 'relative',
-//         display: 'inline-block',
-//         backgroundSize: '100% 100%', // 修正: 使用驼峰命名
-//         backgroundBlendMode: 'overlay', // 修正: 使用驼峰命名
-//         boxSizing: 'border-box'
-//       }
-//     : {
-//         color: 'rgba(175, 193, 222, 1) ' // 未选中时文字颜色
-//       }
-// }
+
+// 查找路径对应的索引
+function findIndexByPath (items, targetPath) {
+  for (const item of items) {
+    if (item.path === targetPath) {
+      return item.index
+    }
+    if (item.children) {
+      const found = findIndexByPath(item.children, targetPath)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+// // 监听路由变化，自动更新激活菜单
+// watch(() => route.path, (newPath) => {
+//   const matchedIndex = findIndexByPath(allMenuItems, newPath)
+//   if (matchedIndex) {
+//     activeIndex.value = matchedIndex
+//     localStorage.setItem(STORAGE_KEY, matchedIndex)
+//   }
+// }, { immediate: true })
+
 const logout = () => {
   localStorage.clear()
   root.$router.push('/' + ERouterName.PROJECT)
@@ -318,10 +300,78 @@ const logout = () => {
 function goHome () {
   root.$router.push('/' + ERouterName.MEMBERS)
 }
-
 </script>
 
 <style scoped lang="scss">
+
+// 菜单样式
+:deep(.el-menu){
+   background-color:transparent;
+   height: 50px;
+}
+:deep(.el-menu:hover){
+   background-color:transparent;
+   height: 50px;
+}
+// 一级标题
+:deep(.el-menu--horizontal>.el-menu-item ){
+  height: 40px;
+  overflow-wrap: break-word;
+  color: rgba(175, 193, 222, 1) ;
+  font-size: 22px;
+  font-family: YouSheBiaoTiHei-Regular;
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+  line-height: 40px;
+  margin: 15px 10px 0 10px;
+}
+:deep(.el-menu--horizontal>.el-menu-item.is-active){
+  color: rgba(175, 193, 222, 1) !important;
+  background: url('/@/assets/v4/selected_center.png') 100% no-repeat;
+  background-size: 100% 100%
+}
+:deep(.el-menu--horizontal>.el-menu-item:hover){
+  color: rgb(202, 222, 255); /* 选中时文字颜色 */
+  background: none;
+}
+
+// 二级标题
+:deep(.el-menu--horizontal>.el-sub-menu.is-active .el-sub-menu__title){
+  border: none;
+  background: url('/@/assets/v4/selected_center.png') 100% no-repeat;
+  background-size: 100% 100%
+}
+:deep(.el-menu--horizontal>.el-sub-menu .el-sub-menu__title){
+  height: 40px;
+  overflow-wrap: break-word;
+  color: rgba(175, 193, 222, 1) ;
+  font-size: 22px;
+  font-family: YouSheBiaoTiHei-Regular;
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+  line-height: 40px;
+  margin: 15px 10px 0 10px;
+
+}
+:deep(.el-menu--horizontal>.el-sub-menu .el-sub-menu__title:hover){
+  color: rgb(202, 222, 255); /* 选中时文字颜色 */
+  background: none;
+
+}
+:deep(.el-menu--horizontal.el-menu){
+  border:none
+}
+
+// 二级标题下拉列表 .el-sub-menu__title
+:deep(.el-menu--horizontal .el-menu .el-menu-item, .el-menu--horizontal .el-menu) {
+  background: linear-gradient(135deg, #1e3a8a 0%, #0c4a6e 100%) !important;
+  border: 1px solid rgba(99, 156, 242, 0.3) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+  padding: 5px 0 !important;
+}
 
 .selected-item {
   color: rgba(175, 193, 222, 1); /* 选中时文字颜色 */
@@ -444,5 +494,41 @@ function goHome () {
   line-height: 22px;
   margin-top: 33px;
 }
+</style>
 
+<style lang="scss">
+.child-menu-title{
+  border: none !important;
+  .el-menu {
+    // 修改二级菜单整个背景颜色
+    background-color:rgb(2, 51, 112);
+    // 二级菜单中的子选项
+    .el-menu-item {
+      a{
+        color: #e0e2e6 !important;
+        font-weight: 500;
+        font-size: 16px;
+        text-align: center;
+      }
+      background-color: transparent !important;
+      width: 100%;
+      &.is-active{
+        a{
+          color: rgb(8, 120, 248) !important;
+          text-align: center;
+        }
+
+        background-color: #182dd036 !important;
+        width: 100%;
+
+      }
+      // 被选择的子选项
+      &:not(.is-disabled):hover {
+        a{
+          color: rgb(41, 197, 222) !important;
+        }
+      }
+    }
+  }
+}
 </style>

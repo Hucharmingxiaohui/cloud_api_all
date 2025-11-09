@@ -51,77 +51,77 @@
       <div class="table-container">
         <el-table :data="tableData" stripe>
           <el-table-column type="index"  align="center" label="序号" width="60" />
-          <el-table-column label="风机名称" style="max-width: 100px;">
+          <el-table-column label="风机名称" width="200">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.turbine_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场经度" width="150">
+          <el-table-column label="机场经度" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场纬度" width="150">
+          <el-table-column label="机场纬度" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场海拔(米)" width="100">
+          <el-table-column label="机场海拔(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="正对航向角" width="100">
+          <!-- <el-table-column label="正对航向角" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.approach_yaw }}</div>
             </template>
-          </el-table-column>
-          <el-table-column label="最高点经度" width="100">
+          </el-table-column> -->
+          <el-table-column label="最高点经度" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点纬度" width="100">
+          <el-table-column label="最高点纬度" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点海拔(米)" width="100">
+          <el-table-column label="最高点海拔(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="叶片中心高度(米)" width="100">
+          <el-table-column label="叶片中心高度(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_center_height }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="停机叶片夹角" width="100">
+          <!-- <el-table-column label="停机叶片夹角" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_stop_angle }}</div>
             </template>
-          </el-table-column>
-          <el-table-column label="叶片长度(米)" width="100">
+          </el-table-column> -->
+          <el-table-column label="叶片长度(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_length }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="无人机距离(米)" width="100">
+          <el-table-column label="无人机距离(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.uav_blade_distance }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="风机底部高度(米)" width="100">
+          <el-table-column label="风机底部高度(米)" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_bottom_height }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="单个扇叶的点数" width="100">
+          <el-table-column label="单个扇叶的点数" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_points }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="塔筒的点数" width="100">
+          <el-table-column label="塔筒的点数" >
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.tower_points }}</div>
             </template>
@@ -187,12 +187,12 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="正对航向角" prop="approach_yaw" required>
+            <!-- <el-form-item label="正对航向角" prop="approach_yaw" required>
               <el-input
                 v-model="insertForm.approach_yaw"
                 maxlength="50"
               ></el-input>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="飞行最高点经度" prop="peak_longitude" required>
               <el-input
                 v-model="insertForm.peak_longitude"
@@ -241,7 +241,7 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item
+            <!-- <el-form-item
               label="停机时叶片1夹角"
               prop="blade_stop_angle"
               required
@@ -250,7 +250,7 @@
                 v-model="insertForm.blade_stop_angle"
                 maxlength="50"
               ></el-input>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="单个叶片长度(米)" prop="blade_length" required>
               <el-input
                 v-model="insertForm.blade_length"
@@ -331,12 +331,12 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="正对航向角" prop="approach_yaw" required>
+            <!-- <el-form-item label="正对航向角" prop="approach_yaw" required>
               <el-input
                 v-model="editForm.approach_yaw"
                 maxlength="50"
               ></el-input>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="飞行最高点经度" prop="peak_longitude" required>
               <el-input
                 v-model="editForm.peak_longitude"
@@ -384,7 +384,7 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item
+            <!-- <el-form-item
               label="停机时叶片1夹角"
               prop="blade_stop_angle"
               required
@@ -393,7 +393,7 @@
                 v-model="editForm.blade_stop_angle"
                 maxlength="50"
               ></el-input>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="单个叶片长度(米)" prop="blade_length" required>
               <el-input
                 v-model="editForm.blade_length"
@@ -460,12 +460,10 @@ const insertForm = reactive({
   airport_longitude: '',
   airport_latitude: '',
   airport_altitude: '',
-  approach_yaw: '',
   peak_longitude: '',
   peak_latitude: '',
   peak_altitude: '',
   blade_center_height: '',
-  blade_stop_angle: '',
   blade_length: '',
   uav_blade_distance: '',
   blade_bottom_height: '',
@@ -478,12 +476,10 @@ const editForm = reactive({
   airport_longitude: '',
   airport_latitude: '',
   airport_altitude: '',
-  approach_yaw: '',
   peak_longitude: '',
   peak_latitude: '',
   peak_altitude: '',
   blade_center_height: '',
-  blade_stop_angle: '',
   blade_length: '',
   uav_blade_distance: '',
   blade_bottom_height: '',
@@ -515,10 +511,10 @@ const formRules = {
     { required: true, message: '请输入机场海拔高度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  approach_yaw: [
-    { required: true, message: '请输入正对航向角', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
+  // approach_yaw: [
+  //   { required: true, message: '请输入正对航向角', trigger: 'blur' },
+  //   { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  // ],
   peak_longitude: [
     { required: true, message: '请输入飞行最高点经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
@@ -533,10 +529,6 @@ const formRules = {
   ],
   blade_center_height: [
     { required: true, message: '请输入叶片旋转中心高度', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  blade_stop_angle: [
-    { required: true, message: '请输入停机时叶片1夹角', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   blade_length: [
@@ -595,12 +587,10 @@ function openInsertDialog () {
     airport_longitude: '',
     airport_latitude: '',
     airport_altitude: '',
-    approach_yaw: '',
     peak_longitude: '',
     peak_latitude: '',
     peak_altitude: '',
     blade_center_height: '',
-    blade_stop_angle: '',
     blade_length: '',
     uav_blade_distance: ''
   })

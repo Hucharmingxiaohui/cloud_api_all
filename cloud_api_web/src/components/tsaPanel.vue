@@ -25,7 +25,7 @@
               <img
                 class="image_6"
                 referrerpolicy="no-referrer"
-                src="https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG1cda726884908d30359e37844a217e60.png"
+                src="../assets/v4/dock.png"
               />
               <div class="group_31 flex-col justify-between">
                 <div class="box_35 flex-row justify-between">
@@ -132,14 +132,14 @@
               <img
                 class="image_3"
                 referrerpolicy="no-referrer"
-                src="https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG25f9ea5d482babaf860bd065484ce952.png"
+                src="../assets/v4/nav-icon.png"
               />
               <div class="group_35 flex-col">
                 <div class="box_39 flex-row justify-between">
                   <img
                     class="label_2"
                     referrerpolicy="no-referrer"
-                    src="https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG4e8b5e45195758a311d29bb503f6b630.png"
+                    src="../assets/v4/fan.png"
                   />
                   <span class="text_22">{{ dock.callsign ?? 'No Drone' }}</span>
                 </div>
@@ -198,7 +198,7 @@
               <img
                 class="label_3"
                 referrerpolicy="no-referrer"
-                src="https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG1e4255ec5a9d78aaf5f4cbb350bad7a2.png"
+                src="../assets/v4/dropdown.png"
               />
             </div>
             <div class="box_42 flex-row">
@@ -208,7 +208,7 @@
                   <img
                     class="image_4"
                     referrerpolicy="no-referrer"
-                    src="https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG02bdd71a41b72089a809b3a17f718437.png"
+                    src="../assets/v4/yellow-airplane.png"
                   />
                 </div>
               </div>

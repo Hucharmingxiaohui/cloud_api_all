@@ -467,7 +467,7 @@ import {
   ThunderboltOutlined, SignalFilled, GlobalOutlined, HistoryOutlined, CloudUploadOutlined, RocketOutlined,
   FieldTimeOutlined, CloudOutlined, CloudFilled, FolderOpenOutlined, RobotFilled, ArrowUpOutlined, CarryOutOutlined
 } from '@ant-design/icons-vue'
-import { EDeviceTypeName, EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
+import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import DockControlPanel from '/@/components/g-map/DockControlPanel.vue'
 import { useDockControl } from '/@/components/g-map/use-dock-control'
 import DroneControlPanel from '/@/components/g-map/DroneControlPanel.vue'
