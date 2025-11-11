@@ -66,7 +66,8 @@ import EventBus from '/@/event-bus'
 // import myWayline from '/@/components/WaylinePanel.vue'
 // import GMap from '/@/components/GMap.vue'
 // import myWayline from './wayline.vue'
-
+let dockOsdEmptyTimer = null
+let dockOsdEmptyStartTime = 0
 const root = getRoot()
 const store = useMyStore()
 const messageHandler = async (payload: any) => {
@@ -80,10 +81,36 @@ const messageHandler = async (payload: any) => {
     }
     case EBizCode.DeviceOsd: {
       store.commit('SET_DEVICE_INFO', payload.data)
+
       break
     }
     case EBizCode.DockOsd: {
-      store.commit('SET_DOCK_INFO', payload.data)
+      const currentData = payload.data
+      const hasEnvironmentTemperature = currentData.host?.environment_temperature !== ''
+      console.log(currentData.host?.environment_temperature)
+
+      if (hasEnvironmentTemperature) {
+        // 不为空，立即提交
+        clearTimeout(dockOsdEmptyTimer)
+        dockOsdEmptyStartTime = 0
+        store.commit('SET_DOCK_INFO', currentData)
+      } else {
+        // 为空，检查是否已经持续2秒
+        const now = Date.now()
+
+        if (dockOsdEmptyStartTime === 0) {
+          // 第一次检测到为空，开始计时
+          dockOsdEmptyStartTime = now
+        }
+
+        clearTimeout(dockOsdEmptyTimer)
+        dockOsdEmptyTimer = setTimeout(() => {
+          if (Date.now() - dockOsdEmptyStartTime >= 2000) {
+            store.commit('SET_DOCK_INFO', currentData)
+          }
+          dockOsdEmptyStartTime = 0 // 重置计时
+        }, 2000)
+      }
       break
     }
     case EBizCode.MapElementCreate: {
@@ -160,10 +187,11 @@ const messageHandler = async (payload: any) => {
       break
   }
 }
-
-// 监听ws 消息
 useConnectWebSocket(messageHandler)
+onMounted(() => {
+  // 监听ws 消息
 
+})
 </script>
 <style lang="scss" scoped>
 .content-bg{
