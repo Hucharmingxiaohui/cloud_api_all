@@ -265,7 +265,6 @@ function onTaskProgressWs (data: TaskProgressInfo) {
         getPlans()
       } else if ([TaskProgressStatus.OK].includes(status)) {
         getPlans()
-        checkAnaysisStaus(taskItem)
       }
     }
   }
@@ -291,6 +290,8 @@ function onTaskMediaProgressWs (data: MediaStatusProgressInfo) {
   }
   taskItem.media_count = mediaCount
   taskItem.uploaded_count = uploadedCount
+  
+ 
 }
 
 function onoTaskMediaHighestPriorityWS (data: TaskMediaHighestPriorityProgressInfo) {
@@ -365,11 +366,14 @@ watch(
       const statusInfo = formatMediaTaskStatus(row)
 
       // 当状态为"已上传"且未分析过时，执行分析
+      console.log('执行分析判断', analyzedTasks.value.has(row.job_id))
       if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
         analyzedTasks.value.add(row.job_id)
 
         // 使用nextTick确保DOM更新完成后再执行
         nextTick(() => {
+          console.log('上传图片完成，进行分析....')
+          console.log('上传行信息', statusInfo)
           checkAnaysisStaus(row)
         })
       }
