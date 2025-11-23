@@ -96,11 +96,6 @@ const routes: Array<RouteRecordRaw> = [
         ]
       },
       {
-        path: '/test1',
-        name: 'test1',
-        component: () => import('/@/components/task/PlanInfo.vue')
-      },
-      {
         path: '/' + ERouterName.LAYER,
         name: ERouterName.LAYER,
         component: () => import('/@/pages/page-web/projects/layer.vue')
@@ -209,37 +204,15 @@ const routes: Array<RouteRecordRaw> = [
         component: () => import('/@/components/task/showState.vue'),
       },
       {
-        path: '/' + ERouterName.FLY_PLAN,
-        name: ERouterName.FLY_PLAN,
-        component: () => import('/@/components/task/fly_plan.vue'),
+        path: '/' + ERouterName.FLY_WAYLINE_PLAN,
+        name: ERouterName.FLY_WAYLINE_PLAN,
+        component: () => import('/@/components/task/flyWaylinePlan.vue'),
       },
-      // {
-      //   path: '/' + ERouterName.TASK,
-      //   name: ERouterName.TASK,
-      //   component: () => import('/@/components/task/TaskPanel.vue'),
-      //   children: [
-      //     {
-      //       path: ERouterName.CREATE_PLAN,
-      //       name: ERouterName.CREATE_PLAN,
-      //       component: CreatePlan,
-      //       children: [
-      //         {
-      //           path: ERouterName.SELECT_PLAN,
-      //           name: ERouterName.SELECT_PLAN,
-      //           components: {
-      //             WaylinePanel,
-      //             DockPanel
-      //           }
-      //         }
-      //       ],
-      //     },
-      //     {
-      //       path: 'taskResult',
-      //       name: 'taskResult',
-      //       component: () => import('/@/components/task/task_result.vue'),
-      //     },
-      //   ]
-      // },
+      {
+        path: '/' + ERouterName.FLY_FAN_PLAN,
+        name: ERouterName.FLY_FAN_PLAN,
+        component: () => import('/@/components/task/flyFanPlan.vue'),
+      },
       {
         path: '/' + ERouterName.TASK,
         name: ERouterName.TASK,

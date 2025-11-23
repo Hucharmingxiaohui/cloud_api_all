@@ -215,11 +215,16 @@ const menuRightOptions = [
     children: [
       {
         index: '5-1',
-        label: '飞行计划',
-        path: '/' + ERouterName.FLY_PLAN,
+        label: '普通计划',
+        path: '/' + ERouterName.FLY_WAYLINE_PLAN,
       },
       {
         index: '5-2',
+        label: '风机计划',
+        path: '/' + ERouterName.FLY_FAN_PLAN,
+      },
+      {
+        index: '5-3',
         label: '飞行任务',
         path: '/' + ERouterName.TASK
       },
