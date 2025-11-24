@@ -165,7 +165,8 @@ public class WindTurbineWaylineController {
                     pubWaylineJobPlanDfEntity.setMajor("变电");
 //                  风机名称
                     pubWaylineJobPlanDfEntity.setFanName(windTurbine.getTurbineName());
-
+//                  设为普通类型，为了暂时适配创建计划
+                    pubWaylineJobPlanDfEntity.setPlanType(0);
 //                  创建计划存数据库
                     pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
 //                  直接执行任务（可以不用查计划？）

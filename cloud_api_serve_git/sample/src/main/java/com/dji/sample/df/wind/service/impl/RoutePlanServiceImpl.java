@@ -4,11 +4,16 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
+import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.control.model.param.FlyToPointParam;
 import com.dji.sample.control.model.param.InFlightWaylineDeliverParam;
 import com.dji.sample.control.service.IControlService;
 import com.dji.sample.control.service.IControlService2;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
+import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
+import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.df.wind.service.WindTurbineService;
@@ -31,16 +36,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
 import java.net.URL;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
 import static com.dji.sample.df.wind.controller.WindTurbineWaylineController.convert;
 
 @Service
@@ -67,6 +72,14 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     @Autowired
     private IWaylineFileService waylineFileService;
 
+    @Resource
+    WindTurbineMapper windTurbineMapper;
+
+    @Autowired
+    private PubWaylineJobPlanDfService pubWaylineJobPlanDfService;
+
+    @Autowired
+    private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -567,6 +580,116 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }catch (Exception e){
             e.printStackTrace();
         }
+    }
+
+    @Override
+    public boolean buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+        // 写发送逻辑
+        String fanId = pubWaylineJobPlanDfEntity.getFanId();
+        redisUtils.set("windTurbineId", fanId);
+        WindTurbine windTurbine = windTurbineMapper.selectById(fanId);
+
+        String url = "http://172.20.63.157:5001/top";
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("turbine_name", windTurbine.getTurbineName());
+        jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
+        jsonObject.put("lat0_deg", windTurbine.getAirportLatitude());
+        jsonObject.put("h0", windTurbine.getAirportAltitude());
+        //      转向角为获取
+        jsonObject.put("yaw_ver", windTurbine.getApproachYaw());
+        jsonObject.put("lon_in_deg", windTurbine.getPeakLongitude());
+        jsonObject.put("lat_in_deg", windTurbine.getPeakLatitude());
+        jsonObject.put("h_in", windTurbine.getPeakAltitude());
+        jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
+        jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
+        jsonObject.put("length", windTurbine.getBladeLength());
+        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+        jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
+        jsonObject.put("blade_points", windTurbine.getBladePoints());
+        jsonObject.put("tower_points", windTurbine.getTowerPoints());
+        String jsonInput = jsonObject.toString();
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            // 设置请求方法
+            con.setRequestMethod("POST");
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setDoOutput(true);
+            // 发送请求
+            try (OutputStream os = con.getOutputStream()) {
+                byte[] input = jsonInput.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+            // 获取响应
+            int responseCode = con.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+//          如果响应成功，则成功生成kmz文件转为multipartFile，导入minio
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(con.getInputStream(), "utf-8"))) {
+                    StringBuilder response1 = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response1.append(responseLine.trim());
+                    }
+                    JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
+                    String routeName = jsonResponse.getString("routeName");
+                    // 项目根目录下的文件路径（根据实际部署环境调整），注意linux是否可行
+                    String projectPath = System.getProperty("user.dir");
+                    String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
+                    MultipartFile file = convert(filePath);
+                    if (Objects.isNull(file)) {
+                         log.error("kmz文件未检测到");
+                    }
+
+                    String workspaceId = redisUtils.get("workspaceId").toString();
+                    String creator = redisUtils.get("creator").toString();
+                    importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
+                    String fileName = file.getOriginalFilename();
+                    if (fileName != null && fileName.endsWith(".kmz")) {
+                        fileName = fileName.substring(0, fileName.length() - 4);
+                    }
+                    WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
+                    if (Objects.isNull(entity)) {
+                        log.error("导入外部航线失败");
+                    }
+                    pubWaylineJobPlanDfEntity.setName(routeName);
+                    pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
+//                  航线类型：航点
+                    pubWaylineJobPlanDfEntity.setWaylineType(0);
+//                  风机名称
+                    pubWaylineJobPlanDfEntity.setFanName(windTurbine.getTurbineName());
+//                  创建计划存数据库
+                    pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+                    // 获取当前系统时间戳（以毫秒为单位）
+                    long currentTimeMillis = System.currentTimeMillis();
+                    //如果是立即执行任务，添加begin_time
+                    if(pubWaylineJobPlanDfEntity.getTaskType()==0){
+                        pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
+                    }
+                    pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
+                    pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+                    //校验paln_id是否重复
+                    PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
+                            eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
+                    if(entity1!=null){//plan_id重复
+                        return false;
+                    }else{//plan_id不重复
+                        pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
+                        return true;
+                    }
+                }
+            }
+        } catch (ProtocolException e) {
+            throw new RuntimeException(e);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return true;
     }
 
 

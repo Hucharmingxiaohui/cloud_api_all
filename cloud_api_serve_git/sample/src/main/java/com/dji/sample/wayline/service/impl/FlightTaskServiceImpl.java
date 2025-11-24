@@ -100,6 +100,49 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     @Autowired
     HisUniTaskItemPointsServiceImpl hisUniTaskItemPointsService;
+//  风机定时任务,可能不需要
+    @Scheduled(initialDelay = 10, fixedRate = 5, timeUnit = TimeUnit.SECONDS)
+    public void checkFanScheduledJob() {
+        Object jobIdValue = RedisOpsUtils.zGetMin(RedisConst.WAYLINE_JOB_TIMED_EXECUTE);
+        if (Objects.isNull(jobIdValue)) {
+            return;
+        }
+        log.info("Check the timed tasks of the wayline. {}", jobIdValue);
+        // format: {workspace_id}:{dock_sn}:{job_id}
+        String[] jobArr = String.valueOf(jobIdValue).split(RedisConst.DELIMITER);
+        double time = RedisOpsUtils.zScore(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
+        long now = System.currentTimeMillis();
+        int offset = 30_000;
+
+        // Expired tasks are deleted directly.
+        if (time < now - offset) {
+            RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
+            waylineJobService.updateJob(WaylineJobDTO.builder()
+                    .jobId(jobArr[2])
+                    .status(WaylineJobStatusEnum.FAILED.getVal())
+                    .executeTime(LocalDateTime.now())
+                    .completedTime(LocalDateTime.now())
+                    .code(HttpStatus.SC_REQUEST_TIMEOUT).build());
+            return;
+        }
+
+        if (now <= time && time <= now + offset) {
+            try {
+                this.executeFlightTask(jobArr[0], jobArr[2]);
+            } catch (Exception e) {
+                log.info("The scheduled task delivery failed.");
+                waylineJobService.updateJob(WaylineJobDTO.builder()
+                        .jobId(jobArr[2])
+                        .status(WaylineJobStatusEnum.FAILED.getVal())
+                        .executeTime(LocalDateTime.now())
+                        .completedTime(LocalDateTime.now())
+                        .code(HttpStatus.SC_INTERNAL_SERVER_ERROR).build());
+            } finally {
+                RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
+            }
+        }
+    }
+
 
     @Scheduled(initialDelay = 10, fixedRate = 5, timeUnit = TimeUnit.SECONDS)
     public void checkScheduledJob() {
@@ -205,9 +248,9 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
      * @param param
      */
     private void fillImmediateTime(CreateJobParam param) {
-        if (TaskTypeEnum.IMMEDIATE != param.getTaskType()) {
-            return;
-        }
+//        if (TaskTypeEnum.IMMEDIATE != param.getTaskType()) {
+//            return;
+//        }
         long now = System.currentTimeMillis() / 1000;
         param.setTaskDays(List.of(now));
         param.setTaskPeriods(List.of(List.of(now)));
@@ -247,10 +290,13 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             for (List<Long> taskPeriod : param.getTaskPeriods()) {
                 long beginTime = LocalDateTime.of(date, LocalTime.ofInstant(Instant.ofEpochSecond(taskPeriod.get(0)), ZoneId.systemDefault()))
                         .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                if(TaskTypeEnum.TIMED == param.getTaskType()){
+                    beginTime = param.getBeginTime();
+                }
                 long endTime = taskPeriod.size() > 1 ?
                         LocalDateTime.of(date, LocalTime.ofInstant(Instant.ofEpochSecond(taskPeriod.get(1)), ZoneId.systemDefault()))
                                 .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : beginTime;
-                if (TaskTypeEnum.IMMEDIATE != param.getTaskType() && endTime < System.currentTimeMillis()) {
+                if (TaskTypeEnum.IMMEDIATE != param.getTaskType() &&TaskTypeEnum.TIMED != param.getTaskType() && endTime < System.currentTimeMillis()) {
                     continue;
                 }
 

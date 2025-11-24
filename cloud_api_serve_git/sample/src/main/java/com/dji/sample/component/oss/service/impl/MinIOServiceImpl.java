@@ -11,6 +11,7 @@ import io.minio.errors.*;
 import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -28,10 +29,11 @@ import java.util.Objects;
  */
 @Service
 @Slf4j
+@Primary
 public class MinIOServiceImpl implements IOssService {
 
     private MinioClient client;
-    
+
     @Override
     public OssTypeEnum getOssType() {
         return OssTypeEnum.MINIO;

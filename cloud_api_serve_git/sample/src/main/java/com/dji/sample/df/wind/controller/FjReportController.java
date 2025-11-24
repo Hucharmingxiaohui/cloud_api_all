@@ -4,33 +4,25 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.config.FileConfig;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.utils.ParamsUtils;
 import com.df.framework.vo.Result;
-import com.df.server.dto.HisUniTask.ConfirmHisTaskReportParams;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
-import com.df.server.entity.his.HisUniTaskReportEntity;
-import com.df.server.service.his.HisUniTaskReportService;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
-import com.dji.sample.df.electricInspectionDf.timer.ReportGenTimer;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
-import com.dji.sample.df.wind.PictureSaveHandler;
+import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
-import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.service.FjReportService;
-import com.dji.sample.df.wind.timer.ExecuteFJReportGenTimer;
 
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.core.io.Resource;
@@ -43,9 +35,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -53,8 +42,6 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import org.springframework.http.HttpHeaders;
 
@@ -100,6 +87,11 @@ public class FjReportController {
     @PostMapping("/pictureSave")
     public Result pictureSave(@RequestBody JSONObject jsonObject) {
         String jobId = jsonObject.get("jobId").toString();
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+//      正在分析（实则是正在保存加分析）
+        waylineJobEntity.setIsAnalyzed(2);
+        waylineJobMapper.updateById(waylineJobEntity);
+        log.info(jobId+"正在分析。。。");
         Result result = pictureSaveHandler.pictureSave(jobId);
         if (result.getCode() == 0) {
              AnalysisRequest request = new AnalysisRequest();
@@ -118,8 +110,9 @@ public class FjReportController {
                  System.out.println("分析结果: " + response);
              }
              fjReportService.processAndAddDefects(response, jobId);
-             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+//           分析完成
              waylineJobEntity.setIsAnalyzed(1);
+             log.info(jobId+"分析完成。。。");
              waylineJobMapper.updateById(waylineJobEntity);
              return Result.success("success");
         }
@@ -131,13 +124,13 @@ public class FjReportController {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
         if(isAnalyzed == null){
-            return Result.success(false);
+            return Result.success(0);
+        }else if(isAnalyzed == 1){
+            return Result.success(1);
+        }else if(isAnalyzed == 2){
+            return Result.success(2);
         }
-        if(isAnalyzed == 1){
-            return Result.success(true);
-        }else {
-            return Result.success(false);
-        }
+        return Result.success(0);
     }
 
     /**

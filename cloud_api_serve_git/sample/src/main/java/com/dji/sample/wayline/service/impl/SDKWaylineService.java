@@ -1,21 +1,28 @@
 package com.dji.sample.wayline.service.impl;
 
+import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.common.error.CommonErrorEnum;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
+import com.dji.sample.component.oss.model.OssConfiguration;
+import com.dji.sample.component.oss.service.IOssService;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.entity.DeviceEntity;
+import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.manage.model.enums.UserTypeEnum;
 import com.dji.sample.manage.service.IDeviceRedisService;
+import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.model.MediaFileCountDTO;
+import com.dji.sample.media.model.MediaFileEntity;
 import com.dji.sample.media.service.IMediaRedisService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
@@ -51,6 +58,7 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,6 +106,15 @@ public class SDKWaylineService extends AbstractWaylineService {
 
     @Resource
     private WindTurbineMapper windTurbineMapper;
+
+    @Resource
+    private IOssService ossService;
+
+    @Resource
+    IFileMapper fileMapper;
+
+    @Autowired
+    private IWorkspaceMapper workspaceMapper;
 
     private final ConcurrentMap<String, AtomicInteger> processedWaypoints = new ConcurrentHashMap<>();
 
@@ -261,7 +278,9 @@ public class SDKWaylineService extends AbstractWaylineService {
         Integer status = response.getData().getStatus();
         Integer currentWaypointIndex = response.getData().getWayPointIndex();
         String flightId = response.getData().getInFlightWaylineId();
-
+        WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
+        String workspaceId = workspaceEntity.getWorkspaceId();
+        DeviceEntity uavEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
         log.info("执行空中航线任务-"+flightId+"  当前航点号为"+currentWaypointIndex+"号");
         String fightState = redisUtils.get("in_fight_state").toString();
 //        String inFightAction = redisUtils.get("in_fight_action").toString();
@@ -313,16 +332,32 @@ public class SDKWaylineService extends AbstractWaylineService {
 
                             if (jsonResponse.getString("desc").equals("1")) {
                                 if (jsonResponse.getString("file_path") != null) {
-//                          处理抓拍图片
-//                                try {
-//                                    MultipartFile file = convert(new File("C:\\Users\\90828\\Desktop\\风机参数.txt"));
-//                                    String ObjectKey= OssConfiguration.objectDirPrefix + File.separator + file.getOriginalFilename();
-//                                    ossService.putObject(OssConfiguration.bucket, ObjectKey, file.getInputStream());
-//                                } catch (IOException e) {
-//                                    throw new RuntimeException(e);
-//                                }
+//                                  处理抓拍图片
                                     String filePath = jsonResponse.getString("file_path");
-                                    String fileName1 = jsonResponse.getString("file_name1");
+                                    JSONArray imageList = jsonResponse.getJSONArray("imageList");
+                                    for (int i = 0; i < imageList.size(); i++) {
+                                        try {
+                                            MultipartFile file = convert(new File(filePath+imageList.getString(i)));
+                                            log.info("保存文件视频截图文件---"+file.getOriginalFilename());
+                                            String ObjectKey= OssConfiguration.objectDirPrefix + "/" + jobId + "/" +file.getOriginalFilename();;
+                                            ossService.putObject(OssConfiguration.bucket, ObjectKey, file.getInputStream());
+                                            MediaFileEntity  mediaFileEntity = new MediaFileEntity();
+                                            mediaFileEntity.setFileId(UUID.randomUUID().toString());
+                                            mediaFileEntity.setFileName(file.getOriginalFilename());
+                                            mediaFileEntity.setFilePath(OssConfiguration.objectDirPrefix + "/" + jobId);
+                                            mediaFileEntity.setObjectKey(ObjectKey);
+                                            mediaFileEntity.setJobId(jobId);
+                                            mediaFileEntity.setWorkspaceId(workspaceId);
+                                            mediaFileEntity.setDrone(uavEntity.getDeviceSn());
+//                                          负载暂时不写
+                                            mediaFileEntity.setPayload(null);
+                                            mediaFileEntity.setIsOriginal(true);
+                                            log.info("插入文件入库---"+mediaFileEntity);
+                                            fileMapper.insert(mediaFileEntity);
+                                        } catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    }
                                     log.info("处理返回图像---------------------");
                                 } else if (jsonResponse.getString("desc").equals("0")) {
     //                              分析失败返航

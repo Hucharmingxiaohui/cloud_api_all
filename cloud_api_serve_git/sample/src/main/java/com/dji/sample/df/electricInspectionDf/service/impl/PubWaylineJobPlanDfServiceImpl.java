@@ -10,6 +10,7 @@ import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.waylineDf.dao.IWaylineFileMapperDf;
 import com.dji.sample.df.waylineDf.model.entity.WaylineFileEntity;
+import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.model.MediaFileEntity;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -26,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
+import javax.xml.transform.ErrorListener;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,30 +49,39 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     private UniPointMapper uniPointMapper;
     @Autowired
     private IWaylineFileMapperDf waylineFileMapperDf;
+    @Resource
+    RoutePlanService routePlanService;
 
     //创建计划
     @Override
     public boolean createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
-        //创建计划接口
-        pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
-        // 获取当前系统时间戳（以毫秒为单位）
-        long currentTimeMillis = System.currentTimeMillis();
+        Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+//      如果是风机计划则调用创建风机航线接口
+        if(planType==1){
+            routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
+        }else {
+            //创建计划接口
+            pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+            // 获取当前系统时间戳（以毫秒为单位）
+            long currentTimeMillis = System.currentTimeMillis();
 
-        //如果是立即执行任务，添加begin_time
-        if(pubWaylineJobPlanDfEntity.getTaskType()==0){
-            pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
+            //如果是立即执行任务，添加begin_time
+            if(pubWaylineJobPlanDfEntity.getTaskType()==0){
+                pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
+            }
+            pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
+            pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+            //校验paln_id是否重复
+            PubWaylineJobPlanDfEntity entity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
+                    eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
+            if(entity!=null){//plan_id重复
+                return false;
+            }else{//plan_id不重复
+                pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
+                return true;
+            }
         }
-        pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
-        pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
-        //校验paln_id是否重复
-        PubWaylineJobPlanDfEntity entity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
-                eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
-        if(entity!=null){//plan_id重复
-            return false;
-        }else{//plan_id不重复
-            pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
-            return true;
-        }
+        return true;
     }
 
     @Override
@@ -130,6 +142,19 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         List<PubWaylineJobPlanDfEntity> records = pageData.getRecords();
         return new PaginationData<PubWaylineJobPlanDfEntity>(records, new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
     }
+
+    @Override
+    public PaginationData<PubWaylineJobPlanDfEntity> getPlanByPlantype(String plan_type, long page, long pageSize) {
+        Page<PubWaylineJobPlanDfEntity> pageData = pubWaylineJobPlanDfMapper.selectPage(
+                new Page<PubWaylineJobPlanDfEntity>(page, pageSize),
+                new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanType, plan_type)
+                        .orderByDesc(PubWaylineJobPlanDfEntity::getId));
+        List<PubWaylineJobPlanDfEntity> records = pageData.getRecords();
+        return new PaginationData<PubWaylineJobPlanDfEntity>(records, new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
+    }
+
+
     //执行任务
     @Override
     public HttpResultResponse expressPlan(CustomClaim customClaim,  PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
@@ -192,55 +217,56 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         //执行的日期
         List<Long> task_days=new ArrayList<>();//存储执行日期
 
-        if(pubWaylineJobPlanDfEntity.getTaskType()!=0)
-        {
-            //取出出时间段
-            String days= pubWaylineJobPlanDfEntity.getTaskDays();//长度为21
-            Long day1=Long.parseLong(days.substring(0,9));
-            Long day2=Long.parseLong(days.substring(11,20));
-            if(day1.equals(day2))
-            {
-                task_days.add(day1);
-            }else {
-                for(Long i=day1;i<=day2;)
-                {
-                    task_days.add(i);
-                    i=i+86400;
-                }
-            }
-        }
-          param.setTaskDays(task_days);
-        //执行的时间段
-        List<List<Long>> task_periods=new ArrayList<>();//存储执行时间段
-        if(pubWaylineJobPlanDfEntity.getTaskType()!=0)
-        {   String taskPeriods= pubWaylineJobPlanDfEntity.getTaskPeriods();
-            for(int i=0;i<taskPeriods.length();)
-            {
-                Long time1=Long.parseLong(taskPeriods.substring(0+i,9+i));//开始时间
-                Long time2=Long.parseLong(taskPeriods.substring(11+i,20+i));//结束时间
-                List<Long> list=new ArrayList<>();//存储时间段
-                if(time1.equals(time2))
-                {
-                    list.add(time1);
-                    task_periods.add(list);
-                }else {
-                    list.add(time1);
-                    list.add(time2);
-                    task_periods.add(list);
-                }
-                i=i+22;
-            }
-
-        }
-        param.setTaskPeriods(task_periods);
+//        if(pubWaylineJobPlanDfEntity.getTaskType()!=0)
+//        {
+//            //取出出时间段
+//            String days= pubWaylineJobPlanDfEntity.getTaskDays();//长度为21
+//            Long day1=Long.parseLong(days.substring(0,9));
+//            Long day2=Long.parseLong(days.substring(11,20));
+//            if(day1.equals(day2))
+//            {
+//                task_days.add(day1);
+//            }else {
+//                for(Long i=day1;i<=day2;)
+//                {
+//                    task_days.add(i);
+//                    i=i+86400;
+//                }
+//            }
+//        }
+//          param.setTaskDays(task_days);
+//        //执行的时间段
+//        List<List<Long>> task_periods=new ArrayList<>();//存储执行时间段
+//        if(pubWaylineJobPlanDfEntity.getTaskType()!=0)
+//        {   String taskPeriods= pubWaylineJobPlanDfEntity.getTaskPeriods();
+//            for(int i=0;i<taskPeriods.length();)
+//            {
+//                Long time1=Long.parseLong(taskPeriods.substring(0+i,9+i));//开始时间
+//                Long time2=Long.parseLong(taskPeriods.substring(11+i,20+i));//结束时间
+//                List<Long> list=new ArrayList<>();//存储时间段
+//                if(time1.equals(time2))
+//                {
+//                    list.add(time1);
+//                    task_periods.add(list);
+//                }else {
+//                    list.add(time1);
+//                    list.add(time2);
+//                    task_periods.add(list);
+//                }
+//                i=i+22;
+//            }
+//
+//        }
+//        param.setTaskPeriods(task_periods);
         param.setPlanId(pubWaylineJobPlanDfEntity.getPlanId());
         param.setFanName(pubWaylineJobPlanDfEntity.getFanName());
-
+        param.setBeginTime(pubWaylineJobPlanDfEntity.getBeginTime());
         System.out.println(param);
         System.out.println("kkkkk");
         //更新状态
         pubWaylineJobPlanDfMapper.updateById(pubWaylineJobPlanDfEntity);
-        return flightTaskService.publishFlightTask(param,customClaim, pubWaylineJobPlanDfEntity);
+        HttpResultResponse httpResultResponse = flightTaskService.publishFlightTask(param, customClaim, pubWaylineJobPlanDfEntity);
+        return httpResultResponse;
     }
 
     @Override

@@ -52,4 +52,6 @@ public class CreateJobParam {
     private String planId;
 
     private String fanName;
+
+    private Long beginTime;
 }

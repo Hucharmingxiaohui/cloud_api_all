@@ -1,32 +1,25 @@
 package com.dji.sample.df.wind.service.impl;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
-import com.df.framework.vo.Result;
-import com.df.server.dto.HisUniTask.ConfirmHisTaskReportParams;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
-import com.dji.sample.df.mediaDf.model.MediaFileEntity;
-import com.dji.sample.df.wind.PictureSaveHandler;
+import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FjReportMapper;
-import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FjReportEntity;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
-import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.IIOImage;
@@ -43,7 +36,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 public class FjReportServiceImpl implements FjReportService {

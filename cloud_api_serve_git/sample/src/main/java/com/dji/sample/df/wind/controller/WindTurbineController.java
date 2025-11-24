@@ -1,7 +1,7 @@
 package com.dji.sample.df.wind.controller;
 
 import com.df.framework.vo.Result;
-import com.dji.sample.df.wind.PictureSaveHandler;
+import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.df.wind.service.WindTurbineService;

@@ -336,15 +336,26 @@ public class FileServiceImplDf implements IFileServiceDf {
     public List<MediaFileDTO> getMediaDileByJobId3(String job_id, String workspace_id) throws Exception {
         synchronized (lock) {
             List<MediaFileDTO> mediaFileDTOList = this.getUniqueFilesByJobId(job_id);
+            // 分离DJI文件和非DJI文件
+            List<MediaFileDTO> djiFiles = new ArrayList<>();
+            List<MediaFileDTO> nonDjiFiles = new ArrayList<>();
+
+            for (MediaFileDTO file : mediaFileDTOList) {
+                if (file.getFileName().startsWith("DJI")) {
+                    djiFiles.add(file);
+                } else {
+                    nonDjiFiles.add(file);
+                }
+            }
             //排序
-            for (int i = 0; i < mediaFileDTOList.size() - 1; i++) {
+            for (int i = 0; i < djiFiles.size() - 1; i++) {
                 // 设置一个标志位，用于检测是否发生了交换
                 boolean swapped = false;
                 // 内层循环，从第一个元素到倒数第i个元素
-                for (int j = 0; j < mediaFileDTOList.size() - i - 1; j++) {
+                for (int j = 0; j < djiFiles.size() - i - 1; j++) {
                     //获取第一张图片的时间数
                     //获取第j张照片名称
-                    String T1fileName = mediaFileDTOList.get(j).getFileName();
+                    String T1fileName = djiFiles.get(j).getFileName();
                     //记录第J张照片时间
                     String strT1num = "";
                     //记录下划线
@@ -364,7 +375,7 @@ public class FileServiceImplDf implements IFileServiceDf {
                     Long T1num = Long.valueOf(strT1num);
 
                     //获取第二张图片时间数
-                    String T2fileName = mediaFileDTOList.get(j + 1).getFileName();
+                    String T2fileName = djiFiles.get(j + 1).getFileName();
                     //记录第J张照片时间
                     String strT2num = "";
                     //记录下划线
@@ -385,9 +396,9 @@ public class FileServiceImplDf implements IFileServiceDf {
                     Long T2num = Long.valueOf(strT2num);
                     // 如果当前元素比下一个元素大，则交换它们
                     if (T1num > T2num) {
-                        MediaFileDTO temp = mediaFileDTOList.get(j);
-                        mediaFileDTOList.set(j, mediaFileDTOList.get(j + 1));
-                        mediaFileDTOList.set(j + 1, temp);
+                        MediaFileDTO temp = djiFiles.get(j);
+                        djiFiles.set(j, djiFiles.get(j + 1));
+                        djiFiles.set(j + 1, temp);
                         swapped = true;
                     }
                 }
@@ -396,6 +407,10 @@ public class FileServiceImplDf implements IFileServiceDf {
                     break;
                 }
             }
+            // 合并列表：排序后的DJI文件在前，非DJI文件在后
+            mediaFileDTOList.clear();
+            mediaFileDTOList.addAll(djiFiles);
+            mediaFileDTOList.addAll(nonDjiFiles);
             return mediaFileDTOList;
         }
     }

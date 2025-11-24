@@ -94,7 +94,13 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     private String waylinePointPos;
 
     @TableField("fan_name")
-    private String fanName;
+    private String fanName;//风机名称
+
+    @TableField("fan_id")
+    private String fanId;//风机id
+
+    @TableField("plan_type")
+    private Integer planType;// 计划类型：0普通任务1风机任务
 
     @Transient
     @TableField(exist = false)

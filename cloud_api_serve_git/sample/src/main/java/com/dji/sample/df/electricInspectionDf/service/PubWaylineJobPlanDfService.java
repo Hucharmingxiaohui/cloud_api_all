@@ -19,6 +19,8 @@ public interface PubWaylineJobPlanDfService {
     Map<String, String> getWaylineIdByPos(Map<Integer, String> waylineByPoint);
     //按场站查询计划
     PaginationData<PubWaylineJobPlanDfEntity> getPlanBySubCode(String sub_code, long page, long pageSize);
+
+    PaginationData<PubWaylineJobPlanDfEntity> getPlanByPlantype(String sub_code, long page, long pageSize);
     //执行计划生成任务&&更新计划
     HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException;
     //取消任务
