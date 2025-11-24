@@ -9,7 +9,7 @@
       <div class="create-plan-wrapper">
         <div class="content">
           <el-form
-            ::model="planBody"
+            :model="planBody"
             label-width="110px"
             ref="valueRef"
             :rules="rules"
@@ -19,9 +19,19 @@
             <el-form-item label="计划名称" required prop="name">
               <el-input v-model="planBody.name" maxlength="50"></el-input>
             </el-form-item>
-            <el-form-item label="风机设备" required prop="fanId"  v-if="type==='1'">
-              <el-select v-model="planBody.fanId" >
-                <el-option v-for="item in fanTable" :label="item.turbine_name" :value="item.id" :key="item.id"></el-option>
+            <el-form-item
+              label="风机设备"
+              required
+              prop="fanId"
+              v-if="type==='1'"
+            >
+              <el-select v-model="planBody.fanId">
+                <el-option
+                  v-for="item in fanTable"
+                  :label="item.turbine_name"
+                  :value="item.id"
+                  :key="item.id"
+                ></el-option>
               </el-select>
             </el-form-item>
             <el-form-item
@@ -30,7 +40,11 @@
               prop="file_id"
               v-if="type==='0'"
             >
-              <div style="margin-left: 120px" class="block_2" @click="selectPlan">
+              <div
+                style="margin-left: 120px"
+                class="block_2"
+                @click="selectPlan"
+              >
                 选择航线
               </div>
             </el-form-item>
@@ -80,8 +94,9 @@
                 @click="selectDevice"
                 style="margin-left: 120px"
                 class="block_2"
-                >选择设备</div
               >
+                选择设备
+              </div>
             </el-form-item>
             <div
               class="panel"
@@ -168,7 +183,6 @@
                   type="primary"
                   style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
                   @click="onSubmit"
-                  :disabled="disabled"
                   >确认
                 </el-button>
               </div>
@@ -187,10 +201,10 @@
     style="position: absolute; left: 460px; width: 280px; height: 605px; float: right; top: 145px; z-index: 1000; color: white; background: #282828;"
   >
     <div v-if="selectType === '1'">
-      <SelectWayLine/>
+      <SelectWayLine />
     </div>
     <div v-else>
-      <SelectDock/>
+      <SelectDock />
     </div>
     <div style="position: absolute; top: 15px; right: 10px;">
       <a style="color: white;" @click="closePanel"><CloseOutlined /></a>
@@ -232,13 +246,12 @@ const dock = computed<Device>(() => {
   return store.state.dockInfo
 })
 const fanTable = ref([]) // 风机列表
-const disabled = ref(false)
 const routeName = ref('')
 const planBody = reactive({
   plan_source: '系统创建',
   name: '',
-  file_id: computed(() => store.state?.waylineInfo.id),
-  dock_sn: computed(() => store.state?.dockInfo.device_sn),
+  file_id: computed(() => store?.state?.waylineInfo.id),
+  dock_sn: computed(() => store?.state?.dockInfo.device_sn),
   workspace_id: localStorage.getItem(ELocalStorageKey.WorkspaceId)!,
   task_type: TaskType.Immediate,
   begin_time: '',
@@ -257,7 +270,7 @@ const drawerVisible = ref(false)
 const valueRef = ref()
 const rules = {
   rth_altitude: [
-    { required: true, message: '请输入返航高度', trigger: 'submit' },
+    { required: true, message: '请输入返航高度', trigger: 'blur' },
     {
       pattern: /^[1-9]\d*$/,
       message: '返航高度必须是正整数',
@@ -277,22 +290,22 @@ const rules = {
       trigger: 'submit'
     }
   ],
-  fanId: [{ required: true, message: '请选择风机', trigger: 'submit' }],
+  fanId: [{ required: true, message: '请选择风机', trigger: 'blur' }],
   name: [
-    { required: true, message: '请输入计划名称', trigger: 'submit' },
-    { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'submit' }
+    { required: true, message: '请输入计划名称', trigger: 'blur' },
+    { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'blur' }
   ],
 
   file_id: [
-    { required: true, message: '请选择航线', trigger: 'submit' }
+    { required: true, message: '请选择航线', trigger: ['blur', 'change'] }
   ],
 
   dock_sn: [
-    { required: true, message: '请选择设备', trigger: 'submit' }
+    { required: true, message: '请选择设备', trigger: ['blur', 'change'] }
   ],
 
   task_type: [
-    { required: true, message: '请选择时间方案', trigger: 'submit' }
+    { required: true, message: '请选择时间方案', trigger: 'change' }
   ],
 
   beginTime: [
@@ -304,12 +317,12 @@ const rules = {
           callback()
         }
       },
-      trigger: 'submit'
+      trigger: 'change'
     }
   ],
 
   out_of_control: [
-    { required: true, message: '请选择失联动作', trigger: 'submit' }
+    { required: true, message: '请选择失联动作', trigger: 'change' }
   ]
 }
 
@@ -319,19 +332,21 @@ onMounted(() => {
   }
 })
 
-function onSubmit () {
-  valueRef.value.validate().then(() => {
-    disabled.value = true
-    createFlyPlan(planBody)
-      .then(res => {
-        ElMessage.success('创建成功!')
-        disabled.value = false
-      }).finally(() => {
-        closePlan()
-      })
-  }).catch((e: any) => {
-    console.log('validate err', e)
-  })
+async function onSubmit () {
+  try {
+    const valid = await valueRef.value.validate()
+    if (valid) {
+      const res = await createFlyPlan(planBody)
+      if (res.code !== 0) {
+        ElMessage.warning('请填写必填项!')
+        return
+      }
+      ElMessage.success('创建成功!')
+      closePlan()
+    }
+  } catch (error) {
+
+  }
 }
 
 /**
@@ -356,13 +371,11 @@ function getSubInfo () {
 }
 
 function closePlan () {
-  if(type ==='1'){
-router.push({ path: '/fly-fan-plan' })
-  } else{
+  if (type.value === '1') {
+    router.push({ path: '/fly-fan-plan' })
+  } else {
     router.push({ path: '/fly-wanyline-plan' })
-   
   }
-  
 }
 
 function closePanel () {
@@ -379,7 +392,6 @@ function selectDevice () {
   drawerVisible.value = true
   selectType.value = '2'
 }
-
 </script>
 
 <style lang="scss" scoped>
