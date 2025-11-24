@@ -138,11 +138,11 @@
             <el-form-item
               label="开始时间"
               required
-              prop="beginTime"
+              prop="begin_time"
               v-if="planBody.task_type === TaskType.Timed || planBody.task_type === TaskType.Condition"
             >
               <el-date-picker
-                v-model="planBody.beginTime"
+                v-model="planBody.begin_time"
                 type="datetime"
                 placeholder="选择日期和时间"
                 value-format="x"
@@ -308,7 +308,7 @@ const rules = {
     { required: true, message: '请选择时间方案', trigger: 'change' }
   ],
 
-  beginTime: [
+  begin_time: [
     {
       validator: (rule, value, callback) => {
         if ((planBody.task_type === TaskType.Timed || planBody.task_type === TaskType.Condition) && !value) {
