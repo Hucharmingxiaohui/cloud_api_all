@@ -22,10 +22,10 @@
             <el-form-item
               label="风机设备"
               required
-              prop="fanId"
+              prop="fan_id"
               v-if="type==='1'"
             >
-              <el-select v-model="planBody.fanId">
+              <el-select v-model="planBody.fan_id">
                 <el-option
                   v-for="item in fanTable"
                   :label="item.turbine_name"
@@ -257,9 +257,9 @@ const planBody = reactive({
   begin_time: '',
   end_time: '',
   status: 1,
-  fanId: '',
+  fan_id: '',
   username: 'pilot',
-  planType: type.value,
+  plan_type: type.value,
   rth_altitude: '',
   out_of_control: '',
   enable_status: 0,
@@ -279,8 +279,8 @@ const rules = {
     {
       validator: (rule, value, callback) => {
         const numValue = Number(value)
-        if (numValue < 90) {
-          callback(new Error('返航高度不能低于90米'))
+        if (numValue < 30) {
+          callback(new Error('返航高度不能低于30米'))
         } else if (numValue > 1500) {
           callback(new Error('返航高度不能超过1500米'))
         } else {
@@ -290,7 +290,7 @@ const rules = {
       trigger: 'submit'
     }
   ],
-  fanId: [{ required: true, message: '请选择风机', trigger: 'blur' }],
+  fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
     { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'blur' }
