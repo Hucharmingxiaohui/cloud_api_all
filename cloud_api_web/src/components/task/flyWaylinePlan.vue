@@ -2,87 +2,39 @@
   <div class="container">
     <!-- <div class="header1">飞行计划</div> -->
     <div class="operation">
-      <!-- 场站/线路选择框 -->
-      <span class="label">场站/线路：</span>
-      <el-select v-model="selectedStation" placeholder="请输入" class="select-operation" :teleported='false'
-        style="width: 200px;">
-        <el-option label="场站/线路1" value="场站/线路1"></el-option>
-        <el-option label="场站/线路2" value="场站/线路2"></el-option>
-        <el-option label="场站/线路3" value="场站/线路3"></el-option>
-      </el-select>
-      <!-- <span style="width: 75px;">航线名称:</span> -->
-      <span class="label">飞行计划：</span>
-      <el-input placeholder="按飞行计划名称搜索" class="custom-select" style="width: 200px;"></el-input>
+      <el-form :inline="true" :model="queryForm" label-position="right">
+        <el-form-item label="计划名称:" prop="name">
+          <el-input v-model="queryForm.name" placeholder="按飞行计划名称搜索" class="custom-input" ></el-input>
+        </el-form-item>
+        <el-form-item label="计划ID:" prop="planId">
+          <el-input
+            v-model="queryForm.planId"
+            placeholder="请输入计划ID"
+            class="custom-input"
+          ></el-input>
+        </el-form-item>
+        <el-form-item>
+            <!-- 查询按钮 -->
+            <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
+              @click="queryPoint">查询
+            </el-button>
+            <!-- 重置按钮 -->
+            <el-button class="new_btn1 iconfont icon-zhongzhi-" type="primary" style="margin-left: 10px" @click="reset">重置
+            </el-button>
 
-      <!-- 方案状态选择框 -->
-      <span class="label">方案状态：</span>
-      <el-select v-model="selectedScheme" placeholder="方案状态" class="select-operation" :teleported='false'
-        style="width: 200px;">
-        <el-option label="方案状态1" value="方案状态1"></el-option>
-        <el-option label="方案状态2" value="方案状态2"></el-option>
-        <el-option label="方案状态3" value="方案状态3"></el-option>
-      </el-select>
-
-      <!-- 优先级选择框 -->
-      <span class="label">优先级：</span>
-      <el-select v-model="selectedPriority" placeholder="优先级" class="select-operation" :teleported='false'
-        style="width: 200px;">
-        <el-option label="优先级1" value="优先级1"></el-option>
-        <el-option label="优先级2" value="优先级2"></el-option>
-        <el-option label="优先级3" value="优先级3"></el-option>
-      </el-select>
-
-      <!-- 搜索框：点位名称 -->
-      <!-- <el-input v-model="searchPoint" placeholder="搜索点位名称" class="custom-input" style="width: 200px;"></el-input> -->
-
-      <!-- 查询按钮 -->
-      <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
-        @click="queryPoint">
-        <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
-        <span style="margin-left: 5px; font-size: 14px;">查询</span>
-      </el-button>
-      <!-- 重置按钮 -->
-      <el-button class="new_btn1 iconfont icon-zhongzhi-" type="primary" style="margin-left: 10px" @click="resetPoint">
-        <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/refresh.png" /> -->
-        <span style="margin-left: 5px; font-size: 14px;">重置</span>
-      </el-button>
-
-      <!-- 新建计划 -->
-      <!-- <el-button class="btn" type="primary" style="margin-left: 10px" @click="resetPoint">新建计划</el-button> -->
-      <router-link to="/task/createPlan">
-        <el-button class="new_btn iconfont icon-xinjianjihua" type="primary" style="margin-left: 10px">
-          <span style="margin-left: 5px; font-size: 14px;">新建计划</span>
-        </el-button>
-      </router-link>
-
-      <!-- <router-link to="/task">
-        <el-button class="new_btn iconfont icon-renwuguanli" type="primary" style="margin-left: 10px">
-          <span style="margin-left: 5px; font-size: 14px;">任务管理</span>
-        </el-button>
-      </router-link> -->
+            <!-- 新建计划 -->
+            <el-button class="new_btn iconfont icon-xinjianjihua" type="primary" style="margin-left: 10px" @click="toCreatePlan('0')">新建计划</el-button>
+        </el-form-item>
+      </el-form>
     </div>
     <div class="content">
       <div class="table-container">
         <el-table :data="tableData" stripe>
 
           <!-- 序号列 -->
-          <!-- <el-table-column label="序号" type="index" width="80" /> -->
           <el-table-column type="selection" width="55" />
-          <el-table-column label="序号" align='center' width="60">
-              <template #default="scope">
-                {{ scope.$index +(paginationProp.current - 1) * paginationProp.pageSize+ 1 }}
-              </template>
+          <el-table-column label="序号" type="index" align='center' width="60">
             </el-table-column>
-          <el-table-column label="专业">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.major }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="优先级">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.plan_priority }}级</div>
-            </template>
-          </el-table-column>
           <el-table-column label="计划名称" show-overflow-tooltip="true">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.name }}</div>
@@ -108,7 +60,6 @@
               <div class="flex-row" style="white-space: pre-wrap">
                 <div class="ellipsis">
                   <div>{{ new Date(scope.row.begin_time).toLocaleString()}}</div>
-                  <!-- <div>{{ scope.row.end_time }}</div> -->
                 </div>
               </div>
             </template>
@@ -118,27 +69,11 @@
               <div class="ellipsis">{{ scope.row.plan_source }}</div>
             </template>
           </el-table-column>
-          <!-- <el-table-column label="方案状态">
-              <template #default="scope">
-                <div>{{ scope.row.status  }}</div>
-              </template>
-            </el-table-column> -->
-          <el-table-column label="方案状态" show-overflow-tooltip="true">
-            <template #default="scope">
-              <el-switch v-model="scope.row.schestat" active-text="启用" inactive-text="禁用" :active="scope.row.status"
-                :inactive="!scope.row.status" />
-            </template>
-          </el-table-column>
-          <!-- <el-table-column label="操作" >
-                <el-button size="small" type="text" >立即执行</el-button>
-            </el-table-column> -->
           <el-table-column label="操作" width="300px">
             <template #default="scope">
               <div class="action-buttons">
                 <el-button size="small" type="primary" class="custom-execute-btn"
                   @click="executeNow(scope.row)">下发任务</el-button>
-                <el-button size="small" type="success" class="custom-copy-btn" @click="copyPlan(scope.row)">复制</el-button>
-                <el-button size="small" type="warning" class="custom-edit-btn" @click="editPlan(scope.row)">编辑</el-button>
                 <el-button size="small" type="danger" class="custom-delete-btn"
                   @click="deletePlan(scope.row)">删除</el-button>
               </div>
@@ -162,16 +97,11 @@
 import { reactive, ref, onMounted, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
-import { Task, getFlyPlan, DistributeFlyPlan, deleteFlyPlan } from '/@/api/wayline'
-import { useFormatTask } from './use-format-task'
+import { Task, getFlyWaylinePlan, DistributeFlyPlan, deleteFlyPlan } from '/@/api/wayline'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
 
 const router = useRouter()
-const selectedStation = ref<string | null>(null)
-const selectedScheme = ref<string | null>(null)
-const selectedAll = ref<string | null>(null)
-const selectedPriority = ref<string | null>(null)
 
 const body: IPage = {
   page: 1,
@@ -188,58 +118,70 @@ const paginationProp = reactive({
 })
 type Pagination = TableState['pagination']
 
-const plansData = reactive({
-  data: [] as Task[]
+const queryForm = reactive({
+  name: '',
+  planId: ''
 })
-const open = ref<boolean>(false)
-const { formatTaskTime } = useFormatTask()
 
 onMounted(() => {
   getPlan()
 })
-const sub_code = 'faf3362c-3c90-2fce-0f88-b059716cb160'
+
+// 查询航线飞行计划  0普通航线计划  1 风机计划
 const tableData = ref([])
 function getPlan () {
-  getFlyPlan(sub_code, body).then(res => {
+  getFlyWaylinePlan('0', body).then(res => {
     if (res.code !== 0) {
       return
     }
-    // console.log('计划数据', res.data)
     tableData.value = res.data.list
     paginationProp.total = res.data.pagination.total
     paginationProp.current = res.data.pagination.page
   })
 }
 
-// function getPlans () {
-//   getWaylineJobs(workspaceId, body).then(res => {
-//     if (res.code !== 0) {
-//       return
-//     }
-//     plansData.data = res.data.list
-//     console.log('任务详情', res.data.list)
-//     paginationProp.total = res.data.pagination.total
-//     paginationProp.current = res.data.pagination.page
-//   })
-// }
+// 重置列表
+function reset () {
+  queryForm.name = ''
+  queryForm.planId = ''
+  getPlan()
+}
+
 // 下发任务
 function executeNow (data: any) {
   DistributeFlyPlan(data).then(res => {
     if (res.code !== 0) {
       return
     }
-    // console.log(res.data)
     router.push({ path: '/livestream' })
   })
 }
 
 // 删除任务
 function deletePlan (val: any) {
-  deleteFlyPlan(val.id).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    getPlan()
+  ElMessageBox.confirm('确定要删除本计划吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(async () => {
+      const res = await deleteFlyPlan(val.id)
+      if (res.code !== 0) {
+        return
+      }
+      ElMessage.success('删除成功')
+      getPlan()
+    })
+    .catch(() => {
+      ElMessage.info('已取消删除')
+    })
+}
+
+// 新建任务 type  0普通航线计划  1 风机计划
+function toCreatePlan (type:string) {
+  localStorage.setItem('createPlan_query', type)
+  router.push({
+    path: '/task/createPlan',
   })
 }
 // ============================================================分页数据==========================================================
@@ -262,6 +204,9 @@ function refreshData (page: Pagination) {
 </script>
 
 <style lang="scss" scoped>
+:deep(.el-form-item__label){
+  color: white;
+}
 .container {
   // height: 100%;
   width: 100vw;
@@ -335,22 +280,8 @@ function refreshData (page: Pagination) {
   // width: 100%;
   height: 60px;
   margin: 31px 12px 0 12px;
-
-  .label {
-    height: 60px;
-    display: flex;
-    /* 这个可以保留，确保子元素居中 */
-    align-items: center;
-    /* 垂直居中 */
-    justify-content: center;
-    /* 水平居中 */
-    color: rgba(255, 255, 255, 1);
-    font-size: 14px;
-    font-family: Google Sans-Medium;
-    font-weight: 500;
-    margin: 0 10px 0 30px;
-  }
-
+  padding-top: 15px;
+  padding-left: 15px;
   .new_btn {
     background-image: linear-gradient(180deg,
         rgba(70, 145, 217, 1) 0,

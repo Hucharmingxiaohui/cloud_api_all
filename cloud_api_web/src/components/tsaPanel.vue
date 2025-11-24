@@ -132,7 +132,7 @@
               <img
                 class="image_3"
                 referrerpolicy="no-referrer"
-                src="../assets/v4/nav-icon.png"
+                src="../assets/v4/drone.png"
               />
               <div class="group_35 flex-col">
                 <div class="box_39 flex-row justify-between">
@@ -857,10 +857,6 @@ function openLivestreamAgora () {
       height: 52px;
       margin: 29px 0 0 11px;
       .group_7 {
-        height: 49px;
-        background: url(https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNG528b587e81cbbe89e17e49f7b957e924.png)
-          100% no-repeat;
-        background-size: 100% 100%;
         margin-top: 1px;
         width: 112px;
         .group_8 {
@@ -877,14 +873,14 @@ function openLivestreamAgora () {
             background-size: 70% 70%;
             width: 30px;
             margin: 3px 0 0 10px;
-            .block_3 {
-              width: 18px;
-              height: 18px;
-              background: url(https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNGcf59ce6a251b66ebce0de586896e880a.png)
-                100% no-repeat;
-              background-size: 100% 100%;
-              margin: 6px 0 0 6px;
-            }
+            // .block_3 {
+            //   width: 18px;
+            //   height: 18px;
+            //   background: url(https://lanhu-oss.lanhuapp.com/FigmaDDSSlicePNGcf59ce6a251b66ebce0de586896e880a.png)
+            //     100% no-repeat;
+            //   background-size: 100% 100%;
+            //   margin: 6px 0 0 6px;
+            // }
           }
           .text_15 {
             width: 42px;

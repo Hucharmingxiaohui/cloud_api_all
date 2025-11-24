@@ -290,8 +290,6 @@ function onTaskMediaProgressWs (data: MediaStatusProgressInfo) {
   }
   taskItem.media_count = mediaCount
   taskItem.uploaded_count = uploadedCount
-  
- 
 }
 
 function onoTaskMediaHighestPriorityWS (data: TaskMediaHighestPriorityProgressInfo) {
@@ -341,13 +339,16 @@ async function checkAnaysisStaus (row) {
 
     const res = await isAnalyzedApi(row.job_id)
 
-    if (res.data !== true) {
+    if (res.data === 0) {
       // 未分析过，开始分析
       taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
       await anaysisTaskResult(row)
-    } else {
+    } else if (res.data === 1) {
       // 已经分析完成
       taskAnalysisStatus.value.set(row.job_id, { status: 'completed', loading: false })
+    } else {
+      // 正在分析
+      taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
     }
   } catch (error) {
     console.error('检查分析状态失败:', error)
@@ -698,11 +699,8 @@ function toTaskVideo (val: any) {
 .temeasure,
 .waylipot,
 .wayliedit {
-  background-color: rgba(51, 122, 255, 0.12);
-  border-radius: 4px;
-  height: 28px;
-  border: 1px solid rgba(0, 64, 147, 1);
-  width: 40px;
+  // height: 28px;
+  // width: 40px;
   margin-left: 7px;
 }
 

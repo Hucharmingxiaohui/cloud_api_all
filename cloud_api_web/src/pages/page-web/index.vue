@@ -89,36 +89,7 @@ const onSubmit = async (e: any) => {
     return
   }
   try {
-    loading.value = true
-    // const params = {
-    //   username: 'adminPC',
-    //   password: 'adminPC',
-    //   flag: 1
-    // }
-    // axios({
-    //   url: import.meta.env.VITE_BACK + '/api/get3Dwaylines',
-    //   method: 'post',
-    //   timeout: 10000,
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //     'Test-Debug': 'true' // 添加调试头
-    //   },
-    //   data: params,
-    // }).then(rs => {
-    //   console.log('完整响应:', rs)
-    // }).catch(error => {
-    //   if (error.code === 'ECONNABORTED') {
-    //     console.error('请求超时，请检查：')
-    //     console.error('1. 后端服务是否运行')
-    //     console.error('2. 网络防火墙设置')
-    //     console.error('3. 代理配置是否正确')
-    //   }
-    //   console.error('错误详情:', {
-    //     config: error.config,
-    //     request: error.request,
-    //     response: error.response
-    //   })
-    // })
+    // loading.value = true
     // localStorage.setItem(STORAGE_KEY, '2')
     // root.$router.push(ERouterName.DEVICES)
 
@@ -130,6 +101,7 @@ const onSubmit = async (e: any) => {
       localStorage.setItem(ELocalStorageKey.UserId, result.data.user_id)
       localStorage.setItem(ELocalStorageKey.Flag, EUserType.Web.toString())
       localStorage.setItem(ELocalStorageKey.User_Type, result.data.user_type)
+      loading.value = true
       // 跳转到成员页面
       localStorage.setItem(STORAGE_KEY, '2')
       root.$router.push(ERouterName.DEVICES)
