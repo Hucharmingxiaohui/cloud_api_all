@@ -13,6 +13,7 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
+import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
@@ -80,6 +81,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Autowired
     private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
+    @Autowired
+    private WaylineUrlConfig waylineUrlConfig;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -168,7 +172,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     public void flyToWayline(String name,Double value) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);
-        String url = "http://172.20.63.157:5001/single";
+//        String url = "http://172.20.63.157:5001/single";
+        String url = waylineUrlConfig.getBuildKmzUrl().getSingleWayline();
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("turbine_name", windTurbine.getTurbineName());
         jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
@@ -329,7 +334,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     public void workingWayline(String name) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);
-        String url = "http://172.20.63.157:5001/working";
+//        String url = "http://172.20.63.157:5001/working";
+        String url = waylineUrlConfig.getBuildKmzUrl().getWorkingWayline();
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("turbine_name", windTurbine.getTurbineName());
         jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
@@ -450,7 +456,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     public void stopWayline(String name, Double yaw) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);
-        String url = "http://172.20.63.157:5001/stop";
+//        String url = "http://172.20.63.157:5001/stop";
+        String url = waylineUrlConfig.getBuildKmzUrl().getStopWayline();
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("turbine_name", windTurbine.getTurbineName());
         jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
@@ -570,12 +577,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 param.setInFlightWaylineId(job_id);
                 log.info("空中航线前2----------");
                 performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
-//                if (httpResultResponse.getCode() == CODE_SUCCESS) {
-//                    DeviceEntity deviceEntity1 = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-//                    abstractWaylineService.returnHome(SDKManager.getDeviceSDK(deviceEntity1.getDeviceSn()));
-//                }
-//        DeviceEntity deviceEntity1 = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-//        abstractWaylineService.returnHome(SDKManager.getDeviceSDK(deviceEntity1.getDeviceSn()));
             }
         }catch (Exception e){
             e.printStackTrace();
@@ -588,8 +589,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String fanId = pubWaylineJobPlanDfEntity.getFanId();
         redisUtils.set("windTurbineId", fanId);
         WindTurbine windTurbine = windTurbineMapper.selectById(fanId);
-
-        String url = "http://172.20.63.157:5001/top";
+//        String url = "http://172.20.63.157:5001/top";
+        String url = waylineUrlConfig.getBuildKmzUrl().getTopWayline();
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("turbine_name", windTurbine.getTurbineName());
         jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
@@ -669,6 +670,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     }
                     pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
                     pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+                    pubWaylineJobPlanDfEntity.setWaylineType(0);
                     //校验paln_id是否重复
                     PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
                             eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));

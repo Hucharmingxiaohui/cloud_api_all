@@ -12,6 +12,7 @@ import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
+import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
@@ -75,9 +76,9 @@ public class FjReportController {
     @Autowired
     IWaylineJobMapper waylineJobMapper;
 
+    @Autowired
+    private WaylineUrlConfig waylineUrlConfig;
 
-
-    private static final String ANALYSIS_URL = "http://172.20.63.157:20012/api";
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -265,7 +266,7 @@ public class FjReportController {
             String requestBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(ANALYSIS_URL))
+                    .uri(URI.create(waylineUrlConfig.getAnalysisUrl()))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();

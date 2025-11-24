@@ -33,6 +33,8 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.dji.sdk.cloudapi.wayline.WaylineTypeEnum.WAYPOINT;
+
 @Service
 @Slf4j
 public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfService {
@@ -71,6 +73,7 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
             }
             pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
             pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+            pubWaylineJobPlanDfEntity.setWaylineType(0);
             //校验paln_id是否重复
             PubWaylineJobPlanDfEntity entity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
                     eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));

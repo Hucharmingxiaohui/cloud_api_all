@@ -10,6 +10,7 @@ import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.IOssService;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
@@ -116,6 +117,9 @@ public class SDKWaylineService extends AbstractWaylineService {
     @Autowired
     private IWorkspaceMapper workspaceMapper;
 
+    @Autowired
+    private WaylineUrlConfig waylineUrlConfig;
+
     private final ConcurrentMap<String, AtomicInteger> processedWaypoints = new ConcurrentHashMap<>();
 
     private final ConcurrentMap<String, AtomicInteger> processedinWaypoints = new ConcurrentHashMap<>();
@@ -169,7 +173,8 @@ public class SDKWaylineService extends AbstractWaylineService {
                     try {
                         log.info("接受航线:" + flightId + "接受航点: " + currentWaypointIndex);
                         // 写发送逻辑
-                        String url = "http://172.20.63.157:5002/state";
+//                        String url = "http://172.20.63.157:5002/state";
+                        String url = waylineUrlConfig.getWaylineStateUrl();
                         JSONObject jsonObject = new JSONObject();
                         jsonObject.put("waylineType", "flightTask");
                         jsonObject.put("status", statusEnum);
@@ -289,9 +294,9 @@ public class SDKWaylineService extends AbstractWaylineService {
                 if (current == null || current.get() < currentWaypointIndex) {
                     log.info("接受空中航线:" + flightId + "接受航点: " + currentWaypointIndex);
                     // 写发送逻辑
-                    String url = "http://172.20.63.157:5002/state";
+//                    String url = "http://172.20.63.157:5002/state";
+                    String url = waylineUrlConfig.getWaylineStateUrl();
                     JSONObject jsonObject = new JSONObject();
-
                     String turbineName = redisUtils.get("turbineName").toString();
                     String jobId = redisUtils.get("jobId").toString();
                     String windTurbineId = redisUtils.get("windTurbineId").toString();
@@ -379,7 +384,8 @@ public class SDKWaylineService extends AbstractWaylineService {
                 if (current == null) {
                     if(currentWaypointIndex == 2){
                         // 写发送逻辑
-                        String url = "http://172.20.63.157:5002/state";
+//                        String url = "http://172.20.63.157:5002/state";
+                        String url = waylineUrlConfig.getWaylineStateUrl();
                         JSONObject jsonObject = new JSONObject();
                         JSONObject jsonObject1 = new JSONObject();
 

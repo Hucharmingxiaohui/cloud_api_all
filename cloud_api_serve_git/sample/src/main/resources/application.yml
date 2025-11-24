@@ -285,5 +285,14 @@ fjfile:
 #  D:/report/, linux配/home/uav_server/report/
   fileReportPath: D:/report/
 
+wayline:
+  build-kmz-url:
+    top-wayline: "http://172.20.63.157:5001/top"
+    single-wayline: "http://172.20.63.157:5001/single"
+    working-wayline: "http://172.20.63.157:5001/working"
+    stop-wayline: "http://172.20.63.157:5001/stop"
+  wayline-state-url: "http://172.20.63.157:5002/state"
+  analysis-url: "http://172.20.63.157:20012/api"
+
 
 
