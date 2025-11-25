@@ -10,6 +10,8 @@ import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.media.service.IFileService;
@@ -48,6 +50,9 @@ public class PictureSaveHandler {
     @Resource
     IWorkspaceMapper workspaceMapper;
 
+    @Resource
+    FanWaylinePointsMapper fanWaylinePointsMapper;
+
     public Result pictureSave(String jobId) {
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
         // 分离DJI文件和非DJI文件
@@ -62,13 +67,15 @@ public class PictureSaveHandler {
             }
         }
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
-        // 从Redis获取图片命名规则
-        String fanPointsJson = redisUtils.get("fanPoints").toString();
-        JSONArray points = JSON.parseArray(fanPointsJson);
+        // 从数据库获取图片命名规则
+//        String fanPointsJson = redisUtils.get("fanPoints").toString();
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId, jobId));
+        JSONArray points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
 
         if (points == null || points.isEmpty()) {
-            System.err.println("错误：从Redis获取图片命名规则失败");
-            return Result.error("错误：从Redis获取图片命名规则失败");
+            System.err.println("错误：从数据库获取图片命名规则失败");
+            return Result.error("错误：从数据库获取图片命名规则失败");
         }
 
         try {

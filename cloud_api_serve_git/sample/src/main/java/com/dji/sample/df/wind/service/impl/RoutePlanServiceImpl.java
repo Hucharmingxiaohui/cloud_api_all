@@ -14,7 +14,9 @@ import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.df.wind.service.WindTurbineService;
@@ -84,6 +86,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Autowired
     private WaylineUrlConfig waylineUrlConfig;
+
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -381,7 +386,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 System.out.println("JSON Response: " + jsonResponse.toJSONString());
                 String routeName = jsonResponse.getString("routeName");
                 JSONArray points = jsonResponse.getJSONArray("points");
-                redisUtils.set("fanPoints",points.toJSONString());
+//                redisUtils.set("fanPoints",points.toJSONString());
+                FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
+                fanWaylinePoints.setJobId(redisUtils.get("jobId").toString());
+                fanWaylinePoints.setDjiFanPoints(points.toJSONString());
+                fanWaylinePoints.setJobType(1);
+                fanWaylinePointsMapper.insert(fanWaylinePoints);
                 // 项目根目录下的文件路径（根据实际部署环境调整）
                 String projectPath = System.getProperty("user.dir");
                 String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
@@ -504,8 +514,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String routeName = jsonResponse.getString("routeName");
 //              把扇叶位置存到redis
                 JSONArray points = jsonResponse.getJSONArray("points");
-                redisUtils.set("fanPoints",points.toJSONString());
-
+//                redisUtils.set("fanPoints",points.toJSONString());
+                FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
+                fanWaylinePoints.setJobId(redisUtils.get("jobId").toString());
+                fanWaylinePoints.setDjiFanPoints(points.toJSONString());
+                fanWaylinePoints.setJobType(0);
+                fanWaylinePointsMapper.insert(fanWaylinePoints);
                 // 项目根目录下的文件路径（根据实际部署环境调整）
                 String projectPath = System.getProperty("user.dir");
                 String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";

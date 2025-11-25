@@ -13,11 +13,13 @@ import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.service.FjReportService;
 
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -79,6 +81,9 @@ public class FjReportController {
     @Autowired
     private WaylineUrlConfig waylineUrlConfig;
 
+    @Autowired
+    FanWaylinePointsMapper  fanWaylinePointsMapper;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -100,11 +105,23 @@ public class FjReportController {
              request.setFile_path(fileConfig.getFilePictrueUrl() + jobId);
              // 动态生成文件名列表
              List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
-                     eq(MediaFileEntity::getJobId, jobId));
+                     eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId));
              // 从Redis获取图片命名规则
-             String fanPointsJson = redisUtils.get("fanPoints").toString();
-             JSONArray points = JSON.parseArray(fanPointsJson);
-             List<String> fileNames = generateFileNames(mediaFileEntities, points);
+//             String fanPointsJson = redisUtils.get("fanPoints").toString();
+            FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                    .eq(FanWaylinePoints::getJobId, jobId));
+            JSONArray jsonArray = new JSONArray();
+            Integer jobType = fanWaylinePoints.getJobType();
+            JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+            JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+            if(jobType==0){
+                jsonArray.addAll(djiPoints);
+            }else if(jobType==1){
+                jsonArray.addAll(videoPoints);
+                jsonArray.addAll(djiPoints);
+            }
+             List<String> fileNames = generateFileNames(mediaFileEntities, jsonArray);
+             log.info("文件名为-------------"+fileNames);
              request.setFile_name(fileNames);
              AnalysisResponse response = sendAnalysisRequest(request);
              if (response != null) {

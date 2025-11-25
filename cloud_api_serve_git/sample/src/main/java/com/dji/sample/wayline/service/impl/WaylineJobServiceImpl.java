@@ -118,7 +118,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .fanName(param.getFanName())
 //                .allPointCnt(split.length)
                 .build();
-        redisUtils.set("jobId",jobEntity.getJobId());
+//        redisUtils.set("jobId",jobEntity.getJobId());
         return insertWaylineJob(jobEntity);
     }
 

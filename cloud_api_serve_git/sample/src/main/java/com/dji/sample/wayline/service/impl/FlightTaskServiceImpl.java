@@ -1,6 +1,7 @@
 package com.dji.sample.wayline.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.df.framework.redis.RedisUtils;
 import com.df.framework.thread.CustomExecutorFactory;
 import com.df.server.entity.his.HisUniTaskItemFileEntity;
 import com.df.server.entity.his.HisUniTaskItemPointsEntity;
@@ -51,6 +52,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.Resource;
 import java.net.URL;
 import java.sql.SQLException;
 import java.time.*;
@@ -100,48 +102,9 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     @Autowired
     HisUniTaskItemPointsServiceImpl hisUniTaskItemPointsService;
-//  风机定时任务,可能不需要
-    @Scheduled(initialDelay = 10, fixedRate = 5, timeUnit = TimeUnit.SECONDS)
-    public void checkFanScheduledJob() {
-        Object jobIdValue = RedisOpsUtils.zGetMin(RedisConst.WAYLINE_JOB_TIMED_EXECUTE);
-        if (Objects.isNull(jobIdValue)) {
-            return;
-        }
-        log.info("Check the timed tasks of the wayline. {}", jobIdValue);
-        // format: {workspace_id}:{dock_sn}:{job_id}
-        String[] jobArr = String.valueOf(jobIdValue).split(RedisConst.DELIMITER);
-        double time = RedisOpsUtils.zScore(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
-        long now = System.currentTimeMillis();
-        int offset = 30_000;
 
-        // Expired tasks are deleted directly.
-        if (time < now - offset) {
-            RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
-            waylineJobService.updateJob(WaylineJobDTO.builder()
-                    .jobId(jobArr[2])
-                    .status(WaylineJobStatusEnum.FAILED.getVal())
-                    .executeTime(LocalDateTime.now())
-                    .completedTime(LocalDateTime.now())
-                    .code(HttpStatus.SC_REQUEST_TIMEOUT).build());
-            return;
-        }
-
-        if (now <= time && time <= now + offset) {
-            try {
-                this.executeFlightTask(jobArr[0], jobArr[2]);
-            } catch (Exception e) {
-                log.info("The scheduled task delivery failed.");
-                waylineJobService.updateJob(WaylineJobDTO.builder()
-                        .jobId(jobArr[2])
-                        .status(WaylineJobStatusEnum.FAILED.getVal())
-                        .executeTime(LocalDateTime.now())
-                        .completedTime(LocalDateTime.now())
-                        .code(HttpStatus.SC_INTERNAL_SERVER_ERROR).build());
-            } finally {
-                RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE, jobIdValue);
-            }
-        }
-    }
+    @Resource
+    private RedisUtils redisUtils;
 
 
     @Scheduled(initialDelay = 10, fixedRate = 5, timeUnit = TimeUnit.SECONDS)
@@ -484,6 +447,8 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             }
             return false;
         }
+
+        redisUtils.set("jobId",jobId);
 
         waylineJobService.updateJob(WaylineJobDTO.builder()
                 .jobId(jobId)

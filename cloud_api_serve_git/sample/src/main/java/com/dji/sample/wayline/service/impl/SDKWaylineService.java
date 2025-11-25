@@ -1,5 +1,6 @@
 package com.dji.sample.wayline.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -11,7 +12,9 @@ import com.dji.sample.component.oss.service.IOssService;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -119,6 +122,9 @@ public class SDKWaylineService extends AbstractWaylineService {
 
     @Autowired
     private WaylineUrlConfig waylineUrlConfig;
+
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     private final ConcurrentMap<String, AtomicInteger> processedWaypoints = new ConcurrentHashMap<>();
 
@@ -333,7 +339,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 response1.append(responseLine.trim());
                             }
                             JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                            log.info("收到方法返回参数----" + jsonResponse);
+                            log.info("收到不停机状态返回参数----" + jsonResponse);
 
                             if (jsonResponse.getString("desc").equals("1")) {
                                 if (jsonResponse.getString("file_path") != null) {
@@ -363,6 +369,25 @@ public class SDKWaylineService extends AbstractWaylineService {
                                             throw new RuntimeException(e);
                                         }
                                     }
+//                                  截图点位入库
+                                    FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                                            .eq(FanWaylinePoints::getJobId, jobId));
+                                    for (int i = 0; i < imageList.size(); i++) {
+                                        String fileName = imageList.getString(i);
+                                        imageList.set(i, fileName.replace(".jpg", ""));
+                                    }
+                                    JSONArray jsonArray = new JSONArray();
+                                    String videoFanPoints = fanWaylinePoints.getVideoFanPoints();
+                                    if (videoFanPoints != null) {
+                                        JSONArray videoPoints = JSON.parseArray(videoFanPoints);
+                                        jsonArray.addAll(videoPoints);
+                                        jsonArray.addAll(imageList);
+                                    }else {
+                                        jsonArray.addAll(imageList);
+                                    }
+                                    fanWaylinePoints.setVideoFanPoints(jsonArray.toJSONString());
+                                    fanWaylinePointsMapper.updateById(fanWaylinePoints);
+                                    log.info("截图点位入库---"+fanWaylinePoints);
                                     log.info("处理返回图像---------------------");
                                 } else if (jsonResponse.getString("desc").equals("0")) {
     //                              分析失败返航

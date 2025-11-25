@@ -1,5 +1,6 @@
 package com.dji.sample.df.wind.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
@@ -7,12 +8,14 @@ import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FjReportMapper;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.model.entity.FjReportEntity;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -22,6 +25,7 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.Resource;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.ImageWriteParam;
@@ -52,23 +56,9 @@ public class FjReportServiceImpl implements FjReportService {
     @Autowired
     DefectEntityMapper defectEntityMapper;
 
-    @Autowired
-    ReportService reportService;
 
-    @Autowired
-    private FjReportService fjReportService;
-
-
-    @Autowired
-    private PictureSaveHandler pictureSaveHandler;
-
-    @Autowired
-    IFileMapperDf iFileMapperDf;
-
-    @Autowired
-    private RedisUtils redisUtils;
-
-
+    @Resource
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     @Override
     public String createNewReport(String jobId) {
@@ -83,39 +73,6 @@ public class FjReportServiceImpl implements FjReportService {
         fjReportMapper.insert(reportEntity);
         return reportEntity.getId();
     }
-//
-//    @Override
-//    @Async
-//    public CompletableFuture<Void> processPictureAsync(String jobId) {
-//        return CompletableFuture.runAsync(() -> {
-//            try {
-//                Result result = pictureSaveHandler.pictureSave(jobId);
-//                if(result.getCode() == 0){
-//                    AnalysisRequest request = new AnalysisRequest();
-//                    request.setFunction("defect_fjxj");
-//                    request.setFile_path(fileConfig.getFilePictrueUrl()+jobId);
-//
-//                    List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(
-//                            new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
-//
-//                    String fanPointsJson = redisUtils.get("fanPoints").toString();
-//                    JSONArray points = JSON.parseArray(fanPointsJson);
-//                    List<String> fileNames = generateFileNames(mediaFileEntities, points);
-//                    request.setFile_name(fileNames);
-//
-//                    AnalysisResponse response = sendAnalysisRequest(request);
-//                    if (response != null) {
-//                        System.out.println("分析结果: " + response);
-//                    }
-//                    fjReportService.processAndAddDefects(response, jobId);
-//                }
-//            } catch (Exception e) {
-//                System.err.println("异步处理图片保存和分析时发生错误: " + e.getMessage());
-//                e.printStackTrace();
-//            }
-//        });
-//    }
-
 
     /**
      * 查看任务报告
@@ -156,9 +113,18 @@ public class FjReportServiceImpl implements FjReportService {
                 .filter(defect -> !defect.getDefectType().contains("无结果"))
                 .count();
         // 从Redis获取fanPoints数据并解析为JSONArray
-        String fanPointsStr = (String) redisUtils.get("fanPoints");
-        JSONArray points = JSONArray.parseArray(fanPointsStr);
-        int pointCount = points.size();
+//        String fanPointsStr = (String) redisUtils.get("fanPoints");
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId, jobId));
+        JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+        JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+        Integer jobType = fanWaylinePoints.getJobType();
+        int pointCount=0;
+        if(jobType==0){
+             pointCount = djiPoints.size();
+        }else if(jobType==1){
+             pointCount = djiPoints.size()+videoPoints.size();
+        }
 
         String taskDesp = "本次巡检 1 台风机，共计 "+pointCount+ "个巡检点位，其中迎风面 "+pointCount/2+" 个点位，背风面 "+pointCount/2+" 个点位。\n" +
                 "识别缺陷 " + count + " 处。";
