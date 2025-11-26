@@ -1,5 +1,7 @@
 package com.dji.sample.wayline.service.impl;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -9,6 +11,8 @@ import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.manage.service.IDeviceService;
@@ -80,6 +84,9 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 
     @Resource
     RedisUtils redisUtils;
+
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     private Optional<WaylineJobDTO> insertWaylineJob(WaylineJobEntity jobEntity) {
         int id = mapper.insert(jobEntity);
@@ -326,8 +333,21 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         String key = RedisConst.MEDIA_HIGHEST_PRIORITY_PREFIX + entity.getDockSn();
         String countKey = RedisConst.MEDIA_FILE_PREFIX + entity.getDockSn();
         Object mediaFileCount = RedisOpsUtils.hashGet(countKey, entity.getJobId());
+
+//      如果是不停机巡检任务，已上传图片要加上
+        int videoPointNum=0;
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId,entity.getJobId()));
+        if(fanWaylinePoints!=null){
+            Integer jobType = fanWaylinePoints.getJobType();
+            if (jobType == 1) {
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                videoPointNum = videoPoints.size();
+            }
+        }
+
         if (Objects.nonNull(mediaFileCount)) {
-            builder.uploadedCount(((MediaFileCountDTO) mediaFileCount).getUploadedCount())
+            builder.uploadedCount(((MediaFileCountDTO) mediaFileCount).getUploadedCount()+videoPointNum)
                     .uploading(RedisOpsUtils.checkExist(key) && entity.getJobId().equals(((MediaFileCountDTO)RedisOpsUtils.get(key)).getJobId()));
             return builder.build();
         }

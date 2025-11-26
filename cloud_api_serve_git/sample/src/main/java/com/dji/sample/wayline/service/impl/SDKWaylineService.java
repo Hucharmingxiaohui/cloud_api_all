@@ -246,13 +246,23 @@ public class SDKWaylineService extends AbstractWaylineService {
                 processedWaypoints.put(flightId, new AtomicInteger(currentWaypointIndex));
             }
         }
+        int videoPointNum=0;
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId")));
+        if(fanWaylinePoints!=null){
+            Integer jobType = fanWaylinePoints.getJobType();
+            if (jobType == 1) {
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                videoPointNum = videoPoints.size();
+            }
+        }
 
         if (statusEnum.isEnd()) {
             WaylineJobDTO job = WaylineJobDTO.builder()
                     .jobId(response.getBid())
                     .status(WaylineJobStatusEnum.SUCCESS.getVal())
                     .completedTime(LocalDateTime.now())
-                    .mediaCount(output.getExt().getMediaCount())
+                    .mediaCount(output.getExt().getMediaCount()+videoPointNum)
                     .build();
 
             // record the update of the media count.

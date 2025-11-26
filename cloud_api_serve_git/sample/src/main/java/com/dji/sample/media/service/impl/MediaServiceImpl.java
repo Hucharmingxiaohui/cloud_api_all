@@ -1,8 +1,13 @@
 package com.dji.sample.media.service.impl;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.enums.UserTypeEnum;
 import com.dji.sample.manage.service.IDeviceRedisService;
@@ -59,6 +64,9 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
 
     @Autowired
     private IMediaRedisService mediaRedisService;
+
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     @Override
     public Boolean fastUpload(String workspaceId, String fingerprint) {
@@ -172,8 +180,20 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
         mediaFileCount.setTid(request.getTid());
         mediaFileCount.setUploadedCount(mediaFileCount.getUploadedCount() + 1);
 
+//      如果是不停机巡检任务，统计已上传图片要加上，用于删除redis中缓存
+        int videoPointNum=0;
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId,jobId));
+        if(fanWaylinePoints!=null){
+            Integer jobType = fanWaylinePoints.getJobType();
+            if (jobType == 1) {
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                videoPointNum = videoPoints.size();
+            }
+        }
+
         // After all the files of the job are uploaded, delete the media file key.
-        if (mediaFileCount.getUploadedCount() >= mediaFileCount.getMediaCount()) {
+        if (mediaFileCount.getUploadedCount()+videoPointNum >= mediaFileCount.getMediaCount()) {
             mediaRedisService.delMediaCount(request.getGateway(), jobId);
 
             // After uploading, delete the key with the highest priority.
