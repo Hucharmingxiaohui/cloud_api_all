@@ -8,18 +8,18 @@ import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
+import com.dji.sample.df.mediaDf.model.MediaFileEntity;
+import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FjReportMapper;
-import com.dji.sample.df.wind.model.entity.AnalysisResponse;
-import com.dji.sample.df.wind.model.entity.DefectEntity;
-import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
-import com.dji.sample.df.wind.model.entity.FjReportEntity;
+import com.dji.sample.df.wind.model.entity.*;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +35,10 @@ import javax.servlet.http.HttpServletResponse;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -56,9 +60,14 @@ public class FjReportServiceImpl implements FjReportService {
     @Autowired
     DefectEntityMapper defectEntityMapper;
 
-
     @Resource
     FanWaylinePointsMapper fanWaylinePointsMapper;
+
+    @Autowired
+    private WaylineUrlConfig waylineUrlConfig;
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
     public String createNewReport(String jobId) {
@@ -229,6 +238,63 @@ public class FjReportServiceImpl implements FjReportService {
             throw new RuntimeException(e);
         }
         System.out.println("报告生成成功：" + reportPath);
+    }
+
+    @Override
+    public List<String> generateFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
+        List<String> fileNames = new ArrayList<>();
+        int index = 0;
+
+        for (MediaFileEntity mediaFileEntity : mediaFileEntities) {
+            String fileName;
+            if (index < points.size()) {
+                // 使用Redis中的命名规则
+                String pointName = points.getString(index);
+                fileName = pointName + ".jpg";
+            } else {
+                // 如果图片数量超过Redis规则，使用原始文件名
+                String originalName = mediaFileEntity.getFileName() != null ?
+                        mediaFileEntity.getFileName() :
+                        "file_" + mediaFileEntity.getFileId();
+                // 确保文件扩展名
+                if (!originalName.toLowerCase().endsWith(".jpg") &&
+                        !originalName.toLowerCase().endsWith(".jpeg")) {
+                    fileName = originalName + ".jpg";
+                } else {
+                    fileName = originalName;
+                }
+            }
+            fileNames.add(fileName);
+            index++;
+        }
+        return fileNames;
+    }
+
+    @Override
+    public AnalysisResponse sendAnalysisRequest(AnalysisRequest request) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(waylineUrlConfig.getAnalysisUrl()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> httpResponse = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            if (httpResponse.statusCode() == 200) {
+                return objectMapper.readValue(httpResponse.body(), AnalysisResponse.class);
+            } else {
+                System.err.println("请求失败，状态码: " + httpResponse.statusCode());
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("发送分析请求时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**

@@ -1,5 +1,7 @@
 package com.dji.sample.df.mediaDf.service.impl;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -22,6 +24,9 @@ import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointCount.PointCount;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
 import com.dji.sample.df.thirdKmzDf.service.WaylineKmzThirdService;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
+import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.manage.model.dto.DeviceDictionaryDTO;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -84,6 +89,12 @@ public class FileServiceImplDf implements IFileServiceDf {
     private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
     @Autowired
     private UniPointMapper uniPointMapper;
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
+    @Autowired
+    IFileMapperDf iFileMapperDf;
+    @Autowired
+    private FjReportService fjReportService;
 
     private Optional<MediaFileEntity> getMediaByFingerprint(String workspaceId, String fingerprint) {
         MediaFileEntity fileEntity = mapper.selectOne(new LambdaQueryWrapper<MediaFileEntity>()
@@ -149,27 +160,11 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Override
     public List<MediaFileDTO> getFilesByJobId( String jobId) {
         return mapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
-                .eq(MediaFileEntity::getJobId, jobId))
+                .eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId))
                 .stream()
                 .map(this::entityConvertToDto).collect(Collectors.toList());
     }
 
-    @Override
-    public List<MediaFileDTO> getUniqueFilesByJobId( String jobId) {
-        return mapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
-                        .eq(MediaFileEntity::getJobId, jobId))
-                .stream()
-                .collect(Collectors.groupingBy(
-                        MediaFileEntity::getFileName,
-                        Collectors.minBy(Comparator.comparing(MediaFileEntity::getCreateTime))
-                ))
-                .values()
-                .stream()
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .map(this::entityConvertToDto)
-                .collect(Collectors.toList());
-    }
 
     @Override
     public PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName) {
@@ -236,7 +231,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Override
     public PointResult getMediaDileByJobId(String job_id, String workspace_id, String wayline_id) throws Exception {
         synchronized (lock){
-            List<MediaFileDTO> mediaFileDTOList = this.getUniqueFilesByJobId(job_id);
+            List<MediaFileDTO> mediaFileDTOList = this.getFilesByJobId(job_id);
             //排序
             for (int i = 0; i < mediaFileDTOList.size()- 1; i++) {
                 // 设置一个标志位，用于检测是否发生了交换
@@ -335,86 +330,113 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Override
     public List<MediaFileDTO> getMediaDileByJobId3(String job_id, String workspace_id) throws Exception {
         synchronized (lock) {
-            List<MediaFileDTO> mediaFileDTOList = this.getUniqueFilesByJobId(job_id);
-            // 分离DJI文件和非DJI文件
-            List<MediaFileDTO> djiFiles = new ArrayList<>();
-            List<MediaFileDTO> nonDjiFiles = new ArrayList<>();
 
-            for (MediaFileDTO file : mediaFileDTOList) {
-                if (file.getFileName().startsWith("DJI")) {
-                    djiFiles.add(file);
-                } else {
-                    nonDjiFiles.add(file);
+            List<MediaFileDTO> mediaFileDTOList = this.getFilesByJobId(job_id);
+            FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                    .eq(FanWaylinePoints::getJobId, job_id));
+            JSONArray jsonArray = new JSONArray();
+//          风机任务则按照命名规则，其余按大疆顺序显示
+            if(fanWaylinePoints!=null){
+                Integer jobType = fanWaylinePoints.getJobType();
+                JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                if(jobType==0){
+                    jsonArray.addAll(djiPoints);
+                }else if(jobType==1){
+                    jsonArray.addAll(videoPoints);
+                    jsonArray.addAll(djiPoints);
                 }
+                List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
+                        eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
+                List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
+
+                if (fileNames.size() == mediaFileDTOList.size()) {
+                    for (int i = 0; i < mediaFileDTOList.size(); i++) {
+                        mediaFileDTOList.get(i).setFileName(fileNames.get(i));
+                    }
+                }
+                return mediaFileDTOList;
+            }else {
+
+                // 分离DJI文件和非DJI文件
+                List<MediaFileDTO> djiFiles = new ArrayList<>();
+                List<MediaFileDTO> nonDjiFiles = new ArrayList<>();
+
+                for (MediaFileDTO file : mediaFileDTOList) {
+                    if (file.getFileName().startsWith("DJI")) {
+                        djiFiles.add(file);
+                    } else {
+                        nonDjiFiles.add(file);
+                    }
+                }
+                //排序
+                for (int i = 0; i < djiFiles.size() - 1; i++) {
+                    // 设置一个标志位，用于检测是否发生了交换
+                    boolean swapped = false;
+                    // 内层循环，从第一个元素到倒数第i个元素
+                    for (int j = 0; j < djiFiles.size() - i - 1; j++) {
+                        //获取第一张图片的时间数
+                        //获取第j张照片名称
+                        String T1fileName = djiFiles.get(j).getFileName();
+                        //记录第J张照片时间
+                        String strT1num = "";
+                        //记录下划线
+                        int T1count = 0;
+                        for (int i1 = 0; i1 < T1fileName.length(); i1++) {
+                            if (T1fileName.charAt(i1) == '_') {
+                                T1count++;
+                            }
+                            if (T1count == 1 && T1fileName.charAt(i1) != '_') {
+                                strT1num = strT1num + T1fileName.charAt(i1);
+                            }
+                            if (T1count == 2) {
+                                break;
+                            }
+
+                        }
+                        Long T1num = Long.valueOf(strT1num);
+
+                        //获取第二张图片时间数
+                        String T2fileName = djiFiles.get(j + 1).getFileName();
+                        //记录第J张照片时间
+                        String strT2num = "";
+                        //记录下划线
+                        int T2count = 0;
+                        for (int i1 = 0; i1 < T2fileName.length(); i1++) {
+                            if (T2fileName.charAt(i1) == '_') {
+                                T2count++;
+                            }
+                            if (T2count == 1 && T2fileName.charAt(i1) != '_') {
+                                strT2num = strT2num + T2fileName.charAt(i1);
+                            }
+                            if (T2count == 2) {
+                                break;
+                            }
+
+                        }
+                        Long T2num = Long.valueOf(strT2num);
+                        // 如果当前元素比下一个元素大，则交换它们
+                        if (T1num > T2num) {
+                            MediaFileDTO temp = djiFiles.get(j);
+                            djiFiles.set(j, djiFiles.get(j + 1));
+                            djiFiles.set(j + 1, temp);
+                            swapped = true;
+                        }
+                    }
+                    // 如果没有发生交换，说明列表已经有序，提前退出
+                    if (!swapped) {
+                        break;
+                    }
+                }
+                // 合并列表：排序后的DJI文件在前，非DJI文件在后
+                mediaFileDTOList.clear();
+                mediaFileDTOList.addAll(djiFiles);
+                mediaFileDTOList.addAll(nonDjiFiles);
+                return mediaFileDTOList;
             }
-            //排序
-            for (int i = 0; i < djiFiles.size() - 1; i++) {
-                // 设置一个标志位，用于检测是否发生了交换
-                boolean swapped = false;
-                // 内层循环，从第一个元素到倒数第i个元素
-                for (int j = 0; j < djiFiles.size() - i - 1; j++) {
-                    //获取第一张图片的时间数
-                    //获取第j张照片名称
-                    String T1fileName = djiFiles.get(j).getFileName();
-                    //记录第J张照片时间
-                    String strT1num = "";
-                    //记录下划线
-                    int T1count = 0;
-                    for (int i1 = 0; i1 < T1fileName.length(); i1++) {
-                        if (T1fileName.charAt(i1) == '_') {
-                            T1count++;
-                        }
-                        if (T1count == 1 && T1fileName.charAt(i1) != '_') {
-                            strT1num = strT1num + T1fileName.charAt(i1);
-                        }
-                        if (T1count == 2) {
-                            break;
-                        }
-
-                    }
-                    Long T1num = Long.valueOf(strT1num);
-
-                    //获取第二张图片时间数
-                    String T2fileName = djiFiles.get(j + 1).getFileName();
-                    //记录第J张照片时间
-                    String strT2num = "";
-                    //记录下划线
-                    int T2count = 0;
-                    for (int i1 = 0; i1 < T2fileName.length(); i1++) {
-                        if (T2fileName.charAt(i1) == '_') {
-                            T2count++;
-                        }
-                        if (T2count == 1 && T2fileName.charAt(i1) != '_') {
-                            strT2num = strT2num + T2fileName.charAt(i1);
-                        }
-                        if (T2count == 2) {
-                            break;
-                        }
-
-
-                    }
-                    Long T2num = Long.valueOf(strT2num);
-                    // 如果当前元素比下一个元素大，则交换它们
-                    if (T1num > T2num) {
-                        MediaFileDTO temp = djiFiles.get(j);
-                        djiFiles.set(j, djiFiles.get(j + 1));
-                        djiFiles.set(j + 1, temp);
-                        swapped = true;
-                    }
-                }
-                // 如果没有发生交换，说明列表已经有序，提前退出
-                if (!swapped) {
-                    break;
-                }
-            }
-            // 合并列表：排序后的DJI文件在前，非DJI文件在后
-            mediaFileDTOList.clear();
-            mediaFileDTOList.addAll(djiFiles);
-            mediaFileDTOList.addAll(nonDjiFiles);
-            return mediaFileDTOList;
         }
-    }
 
+    }
 
     @Override
     public PointResult getMediaDileByJobId2(String job_id, String workspace_id, String wayline_id ) throws Exception {

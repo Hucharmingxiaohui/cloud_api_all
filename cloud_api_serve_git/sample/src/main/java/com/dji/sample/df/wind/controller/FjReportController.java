@@ -53,7 +53,6 @@ import org.springframework.http.HttpHeaders;
 @RequestMapping("fjReport/api/v1/")
 public class FjReportController {
 
-
     @Autowired
     ReportService reportService;
 
@@ -70,22 +69,10 @@ public class FjReportController {
     IFileMapperDf iFileMapperDf;
 
     @Autowired
-    private RedisUtils redisUtils;
-
-    @Autowired
-    DefectEntityMapper defectEntityMapper;
-
-    @Autowired
     IWaylineJobMapper waylineJobMapper;
 
     @Autowired
-    private WaylineUrlConfig waylineUrlConfig;
-
-    @Autowired
     FanWaylinePointsMapper  fanWaylinePointsMapper;
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     /**
      * 保存巡检图片并分析
@@ -120,10 +107,10 @@ public class FjReportController {
                 jsonArray.addAll(videoPoints);
                 jsonArray.addAll(djiPoints);
             }
-             List<String> fileNames = generateFileNames(mediaFileEntities, jsonArray);
+             List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
              log.info("文件名为-------------"+fileNames);
              request.setFile_name(fileNames);
-             AnalysisResponse response = sendAnalysisRequest(request);
+             AnalysisResponse response = fjReportService.sendAnalysisRequest(request);
              if (response != null) {
                  System.out.println("分析结果: " + response);
              }
@@ -247,61 +234,6 @@ public class FjReportController {
         ParamsUtils.isBlank(params, "taskPatrolledId");
         TaskReportDTO dto = reportService.lookReport(params);
         return Result.success(dto);
-    }
-
-    public List<String> generateFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
-        List<String> fileNames = new ArrayList<>();
-        int index = 0;
-
-        for (MediaFileEntity mediaFileEntity : mediaFileEntities) {
-            String fileName;
-            if (index < points.size()) {
-                // 使用Redis中的命名规则
-                String pointName = points.getString(index);
-                fileName = pointName + ".jpg";
-            } else {
-                // 如果图片数量超过Redis规则，使用原始文件名
-                String originalName = mediaFileEntity.getFileName() != null ?
-                        mediaFileEntity.getFileName() :
-                        "file_" + mediaFileEntity.getFileId();
-                // 确保文件扩展名
-                if (!originalName.toLowerCase().endsWith(".jpg") &&
-                        !originalName.toLowerCase().endsWith(".jpeg")) {
-                    fileName = originalName + ".jpg";
-                } else {
-                    fileName = originalName;
-                }
-            }
-            fileNames.add(fileName);
-            index++;
-        }
-        return fileNames;
-    }
-
-    public AnalysisResponse sendAnalysisRequest(AnalysisRequest request) {
-        try {
-            String requestBody = objectMapper.writeValueAsString(request);
-
-            HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(waylineUrlConfig.getAnalysisUrl()))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-
-            HttpResponse<String> httpResponse = httpClient.send(httpRequest,
-                    HttpResponse.BodyHandlers.ofString());
-
-            if (httpResponse.statusCode() == 200) {
-                return objectMapper.readValue(httpResponse.body(), AnalysisResponse.class);
-            } else {
-                System.err.println("请求失败，状态码: " + httpResponse.statusCode());
-                return null;
-            }
-        } catch (Exception e) {
-            System.err.println("发送分析请求时发生错误: " + e.getMessage());
-            e.printStackTrace();
-            return null;
-        }
     }
 
 }

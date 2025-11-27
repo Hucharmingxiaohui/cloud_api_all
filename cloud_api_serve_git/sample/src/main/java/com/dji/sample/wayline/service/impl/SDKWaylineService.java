@@ -11,6 +11,8 @@ import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.IOssService;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
@@ -125,6 +127,9 @@ public class SDKWaylineService extends AbstractWaylineService {
 
     @Autowired
     FanWaylinePointsMapper fanWaylinePointsMapper;
+
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
     private final ConcurrentMap<String, AtomicInteger> processedWaypoints = new ConcurrentHashMap<>();
 
@@ -315,7 +320,12 @@ public class SDKWaylineService extends AbstractWaylineService {
                     JSONObject jsonObject = new JSONObject();
                     String turbineName = redisUtils.get("turbineName").toString();
                     String jobId = redisUtils.get("jobId").toString();
-                    String windTurbineId = redisUtils.get("windTurbineId").toString();
+//                    String windTurbineId = redisUtils.get("windTurbineId").toString();
+                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
+                            eq(WaylineJobEntity::getJobId, jobId));
+                    PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                            .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+                    String windTurbineId = pubWaylineJobPlanDfEntity.getFanId();
                     WindTurbine windTurbine = windTurbineMapper.selectById(windTurbineId);
                     jsonObject.put("waylineType", "inFlightTask");
                     jsonObject.put("status", status);

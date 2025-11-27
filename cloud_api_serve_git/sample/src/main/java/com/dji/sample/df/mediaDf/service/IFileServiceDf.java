@@ -62,8 +62,6 @@ public interface IFileServiceDf {
      * @return
      */
     List<MediaFileDTO> getFilesByJobId( String jobId);
-//
-    List<MediaFileDTO> getUniqueFilesByJobId( String jobId);
 
     PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName);
 
