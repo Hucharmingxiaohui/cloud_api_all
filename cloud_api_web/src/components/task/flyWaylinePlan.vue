@@ -72,8 +72,19 @@
           <el-table-column label="操作" width="300px">
             <template #default="scope">
               <div class="action-buttons">
-                <el-button size="small" type="primary" class="custom-execute-btn"
-                  @click="executeNow(scope.row)">下发任务</el-button>
+                <div v-if="scope.row.task_type === 0">
+                    <el-button size="small" type="primary" class="custom-execute-btn"
+                      @click="executeNow(scope.row)">下发任务</el-button>
+                </div>
+                <div v-else>
+                  <el-tooltip
+                    effect="dark"
+                    content="创建计划时,定时任务自动进入排队队列,无需执行"
+                  >
+                    <el-button size="small" type="primary" class="custom-execute-btn" disabled>下发任务</el-button>
+                  </el-tooltip>
+                </div>
+
                 <el-button size="small" type="danger" class="custom-delete-btn"
                   @click="deletePlan(scope.row)">删除</el-button>
               </div>

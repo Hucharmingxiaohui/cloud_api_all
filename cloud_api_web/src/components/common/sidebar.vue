@@ -12,22 +12,22 @@
               mode="horizontal"
               @select="handleSelect"
             >
-              <template v-for="item in menuOptions" :key="item.index">
-                <el-menu-item :index="item.index" v-if="!item.children">
+              <template v-for="item in menuOptions" :key="item.name">
+                <el-menu-item :index="item.name" v-if="!item.children || item.children.length === 0">
                   <router-link :to="item.path">
                     {{ item.label }}
                   </router-link>
                 </el-menu-item>
                 <el-sub-menu
                   v-else
-                  :index="item.index"
+                  :index="item.name"
                   popper-class="child-menu-title"
                 >
                   <template #title>
                     {{ item.label }}
                   </template>
-                  <template v-for="child in item.children" :key="child.index">
-                    <el-menu-item :index="child.index">
+                  <template v-for="child in item.children" :key="child.name">
+                    <el-menu-item :index="child.name">
                       <router-link :to="child.path">
                         {{ child.label }}
                       </router-link>
@@ -50,35 +50,35 @@
               :default-active="activeIndex"
               @select="handleSelect"
             >
-              <template v-for="item in menuRightOptions" :key="item.index">
-                <el-menu-item :index="item.index" v-if="!item.children">
+              <template v-for="item in menuRightOptions" :key="item.name">
+                <el-menu-item :index="item.name" v-if="!item.children || item.children.length===0">
                   <router-link :to="item.path">
                     {{ item.label }}
                   </router-link>
                 </el-menu-item>
                 <el-sub-menu
                   v-else
-                  :index="item.index"
+                  :index="item.name"
                   popper-class="child-menu-title"
                 >
                   <template #title>
                     {{ item.label }}
                   </template>
-                  <template v-for="child in item.children" :key="child.index">
-                    <el-menu-item :index="child.index" v-if="!child.children">
+                  <template v-for="child in item.children" :key="child.name">
+                    <el-menu-item :index="child.name" v-if="!child.children || child.children.length===0">
                       <router-link :to="child.path">
                         {{ child.label }}
                       </router-link>
                     </el-menu-item>
-                    <el-sub-menu v-else :index="child.index">
+                    <el-sub-menu v-else :index="child.name">
                       <template #title>
                         {{ child.label }}
                       </template>
 
                       <el-menu-item
                         v-for="grandChild in child.children"
-                        :key="grandChild.index"
-                        :index="grandChild.index"
+                        :key="grandChild.name"
+                        :index="grandChild.name"
                       >
                         <router-link :to="child.path">
                           {{ grandChild.label }}
@@ -133,7 +133,7 @@ import { createVNode, defineComponent, ref, computed, onMounted, onBeforeUnmount
 import { getRoot } from '/@/root'
 import * as icons from '@ant-design/icons-vue'
 import { ERouterName, ELocalStorageKey } from '/@/types'
-import { UserOutlined, ExportOutlined } from '@ant-design/icons-vue'
+import { routes } from '/@/router'
 import { useRouter, useRoute } from 'vue-router'
 const activeIndex = ref('2')
 const router = useRouter()
@@ -152,6 +152,18 @@ interface IOptions {
         query?: any
       }
   icon: string
+}
+
+// 定义菜单类型（与路由meta对齐）
+interface MenuItem {
+  index: string
+  label: string
+  path: string,
+  name: string,
+  children?: MenuItem[]
+  position?: 'left' | 'right'
+  cache?: boolean
+  newWindow?: boolean
 }
 
 // 菜单自动隐藏
@@ -174,95 +186,75 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
 })
-// ----------------------------------------
+// ---------------------------------------- 自动获取路由-----------------------------------------------------------------
+// 1. 从路由中收集所有需要显示的菜单（showInMenu: true）
+const menuTree = ref<MenuItem[]>([])
+function getShowInMenuRoutes (routes) {
+  const result = []
+
+  function traverseRoutes (routeList, parentPath = '') {
+    if (!Array.isArray(routeList)) return
+
+    for (const route of routeList) {
+      // 构建完整路径
+      const fullPath = route.path
+
+      // 检查当前路由是否显示在菜单中
+      if (route.meta && route.meta.showInMenu === true) {
+        // 创建路由副本，保留children用于菜单树结构
+        const routeCopy = {
+          ...route.meta,
+          path: route.path,
+          name: route.name,
+          label: route.meta.label || '',
+          children: [] // 初始化children数组
+        }
+
+        // 递归处理子路由，构建子菜单
+        if (route.children && route.children.length > 0) {
+          route.children.forEach(child => {
+            if (child.meta?.showInMenu === true) {
+              const childFullPath = child.path
+              routeCopy.children.push({
+                ...child.meta,
+                path: childFullPath,
+                name: child.name,
+                label: child.meta.label || '',
+                children: child.children || []
+              })
+            }
+          })
+        }
+
+        result.push(routeCopy)
+      } else {
+        // 如果当前路由不显示，但可能有需要显示的子路由，继续递归
+        if (route.children && route.children.length > 0) {
+          traverseRoutes(route.children, fullPath.endsWith('/') ? fullPath : `${fullPath}/`)
+        }
+      }
+    }
+  }
+
+  traverseRoutes(routes)
+
+  return result
+}
+
+const menuData = getShowInMenuRoutes(routes)
+menuTree.value = menuData
+
+// 2. 拆分左右菜单（按position字段）
+const menuOptions = computed(() => {
+  return menuTree.value.filter(menu => menu.position === 'left')
+})
+console.log('左侧菜单', menuOptions)
+const menuRightOptions = computed(() => {
+  return menuTree.value.filter(menu => menu.position === 'right')
+})
 
 // 左侧菜单
 // 菜单配置数据（添加path字段）
-const menuOptions = [
-  {
-    index: '1',
-    label: '变量管理',
-    children: [
-      {
-        index: '1-1',
-        label: '风机管理',
-        path: '/fanMgt'
-      },
-    ]
-  },
-  {
-    index: '2',
-    label: '设备管理',
-    path: '/' + ERouterName.DEVICES,
-
-  },
-  {
-    index: '3',
-    label: '视频直播',
-    path: '/' + ERouterName.LIVESTREAM,
-  },
-]
-
-const menuRightOptions = [
-  {
-    index: '4',
-    label: '航线管理',
-    path: '/' + ERouterName.NEW_WAYLINE
-  },
-  {
-    index: '5',
-    label: '任务管理',
-    children: [
-      {
-        index: '5-1',
-        label: '普通计划',
-        path: '/' + ERouterName.FLY_WAYLINE_PLAN,
-      },
-      {
-        index: '5-2',
-        label: '风机计划',
-        path: '/' + ERouterName.FLY_FAN_PLAN,
-      },
-      {
-        index: '5-3',
-        label: '飞行任务',
-        path: '/' + ERouterName.TASK
-      },
-    ]
-  },
-  {
-    index: '6',
-    label: '系统管理',
-    children: [{
-      index: '6-1',
-      lable: '日志管理',
-      path: '/' + ERouterName.LOGS
-    },
-    {
-      index: '6-2',
-      lable: '固件管理',
-      path: '/' + ERouterName.FIRMWARES
-    }
-    ]
-  },
-]
-
-// 合并所有菜单项
-const allMenuItems = [...menuOptions, ...menuRightOptions]
-
-// 查找路径
-function findPathByIndex (items, targetIndex) {
-  for (const item of items) {
-    if (item.index === targetIndex) {
-      return item.path
-    }
-    if (item.children) {
-      const found = findPathByIndex(item.children, targetIndex)
-      if (found) return found
-    }
-  }
-  return null
-}
 
 // 更新菜单激活状态
 function handleSelect (index) {

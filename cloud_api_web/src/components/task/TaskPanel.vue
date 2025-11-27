@@ -176,7 +176,7 @@
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
-import { onMounted, watch, provide, reactive, ref, nextTick } from 'vue'
+import { onMounted, watch, provide, reactive, ref, nextTick, onUnmounted } from 'vue'
 import { IPage } from '/@/api/http/type'
 import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, deleteOtherTask } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
@@ -193,15 +193,13 @@ import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
 const router = useRouter()
 
-const showVideo = ref(false)
-const isResizing = ref(false)
-const videoModal = ref(null)
-let startX, startY, startWidth, startHeight
-
 // 存储已处理的任务ID，避免重复分析
 const analyzedTasks = ref(new Set())
 // 存储任务分析状态
 const taskAnalysisStatus = ref(new Map()) // Map<job_id, { status: 'analyzing' | 'completed' | 'none', loading: boolean }>()
+// 维护正在分析的任务列表
+const analyzingTasks = ref(new Set<string>()) // 存储正在分析的任务ID
+let analysisTimer: number | null = null // 定时器引用
 
 const taskTypeLabels = {
   0: '立即任务',
@@ -226,7 +224,7 @@ const outControlAcion = {
 // import CreatePlan from './CreatePlan.vue'
 // import CreatePlan from '/@/pages/page-web/projects/task.vue'
 const store = useMyStore()
-let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
+const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
 const body: IPage = {
   page: 1,
@@ -268,11 +266,6 @@ function onTaskProgressWs (data: TaskProgressInfo) {
       }
     }
   }
-}
-// 跳出新建任务弹窗
-function createTask () {
-  open.value = true
-  console.log(open.value)
 }
 
 // 媒体上传进度更新
@@ -317,15 +310,36 @@ function toTaskResult (val) {
   router.push({ path: '/task/taskResult' })
 }
 
+/**
+ * 获取任务列表
+ */
+function getPlans () {
+  getWaylineJobs(workspaceId, body).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    plansData.data = res.data.list
+    paginationProp.total = res.data.pagination.total
+    paginationProp.current = res.data.pagination.page
+  })
+}
 // ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------
+
 /**
  * 保存任务图片并分析
  */
 async function anaysisTaskResult (row) {
   try {
     const res = await startTaskAnasisyApi({ jobId: row.job_id })
+    // 开始分析后，将任务添加到分析列表
+    if (!analyzingTasks.value.has(row.job_id)) {
+      analyzingTasks.value.add(row.job_id)
+    }
   } catch (error) {
-
+    console.error('开始分析失败:', error)
+    // 分析失败，从分析列表中移除
+    analyzingTasks.value.delete(row.job_id)
+    taskAnalysisStatus.value.set(row.job_id, { status: 'none', loading: false })
   }
 }
 
@@ -334,27 +348,99 @@ async function anaysisTaskResult (row) {
  */
 async function checkAnaysisStaus (row) {
   try {
-    // 设置分析中状态
-    taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
-
     const res = await isAnalyzedApi(row.job_id)
 
     if (res.data === 0) {
       // 未分析过，开始分析
+      if (!analyzingTasks.value.has(row.job_id)) {
+        analyzingTasks.value.add(row.job_id)
+      }
       taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
       await anaysisTaskResult(row)
     } else if (res.data === 1) {
       // 已经分析完成
+      analyzingTasks.value.delete(row.job_id) // 从分析列表中移除
       taskAnalysisStatus.value.set(row.job_id, { status: 'completed', loading: false })
     } else {
       // 正在分析
+      if (!analyzingTasks.value.has(row.job_id)) {
+        analyzingTasks.value.add(row.job_id)
+      }
       taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
     }
   } catch (error) {
     console.error('检查分析状态失败:', error)
-    // 分析失败，重置状态
+    // 检查失败，从分析列表中移除
+    analyzingTasks.value.delete(row.job_id)
     taskAnalysisStatus.value.set(row.job_id, { status: 'none', loading: false })
   }
+}
+
+function startAnalysisTimer () {
+  // 清除现有定时器
+  if (analysisTimer) {
+    clearInterval(analysisTimer)
+  }
+
+  // 设置新的定时器，每10秒检查一次
+  analysisTimer = setInterval(() => {
+    if (analyzingTasks.value.size > 0) {
+      console.log(`定时检查分析状态，当前有 ${analyzingTasks.value.size} 个任务正在分析`)
+
+      // 遍历正在分析的任务列表，逐个检查状态
+      analyzingTasks.value.forEach(jobId => {
+        const task = plansData.data.find(item => item.job_id === jobId)
+        if (task) {
+          checkSingleTaskAnalysisStatus(task)
+        } else {
+          // 如果任务不在当前数据中，从分析列表中移除
+          analyzingTasks.value.delete(jobId)
+        }
+      })
+    }
+  }, 10000) // 10秒检查一次
+}
+
+/**
+ * 检查单个任务的分析状态
+ */
+async function checkSingleTaskAnalysisStatus (task) {
+  try {
+    const res = await isAnalyzedApi(task.job_id)
+
+    if (res.data === 1) {
+      // 分析完成
+      analyzingTasks.value.delete(task.job_id)
+      taskAnalysisStatus.value.set(task.job_id, { status: 'completed', loading: false })
+      console.log(`任务 ${task.job_id} 分析完成`)
+    } else if (res.data === 0) {
+      // 未分析，可能是分析失败，重新分析
+      console.log(`任务 ${task.job_id} 未分析，重新开始分析`)
+      taskAnalysisStatus.value.set(task.job_id, { status: 'analyzing', loading: true })
+      await anaysisTaskResult(task)
+    }
+    // 其他状态（分析中）保持不变
+  } catch (error) {
+    console.error(`检查任务 ${task.job_id} 分析状态失败:`, error)
+    // 检查失败，暂时保留在分析列表中，下次继续检查
+  }
+}
+
+/**
+ * 初始化分析状态检查
+ */
+function initAnalysisStatusCheck () {
+  // 启动定时器
+  startAnalysisTimer()
+
+  // 初始检查所有已上传媒体文件的任务
+  plansData.data.forEach(row => {
+    const statusInfo = formatMediaTaskStatus(row)
+    if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
+      analyzedTasks.value.add(row.job_id)
+      checkAnaysisStaus(row)
+    }
+  })
 }
 
 /**
@@ -363,27 +449,54 @@ async function checkAnaysisStaus (row) {
 watch(
   () => plansData.data,
   (newData, oldData) => {
+    // 1. 数据更新后，确保定时器运行
+    if (!analysisTimer) {
+      initAnalysisStatusCheck()
+    }
+
+    // 2. 检查新数据中需要分析的任务
     newData.forEach(row => {
       const statusInfo = formatMediaTaskStatus(row)
 
       // 当状态为"已上传"且未分析过时，执行分析
-      console.log('执行分析判断', analyzedTasks.value.has(row.job_id))
       if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
         analyzedTasks.value.add(row.job_id)
 
         // 使用nextTick确保DOM更新完成后再执行
         nextTick(() => {
           console.log('上传图片完成，进行分析....')
-          console.log('上传行信息', statusInfo)
           checkAnaysisStaus(row)
         })
       }
     })
+    // 3. 清理旧数据中不再存在的任务的分析状态
+    if (oldData && oldData.length > 0) {
+      const newJobIds = new Set(newData.map(item => item.job_id))
+      oldData.forEach(oldRow => {
+        if (!newJobIds.has(oldRow.job_id)) {
+          // 如果任务已从数据中移除，清理相关状态
+          analyzingTasks.value.delete(oldRow.job_id)
+          analyzedTasks.value.delete(oldRow.job_id)
+        }
+      })
+    }
   },
   {
     deep: true,
-    immediate: true // 立即执行一次，处理初始数据
+    immediate: true
   }
+)
+
+// 监听数据变化，重新初始化分析检查
+watch(
+  () => plansData.data,
+  () => {
+    // 数据更新后，确保定时器运行
+    if (!analysisTimer) {
+      initAnalysisStatusCheck()
+    }
+  },
+  { deep: true }
 )
 
 /**
@@ -398,6 +511,8 @@ function getAnalysisStatusText (jobId) {
       return '分析中'
     case 'completed':
       return '分析完成'
+    case 'none':
+      return '分析异常'
     default:
       return ''
   }
@@ -425,39 +540,10 @@ function getAnalysisStatusColor (jobId) {
  */
 function showAnalysisStatus (jobId) {
   const statusInfo = taskAnalysisStatus.value.get(jobId)
-  return statusInfo && statusInfo.status !== 'none'
+  return statusInfo
 }
 
 // -------------------------------------------------------------------------------------------------------------------
-
-function closeVideo () {
-  showVideo.value = false
-}
-function startResize (event) {
-  isResizing.value = true
-  startX = event.clientX
-  startY = event.clientY
-  startWidth = videoModal.value.offsetWidth
-  startHeight = videoModal.value.offsetHeight
-
-  document.addEventListener('mousemove', resize)
-  document.addEventListener('mouseup', stopResize)
-}
-
-function resize (event) {
-  if (isResizing.value) {
-    const newWidth = startWidth + (event.clientX - startX)
-    const newHeight = startHeight + (event.clientY - startY)
-    videoModal.value.style.width = newWidth + 'px'
-    videoModal.value.style.height = newHeight + 'px'
-  }
-}
-
-function stopResize () {
-  isResizing.value = false
-  document.removeEventListener('mousemove', resize)
-  document.removeEventListener('mouseup', stopResize)
-}
 
 useTaskWsEvent({
   onTaskProgressWs,
@@ -467,72 +553,16 @@ useTaskWsEvent({
 
 onMounted(() => {
   getPlans()
-  // 添加树形图数据
-  getTreeData()
+  initAnalysisStatusCheck()
 })
 
-//= ===========================================添加树形图==========================================================================
-
-const selectedNode = ref(null)
-
-const treeData = ref([
-  {
-    title: '区域1',
-    key: '1',
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (analysisTimer) {
+    clearInterval(analysisTimer)
+    analysisTimer = null
   }
-])
-
-function getTreeData () {
-  let workspaces = null
-  getAllWorkspaceInfo(userId.value).then(res => {
-    // 转换数据格式
-    workspaces = res.data
-    if (workspaces) {
-      clearLeafNodesAndAddData(treeData.value, workspaces)
-    }
-  })
-}
-// 添加树形图方法
-const clearLeafNodesAndAddData = (treeData, data) => {
-  treeData.forEach(node => {
-    // 如果有子节点，则递归遍历
-    if (node.children && node.children.length > 0) {
-      clearLeafNodesAndAddData(node.children, data)
-    }
-
-    // 如果是叶子节点，清空现有数据并添加 data 中的数据
-    if (!node.children || node.children.length === 0) {
-      node.children = data.map(item => ({
-        title: item.workspace_name,
-        key: item.workspace_id, // 使用 workspace_id 作为 key
-        workspace_id: item.workspace_id,
-        workspace_desc: item.workspace_desc,
-        platform_name: item.platform_name,
-        bind_code: item.bind_code,
-        isLeaf: true // 显式标记为叶子节点
-      }))
-    }
-  })
-}
-// 树形图选中方法
-const handleNodeChange = (node) => {
-  // selectedNode.value = node
-
-  workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
-  getPlans()
-  console.log('Node changed in parent:', node) // 确认父组件事件是否触发
-}
-function getPlans () {
-  getWaylineJobs(workspaceId, body).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    plansData.data = res.data.list
-    console.log('任务详情', res.data.list)
-    paginationProp.total = res.data.pagination.total
-    paginationProp.current = res.data.pagination.page
-  })
-}
+})
 
 // ============================================================分页数据==========================================================
 // 分页事件

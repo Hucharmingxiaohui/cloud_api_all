@@ -336,12 +336,18 @@ async function onSubmit () {
   try {
     const valid = await valueRef.value.validate()
     if (valid) {
+      // 1.创建飞行计划
       const res = await createFlyPlan(planBody)
       if (res.code !== 0) {
         ElMessage.warning('请填写必填项!')
         return
       }
       ElMessage.success('创建成功!')
+      // 2. 执行飞行计划 单次定时计划，立即执行飞行任务
+      // if (planBody.task_type === TaskType.Timed) {
+
+      // }
+      // 返回飞行计划管理页面
       closePlan()
     }
   } catch (error) {

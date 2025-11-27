@@ -1,170 +1,310 @@
-import { createRouter, createWebHistory, createWebHashHistory, RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { ERouterName } from '/@/types/index'
-// import CreatePlan from '/@/components/task/CreatePlan.vue'
 import WaylinePanel from '/@/pages/page-web/projects/wayline.vue'
 import DockPanel from '/@/pages/page-web/projects/dock.vue'
 import LiveAgora from '/@/components/livestream-agora.vue'
 import LiveOthers from '/@/components/livestream-others.vue'
 import LiveResults from '/@/components/livestream-results.vue'
-import CreateWayline from '/@/components/wayline/createWayline.vue'
 import { ref } from 'vue'
+
+// 扩展路由元信息类型（移除index/parentIndex，保留核心配置）
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** 是否缓存组件 */
+    cache?: boolean
+    /** 是否显示在菜单中 */
+    showInMenu?: boolean
+    /** 是否在新窗口打开 */
+    newWindow?: boolean
+    /** 菜单标签（优先使用，无则使用name） */
+    label?: string
+    /** 菜单位置（left/right，子路由继承父路由） */
+    position?: 'left' | 'right'
+  }
+}
 
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/' + ERouterName.PROJECT
+    redirect: '/' + ERouterName.PROJECT,
+    meta: { showInMenu: false }
   },
   // 首页
   {
     path: '/' + ERouterName.PROJECT,
     name: ERouterName.PROJECT,
-    component: () => import('/@/pages/page-web/index.vue')
+    component: () => import('/@/pages/page-web/index.vue'),
+    meta: { showInMenu: false, cache: false }
   },
   // members, devices
   {
     path: '/' + ERouterName.HOME,
     name: ERouterName.HOME,
     component: () => import('/@/pages/page-web/home.vue'),
+    meta: { showInMenu: false, cache: false },
     children: [
       {
         path: '/' + ERouterName.MEMBERS,
         name: ERouterName.MEMBERS,
-        component: () => import('/@/pages/page-web/projects/members.vue')
-      },
-      // {
-      //   path: '/' + ERouterName.FIRMWARES,
-      //   name: ERouterName.FIRMWARES,
-      //   component: () => import('../pages/page-web/projects/Firmwares.vue')
-      // }
+        component: () => import('/@/pages/page-web/projects/members.vue'),
+        meta: { showInMenu: false, cache: true }
+      }
     ]
   },
-  // workspace
+  // workspace（主菜单所在路由）
   {
     path: '/' + ERouterName.WORKSPACE,
     name: ERouterName.WORKSPACE,
     component: () => import('/@/pages/page-web/projects/workspace.vue'),
     redirect: '/' + ERouterName.NEW_WAYLINE,
+    meta: { showInMenu: false, cache: false },
     children: [
+      // 左侧菜单 - 变量管理（父菜单，含子路由）
       {
-        path: '/' + ERouterName.TSA,
-        component: () => import('/@/pages/page-web/projects/tsa.vue')
-      },
-      {
-        path: '/' + ERouterName.DEVICES,
-        name: ERouterName.DEVICES,
-        component: () => import('/@/pages/page-web/projects/devices.vue')
-      },
-      {
-        path: '/' + ERouterName.FIRMWARES,
-        name: ERouterName.FIRMWARES,
-        component: () => import('../pages/page-web/projects/Firmwares.vue')
-      },
-      {
-        path: '/' + ERouterName.MEDIA,
-        name: ERouterName.MEDIA,
-        component: () => import('/@/components/MediaPanel.vue')
-      },
-      {
-        path: '/remoteDebug',
-        name: 'remoteDebug',
-        component: () => import('/@/components/task/waylineVideo.vue')
-      },
-      {
-        path: '/member',
-        name: 'member',
-        component: () => import('/@/pages/page-web/projects/members1.vue')
-      },
-      {
-        path: '/station',
-        name: 'station',
-        component: () => import('/@/pages/page-web/projects/station.vue')
-      },
-      {
-        path: '/' + ERouterName.LIVESTREAM,
-        name: ERouterName.LIVESTREAM,
-        component: () => import('/@/pages/page-web/projects/livestream.vue'),
+        path: '/variable-manage',
+        name: 'variableManage',
+        meta: {
+          showInMenu: true,
+          label: '变量管理',
+          position: 'left',
+          cache: false
+        },
         children: [
           {
-            path: ERouterName.LIVING,
-            name: ERouterName.LIVING,
-            components: {
-              LiveAgora,
-              LiveOthers,
-              LiveResults
+            path: '/fanMgt',
+            name: 'fanMgt',
+            component: () => import('/@/components/fanMgt/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '风机管理',
+              cache: true
             }
           }
         ]
       },
+      // 左侧菜单 - 视频直播（无子女菜单）
       {
-        path: '/' + ERouterName.LAYER,
-        name: ERouterName.LAYER,
-        component: () => import('/@/pages/page-web/projects/layer.vue')
+        path: '/' + ERouterName.LIVESTREAM,
+        name: ERouterName.LIVESTREAM,
+        component: () => import('/@/pages/page-web/projects/livestream.vue'),
+        meta: {
+          showInMenu: true,
+          label: '视频直播',
+          position: 'left',
+          cache: false
+        },
+        children: [
+          {
+            path: ERouterName.LIVING,
+            name: ERouterName.LIVING,
+            components: { LiveAgora, LiveOthers, LiveResults },
+            meta: { showInMenu: false, cache: false }
+          }
+        ]
       },
+      // 左侧菜单 - 设备管理（无子女菜单）
       {
-        path: '/test',
-        name: 'test',
-        component: () => import('/@/components/g-map/mapPanel.vue')
+        path: '/' + ERouterName.DEVICES,
+        name: ERouterName.DEVICES,
+        component: () => import('/@/pages/page-web/projects/devices.vue'),
+        meta: {
+          showInMenu: true,
+          label: '设备管理',
+          position: 'left',
+          cache: true
+        }
       },
-      // {
-      //   path: '/' + ERouterName.MEDIA,
-      //   name: ERouterName.MEDIA,
-      //   component: () => import('/@/pages/page-web/projects/media.vue')
-      // },
+
+      // 右侧菜单 - 航线管理（无子女菜单）
       {
         path: '/' + ERouterName.NEW_WAYLINE,
         name: ERouterName.NEW_WAYLINE,
         component: () => import('/@/components/WaylinePanel.vue'),
+        meta: {
+          showInMenu: true,
+          label: '航线管理',
+          position: 'right',
+          cache: true
+        }
+      },
+      // 右侧菜单 - 任务管理（父菜单，含子路由）
+      {
+        path: '/task-manage', // 父菜单路径
+        name: 'taskManage',
+        meta: {
+          showInMenu: true,
+          label: '任务管理',
+          position: 'right', // 右侧菜单（子路由继承）
+          cache: false
+        },
+        children: [
+          // 子菜单 - 普通计划
+          {
+            path: '/' + ERouterName.FLY_WAYLINE_PLAN,
+            name: ERouterName.FLY_WAYLINE_PLAN,
+            component: () => import('/@/components/task/flyWaylinePlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '普通计划',
+              cache: true
+            }
+          },
+          // 子菜单 - 风机计划
+          {
+            path: '/' + ERouterName.FLY_FAN_PLAN,
+            name: ERouterName.FLY_FAN_PLAN,
+            component: () => import('/@/components/task/flyFanPlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '风机计划',
+              cache: true
+            }
+          },
+          // 子菜单 - 飞行任务
+          {
+            path: '/' + ERouterName.TASK,
+            name: ERouterName.TASK,
+            component: () => import('/@/components/task/TaskPanel.vue'),
+            meta: {
+              showInMenu: true,
+              label: '飞行任务',
+              cache: true
+            }
+          }
+        ]
+      },
+      // 右侧菜单 - 系统管理（父菜单，含子路由）
+      {
+        path: '/system-manage', // 父菜单路径
+        name: 'systemManage',
+        meta: {
+          showInMenu: true,
+          label: '系统管理',
+          position: 'right', // 右侧菜单（子路由继承）
+          cache: false
+        },
+        children: [
+          // 子菜单 - 日志管理
+          {
+            path: '/' + ERouterName.LOGS,
+            name: ERouterName.LOGS,
+            component: () => import('/@/components/devices/device-log/logManage.vue'),
+            meta: {
+              showInMenu: false,
+              label: '日志管理',
+              cache: false
+            }
+          },
+          // 子菜单 - 固件管理（新窗口打开）
+          {
+            path: '/' + ERouterName.FIRMWARES,
+            name: ERouterName.FIRMWARES,
+            component: () => import('../pages/page-web/projects/Firmwares.vue'),
+            meta: {
+              showInMenu: true,
+              label: '固件管理',
+              newWindow: true, // 新窗口打开
+              cache: false
+            }
+          }
+        ]
+      },
+      // 其他路由（隐藏菜单）
+      {
+        path: '/' + ERouterName.TSA,
+        component: () => import('/@/pages/page-web/projects/tsa.vue'),
+        meta: { showInMenu: false, cache: false }
+      },
+      {
+        path: '/' + ERouterName.MEDIA,
+        name: ERouterName.MEDIA,
+        component: () => import('/@/components/MediaPanel.vue'),
+        meta: { showInMenu: false, cache: true }
+      },
+      {
+        path: '/remoteDebug',
+        name: 'remoteDebug',
+        component: () => import('/@/components/task/waylineVideo.vue'),
+        meta: { showInMenu: false, cache: false }
+      },
+      {
+        path: '/member',
+        name: 'member',
+        component: () => import('/@/pages/page-web/projects/members1.vue'),
+        meta: { showInMenu: false, cache: true }
+      },
+      {
+        path: '/station',
+        name: 'station',
+        component: () => import('/@/pages/page-web/projects/station.vue'),
+        meta: { showInMenu: false, cache: false }
+      },
+      {
+        path: '/' + ERouterName.LAYER,
+        name: ERouterName.LAYER,
+        component: () => import('/@/pages/page-web/projects/layer.vue'),
+        meta: { showInMenu: false, cache: true }
+      },
+      {
+        path: '/test',
+        name: 'test',
+        component: () => import('/@/components/g-map/mapPanel.vue'),
+        meta: { showInMenu: false, cache: false }
       },
       {
         path: '/waylinePoints',
         name: 'waylinePoints',
         component: () => import('/@/components/wayline/wayline_points.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.WAYLINE,
         name: ERouterName.WAYLINE,
         component: () => import('/@/pages/page-web/projects/wayline.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.Camera_Management,
         name: ERouterName.Camera_Management,
         component: () => import('/@/pages/page-web/projects/camera.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.HOSTCONNECT,
         name: ERouterName.HOSTCONNECT,
         component: () => import('/@/components/hostConnect.vue'),
-      },
-      {
-        path: '/' + ERouterName.LOGS,
-        name: ERouterName.LOGS,
-        component: () => import('/@/components/devices/device-log/logManage.vue'),
+        meta: { showInMenu: false, cache: false }
       },
       {
         path: '/' + ERouterName.Points_Management,
         name: ERouterName.Points_Management,
         component: () => import('/@/components/points/points_manage.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.Setup_Management,
         name: ERouterName.Setup_Management,
         component: () => import('/@/pages/page-web/projects/setup.vue'),
         redirect: '/platformInfo',
+        meta: { showInMenu: false, cache: true },
         children: [
           {
             path: '/platformInfo',
             name: 'platformInfo',
             component: () => import('/@/components/setup/platformInfo.vue'),
+            meta: { showInMenu: false, cache: true }
           },
           {
             path: '/apiConfig',
             name: 'apiConfig',
             component: () => import('/@/components/setup/apiConfig.vue'),
+            meta: { showInMenu: false, cache: true }
           },
           {
             path: '/taskConfig',
             name: 'taskConfig',
             component: () => import('/@/components/setup/taskSetup.vue'),
+            meta: { showInMenu: false, cache: true }
           }
         ]
       },
@@ -172,133 +312,119 @@ const routes: Array<RouteRecordRaw> = [
         path: '/wayline/createWayline',
         name: 'createWayline',
         component: () => import('/@/components/wayline/createWayline.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/wayline/showWayline',
         name: 'showWayline',
         component: () => import('/@/components/wayline/pathTracking.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/TaskPanel',
         name: 'TaskPanel',
         component: () => import('/@/components/task/TaskPanel.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/taskImages',
         name: 'taskImages',
         component: () => import('/@/components/task/TaskImages.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/TaskInfo',
         name: 'TaskInfo',
         component: () => import('/@/components/task/TaskInfo.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/TaskHistory',
         name: 'TaskHistory',
         component: () => import('/@/components/task/TaskHistory.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/show-info',
         name: 'show-info',
         component: () => import('/@/components/task/showState.vue'),
-      },
-      {
-        path: '/' + ERouterName.FLY_WAYLINE_PLAN,
-        name: ERouterName.FLY_WAYLINE_PLAN,
-        component: () => import('/@/components/task/flyWaylinePlan.vue'),
-      },
-      {
-        path: '/' + ERouterName.FLY_FAN_PLAN,
-        name: ERouterName.FLY_FAN_PLAN,
-        component: () => import('/@/components/task/flyFanPlan.vue'),
-      },
-      {
-        path: '/' + ERouterName.TASK,
-        name: ERouterName.TASK,
-        component: () => import('/@/components/task/TaskPanel.vue'),
+        meta: { showInMenu: false, cache: false }
       },
       {
         path: '/task/taskResult',
         name: 'taskResult',
         component: () => import('/@/components/task/task_result.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/wayline/Model',
         name: 'model',
         component: () => import('/@/components/cesium/3DMapPanel.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/modelManage',
         name: 'modelManage',
         component: () => import('/@/components/cesium/modelPanel.vue'),
-      },
-      {
-        path: '/fanMgt',
-        name: 'fanMgt',
-        component: () => import('/@/components/fanMgt/index.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/task/createPlan',
         name: 'createPlan',
         component: () => import('/@/components/task/CreatePlan.vue'),
+        meta: { showInMenu: false, cache: true },
         children: [
           {
-
             path: ERouterName.SELECT_PLAN,
             name: ERouterName.SELECT_PLAN,
-            components: {
-              WaylinePanel,
-              DockPanel
-            }
-          },
+            components: { WaylinePanel, DockPanel },
+            meta: { showInMenu: false, cache: true }
+          }
         ]
       },
-      // {
-      //   path: '/task/taskResult',
-      //   name: 'taskResult',
-      //   component: () => import('/@/components/task/task_result.vue'),
-      // },
-      // {
-      //   path: ERouterName.TASK_RESULT,
-      //   name: ERouterName.TASK_RESULT,
-      //   component: () => import('/@/components/task/task_result.vue')
-      // },
       {
         path: '/' + ERouterName.FLIGHT_AREA,
         name: ERouterName.FLIGHT_AREA,
-        component: () => import('/@/pages/page-web/projects/flight-area.vue')
+        component: () => import('/@/pages/page-web/projects/flight-area.vue'),
+        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.Organization,
         name: ERouterName.Organization,
-        component: () => import('/@/pages/page-web/projects/organize.vue')
-      },
+        component: () => import('/@/pages/page-web/projects/organize.vue'),
+        meta: { showInMenu: false, cache: true }
+      }
     ]
   },
-  // pilot
+  // pilot 相关路由
   {
     path: '/' + ERouterName.PILOT,
     name: ERouterName.PILOT,
     component: () => import('/@/pages/page-pilot/pilot-index.vue'),
+    meta: { showInMenu: false, cache: false }
   },
   {
     path: '/' + ERouterName.PILOT_HOME,
-    component: () => import('/@/pages/page-pilot/pilot-home.vue')
+    component: () => import('/@/pages/page-pilot/pilot-home.vue'),
+    meta: { showInMenu: false, cache: true }
   },
   {
     path: '/' + ERouterName.PILOT_MEDIA,
-    component: () => import('/@/pages/page-pilot/pilot-media.vue')
+    component: () => import('/@/pages/page-pilot/pilot-media.vue'),
+    meta: { showInMenu: false, cache: true }
   },
   {
     path: '/' + ERouterName.PILOT_LIVESHARE,
-    component: () => import('/@/pages/page-pilot/pilot-liveshare.vue')
+    component: () => import('/@/pages/page-pilot/pilot-liveshare.vue'),
+    meta: { showInMenu: false, cache: false }
   },
   {
     path: '/' + ERouterName.PILOT_BIND,
-    component: () => import('/@/pages/page-pilot/pilot-bind.vue')
+    component: () => import('/@/pages/page-pilot/pilot-bind.vue'),
+    meta: { showInMenu: false, cache: false }
   }
 ]
+
 const isLoading = ref(false)
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -307,7 +433,8 @@ const router = createRouter({
     return { top: 0 }
   }
 })
-// 添加全局路由守卫
+
+// 全局路由守卫
 router.beforeEach((to, from, next) => {
   isLoading.value = true
   next()
@@ -319,5 +446,5 @@ router.afterEach(() => {
   }, 200)
 })
 
-export { isLoading }
+export { routes, isLoading }
 export default router
