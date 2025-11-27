@@ -598,8 +598,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
     @Override
-    public boolean buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+    public Map<String,Object> buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
         // 写发送逻辑
+        Map map = new HashMap();
         String fanId = pubWaylineJobPlanDfEntity.getFanId();
         redisUtils.set("windTurbineId", fanId);
         WindTurbine windTurbine = windTurbineMapper.selectById(fanId);
@@ -689,10 +690,13 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
                             eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
                     if(entity1!=null){//plan_id重复
-                        return false;
+                        map.put("result",false);
+                        return map;
                     }else{//plan_id不重复
                         pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
-                        return true;
+                        map.put("result",true);
+                        map.put("plan",pubWaylineJobPlanDfEntity);
+                        return map;
                     }
                 }
             }
@@ -705,7 +709,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return true;
+        return map;
     }
 
 

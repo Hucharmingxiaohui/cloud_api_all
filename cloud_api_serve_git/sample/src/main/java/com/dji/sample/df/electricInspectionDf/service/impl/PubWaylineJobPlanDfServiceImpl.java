@@ -61,7 +61,7 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
 //      如果是风机计划则调用创建风机航线接口
         if(planType==1){
-            routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
+            return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
         }else {
             //创建计划接口
             pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
@@ -88,7 +88,6 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
                 return map;
             }
         }
-        return map;
     }
 
     @Override
