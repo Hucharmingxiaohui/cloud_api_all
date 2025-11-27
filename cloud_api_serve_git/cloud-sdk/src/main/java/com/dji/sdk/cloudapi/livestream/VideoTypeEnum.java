@@ -21,7 +21,10 @@ public enum VideoTypeEnum {
 
     NORMAL("normal"),
 
-    IR("ir");
+    IR("ir"),
+
+    // 添加未知类型处理
+    UNKNOWN("unknown");
 
     private final String type;
 
@@ -34,9 +37,31 @@ public enum VideoTypeEnum {
         return type;
     }
 
+//    @JsonCreator
+//    public static VideoTypeEnum find(String videoType) {
+//        return Arrays.stream(values()).filter(typeEnum -> typeEnum.type.equals(videoType)).findAny()
+//                .orElseThrow(() -> new CloudSDKException(VideoTypeEnum.class , videoType));
+//    }
+
     @JsonCreator
     public static VideoTypeEnum find(String videoType) {
-        return Arrays.stream(values()).filter(typeEnum -> typeEnum.type.equals(videoType)).findAny()
-                .orElseThrow(() -> new CloudSDKException(VideoTypeEnum.class , videoType));
+        // 处理空值、空数组等情况
+        if (videoType == null || videoType.trim().isEmpty() || "[]".equals(videoType)) {
+            return UNKNOWN;
+        }
+
+        return Arrays.stream(values())
+                .filter(typeEnum -> typeEnum.type.equals(videoType))
+                .findAny()
+                .orElse(UNKNOWN); // 返回 UNKNOWN 而不是抛出异常
+    }
+
+    // 可选：添加一个安全查找方法，不抛出异常
+    public static VideoTypeEnum safeFind(String videoType) {
+        try {
+            return find(videoType);
+        } catch (Exception e) {
+            return UNKNOWN;
+        }
     }
 }

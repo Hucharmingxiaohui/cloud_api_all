@@ -56,7 +56,8 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     //创建计划
     @Override
-    public boolean createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+    public Map<String,Object> createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+        Map map=new HashMap();
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
 //      如果是风机计划则调用创建风机航线接口
         if(planType==1){
@@ -78,13 +79,16 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
             PubWaylineJobPlanDfEntity entity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
                     eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
             if(entity!=null){//plan_id重复
-                return false;
+                map.put("result",false);
+                return map;
             }else{//plan_id不重复
                 pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
-                return true;
+                map.put("result",true);
+                map.put("plan",pubWaylineJobPlanDfEntity);
+                return map;
             }
         }
-        return true;
+        return map;
     }
 
     @Override

@@ -24,34 +24,57 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
     @Resource
     private MqttPahoMessageDrivenChannelAdapter adapter;
 
+    // 添加同步锁防止竞态条件
+    private final Object subscribeLock = new Object();
+
     @Override
     public void subscribe(String... topics) {
-        Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
-        for (String topic : topics) {
-            if (topicSet.contains(topic)) {
-                return;
+        synchronized (subscribeLock) {
+            String[] subscribedTopics = getSubscribedTopic();
+            Set<String> topicSet = subscribedTopics != null ?
+                    new HashSet<>(Arrays.asList(subscribedTopics)) : new HashSet<>();
+
+            for (String topic : topics) {
+                if (topicSet.contains(topic)) {
+                    log.debug("主题已订阅，跳过: {}", topic);
+                    continue;
+                }
+                subscribe(topic, 1);
             }
-            subscribe(topic, 1);
         }
     }
 
     @Override
     public void subscribe(String topic, int qos) {
-        Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
-        if (topicSet.contains(topic)) {
-            return;
+        synchronized (subscribeLock) {
+            String[] subscribedTopics = getSubscribedTopic();
+            Set<String> topicSet = subscribedTopics != null ?
+                    new HashSet<>(Arrays.asList(subscribedTopics)) : new HashSet<>();
+
+            if (topicSet.contains(topic)) {
+                log.debug("主题已订阅，跳过: {}", topic);
+                return;
+            }
+            log.info("订阅主题: {}", topic);
+            adapter.addTopic(topic, qos);
         }
-        log.debug("subscribe topic: {}", topic);
-        adapter.addTopic(topic, qos);
     }
 
     @Override
     public void unsubscribe(String... topics) {
-        log.debug("unsubscribe topic: {}", Arrays.toString(topics));
-        adapter.removeTopic(topics);
+        synchronized (subscribeLock) {
+            log.info("取消订阅主题: {}", Arrays.toString(topics));
+            adapter.removeTopic(topics);
+        }
     }
 
     public String[] getSubscribedTopic() {
-        return adapter.getTopic();
+        try {
+            String[] topics = adapter.getTopic();
+            return topics != null ? topics : new String[0];
+        } catch (Exception e) {
+            log.warn("获取已订阅主题失败: {}", e.getMessage());
+            return new String[0];
+        }
     }
 }

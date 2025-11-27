@@ -12,7 +12,7 @@ import java.util.Map;
 
 public interface PubWaylineJobPlanDfService {
     //创建计划
-    boolean createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
+    Map<String,Object> createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
     //  根据点位获取航线及航点信息
     Map<Integer,String> getWaylineByPoint(Integer deviceLevel, String deviceList);
 //    根据航线预置位获取航线id(逗号隔开）

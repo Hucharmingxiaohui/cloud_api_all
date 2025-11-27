@@ -27,17 +27,22 @@ public class PubWaylineJobPlanDfControl {
     private RedisUtils redisUtils;
 
     @PostMapping("/createWaylinePlan")
-    HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity)
-    {
+    HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
         CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
         String workspaceId = customClaim.getWorkspaceId();
         String creator = customClaim.getUsername();
 //      为了后续风机航线创建任务
         redisUtils.set("workspaceId", workspaceId);
         redisUtils.set("creator", creator);
-        boolean flag=pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
-        if(flag){
-           return HttpResultResponse.success().setMessage("创建飞行计划成功");
+        Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
+        boolean result = (boolean) waylineJObPlan.get("result");
+        if(result){
+            PubWaylineJobPlanDfEntity plan = (PubWaylineJobPlanDfEntity)waylineJObPlan.get("plan");
+//          定时任务则立即执行
+            if(plan.getTaskType()==1){
+                pubWaylineJobPlanDfService.expressPlan(customClaim,plan);
+            }
+            return HttpResultResponse.success().setMessage("创建飞行计划成功");
         }else{
            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
         }
@@ -98,25 +103,25 @@ public class PubWaylineJobPlanDfControl {
 
 
     // 初级版本（启用）
-    @PostMapping("/createWaylinePlan2")
-    HttpResultResponse createWaylinePlan2(@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity)
-    {
-        Map<Integer, String> waylineByPoint = pubWaylineJobPlanDfService.
-                getWaylineByPoint(pubWaylineJobPlanDfEntity.getDeviceLevel(), pubWaylineJobPlanDfEntity.getDeviceList());
-        Map<String, String> waylineIdByPos = pubWaylineJobPlanDfService.getWaylineIdByPos(waylineByPoint);
-        boolean flag = true;
-        for (Map.Entry<String, String> entry : waylineIdByPos.entrySet()) {
-            pubWaylineJobPlanDfEntity.setFileId(entry.getKey());
-            pubWaylineJobPlanDfEntity.setWaylinePointPos(entry.getValue());
-            boolean waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
-            flag = flag && waylineJObPlan;
-        }
-        if(flag){
-            return HttpResultResponse.success().setMessage("创建飞行计划成功");
-        }else{
-            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
-        }
-    }
+//    @PostMapping("/createWaylinePlan2")
+//    HttpResultResponse createWaylinePlan2(@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity)
+//    {
+//        Map<Integer, String> waylineByPoint = pubWaylineJobPlanDfService.
+//                getWaylineByPoint(pubWaylineJobPlanDfEntity.getDeviceLevel(), pubWaylineJobPlanDfEntity.getDeviceList());
+//        Map<String, String> waylineIdByPos = pubWaylineJobPlanDfService.getWaylineIdByPos(waylineByPoint);
+//        boolean flag = true;
+//        for (Map.Entry<String, String> entry : waylineIdByPos.entrySet()) {
+//            pubWaylineJobPlanDfEntity.setFileId(entry.getKey());
+//            pubWaylineJobPlanDfEntity.setWaylinePointPos(entry.getValue());
+//            boolean waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
+//            flag = flag && waylineJObPlan;
+//        }
+//        if(flag){
+//            return HttpResultResponse.success().setMessage("创建飞行计划成功");
+//        }else{
+//            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
+//        }
+//    }
 
 
     public static void main(String[] args) {
