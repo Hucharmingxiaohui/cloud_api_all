@@ -103,7 +103,7 @@ const onSubmit = async (e: any) => {
       localStorage.setItem(ELocalStorageKey.User_Type, result.data.user_type)
       loading.value = true
       // 跳转到成员页面
-      localStorage.setItem(STORAGE_KEY, '2')
+      localStorage.setItem(STORAGE_KEY, 'devices')
       root.$router.push(ERouterName.DEVICES)
     } else {
       loading.value = false
