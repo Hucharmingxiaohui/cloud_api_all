@@ -2,6 +2,8 @@ package com.dji.sample.df.wind.service;
 
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 
+import java.util.Map;
+
 public interface RoutePlanService {
 //     void flyToFront(String name, Double yaw);
 //   飞向中间点
@@ -11,5 +13,5 @@ public interface RoutePlanService {
 //   停机巡检
      void stopWayline(String name, Double yaw);
 
-     boolean buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
+     Map<String,Object> buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
 }

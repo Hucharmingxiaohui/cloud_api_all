@@ -195,7 +195,7 @@ public abstract class AbstractWaylineService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_RETURN_HOME_INFO, outputChannel = ChannelName.OUTBOUND_EVENTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
-    public TopicRequestsResponse<MqttReply> returnHomeInfo(TopicRequestsRequest<ReturnHomeInfo> request, MessageHeaders headers) {
+    public TopicRequestsResponse<MqttReply> returnHomeInfo(TopicEventsRequest<ReturnHomeInfo> request, MessageHeaders headers) {
         throw new UnsupportedOperationException("returnHomeInfo not implemented");
     }
 
