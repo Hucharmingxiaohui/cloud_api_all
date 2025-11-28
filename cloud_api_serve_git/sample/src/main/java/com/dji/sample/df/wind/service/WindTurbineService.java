@@ -40,7 +40,7 @@ public interface WindTurbineService  extends IService<WindTurbine> {
      * 查询所有风机参数
      * @return 风机参数列表
      */
-    List<WindTurbine> selectList(Map map);
+    Map<String,Object> selectList(Map map);
 
     WindTurbine selectByName(String name);
 }

@@ -7,6 +7,7 @@ import com.dji.sdk.common.PaginationData;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -67,7 +68,7 @@ public interface IWaylineJobService {
      * @param pageSize
      * @return
      */
-    PaginationData<WaylineJobDTO> getJobsByWorkspaceId(String workspaceId, long page, long pageSize);
+    PaginationData<WaylineJobDTO> getJobsByWorkspaceId(String workspaceId, long page, long pageSize, Map map);
 
     /**
      * Query the wayline execution status of the dock.

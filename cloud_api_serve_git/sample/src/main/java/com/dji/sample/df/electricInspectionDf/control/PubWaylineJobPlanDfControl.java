@@ -51,8 +51,8 @@ public class PubWaylineJobPlanDfControl {
     @GetMapping("/plan_type/{plan_type}/getPlanByPlantype")
     public HttpResultResponse<PaginationData<PubWaylineJobPlanDfEntity>> getPlanByPlantype(@RequestParam(defaultValue = "1") Long page,
                                                                                           @RequestParam(name = "page_size", defaultValue = "10") Long pageSize,
-                                                                                          @PathVariable(name = "plan_type") String plan_type) {
-        PaginationData<PubWaylineJobPlanDfEntity> data = pubWaylineJobPlanDfService.getPlanByPlantype(plan_type, page, pageSize);
+                                                                                          @PathVariable(name = "plan_type") String plan_type,@RequestParam Map map) {
+        PaginationData<PubWaylineJobPlanDfEntity> data = pubWaylineJobPlanDfService.getPlanByPlantype(plan_type, page, pageSize,map);
         return HttpResultResponse.success(data).setMessage("成功查询到飞行计划信息");
     }
 

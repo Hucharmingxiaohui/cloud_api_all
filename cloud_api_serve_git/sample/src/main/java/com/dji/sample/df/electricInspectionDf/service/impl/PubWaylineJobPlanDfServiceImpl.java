@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.df.server.dto.JobPlan.JobPlanItemPointDTO;
 import com.df.server.mapper.uni.UniPointMapper;
+import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
@@ -150,14 +151,46 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     }
 
     @Override
-    public PaginationData<PubWaylineJobPlanDfEntity> getPlanByPlantype(String plan_type, long page, long pageSize) {
+    public PaginationData<PubWaylineJobPlanDfEntity> getPlanByPlantype(String plan_type, long page, long pageSize,Map map) {
+        // 构建查询条件
+        LambdaQueryWrapper<PubWaylineJobPlanDfEntity> queryWrapper = new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanType, plan_type);
+
+        // 动态添加 planId 条件
+        if (map != null && map.containsKey("planId")) {
+            String planId = map.get("planId").toString();
+            if (StringUtils.isNotBlank(planId)) {
+                queryWrapper.eq(PubWaylineJobPlanDfEntity::getPlanId, planId);
+            }
+        }
+
+        // 动态添加 name 条件（模糊查询）
+        if (map != null && map.containsKey("name")) {
+            String name = map.get("name").toString();
+            if (StringUtils.isNotBlank(name)) {
+                queryWrapper.like(PubWaylineJobPlanDfEntity::getName, name);
+            }
+        }
+
+        // 动态添加执行方式
+        if (map != null && map.containsKey("taskType")) {
+            String taskType = map.get("taskType").toString();
+            if (StringUtils.isNotBlank(taskType)) {
+                queryWrapper.eq(PubWaylineJobPlanDfEntity::getTaskType, taskType);
+            }
+        }
+
+        // 排序
+        queryWrapper.orderByDesc(PubWaylineJobPlanDfEntity::getId);
+
+        // 执行分页查询
         Page<PubWaylineJobPlanDfEntity> pageData = pubWaylineJobPlanDfMapper.selectPage(
                 new Page<PubWaylineJobPlanDfEntity>(page, pageSize),
-                new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                        .eq(PubWaylineJobPlanDfEntity::getPlanType, plan_type)
-                        .orderByDesc(PubWaylineJobPlanDfEntity::getId));
+                queryWrapper);
+
         List<PubWaylineJobPlanDfEntity> records = pageData.getRecords();
-        return new PaginationData<PubWaylineJobPlanDfEntity>(records, new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
+        return new PaginationData<PubWaylineJobPlanDfEntity>(records,
+                new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
     }
 
 

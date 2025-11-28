@@ -30,6 +30,7 @@ import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.manage.model.dto.DeviceDictionaryDTO;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.IWaylineFileService;
 import com.dji.sdk.cloudapi.device.DeviceEnum;
@@ -158,7 +159,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     }
 
     @Override
-    public List<MediaFileDTO> getFilesByJobId( String jobId) {
+    public List<MediaFileDTO> getFilesByJobId(String jobId) {
         return mapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
                 .eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId))
                 .stream()

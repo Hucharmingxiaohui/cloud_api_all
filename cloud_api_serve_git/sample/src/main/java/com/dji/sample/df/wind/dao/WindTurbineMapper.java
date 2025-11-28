@@ -11,4 +11,6 @@ import java.util.Map;
 public interface WindTurbineMapper extends BaseMapper<WindTurbine> {
 
     List<WindTurbine> selectList(Map map);
+
+    int selectListCount(Map map);
 }

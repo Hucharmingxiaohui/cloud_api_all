@@ -8,6 +8,7 @@ import com.dji.sdk.common.PaginationData;
 
 import java.net.URL;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author sean

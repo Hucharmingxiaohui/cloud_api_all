@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -62,10 +63,18 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
     }
 
     @Override
-    public List<WindTurbine> selectList(Map map) {
+    public Map<String,Object> selectList(Map map) {
         PageUtil.setPageArgs(map);
         List<WindTurbine> windTurbines = windTurbineMapper.selectList(map);
-        return windTurbines;
+        int count = windTurbineMapper.selectListCount(map);
+        Map result = new HashMap();
+        Map pagination = new HashMap();
+        pagination.put("page",Integer.parseInt(map.get("page").toString()));
+        pagination.put("pageSize",Integer.parseInt(map.get("pageSize").toString()));
+        pagination.put("total",count);
+        result.put("list", windTurbines);
+        result.put("pagination", pagination);
+        return result;
     }
 
     @Override

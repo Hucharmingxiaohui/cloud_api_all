@@ -21,4 +21,22 @@
             LIMIT ${startPos}, ${pageSize}
         </if>
     </select>
+
+
+    <select id="selectListCount" resultType="int">
+        SELECT count(*) FROM manage_fan
+        <where>
+            <if test="turbineName!=null and turbineName!=''">
+                and turbine_name LIKE concat('%', #{turbineName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="id!=null and id!=''">
+                and id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
 </mapper>

@@ -207,18 +207,38 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
     }
 
     @Override
-    public PaginationData<WaylineJobDTO> getJobsByWorkspaceId(String workspaceId, long page, long pageSize) {
+    public PaginationData<WaylineJobDTO> getJobsByWorkspaceId(String workspaceId, long page, long pageSize, Map map) {
+        // 构建查询条件
+        LambdaQueryWrapper<WaylineJobEntity> queryWrapper = new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getWorkspaceId, workspaceId);
+        // 动态添加 name 条件（模糊查询）
+        if (map != null && map.containsKey("name")) {
+            String name = map.get("name").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(name)) {
+                queryWrapper.like(WaylineJobEntity::getName, name);
+            }
+        }
+        // 动态添加 taskType 条件（精确匹配）
+        if (map != null && map.containsKey("taskType")) {
+            String taskType = map.get("taskType").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(taskType)) {
+                queryWrapper.eq(WaylineJobEntity::getTaskType, taskType);
+            }
+        }
+        // 排序
+        queryWrapper.orderByDesc(WaylineJobEntity::getId);
+        // 执行分页查询
         Page<WaylineJobEntity> pageData = mapper.selectPage(
                 new Page<WaylineJobEntity>(page, pageSize),
-                new LambdaQueryWrapper<WaylineJobEntity>()
-                        .eq(WaylineJobEntity::getWorkspaceId, workspaceId)
-                        .orderByDesc(WaylineJobEntity::getId));
+                queryWrapper);
+
         List<WaylineJobDTO> records = pageData.getRecords()
                 .stream()
                 .map(this::entity2Dto)
                 .collect(Collectors.toList());
 
-        return new PaginationData<WaylineJobDTO>(records, new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
+        return new PaginationData<WaylineJobDTO>(records,
+                new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
     }
 
     private WaylineJobEntity dto2Entity(WaylineJobDTO dto) {

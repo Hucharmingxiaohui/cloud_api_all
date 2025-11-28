@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Set;
 
 import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
@@ -62,8 +63,8 @@ public class WaylineJobController {
     @GetMapping("/{workspace_id}/jobs")
     public HttpResultResponse<PaginationData<WaylineJobDTO>> getJobs(@RequestParam(defaultValue = "1") Long page,
                                                                      @RequestParam(name = "page_size", defaultValue = "10") Long pageSize,
-                                                                     @PathVariable(name = "workspace_id") String workspaceId) {
-        PaginationData<WaylineJobDTO> data = waylineJobService.getJobsByWorkspaceId(workspaceId, page, pageSize);
+                                                                     @PathVariable(name = "workspace_id") String workspaceId,@RequestParam Map map) {
+        PaginationData<WaylineJobDTO> data = waylineJobService.getJobsByWorkspaceId(workspaceId, page, pageSize,map);
         return HttpResultResponse.success(data);
     }
 

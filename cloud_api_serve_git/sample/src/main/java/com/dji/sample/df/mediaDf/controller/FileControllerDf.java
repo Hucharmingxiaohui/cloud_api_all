@@ -5,7 +5,9 @@ import com.dji.sample.df.mediaDf.model.JobIdEntity;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
+import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
+import com.dji.sdk.common.Pagination;
 import com.dji.sdk.common.PaginationData;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author sean
@@ -100,9 +103,38 @@ public class FileControllerDf {
     }
 
     @GetMapping("/getMediaFileByJobId")
-    public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id) throws Exception {
-        List<MediaFileDTO> mediaFileDTOS = fileService.getMediaDileByJobId3(job_id, workspace_id);
-        return HttpResultResponse.success(mediaFileDTOS).setMessage("查询任务结果成功");
+    public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id,@RequestParam(defaultValue = "1") Long page,
+                                                  @RequestParam(defaultValue = "10") Long pageSize,@RequestParam Map map) throws Exception {
+        List<MediaFileDTO> allFiles = fileService.getMediaDileByJobId3(job_id, workspace_id);
+        // 条件过滤
+        List<MediaFileDTO> filteredFiles = allFiles.stream()
+                .filter(file -> {
+                    boolean match = true;
+                    // 文件名模糊查询
+                    if (map.containsKey("fileName") && map.get("fileName") != null) {
+                        String fileName = map.get("fileName").toString();
+                        if (file.getFileName() != null) {
+                            match = match && file.getFileName().contains(fileName);
+                        } else {
+                            match = false;
+                        }
+                    }
+                    return match;
+                })
+                .collect(Collectors.toList());
+        // 内存分页
+        int total = filteredFiles.size();
+        int fromIndex = (int) ((page - 1) * pageSize);
+        int toIndex = (int) Math.min(fromIndex + pageSize, total);
+        if (fromIndex >= total) {
+            fromIndex = 0;
+            toIndex = 0;
+        }
+        List<MediaFileDTO> pageList = filteredFiles.subList(fromIndex, toIndex);
+        // 构建分页结果
+        PaginationData<MediaFileDTO> result = new PaginationData<>(pageList,
+                new Pagination(page, pageSize, total));
+        return HttpResultResponse.success(result).setMessage("查询任务结果成功");
     }
 
 

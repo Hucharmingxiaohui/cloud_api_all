@@ -66,11 +66,9 @@ public class WindTurbineController {
      * 查询风机列表
      */
     @GetMapping("selectList")
-    public Result<List<WindTurbine>> selectList(@RequestParam Map <String, Object> map) {
-        List<WindTurbine> list = windTurbineService.selectList(map);
-//        fjReportService.genPatrolTaskWordNew(1,null,null);
-//        routePlan.flyToFront("风机H",195.0);
-        return Result.success(list);
+    public Result<Map> selectList(@RequestParam Map <String, Object> map) {
+        Map<String, Object> stringObjectMap = windTurbineService.selectList(map);
+        return Result.success(stringObjectMap);
     }
 
 }
