@@ -1329,7 +1329,7 @@ function isOk (res: any) {
 // ========== 触发：电量==88 且未成功过 ==========
 watchEffect(async () => {
   if (autoRthDone.value) return
-  if (batteryPct.value !== 93) return
+  if (batteryPct.value !== 30) return
   if (!rthItem.value || rthItem.value.loading) return
 
   const now = Date.now()
