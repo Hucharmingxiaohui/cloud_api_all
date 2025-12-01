@@ -23,6 +23,7 @@
           <el-option value="0" label="立即执行"></el-option>
           <el-option value="1" label="定时执行"></el-option>
         </el-select>
+        </el-form-item>
         <el-form-item>
             <!-- 查询按钮 -->
             <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
