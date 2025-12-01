@@ -68,8 +68,8 @@ export async function getTaskResultById (job_id: string, workspace_id:string, wa
 }
 
 // 根据任务id和航线id查询结果飞行结果 改
-export async function getFlyTaskResultApi (job_id: string, workspace_id:string, wayline_id:string): Promise<IWorkspaceResponse<{}>> {
-  const url = `${HTTP_PREFIX}/files/getMediaFileByJobId?job_id=${job_id}&workspace_id=${workspace_id}&wayline_id=${wayline_id}`
+export async function getFlyTaskResultApi (data): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/files/getMediaFileByJobId?job_id=${data.job_id}&workspace_id=${data.workspace_id}&wayline_id=${data.wayline_id}&page=${data.page}&pageSize=${data.pageSize}&fileName=${data.fileName}`
   const result = await request.get(url)
   return result.data
 }

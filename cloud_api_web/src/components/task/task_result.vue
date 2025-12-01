@@ -1,36 +1,6 @@
 <template>
   <div class="container1">
     <div class="operation">
-      <!-- 场站/线路选择框 -->
-      <div style="margin: 0 10px;">
-        <el-select
-          v-model="selectedScheme"
-          placeholder="所有类型"
-          class="select-operation"
-          style="width: 200px;"
-        >
-          <el-option label="所有类型1" value="所有类型1"></el-option>
-          <el-option label="所有类型2" value="所有类型2"></el-option>
-          <el-option label="所有类型3" value="所有类型3"></el-option>
-        </el-select>
-      </div>
-
-      <div>
-        <el-input
-          v-model="searchTerm"
-          placeholder="请输入名称搜索"
-          style="width: 200px;"
-        ></el-input>
-      </div>
-      <!-- 查询按钮 -->
-      <el-button
-        class="new_btn iconfont icon-chaxunhangxian"
-        type="primary"
-        style="margin-left: 30px; width: 70px;"
-      >
-        <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
-        <span style="margin-left: 5px; font-size: 14px;">查询</span>
-      </el-button>
       <el-button
         class="new_btn2"
         type="primary"
@@ -57,7 +27,7 @@
     </div>
     <div class="content" v-loading="loading">
       <div class="table-container">
-        <el-table :data="paginatedData" stripe>
+        <el-table :data="mediaData.data" stripe>
           <!-- 多选框 -->
           <el-table-column type="selection" width="55" />
           <!-- 序号列 -->
@@ -125,10 +95,10 @@
         <el-pagination
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
-          :current-page="currentPage"
-          :page-sizes="[10, 20, 40, 100]"
-          :page-size="pageSize"
-          :total="totalItems"
+          :current-page="paginationProp.current"
+          :page-sizes="paginationProp.pageSizeOptions"
+          :page-size="paginationProp.pageSize"
+          :total="paginationProp.total"
           layout="total, sizes, prev, pager, next, jumper"
         >
         </el-pagination>
@@ -445,13 +415,19 @@ import { consoleLog } from '/@/utils/logger'
 import { message } from 'ant-design-vue'
 import { renderAsync } from 'docx-preview'
 import { ElMessage } from 'element-plus'
-const router = useRouter()
-const searchTerm = ref('') // 存储搜索关键字
-const selectedScheme = ref<string | null>(null)
-const { formatTaskTime } = useFormatTask()
 const viewReportVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
+
+const paginationProp = reactive({
+  pageSizeOptions: ['10', '20', '40'],
+  showQuickJumper: true,
+  showSizeChanger: true,
+  pageSize: 10,
+  current: 1,
+  total: 0
+})
+
 // ===========================================================请求数据===========================================================================================
 const jobInfo = reactive({
   job_id: '',
@@ -478,9 +454,6 @@ onMounted(() => {
   jobInfo.file_id = data.file_id
 
   getFiles()
-  // setTimeout(() => {
-  //   downloadMedia(mediaData.data[0].file_id, mediaData.data[0].file_name)
-  // }, 1000)
 })
 
 interface MediaFile {
@@ -569,33 +542,18 @@ async function viewReport () {
  * */
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 async function getFiles () {
-  // getTaskResultById(jobInfo.job_id, workspaceId, jobInfo.file_id).then(res => {
-  //   mediaData.data = transformData(res.data)
-  //   // console.log('原任务结果', mediaData.data)
-  //   getUrls()
-  // })
-  getFlyTaskResultApi(jobInfo.job_id, workspaceId, jobInfo.file_id).then(res => {
-    mediaData.data = res.data
-    console.log('原任务结果', res)
+  getFlyTaskResultApi({
+    job_id: jobInfo.job_id,
+    workspace_id: workspaceId,
+    fileName: jobInfo.file_name,
+    page: paginationProp.current,
+    pageSize: paginationProp.pageSize
+  }).then(res => {
+    mediaData.data = res.data.list
+    paginationProp.total = res.data.pagination.total
     getUrls()
   })
 }
-// 获取图片的下载路径
-// async function getUrls () {
-//   for (const item of mediaData.data) {
-//     // const url = null
-//     // const Temp = null
-//     // const height = null
-//     // const width = null
-//     // const fileSizeInMB = null
-//     // 解构赋值获取url、width和height
-
-//     const { url: mediaUrl } = await downloadThumbnailInfo(item.file_id, item.file_name)
-
-//     // 将返回的值赋给item
-//     item.url = mediaUrl
-//   }
-// }
 
 async function getUrls () {
   for (const item of mediaData.data) {
@@ -1066,14 +1024,7 @@ const body: IPage = {
   total: 0,
   page_size: 5
 }
-const paginationProp = reactive({
-  pageSizeOptions: ['20', '15', '20'],
-  showQuickJumper: true,
-  showSizeChanger: true,
-  pageSize: 5,
-  current: 1,
-  total: 0
-})
+
 type Pagination = TableState['pagination']
 
 // 表格数据
@@ -1082,21 +1033,14 @@ const plansData = reactive({
   selectedTasks: [] as Task[], // 用户选中的任务
 })
 
-const open = ref<boolean>(false)
 // ===========================================================前端分页功能实现==================================================
-const currentPage = ref(1)
-const pageSize = ref(10)
-const totalItems = computed(() => mediaData.data.length)
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return mediaData.data.slice(start, end)
-})
-const handleCurrentChange = (newPage) => {
-  currentPage.value = newPage
+function handleSizeChange (val: number) {
+  paginationProp.pageSize = val
+  getFiles()
 }
-const handleSizeChange = (newSize) => {
-  pageSize.value = newSize
+function handleCurrentChange (val: number) {
+  paginationProp.current = val
+  getFiles()
 }
 // ============================================================分页数据==========================================================
 // 分页事件

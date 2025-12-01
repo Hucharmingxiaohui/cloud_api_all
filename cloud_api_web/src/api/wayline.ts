@@ -268,8 +268,8 @@ export const DistributeFlyPlan = async function (data: FlightTestPlan): Promise<
 }
 
 // 查询航线计划
-export const getFlyWaylinePlan = async function (plan_type: string, page: IPage): Promise<IWorkspaceResponse<any>> {
-  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${plan_type}/getPlanByPlantype?page=${page.page}&page_size=${page.page_size}`
+export const getFlyWaylinePlan = async function (data: any): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${data.planType}/getPlanByPlantype?page=${data.page}&page_size=${data.page_size}&name=${data.name}&planId=${data.planId}`
   const result = await request.get(url)
   return result.data
 }

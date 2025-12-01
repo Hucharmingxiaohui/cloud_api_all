@@ -7,13 +7,13 @@
       <!-- 查询按钮 -->
       <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 100px;"
         @click="SearchWayline">
-        <span style="margin-left: 5px; font-size: 14px;">查询航线</span>
+        <span style="margin-left: 5px; font-size: 14px;">查询</span>
       </el-button>
-      <!-- 新建按钮 -->
-      <!-- <el-button class="new_btn iconfont icon-xinjianhangxian" type="primary" style="margin-left: 10px; width: 100px;"
-        @click="selectDroneModel">
-        <span style="margin-left: 5px; font-size: 14px;">新建航线</span>
-      </el-button> -->
+
+      <el-button class="new_btn" type="primary" @click="ResetWayline">
+        <span style="margin-left: 5px; font-size: 14px;">重置</span>
+      </el-button>
+
       <router-link to="/wayline/Model">
         <el-button class="new_btn iconfont icon-xinjianhangxian" type="primary" style="margin-left: 10px; width: 100px;">
           <span style="margin-left: 5px; font-size: 14px;">三维航线</span>

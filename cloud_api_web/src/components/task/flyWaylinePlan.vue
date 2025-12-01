@@ -13,10 +13,21 @@
             class="custom-input"
           ></el-input>
         </el-form-item>
+        <el-form-item label="计划类型:" prop="planId">
+          <el-select
+            v-model="queryForm.taskType"
+            placeholder="请选择类型"
+            :teleported='false'
+            class="select-operation"
+          >
+          <el-option value="0" label="立即执行"></el-option>
+          <el-option value="1" label="定时执行"></el-option>
+        </el-select>
+        </el-form-item>
         <el-form-item>
             <!-- 查询按钮 -->
             <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
-              @click="queryPoint">查询
+              @click="getPlan">查询
             </el-button>
             <!-- 重置按钮 -->
             <el-button class="new_btn1 iconfont icon-zhongzhi-" type="primary" style="margin-left: 10px" @click="reset">重置
@@ -131,7 +142,8 @@ type Pagination = TableState['pagination']
 
 const queryForm = reactive({
   name: '',
-  planId: ''
+  planId: '',
+  taskType: '', // 计划类型 执行方式：0立即1定时
 })
 
 onMounted(() => {
@@ -141,7 +153,7 @@ onMounted(() => {
 // 查询航线飞行计划  0普通航线计划  1 风机计划
 const tableData = ref([])
 function getPlan () {
-  getFlyWaylinePlan('0', body).then(res => {
+  getFlyWaylinePlan({ ...body, ...queryForm }).then(res => {
     if (res.code !== 0) {
       return
     }
@@ -155,6 +167,7 @@ function getPlan () {
 function reset () {
   queryForm.name = ''
   queryForm.planId = ''
+  queryForm.taskType = ''
   getPlan()
 }
 
@@ -239,7 +252,7 @@ function refreshData (page: Pagination) {
 // 下拉框
 .select-operation {
   :deep(.el-select__placeholder) {
-    color: rgba(255, 255, 255, 1);
+    color: rgb(182, 182, 182);
     font-size: 14px;
     font-family: Google Sans-Medium;
     font-weight: 500;
@@ -569,6 +582,9 @@ function refreshData (page: Pagination) {
 :deep .el-pagination .el-pager li:not(.active):not(.disabled) {
   background-color: #062254 !important;
   color: #fff;
+}
+:deep(.el-pager li.is-active){
+  color:#11B4FB !important;
 }
 
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {

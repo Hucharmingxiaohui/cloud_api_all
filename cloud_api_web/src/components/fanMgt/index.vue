@@ -51,22 +51,27 @@
       <div class="table-container">
         <el-table :data="tableData" stripe>
           <el-table-column type="index"  align="center" label="序号" width="60" />
-          <el-table-column label="风机名称" width="200">
+          <el-table-column label="风机ID" align="center"  width="150">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.id }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="风机名称" align="center" width="150">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.turbine_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场经度" >
+          <el-table-column label="机场经度" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场纬度" >
+          <el-table-column label="机场纬度" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="机场海拔(米)" >
+          <el-table-column label="机场海拔(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.airport_altitude }}</div>
             </template>
@@ -76,22 +81,22 @@
               <div class="ellipsis">{{ scope.row.approach_yaw }}</div>
             </template>
           </el-table-column> -->
-          <el-table-column label="最高点经度" >
+          <el-table-column label="最高点经度" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点纬度" >
+          <el-table-column label="最高点纬度" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="最高点海拔(米)" >
+          <el-table-column label="最高点海拔(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.peak_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="叶片中心高度(米)" >
+          <el-table-column label="叶片中心高度(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_center_height }}</div>
             </template>
@@ -101,27 +106,27 @@
               <div class="ellipsis">{{ scope.row.blade_stop_angle }}</div>
             </template>
           </el-table-column> -->
-          <el-table-column label="叶片长度(米)" >
+          <el-table-column label="叶片长度(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_length }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="无人机距离(米)" >
+          <el-table-column label="无人机距离(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.uav_blade_distance }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="风机底部高度(米)" >
+          <el-table-column label="风机底部高度(米)" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_bottom_height }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="单个扇叶的点数" >
+          <el-table-column label="单个扇叶的点数" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.blade_points }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="塔筒的点数" >
+          <el-table-column label="塔筒的点数" align="center">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.tower_points }}</div>
             </template>
@@ -135,12 +140,20 @@
               <el-button link type="danger" @click="handleDelete(scope.row)"
                 >删除</el-button
               >
-              <el-button link type="primary" @click="handleTask(scope.row)"
+              <!-- <el-button link type="primary" @click="handleTask(scope.row)"
                 >执行任务</el-button
-              >
+              > -->
             </template>
           </el-table-column>
         </el-table>
+      </div>
+      <div class="pagination-container">
+        <!-- 分页 -->
+        <el-pagination v-model:current-page="paginationProp.pageNo" v-model:page-size="paginationProp.pageSize"
+          :page-sizes="paginationProp.pageSizeOptions" :total="paginationProp.total"
+          layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
+          @current-change="handleCurrentChange">
+        </el-pagination>
       </div>
     </div>
     <!-- 新增弹窗 -->
@@ -433,13 +446,9 @@
 
 <script lang="ts" setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-// import { TableState } from 'ant-design-vue/lib/table/interface'
-// import { IPage } from '/@/api/http/type'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
 import { addWindTurbineConfigApi, executeFlyTaskApi, getAllWindTurbineApi, updateWindTurbineConfigApi, deleteWindTurbineApi } from '/@/api/turbine/turbineMgt'
-// import * as XLSX from 'xlsx'
-// import { message } from 'ant-design-vue'
 
 // 表单
 const queryForm = reactive({
@@ -450,6 +459,7 @@ const formRef = ref(null)
 const editFormRef = ref(null)
 
 const paginationProp = reactive({
+  pageSizeOptions: ['10', '20', '40'],
   pageSize: 10,
   pageNo: 1,
   total: 0
@@ -647,7 +657,8 @@ function getWindTurbineConfig () {
       if (res.code !== 0) {
         return
       }
-      tableData.value = res.data
+      tableData.value = res.data.list
+      paginationProp.total = res.data.pagination.total
     })
   } catch (error) {
 
@@ -681,6 +692,19 @@ async function handleTask (row) {
   } catch (error) {
 
   }
+}
+
+/**
+ * 分页查询
+ */
+
+function handleSizeChange (val: number) {
+  paginationProp.pageSize = val
+  getWindTurbineConfig()
+}
+function handleCurrentChange (val: number) {
+  paginationProp.pageNo = val
+  getWindTurbineConfig()
 }
 </script>
 
@@ -1194,8 +1218,11 @@ async function handleTask (row) {
 }
 
 :deep(.el-pagination.is-background .el-pager li:not(.is-disabled).is-active) {
-    background-color: #124AAD !important; //修改默认的背景色
+    background-color: #124AAD !important; // 修改默认的背景色
     color: #fff;
+}
+:deep(.el-pager li.is-active){
+  color:#11B4FB !important;
 }
 
 ::v-deep el-pager {

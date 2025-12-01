@@ -2,12 +2,34 @@
   <div class="container">
     <!-- <div class="header1">任务管理</div> -->
     <div class="operation">
-      <span class="label">航线名称:</span>
-      <el-input placeholder="请输入文件名称" class="custom-select" style="width: 200px;"></el-input>
-      <el-button class="new_btn1" type="primary" style="margin-left: 10px" >
-        <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" />
-        <span class="btn_text">查询</span>
-      </el-button>
+      <el-form :inline="true" :model="queryForm" label-position="right">
+        <el-form-item label="任务:">
+          <el-input v-model="queryForm.name" placeholder="请输入任务名称" class="custom-input" ></el-input>
+        </el-form-item>
+        <el-form-item label="计划类型:">
+          <el-select
+            v-model="queryForm.taskType"
+            placeholder="请选择类型"
+            :teleported='false'
+            class="select-operation"
+          >
+          <el-option value="0" label="立即执行"></el-option>
+          <el-option value="1" label="定时执行"></el-option>
+        </el-select>
+        </el-form-item>
+        <el-form-item>
+            <!-- 查询按钮 -->
+            <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
+              @click="getPlans">查询
+            </el-button>
+            <!-- 重置按钮 -->
+            <el-button class="new_btn1 iconfont icon-zhongzhi-" type="primary" style="margin-left: 10px" @click="reset">重置
+            </el-button>
+
+            <!-- 新建计划 -->
+            <el-button class="new_btn iconfont icon-xinjianjihua" type="primary" style="margin-left: 10px" @click="toCreatePlan('0')">新建计划</el-button>
+        </el-form-item>
+      </el-form>
 
     </div>
     <div class="content">
@@ -201,6 +223,11 @@ const taskAnalysisStatus = ref(new Map()) // Map<job_id, { status: 'analyzing' |
 const analyzingTasks = ref(new Set<string>()) // 存储正在分析的任务ID
 let analysisTimer: number | null = null // 定时器引用
 
+const queryForm = reactive({
+  name: '', // 任务名称
+  taskType: '', // 计划类型 执行方式：0立即1定时
+})
+
 const taskTypeLabels = {
   0: '立即任务',
   1: '定时任务',
@@ -314,7 +341,7 @@ function toTaskResult (val) {
  * 获取任务列表
  */
 function getPlans () {
-  getWaylineJobs(workspaceId, body).then(res => {
+  getWaylineJobs(workspaceId, { ...body, ...queryForm }).then(res => {
     if (res.code !== 0) {
       return
     }
@@ -322,6 +349,13 @@ function getPlans () {
     paginationProp.total = res.data.pagination.total
     paginationProp.current = res.data.pagination.page
   })
+}
+
+// 重置
+function reset () {
+  queryForm.name = ''
+  queryForm.taskType = ''
+  getPlans()
 }
 // ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------
 
@@ -654,7 +688,48 @@ function toTaskVideo (val: any) {
   flex-direction: column;
   /* 使子元素垂直排列 */
 }
+.select-operation {
+  :deep(.el-select__placeholder) {
+    color: rgb(182, 182, 182);
+    font-size: 14px;
+    font-family: Google Sans-Medium;
+    font-weight: 500;
+  }
 
+  :deep(.el-select__wrapper) {
+
+    // background: rgba(59, 116, 255, 0.15);
+    background-color: #0B2756;
+    // box-shadow: inset 0px 0px 2px 2px rgba(34, 135, 255, 0.5);
+    // box-shadow: 0px 0px 2px 2px rgba(34, 135, 255, 0.5);
+    // border: 1px solid #719fff;
+    // border-radius: 4px;
+    width: 200px;
+    height: 30px;
+  }
+
+  /**修改下拉图标颜色 */
+  :deep(.el-select__caret) {
+    color: #ffffff;
+  }
+
+  :deep(.el-select-dropdown) {
+    background: #012b78;
+    box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
+    border: 1px solid #719fff;
+  }
+
+  :deep(.el-select-dropdown__item) {
+    font-size: 14px;
+    font-weight: 500;
+    color: #ffffff;
+  }
+
+  :deep(.el-select-dropdown__item.is-hovering) {
+
+    background-color: skyblue;
+  }
+}
 .content {
   margin: 15px 12px 0 12px;
   max-height: calc(100vh - 300px);
@@ -745,22 +820,8 @@ function toTaskVideo (val: any) {
   // width: 100%;
   height: 60px;
   margin: 31px 12px 0 12px;
-
-  .label {
-    height: 60px;
-    display: flex;
-    /* 这个可以保留，确保子元素居中 */
-    align-items: center;
-    /* 垂直居中 */
-    justify-content: center;
-    /* 水平居中 */
-    color: rgba(255, 255, 255, 1);
-    font-size: 14px;
-    font-family: Google Sans-Medium;
-    font-weight: 500;
-    margin: 0 10px 0 30px;
-  }
-
+  padding-top: 15px;
+  padding-left: 15px;
   .new_btn {
     background-image: linear-gradient(180deg,
         rgba(70, 145, 217, 1) 0,
