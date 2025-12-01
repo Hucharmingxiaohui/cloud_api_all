@@ -132,8 +132,8 @@ type Pagination = TableState['pagination']
 const queryForm = reactive({
   name: '',
   planId: '',
-  taskType:'',
-  plan_type:'1'
+  taskType: '',
+  plan_type: '1'
 })
 
 onMounted(() => {

@@ -341,7 +341,6 @@ function toTaskResult (val) {
  * 获取任务列表
  */
 function getPlans () {
-  console.log('sssss12222', { ...body, ...queryForm })
   getWaylineJobs(workspaceId, { ...body, ...queryForm }).then(res => {
     if (res.code !== 0) {
       return
