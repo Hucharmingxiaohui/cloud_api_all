@@ -144,6 +144,7 @@ const queryForm = reactive({
   name: '',
   planId: '',
   taskType: '', // 计划类型 执行方式：0立即1定时
+  plan_type: '0'
 })
 
 onMounted(() => {

@@ -269,7 +269,7 @@ export const DistributeFlyPlan = async function (data: FlightTestPlan): Promise<
 
 // 查询航线计划
 export const getFlyWaylinePlan = async function (data: any): Promise<IWorkspaceResponse<any>> {
-  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${data.planType}/getPlanByPlantype?page=${data.page}&page_size=${data.page_size}&name=${data.name}&planId=${data.planId}`
+  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${data.plan_type}/getPlanByPlantype?page=${data.page}&page_size=${data.page_size}&name=${data.name}&planId=${data.planId}&taskType=${data.taskType}`
   const result = await request.get(url)
   return result.data
 }
@@ -335,8 +335,8 @@ export interface Task {
 }
 
 // 获取飞行任务
-export const getWaylineJobs = async function (workspaceId: string, page: IPage): Promise<IListWorkspaceResponse<Task>> {
-  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs?page=${page.page}&page_size=${page.page_size}`
+export const getWaylineJobs = async function (workspaceId: string, data: any): Promise<IListWorkspaceResponse<Task>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs?page=${data.page}&page_size=${data.page_size}&name=${data.name}&taskType=${data.taskType}`
   const result = await request.get(url)
   return result.data
 }

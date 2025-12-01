@@ -256,13 +256,13 @@ const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
 const body: IPage = {
   page: 1,
   total: 0,
-  page_size: 5
+  page_size: 10
 }
 const paginationProp = reactive({
-  pageSizeOptions: ['5', '10', '15'],
+  pageSizeOptions: ['10', '20', '40'],
   showQuickJumper: true,
   showSizeChanger: true,
-  pageSize: 5,
+  pageSize: 10,
   current: 1,
   total: 0
 })
@@ -341,6 +341,7 @@ function toTaskResult (val) {
  * 获取任务列表
  */
 function getPlans () {
+  console.log('sssss12222', { ...body, ...queryForm })
   getWaylineJobs(workspaceId, { ...body, ...queryForm }).then(res => {
     if (res.code !== 0) {
       return

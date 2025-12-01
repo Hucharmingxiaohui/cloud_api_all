@@ -13,7 +13,7 @@
             class="custom-input"
           ></el-input>
         </el-form-item>
-         <el-form-item label="计划类型:" prop="planId">
+         <el-form-item label="计划类型:" prop="taskType">
           <el-select
             v-model="queryForm.taskType"
             placeholder="请选择类型"
@@ -132,7 +132,8 @@ type Pagination = TableState['pagination']
 const queryForm = reactive({
   name: '',
   planId: '',
-  taskType:''
+  taskType:'',
+  plan_type:'1'
 })
 
 onMounted(() => {
@@ -142,7 +143,7 @@ onMounted(() => {
 // 查询航线飞行计划  0普通航线计划  1 风机计划
 const tableData = ref([])
 function getPlan () {
-  getFlyWaylinePlan('1', body).then(res => {
+  getFlyWaylinePlan({ ...body, ...queryForm }).then(res => {
     if (res.code !== 0) {
       return
     }
