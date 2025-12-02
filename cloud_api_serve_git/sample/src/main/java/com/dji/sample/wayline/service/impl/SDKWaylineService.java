@@ -186,6 +186,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                         // 写发送逻辑
 //                        String url = "http://172.20.63.157:5002/state";
                         String url = waylineUrlConfig.getWaylineStateUrl();
+                        log.info("url为："+url);
                         JSONObject jsonObject = new JSONObject();
                         jsonObject.put("waylineType", "flightTask");
                         jsonObject.put("status", statusEnum);
@@ -256,7 +257,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                 .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId")));
         if(fanWaylinePoints!=null){
             Integer jobType = fanWaylinePoints.getJobType();
-            if (jobType == 1) {
+            if (jobType == 1|| fanWaylinePoints.getVideoFanPoints()!=null) {
                 JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
                 videoPointNum = videoPoints.size();
             }

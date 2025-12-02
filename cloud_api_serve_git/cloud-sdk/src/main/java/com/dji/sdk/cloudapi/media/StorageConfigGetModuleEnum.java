@@ -13,10 +13,7 @@ import java.util.Arrays;
  */
 public enum StorageConfigGetModuleEnum {
 
-    MEDIA(0),
-
-    // 添加未知类型处理
-    UNKNOWN(-1);
+    MEDIA(0);
 
     private final int module;
 
@@ -29,25 +26,9 @@ public enum StorageConfigGetModuleEnum {
         return module;
     }
 
-//    @JsonCreator
-//    public StorageConfigGetModuleEnum find(int module) {
-//        return Arrays.stream(values()).filter(moduleEnum -> moduleEnum.module == module).findAny()
-//                .orElseThrow(() -> new CloudSDKException(StorageConfigGetModuleEnum.class, module));
-//    }
-
     @JsonCreator
-    public static StorageConfigGetModuleEnum find(int module) {
-        return Arrays.stream(values())
-                .filter(moduleEnum -> moduleEnum.module == module)
-                .findAny()
-                .orElse(UNKNOWN); // 返回 UNKNOWN 而不是抛出异常
-    }
-
-    // 可选：添加安全查找方法
-    public static StorageConfigGetModuleEnum safeFind(Integer module) {
-        if (module == null) {
-            return UNKNOWN;
-        }
-        return find(module);
+    public StorageConfigGetModuleEnum find(int module) {
+        return Arrays.stream(values()).filter(moduleEnum -> moduleEnum.module == module).findAny()
+                .orElseThrow(() -> new CloudSDKException(StorageConfigGetModuleEnum.class, module));
     }
 }

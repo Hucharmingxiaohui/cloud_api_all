@@ -71,12 +71,7 @@ public enum DeviceTypeEnum {
     M4D_CAMERA(98),
 
     M4TD_CAMERA(99),
-
-    // 添加新的设备类型
-    UNKNOWN_DEVICE_176(176),
-
-    // 添加未知类型处理
-    UNKNOWN(-1);
+    ;
 
     private final int type;
 
@@ -89,17 +84,9 @@ public enum DeviceTypeEnum {
         return type;
     }
 
-//    @JsonCreator
-//    public static DeviceTypeEnum find(int type) {
-//        return Arrays.stream(values()).filter(typeEnum -> typeEnum.type == type).findAny()
-//                .orElseThrow(() -> new CloudSDKException(DeviceTypeEnum.class, type));
-//    }
-
     @JsonCreator
     public static DeviceTypeEnum find(int type) {
-        return Arrays.stream(values())
-                .filter(typeEnum -> typeEnum.type == type)
-                .findAny()
-                .orElse(UNKNOWN); // 关键修改：返回 UNKNOWN 而不是抛出异常
+        return Arrays.stream(values()).filter(typeEnum -> typeEnum.type == type).findAny()
+                .orElseThrow(() -> new CloudSDKException(DeviceTypeEnum.class, type));
     }
 }

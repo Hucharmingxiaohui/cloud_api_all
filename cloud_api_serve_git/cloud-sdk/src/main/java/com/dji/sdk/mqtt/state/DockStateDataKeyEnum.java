@@ -7,9 +7,10 @@ import com.dji.sdk.cloudapi.property.DockDroneCommanderModeLostAction;
 import com.dji.sdk.cloudapi.property.DockDroneOfflineMapEnable;
 import com.dji.sdk.cloudapi.property.DockDroneRthMode;
 import com.dji.sdk.exception.CloudSDKException;
-import com.fasterxml.jackson.annotation.JsonCreator;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  *
@@ -48,23 +49,6 @@ public enum DockStateDataKeyEnum {
     DONGLE_INFOS(Set.of("dongle_infos"), DongleInfos.class),
 
     SILENT_MODE(Set.of("silent_mode"), DockSilentMode.class),
-
-    // 在 UNKNOWN 枚举值中添加所有遇到的未知数据键
-    UNKNOWN(Set.of(
-            "unknown",
-            "wireless_link_topo",
-            "camera_watermark_settings",
-            "flysafe_database_version",
-            "commander_flight_mode",
-            "remaining_power_for_return_home",
-            "payloads",
-            "geo_caging_status",
-            "is_beidou_version",
-            "ai_model_list",
-            "uom_real_name_state",
-            "psdk_ui_resource",
-            "psdk_widget_values"
-    ), Object.class);
     ;
 
     private final Set<String> keys;
@@ -85,64 +69,9 @@ public enum DockStateDataKeyEnum {
         return keys;
     }
 
-//    public static DockStateDataKeyEnum find(Set<String> keys) {
-//        return Arrays.stream(values()).filter(keyEnum -> !Collections.disjoint(keys, keyEnum.keys)).findAny()
-//                .orElseThrow(() -> new CloudSDKException(DockStateDataKeyEnum.class, keys));
-//    }
-
     public static DockStateDataKeyEnum find(Set<String> keys) {
-        return Arrays.stream(values())
-                .filter(keyEnum -> !Collections.disjoint(keys, keyEnum.keys))
-                .findAny()
-                .orElse(UNKNOWN);
+        return Arrays.stream(values()).filter(keyEnum -> !Collections.disjoint(keys, keyEnum.keys)).findAny()
+                .orElseThrow(() -> new CloudSDKException(DockStateDataKeyEnum.class, keys));
     }
 
-    // 添加更健壮的 Jackson 反序列化方法
-    @JsonCreator
-    public static DockStateDataKeyEnum fromValue(Object value) {
-        if (value == null) {
-            return UNKNOWN;
-        }
-
-        Set<String> keySet = extractKeys(value);
-
-        // 如果 keySet 为空或者是未知的键，直接返回 UNKNOWN
-        if (keySet.isEmpty() || UNKNOWN.keys.stream().anyMatch(keySet::contains)) {
-            return UNKNOWN;
-        }
-
-        return find(keySet);
-    }
-
-    private static Set<String> extractKeys(Object value) {
-        Set<String> keySet = new HashSet<>();
-
-        if (value == null) {
-            return keySet;
-        }
-
-        try {
-            // 处理 Collection 类型
-            if (value instanceof Collection) {
-                ((Collection<?>) value).stream()
-                        .filter(item -> item instanceof String)
-                        .forEach(item -> keySet.add((String) item));
-            }
-            // 处理字符串类型
-            else if (value instanceof String) {
-                keySet.add((String) value);
-            }
-            // 处理数组类型
-            else if (value.getClass().isArray()) {
-                Arrays.stream((Object[]) value)
-                        .filter(item -> item instanceof String)
-                        .forEach(item -> keySet.add((String) item));
-            }
-        } catch (Exception e) {
-            // 如果解析过程中出现任何异常，返回空集合
-            return new HashSet<>();
-        }
-
-        return keySet;
-    }
 }
