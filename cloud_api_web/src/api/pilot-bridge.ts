@@ -1,4 +1,4 @@
-import { message } from 'ant-design-vue'
+import {ElMessage } from 'element-plus'
 import { EComponentName, EPhotoType, ERouterName } from '../types'
 import { CURRENT_CONFIG } from './http/config'
 import { EVideoPublishType, LiveStreamStatus } from '../types/live-stream'
@@ -68,7 +68,7 @@ function returnNumber (response: string): number {
 
 function errorHint (response: JsResponse): boolean {
   if (response.code !== 0) {
-    message.error(response.message)
+    ElMessage.error(response.message)
     console.error(response.message)
     return false
   }

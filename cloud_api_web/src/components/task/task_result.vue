@@ -1203,7 +1203,7 @@ function scrollRight () {
         rgba(70, 145, 217, 1) 0,
         rgba(21, 81, 181, 1) 100%);
     border-radius: 4px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -1233,8 +1233,7 @@ function scrollRight () {
         rgba(248, 212, 94, 1) 0,
         rgba(227, 157, 6, 1) 100%);
     border-radius: 4px;
-    width: 70px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -1358,7 +1357,6 @@ function scrollRight () {
 
 ::v-deep .el-input__wrapper {
   background-color: #0B2756;
-  box-shadow: 0px 0px 2px 2px rgba(34, 135, 255, 0.5);
 }
 
 :deep(.el-select__wrapper) {

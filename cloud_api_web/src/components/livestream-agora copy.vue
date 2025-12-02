@@ -51,7 +51,7 @@
 
 <script lang="ts" setup>
 import AgoraRTC, { IAgoraRTCClient, IAgoraRTCRemoteUser } from 'agora-rtc-sdk-ng'
-import { message } from 'ant-design-vue'
+import {ElMessage } from 'element-plus'
 import { onMounted, reactive, ref, onUnmounted } from 'vue'
 import { uuidv4 } from '../utils/uuid'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
@@ -146,7 +146,7 @@ const onRefresh = async () => {
       }
     })
     .catch(error => {
-      message.error(error)
+      ElMessage.error(error)
       console.error(error)
     })
 }
@@ -323,7 +323,7 @@ const onStop = async () => {
     dronePara.cameraSelected == null ||
     dronePara.claritySelected == null
   ) {
-    message.warn('waring: not select live para!!!')
+    ElMessage.warn('waring: not select live para!!!')
     return
   }
   livePara.videoId =
@@ -335,7 +335,7 @@ const onStop = async () => {
     video_id: livePara.videoId
   }).then(res => {
     if (res.code === 0) {
-      message.success(res.message)
+      ElMessage.success(res.message)
       livePara.liveState = false
       dronePara.lensSelected = ''
       console.log('stop play livestream')
@@ -390,7 +390,7 @@ const onClaritySelect = (val: any) => {
 }
 const onUpdateQuality = () => {
   if (!livePara.liveState) {
-    message.info('Please turn on the livestream first.')
+    ElMessage.info('Please turn on the livestream first.')
     return
   }
   setLivestreamQuality({
@@ -398,14 +398,14 @@ const onUpdateQuality = () => {
     video_quality: dronePara.claritySelected
   }).then(res => {
     if (res.code === 0) {
-      message.success('Set the clarity to ' + clarityList[dronePara.claritySelected].label)
+      ElMessage.success('Set the clarity to ' + clarityList[dronePara.claritySelected].label)
     }
   })
 }
 
 const onSwitch = () => {
   if (dronePara.lensSelected === undefined || dronePara.lensSelected === nonSwitchable) {
-    message.info('The ' + nonSwitchable + ' lens cannot be switched, please select the lens to be switched.', 8)
+    ElMessage.info('The ' + nonSwitchable + ' lens cannot be switched, please select the lens to be switched.', 8)
     return
   }
   changeLivestreamLens({
@@ -413,7 +413,7 @@ const onSwitch = () => {
     video_type: dronePara.lensSelected
   }).then(res => {
     if (res.code === 0) {
-      message.success('Switching live camera successfully.')
+      ElMessage.success('Switching live camera successfully.')
     }
   })
 }

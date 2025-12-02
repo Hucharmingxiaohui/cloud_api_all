@@ -1,19 +1,10 @@
 <template>
   <div class="content">
-    <div class="nav">
-      <img class="thumbnail_1" referrerpolicy="no-referrer" src="../assets/v4/nav-icon.png" />
-      <span class="text_9">{{ current_sub }}</span>
-    </div>
-    <div class="nav-select">
-      <el-select v-model="current_sub" placeholder="变电站" class="select-operation" :teleported='false'
-          style="width: 50px;" @change="changeSub">
-          <el-option v-for="item in subOption" :key="item.value" :label="item.label" :value="item.value" />
-      </el-select>
-    </div>
+
     <div class="title">
       设备管理
     </div>
-    <div class="content" v-if="onlineDocks.data.length === 0">
+    <div style="margin-top: 100px;" v-if="onlineDocks.data.length === 0">
       <a-empty :image="noData" :image-style="{ height: '60px' }" />
     </div>
     <div class="content" v-else>

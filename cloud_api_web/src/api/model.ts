@@ -1,4 +1,3 @@
-import { message } from 'ant-design-vue'
 import request, { IPage, IWorkspaceResponse, IListWorkspaceResponse } from '/@/api/http/request'
 import { TaskType, TaskStatus, OutOfControlAction } from '/@/types/task'
 import { WaylineType } from '/@/types/wayline'

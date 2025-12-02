@@ -95,7 +95,6 @@ import {
   getWorkspaceByName, createWorkspace, getPlatformInfo, getAllUsersInfo,
   updateUserInfo, deleteUser, addUser, getOneUser, addSub, deleteSub, updateSub
 } from '/@/api/manage'
-import { message, PaginationProps } from 'ant-design-vue'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { localeContextKey, ElMessageBox, ElMessage } from 'element-plus'
 import { IPage } from '/@/api/http/type'
@@ -175,7 +174,7 @@ function saveEdit2 () {
   }
   updateSub(form2).then(res => {
     if (res.code !== 0) {
-      message.error(res.message)
+      ElMessage.error(res.message)
     } else {
       // 关闭编辑对话框
       editDialogVisible2.value = false
@@ -190,7 +189,7 @@ function handleDelete1 (sub_id: string) {
   // deleteSub
   deleteSub(sub_id).then(res => {
     if (res.code !== 0) {
-      message.error(res.message)
+      ElMessage.error(res.message)
     } else {
       // 关闭编辑对话框
       // editDialogVisible2.value = false
@@ -245,7 +244,7 @@ function saveEdit3 () {
   form3.workspace_id = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
   addSub(form3).then(res => {
     if (res.code !== 0) {
-      message.error(res.message)
+      ElMessage.error(res.message)
     } else {
       // 关闭编辑对话框
       editDialogVisible3.value = false

@@ -370,7 +370,7 @@ function getSubInfo () {
       if (res.code !== 0) {
         return
       }
-      fanTable.value = res.data
+      fanTable.value = res.data.list
     })
   } catch (error) {
   }

@@ -94,7 +94,7 @@
 
 <script lang="ts" setup>
 import { reactive } from '@vue/reactivity'
-import { message } from 'ant-design-vue'
+import { ElMessage } from 'element-plus'
 import { onMounted, onUpdated, ref } from 'vue'
 import { deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, searchWaylineFiles } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName } from '/@/types'
@@ -150,14 +150,15 @@ function getWaylines () {
   }
   canRefresh.value = false
   getWaylineFiles(workspaceId, {
-    page: pagination.page,
-    page_size: pagination.page_size,
-    order_by: 'update_time desc'
+    page: 1,
+    page_size: 10000,
+    order_by: 'update_time desc',
+    name: ''
   }).then(res => {
     if (res.code !== 0) {
       return
     }
-    waylinesData.data = [...waylinesData.data, ...res.data.list]
+    waylinesData.data = res.data.list
     pagination.total = res.data.pagination.total
     pagination.page = res.data.pagination.page
   }).finally(() => {
@@ -169,22 +170,22 @@ function showWaylineTip (waylineId: string) {
   deleteWaylineId.value = waylineId
   deleteTip.value = true
 }
-
 // 搜索航线
 function SearchWayline () {
   if (!canRefresh.value) {
     return
   }
   canRefresh.value = false
-  searchWaylineFiles(workspaceId, {
-    search_value: searchValue.value,
-    order_by: 'update_time desc'
+  getWaylineFiles(workspaceId, {
+    page: 1,
+    page_size: 10000,
+    order_by: 'update_time desc',
+    name: searchValue.value
   }).then(res => {
     if (res.code !== 0) {
       return
     }
-    waylinesData.data = []
-    waylinesData.data = [...waylinesData.data, ...res.data.list]
+    waylinesData.data = res.data.list
     pagination.total = res.data.pagination.total
     pagination.page = res.data.pagination.page
   }).finally(() => {
@@ -194,7 +195,7 @@ function SearchWayline () {
 function deleteWayline () {
   deleteWaylineFile(workspaceId, deleteWaylineId.value).then(res => {
     if (res.code === 0) {
-      message.success('Wayline file deleted')
+      ElMessage.success('Wayline file deleted')
     }
     deleteWaylineId.value = ''
     deleteTip.value = false
@@ -256,7 +257,7 @@ const uploadFile = async () => {
     fileData.append('file', file, file.name)
     await importKmzFile(workspaceId, fileData).then((res) => {
       if (res.code === 0) {
-        message.success(`${file.name} file uploaded successfully`)
+        ElMessage.success(`${file.name} file uploaded successfully`)
         canRefresh.value = true
         pagination.total = 0
         pagination.page = 1

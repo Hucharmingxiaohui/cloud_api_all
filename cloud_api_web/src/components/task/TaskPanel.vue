@@ -19,15 +19,12 @@
         </el-form-item>
         <el-form-item>
             <!-- 查询按钮 -->
-            <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
+            <el-button class="new_btn" type="primary" :icon="Search"
               @click="getPlans">查询
             </el-button>
             <!-- 重置按钮 -->
-            <el-button class="new_btn1 iconfont icon-zhongzhi-" type="primary" style="margin-left: 10px" @click="reset">重置
+            <el-button class="new_btn1" type="primary" style="margin-left: 10px" :icon="Refresh" @click="reset">重置
             </el-button>
-
-            <!-- 新建计划 -->
-            <el-button class="new_btn iconfont icon-xinjianjihua" type="primary" style="margin-left: 10px" @click="toCreatePlan('0')">新建计划</el-button>
         </el-form-item>
       </el-form>
 
@@ -213,6 +210,7 @@ import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
+import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 const router = useRouter()
 
 // 存储已处理的任务ID，避免重复分析
@@ -827,8 +825,7 @@ function toTaskVideo (val: any) {
         rgba(70, 145, 217, 1) 0,
         rgba(21, 81, 181, 1) 100%);
     border-radius: 4px;
-    width: 108px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -858,8 +855,7 @@ function toTaskVideo (val: any) {
         rgba(248, 212, 94, 1) 0,
         rgba(227, 157, 6, 1) 100%);
     border-radius: 4px;
-    width: 70px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -1095,60 +1091,11 @@ function toTaskVideo (val: any) {
   background-color: #0B2756;
 }
 
-/**
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+:deep(.el-form-item__label) {
+    color: white;
 }
 
-.video-modal {
-  position: relative;
-  width: 80%;
-  max-width: 800px;
-  min-width: 400px;
-  min-height: 300px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
+::v-deep .el-input__inner {
+    color: white;
 }
-
-.video-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px;
-  background: #f0f0f0;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 20px;
-}
-
-.video-player {
-  width: 100%;
-  height: auto;
-}
-
-.resizer {
-  width: 10px;
-  height: 10px;
-  background: red;
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  cursor: se-resize;
-}
-*/
 </style>

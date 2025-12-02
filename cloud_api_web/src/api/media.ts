@@ -1,4 +1,4 @@
-import { message } from 'ant-design-vue'
+import { ElMessage } from 'element-plus'
 import request, { CommonListResponse, IPage, IWorkspaceResponse } from '/@/api/http/request'
 const HTTP_PREFIX = '/media/api/v1'
 const HTTP_PREFIX_TWO = '/fjReport/api/v1'
@@ -18,7 +18,7 @@ export const downloadMediaFile = async function (workspaceId: string, fileId: st
     reader.onload = function (e) {
       const text = reader.result as string
       const result = JSON.parse(text)
-      message.error(result.message)
+      ElMessage.error(result.message)
     }
     reader.readAsText(result.data, 'utf-8')
     console.log('json')
@@ -36,7 +36,7 @@ export const downloadThumbnail = async function (workspaceId: string, fileId: st
     reader.onload = function (e) {
       const text = reader.result as string
       const result = JSON.parse(text)
-      message.error(result.message)
+      ElMessage.error(result.message)
     }
     reader.readAsText(result.data, 'utf-8')
     console.log('json')
@@ -94,7 +94,7 @@ export const downloadFlyTaskReportApi = async function (jobId: string): Promise<
     reader.onload = function (e) {
       const text = reader.result as string
       const result = JSON.parse(text)
-      message.error(result.message)
+      ElMessage.error(result.message)
     }
     reader.readAsText(result.data, 'utf-8')
     console.log('json')

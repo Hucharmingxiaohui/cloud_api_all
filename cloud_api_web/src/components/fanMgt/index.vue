@@ -20,29 +20,26 @@
           <el-button
             class="new_btn"
             type="primary"
-            style="width: 70px;"
             :icon="Search"
             @click="getWindTurbineConfig()"
           >
-            <span style="margin-left: 5px; font-size: 14px;">查询</span>
+            查询
           </el-button>
           <el-button
-            class="new_btn"
+            class="new_btn1"
             type="primary"
-            style="width: 70px;"
             :icon="Refresh"
             @click="handleRest()"
           >
-            <span style="margin-left: 5px; font-size: 14px;">重置</span>
+            重置
           </el-button>
           <el-button
             class="new_btn"
             type="primary"
-            style="width: 70px;"
             :icon="Plus"
             @click="openInsertDialog()"
           >
-            <span style="margin-left: 5px; font-size: 14px;">新增</span>
+            新增
           </el-button>
         </el-form-item>
       </el-form>
@@ -907,21 +904,7 @@ function handleCurrentChange (val: number) {
                 rgba(70, 145, 217, 1) 0,
                 rgba(21, 81, 181, 1) 100%);
         border-radius: 4px;
-        width: 108px;
         height: 30px;
-
-        // margin: 12px 0 0 30px;
-        .thumbnail_1 {
-            width: 12px;
-            height: 12px;
-            margin: 5px 0 0 12px;
-        }
-
-        .thumbnail_2 {
-            width: 20px;
-            height: 20px;
-        }
-
         .btn_text {
             width: 56px;
             height: 18px;
@@ -935,27 +918,6 @@ function handleCurrentChange (val: number) {
             line-height: 14px;
             margin: 9px 20px 0 8px;
         }
-
-    }
-
-    .new_btn2 {
-        background-image: linear-gradient(180deg,
-                rgba(70, 145, 217, 1) 0,
-                rgba(21, 81, 181, 1) 100%);
-        border-radius: 4px;
-        padding: 0 5px;
-
-        .thumbnail_1 {
-            width: 12px;
-            height: 12px;
-            margin: 5px 0 0 12px;
-        }
-
-        .thumbnail_2 {
-            width: 20px;
-            height: 20px;
-        }
-
     }
 
     .new_btn1 {
@@ -963,17 +925,7 @@ function handleCurrentChange (val: number) {
                 rgba(248, 212, 94, 1) 0,
                 rgba(227, 157, 6, 1) 100%);
         border-radius: 4px;
-        width: 70px;
-        height: 37px;
-        margin-left: 0px;
-
-        // margin: 12px 0 0 30px;
-        .thumbnail_1 {
-            width: 12px;
-            height: 12px;
-            margin: 5px 0 0 12px;
-        }
-
+        height: 30px;
         .btn_text {
             width: 30px;
             height: 18px;
@@ -1275,7 +1227,5 @@ function handleCurrentChange (val: number) {
 ::v-deep .el-input__inner {
     color: white;
 }
- .el-input__inner {
-    color: white;
-}
+
 </style>

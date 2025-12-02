@@ -2,85 +2,102 @@
   <div class="container">
     <!-- <div class="header">航线管理</div> -->
     <div class="operation">
-            <el-form :inline="true" :model="queryForm" label-position="right">
+      <el-form :inline="true" :model="queryForm" label-position="right">
         <el-form-item label="航线名称:" prop="name">
-          <el-input v-model="queryForm.name" placeholder="请输入航线名称" class="custom-input" ></el-input>
+          <el-input
+            v-model="queryForm.name"
+            placeholder="请输入航线名称"
+            class="custom-input"
+          ></el-input>
         </el-form-item>
         <el-form-item>
           <!-- 查询按钮 -->
-          <el-button class="new_btn" type="primary" :icon="Search" @click="getWaylines">查询</el-button>
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Search"
+            @click="getWaylines"
+            >查询</el-button
+          >
 
-          <el-button class="new_btn" type="primary" :icon="Refresh" @click="reset">
+          <el-button
+            class="new_btn1"
+            type="primary"
+            :icon="Refresh"
+            @click="reset"
+          >
             重置
           </el-button>
 
           <router-link to="/wayline/Model">
-            <el-button class="new_btn iconfont icon-xinjianhangxian" type="primary" style="margin-left: 10px; width: 100px;">
+            <el-button
+              class="new_btn iconfont icon-xinjianhangxian"
+              type="primary"
+              style="margin-left: 10px; width: 100px;"
+            >
               <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
             </el-button>
           </router-link>
 
           <!-- 导入按钮 -->
-          <el-button class="new_btn iconfont icon-daoruhangxian" type="primary" style="margin-left: 10px; width: 100px;"
+          <!-- <el-button class="new_btn iconfont icon-daoruhangxian" type="primary" style="margin-left: 10px; width: 100px;"
             @click="openWaylineDialog">
             <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
-          </el-button>
+          </el-button> -->
+
+          <el-upload
+            :before-upload="beforeUpload"
+            :show-file-list="false"
+            :http-request="uploadFile"
+            style="display: inline-block;"
+            ref="upload"
+          >
+            <el-button
+              class="new_btn iconfont icon-daoruhangxian"
+              type="primary"
+              style="margin-left: 10px; width: 100px; margin-top: 5px;"
+            >
+              <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
+            </el-button>
+          </el-upload>
         </el-form-item>
       </el-form>
-
-      <el-dialog v-model="isImportWayline" title="导入航线" center width="400px" top="10%" class="selectDialog"
-        :close-on-click-modal="false">
-        <div style="display: flex; flex-direction: column; align-items: center; color: aliceblue;">
-          <!-- 选择专业 和 选择框在同一行 -->
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <span style="font-size: 18px; margin-right: 10px; width: 150px;">选择专业:</span>
-            <el-select v-model="selectedMajor" placeholder="请选择" size="large" class="select-operation"
-              :teleported='false'>
-              <el-option v-for="item in MajorOption" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-          </div>
-
-          <!-- 选择场站 和 选择框在同一行 -->
-          <div style="display: flex; align-items: center; margin-top: 10px;">
-            <span style="font-size: 18px; margin-right: 10px;width: 150px; ">选择场站:</span>
-            <el-select v-model="selectedStation" placeholder="请选择" size="large" class="select-operation"
-              :teleported='false'>
-              <el-option v-for="item in StationOption" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
-          </div>
-        </div>
-
-        <!-- 上传文件的组件 -->
-        <div style="margin: 20px 0 0 15px; text-align: center;">
-          <el-upload class="upload-demo" :before-upload="beforeUpload" :show-file-list="true" :http-request="uploadFile"
-            ref="upload">
-            <el-button class="btn">导入航线</el-button>
-          </el-upload>
-        </div>
-
-        <template #footer>
-          <div class="dialog-footer">
-            <el-button @click="closeImportWayline" class="nobtn">取消</el-button>
-            <el-button type="primary" @click="uploadWayline" class="okbtn">确定</el-button>
-          </div>
-        </template>
-      </el-dialog>
     </div>
     <div>
-      <el-dialog v-model="showSelectDialog" title="选择机型" center width="20%" top="10%" class="selectDialog"
-        :close-on-click-modal="false">
-        <div style="display: flex; justify-content: center; align-items:center;color: aliceblue;">
-          <span style="display: flex; justify-content: center;align-content: center; margin-right: 10px;">无人机机型:</span>
-          <el-cascader v-model="selectedDroneModel" :options="droneOption" @change="updateDroneOption"
-            class="custom-select" />
+      <el-dialog
+        v-model="showSelectDialog"
+        title="选择机型"
+        center
+        width="20%"
+        class="selectDialog"
+      >
+        <div
+          style="display: flex; justify-content: center; align-items:center;color: aliceblue;"
+        >
+          <span
+            style="display: flex; justify-content: center;align-content: center; margin-right: 10px;"
+            >无人机机型:</span
+          >
+          <el-cascader
+            v-model="selectedDroneModel"
+            :options="droneOption"
+            @change="updateDroneOption"
+            class="custom-select"
+          />
         </div>
         <template #footer>
           <div class="dialog-footer">
-            <el-button @click="showSelectDialog = false" class="nobtn">取消</el-button>
+            <el-button @click="showSelectDialog = false" class="nobtn"
+              >取消</el-button
+            >
             <router-link to="/wayline/createWayline">
-              <el-button type="primary" @click="showSelectDialog = false" class="okbtn">确定</el-button>
+              <el-button
+                type="primary"
+                @click="showSelectDialog = false"
+                class="okbtn"
+                >确定</el-button
+              >
             </router-link>
-
           </div>
         </template>
       </el-dialog>
@@ -88,8 +105,7 @@
     <div class="content">
       <div class="table-container">
         <el-table :data="waylinesData.data" stripe>
-
-          <el-table-column label="序号" align='center' width="60">
+          <el-table-column label="序号" align="center" width="60">
             <template #default="scope">
               {{ scope.$index + (paginationProp.current - 1) * paginationProp.pageSize + 1 }}
             </template>
@@ -111,36 +127,62 @@
           </el-table-column> -->
           <el-table-column label="更新时间">
             <template #default="scope">
-              <div class="ellipsis">{{ new Date(scope.row.update_time).toLocaleString() }}</div>
+              <div class="ellipsis">
+                {{ new Date(scope.row.update_time).toLocaleString() }}
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="无人机">
             <template #default="scope">
-              <div class="ellipsis">{{ DEVICE_NAME[scope.row.drone_model_key] }}</div>
+              <div class="ellipsis">
+                {{ DEVICE_NAME[scope.row.drone_model_key] }}
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="相机">
             <template #default="scope">
-              <div class="ellipsis">{{ DEVICE_NAME[scope.row.payload_model_keys] }}</div>
+              <div class="ellipsis">
+                {{ DEVICE_NAME[scope.row.payload_model_keys] }}
+              </div>
             </template>
           </el-table-column>
 
           <el-table-column label="操作" width="330px">
             <template #default="scope">
               <div class="action-buttons">
-                <el-button size="small" link type="primary" class="download"
-                  @click="downloadWayline(scope.row.id, scope.row.name)">下载</el-button>
-                <el-button size="small" link type="primary" class="preview"
-                  @click="openDrag(scope.row.id, scope.row.template_types[0])">预览</el-button>
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  class="download"
+                  @click="downloadWayline(scope.row.id, scope.row.name)"
+                  >下载</el-button
+                >
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  class="preview"
+                  @click="openDrag(scope.row.id, scope.row.template_types[0])"
+                  >预览</el-button
+                >
                 <!-- <el-button size="small" link type="primary" class="waylipot"
                   @click="openWaylinePoints(scope.row)">航点</el-button>
                 <el-button size="small" link type="primary" class="wayliedit"
                   @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])">编辑</el-button> -->
                 <!-- <el-button size="small" type="text" @click="downloadWayline(scope.row.id, scope.row.name)">查看</el-button> -->
-                <el-popconfirm width="220" confirm-button-text="确定" cancel-button-text="不，谢谢" icon-color="#626AEF"
-                  title="航线文件一旦删除就无法恢复,是否继续？" @confirm="deleteWayline(scope.row.id)">
+                <el-popconfirm
+                  width="220"
+                  confirm-button-text="确定"
+                  cancel-button-text="不，谢谢"
+                  icon-color="#626AEF"
+                  title="航线文件一旦删除就无法恢复,是否继续？"
+                  @confirm="deleteWayline(scope.row.id)"
+                >
                   <template #reference>
-                    <el-button size="small" link type="primary" class="delete">删除</el-button>
+                    <el-button size="small" link type="primary" class="delete"
+                      >删除</el-button
+                    >
                   </template>
                 </el-popconfirm>
               </div>
@@ -154,19 +196,23 @@
     </div>
     <div class="pagination-container">
       <!-- 分页 -->
-      <el-pagination v-model:current-page="paginationProp.current" v-model:page-size="paginationProp.pageSize"
-        :page-sizes="paginationProp.pageSizeOptions" :total="paginationProp.total"
-        layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"></el-pagination>
+      <el-pagination
+        v-model:current-page="paginationProp.current"
+        v-model:page-size="paginationProp.pageSize"
+        :page-sizes="paginationProp.pageSizeOptions"
+        :total="paginationProp.total"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      ></el-pagination>
     </div>
     <!-- 弹窗 -->
-    <div class="live" v-if="showMap" v-drag-window>
-      <div style="height: 40px; width: 100%" class="drag-title"></div>
-      <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeDrag">
-        <CloseOutlined />
-      </a>
-      <waylineMap ref="wayLineid"></waylineMap>
-    </div>
+    <el-dialog v-model="showMap" title="航线预览" width="800px" style="height: 500px;">
+      <div class="live">
+        <waylineMap ref="wayLineid"></waylineMap>
+      </div>
+    </el-dialog>
+
     <!-- 测温弹窗 -->
   </div>
   <!-- </div> -->
@@ -223,20 +269,6 @@ const queryForm = reactive({
 })
 // --------------------------------航线导入-------------------------------------------------------
 const isImportWayline = ref(false)
-const MajorOption = [
-  {
-    label: '输电',
-    value: '输电'
-  },
-  {
-    label: '配电',
-    value: '配电'
-  },
-  {
-    label: '变电',
-    value: '变电'
-  },
-]
 const StationOption = ref([])
 const selectedMajor = ref<any>(null) // 选择的专业
 const selectedStation = ref<any>(null) // 选择的场站
@@ -544,12 +576,6 @@ function getWaylines () {
     return
   }
   canRefresh.value = false
-  // console.log('sss11111', {
-  //   page: body.page,
-  //   page_size: body.page_size,
-  //   order_by: 'update_time desc',
-  //   ...queryForm
-  // })
   getWaylineFiles(workspaceId, {
     page: body.page,
     page_size: body.page_size,
@@ -709,7 +735,6 @@ const uploadFile = async () => {
     })
   })
 }
-
 </script>
 
 <style lang="scss" scoped>
@@ -801,10 +826,10 @@ const uploadFile = async () => {
   color: #F1F6FF;
 }
 
-::v-deep .el-dialog {
+:deep(.el-dialog){
   background-color: #0B2757;
   // background: rgba(59, 116, 255, 0.15);
-  width: 25%;
+  // width: 25%;
   -webkit-box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
   box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
 }
@@ -946,7 +971,7 @@ const uploadFile = async () => {
         rgba(70, 145, 217, 1) 0,
         rgba(21, 81, 181, 1) 100%);
     border-radius: 4px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -976,8 +1001,7 @@ const uploadFile = async () => {
         rgba(248, 212, 94, 1) 0,
         rgba(227, 157, 6, 1) 100%);
     border-radius: 4px;
-    width: 70px;
-    height: 37px;
+    height: 30px;
 
     // margin: 12px 0 0 30px;
     .thumbnail_1 {
@@ -1046,17 +1070,6 @@ const uploadFile = async () => {
 }
 
 //----------------------------------------------------------------------
-.btn {
-  background-image: linear-gradient(180deg,
-      rgba(70, 145, 217, 1) 0,
-      rgba(21, 81, 181, 1) 100%);
-  border-radius: 4px;
-  height: 36px;
-  color: white;
-  width: 93px;
-  border: none;
-
-}
 
 .btn:hover {
   border: 2px solid #1299C3;
@@ -1074,14 +1087,14 @@ const uploadFile = async () => {
 }
 
 .live {
-  position: absolute;
+  // position: absolute;
   z-index: 1;
-  left: 0;
-  top: 400px;
-  margin-left: 345px;
+  // left: 0;
+  // top: 400px;
+  // margin-left: 345px;
 
   text-align: center;
-  width: 1000px;
+  width: 765px;
   height: 420px;
   background: #232323;
 }
@@ -1155,6 +1168,13 @@ const uploadFile = async () => {
   box-shadow: 0 0 0 1px #163474 inset;
   color: aliceblue;
   width: 130px;
+}
+
+:deep(.el-input__inner)  {
+    color: white;
+}
+:deep(.el-form-item__label) {
+    color: white;
 }
 
 ::v-deep .el-cascader-node:hover {

@@ -1,4 +1,3 @@
-import { message } from 'ant-design-vue'
 import request, { CommonListResponse, IPage, IWorkspaceResponse } from '/@/api/http/request'
 const HTTP_PREFIX = ''
 // 定义 objectList 数组中的每一项

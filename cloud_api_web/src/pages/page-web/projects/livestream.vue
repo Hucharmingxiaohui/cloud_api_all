@@ -29,7 +29,6 @@ import {
   DeviceOsd, DeviceStatus, DockOsd, EGear, EModeCode, GatewayOsd, EDockModeCode,
   NetworkStateQualityEnum, NetworkStateTypeEnum, RainfallEnum, DroneInDockEnum
 } from '/@/types/device'
-import { message } from 'ant-design-vue'
 import { onMounted, watch, ref, nextTick, reactive, computed } from 'vue'
 import { getRoot } from '/@/root'
 import { useMyStore } from '/@/store'
