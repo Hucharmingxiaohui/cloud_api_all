@@ -10,7 +10,8 @@ const HTTP_PREFIX3 = '/pub/api/v1'
 
 // 获取航线
 export const getWaylineFiles = async function (wid: string, body: {}): Promise<IWorkspaceResponse<any>> {
-  const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines?order_by=${body.order_by}&page=${body.page}&page_size=${body.page_size}`
+  console.log('fanhui', body)
+  const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines?order_by=${body.order_by}&page=${body.page}&page_size=${body.page_size}&key=${body.name}`
   const result = await request.get(url)
   return result.data
 }

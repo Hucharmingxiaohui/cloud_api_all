@@ -121,6 +121,7 @@ import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
 import { Task, getFlyWaylinePlan, DistributeFlyPlan, deleteFlyPlan } from '/@/api/wayline'
 import { useRouter } from 'vue-router'
+import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
 
 const router = useRouter()

@@ -2,8 +2,8 @@
   <div class="container1">
     <div class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right">
-        <el-form-item label="图片名称:" prop="name">
-          <el-input v-model="queryForm.name" placeholder="按飞行计划名称搜索" class="custom-input"></el-input>
+        <el-form-item label="图片名称:">
+          <el-input v-model="queryForm.name" placeholder="请输入图片名称" class="custom-input"></el-input>
         </el-form-item>
         <el-form-item>
           <!-- 查询按钮 -->

@@ -2,29 +2,32 @@
   <div class="container">
     <!-- <div class="header">航线管理</div> -->
     <div class="operation">
-      <span class="label">航线名称:</span>
-      <el-input placeholder="请输入文件名称" class="custom-select" style="width: 200px;" v-model="searchValue"></el-input>
-      <!-- 查询按钮 -->
-      <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 100px;"
-        @click="SearchWayline">
-        <span style="margin-left: 5px; font-size: 14px;">查询</span>
-      </el-button>
+            <el-form :inline="true" :model="queryForm" label-position="right">
+        <el-form-item label="航线名称:" prop="name">
+          <el-input v-model="queryForm.name" placeholder="请输入航线名称" class="custom-input" ></el-input>
+        </el-form-item>
+        <el-form-item>
+          <!-- 查询按钮 -->
+          <el-button class="new_btn" type="primary" :icon="Search" @click="getWaylines">查询</el-button>
 
-      <el-button class="new_btn" type="primary" @click="ResetWayline">
-        <span style="margin-left: 5px; font-size: 14px;">重置</span>
-      </el-button>
+          <el-button class="new_btn" type="primary" :icon="Refresh" @click="reset">
+            重置
+          </el-button>
 
-      <router-link to="/wayline/Model">
-        <el-button class="new_btn iconfont icon-xinjianhangxian" type="primary" style="margin-left: 10px; width: 100px;">
-          <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
-        </el-button>
-      </router-link>
+          <router-link to="/wayline/Model">
+            <el-button class="new_btn iconfont icon-xinjianhangxian" type="primary" style="margin-left: 10px; width: 100px;">
+              <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
+            </el-button>
+          </router-link>
 
-      <!-- 导入按钮 -->
-      <el-button class="new_btn iconfont icon-daoruhangxian" type="primary" style="margin-left: 10px; width: 100px;"
-        @click="openWaylineDialog">
-        <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
-      </el-button>
+          <!-- 导入按钮 -->
+          <el-button class="new_btn iconfont icon-daoruhangxian" type="primary" style="margin-left: 10px; width: 100px;"
+            @click="openWaylineDialog">
+            <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
+          </el-button>
+        </el-form-item>
+      </el-form>
+
       <el-dialog v-model="isImportWayline" title="导入航线" center width="400px" top="10%" class="selectDialog"
         :close-on-click-modal="false">
         <div style="display: flex; flex-direction: column; align-items: center; color: aliceblue;">
@@ -129,10 +132,10 @@
                   @click="downloadWayline(scope.row.id, scope.row.name)">下载</el-button>
                 <el-button size="small" link type="primary" class="preview"
                   @click="openDrag(scope.row.id, scope.row.template_types[0])">预览</el-button>
-                <el-button size="small" link type="primary" class="waylipot"
+                <!-- <el-button size="small" link type="primary" class="waylipot"
                   @click="openWaylinePoints(scope.row)">航点</el-button>
                 <el-button size="small" link type="primary" class="wayliedit"
-                  @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])">编辑</el-button>
+                  @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])">编辑</el-button> -->
                 <!-- <el-button size="small" type="text" @click="downloadWayline(scope.row.id, scope.row.name)">查看</el-button> -->
                 <el-popconfirm width="220" confirm-button-text="确定" cancel-button-text="不，谢谢" icon-color="#626AEF"
                   title="航线文件一旦删除就无法恢复,是否继续？" @confirm="deleteWayline(scope.row.id)">
@@ -184,27 +187,19 @@ import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName } from '/@/types'
-
-import { EllipsisOutlined, RocketOutlined, CameraFilled, UserOutlined, SelectOutlined, SearchOutlined, CloseOutlined } from '@ant-design/icons-vue'
+import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { DEVICE_NAME } from '/@/types/device'
 import { useMyStore } from '/@/store'
 import { WaylineFile } from '/@/types/wayline'
 import { downloadFile } from '/@/utils/common'
 import { IPage } from '/@/api/http/type'
-import { CURRENT_CONFIG } from '/@/api/http/config'
-import { load } from '@amap/amap-jsapi-loader'
 import { getRoot } from '/@/root'
 import waylineMap from '/@/components/g-map/mapPanel.vue'
 import { useRouter } from 'vue-router'
 import { uuidv4 } from '/@/utils/uuid'
-import { GeojsonCoordinate } from '/@/types/map'
-import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
 import { PostElementsBody } from '/@/types/mapLayer'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
-import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
-import CustomTree from '/@/components/substationTree.vue'
-
-import { insertTEMPConfig, getAllSub, PointData, getAllPoints } from '/@/api/points'
+import { getAllSub } from '/@/api/points'
 import {
   generateLineContent,
   generatePointContent,
@@ -216,13 +211,16 @@ const loading = ref(false)
 const store = useMyStore()
 const useGMapCoverHook = useGMapCover(store)
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
-let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
+const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const body: IPage = {
   page: 1,
   total: -1,
   page_size: 10
 }
 
+const queryForm = reactive({
+  name: '',
+})
 // --------------------------------航线导入-------------------------------------------------------
 const isImportWayline = ref(false)
 const MajorOption = [
@@ -317,25 +315,6 @@ const uploadWayline = () => {
   }
   insertWayline()
 }
-function updateMajor (val) {
-  selectedMajor.value = val
-}
-function updateStation (val) {
-  selectedStation.value = val
-}
-function addStationData () {
-  let workspaces = null
-  getAllWorkspaceInfo(userId.value).then(res => {
-    // 转换数据格式
-    workspaces = res.data
-    if (workspaces) {
-      StationOption.value = workspaces.map(item => ({
-        value: item.workspace_id, // 使用 workspace_id 作为 value
-        label: item.workspace_name // 使用 workspace_name 作为 label
-      }))
-    }
-  })
-}
 // --------------------------------------------------------------------------------------------
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '30', '40'],
@@ -355,71 +334,11 @@ const root = getRoot()
 const deleteTip = ref(false)
 const deleteWaylineId = ref<string>('')
 const canRefresh = ref(true)
-const importVisible = ref<boolean>(root.$router.currentRoute.value.name === ERouterName.NEW_WAYLINE)
-const height = ref()
 
 onMounted(() => {
-  // const parent = document.getElementsByClassName('scrollbar').item(0)?.parentNode as HTMLDivElement
-  // height.value = document.body.clientHeight - parent.firstElementChild!.clientHeight
   getWaylines()
-
-  // 添加树形图数据
-  getTreeData()
-  // 添加场站选择数据
-  // addStationData()
 })
 
-//= ===========================================添加树形图==========================================================================
-
-const selectedNode = ref(null)
-
-const treeData = ref([
-  {
-    title: '区域1',
-    key: '1',
-  }
-])
-
-function getTreeData () {
-  let workspaces = null
-  getAllWorkspaceInfo(userId.value).then(res => {
-    // 转换数据格式
-    workspaces = res.data
-    if (workspaces) {
-      clearLeafNodesAndAddData(treeData.value, workspaces)
-    }
-  })
-}
-// 添加树形图方法
-const clearLeafNodesAndAddData = (treeData, data) => {
-  treeData.forEach(node => {
-    // 如果有子节点，则递归遍历
-    if (node.children && node.children.length > 0) {
-      clearLeafNodesAndAddData(node.children, data)
-    }
-
-    // 如果是叶子节点，清空现有数据并添加 data 中的数据
-    if (!node.children || node.children.length === 0) {
-      node.children = data.map(item => ({
-        title: item.workspace_name,
-        key: item.workspace_id, // 使用 workspace_id 作为 key
-        workspace_id: item.workspace_id,
-        workspace_desc: item.workspace_desc,
-        platform_name: item.platform_name,
-        bind_code: item.bind_code,
-        isLeaf: true // 显式标记为叶子节点
-      }))
-    }
-  })
-}
-// 树形图选中方法
-const handleNodeChange = (node) => {
-  // selectedNode.value = node
-
-  workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
-  getWaylines()
-  console.log('Node changed in parent:', node) // 确认父组件事件是否触发
-}
 // -----------------------------------------新建航线---选择无人机机型-----------------------------------------------------------------------------------------------------------------------
 const droneOption = [
   {
@@ -625,18 +544,22 @@ function getWaylines () {
     return
   }
   canRefresh.value = false
+  // console.log('sss11111', {
+  //   page: body.page,
+  //   page_size: body.page_size,
+  //   order_by: 'update_time desc',
+  //   ...queryForm
+  // })
   getWaylineFiles(workspaceId, {
     page: body.page,
     page_size: body.page_size,
-    order_by: 'update_time desc'
+    order_by: 'update_time desc',
+    ...queryForm
   }).then(res => {
     if (res.code !== 0) {
       return
     }
-    // waylinesData.data = [...waylinesData.data, ...res.data.list]
     waylinesData.data = res.data.list
-    // body.total = res.data.pagination.total
-    // body.page = res.data.pagination.page
     paginationProp.total = res.data.pagination.total
     paginationProp.current = res.data.pagination.page
   }).finally(() => {
@@ -644,9 +567,9 @@ function getWaylines () {
   })
 }
 
-function showWaylineTip (waylineId: string) {
-  deleteWaylineId.value = waylineId
-  deleteTip.value = true
+function reset () {
+  queryForm.name = ''
+  getWaylines()
 }
 
 // 分页事件
@@ -1016,28 +939,13 @@ const uploadFile = async () => {
   // width: 100%;
   height: 60px;
   margin: 31px 12px 0 12px;
-
-  .label {
-    height: 60px;
-    display: flex;
-    /* 这个可以保留，确保子元素居中 */
-    align-items: center;
-    /* 垂直居中 */
-    justify-content: center;
-    /* 水平居中 */
-    color: rgba(255, 255, 255, 1);
-    font-size: 14px;
-    font-family: Google Sans-Medium;
-    font-weight: 500;
-    margin: 0 10px 0 30px;
-  }
-
+  padding-top: 15px;
+  padding-left: 15px;
   .new_btn {
     background-image: linear-gradient(180deg,
         rgba(70, 145, 217, 1) 0,
         rgba(21, 81, 181, 1) 100%);
     border-radius: 4px;
-    width: 108px;
     height: 37px;
 
     // margin: 12px 0 0 30px;
@@ -1048,7 +956,7 @@ const uploadFile = async () => {
     }
 
     .btn_text {
-      width: 70px;
+      width: 56px;
       height: 18px;
       overflow-wrap: break-word;
       color: rgba(255, 255, 255, 1);

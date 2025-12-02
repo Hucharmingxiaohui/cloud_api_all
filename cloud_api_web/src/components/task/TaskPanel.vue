@@ -3,7 +3,7 @@
     <!-- <div class="header1">任务管理</div> -->
     <div class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right">
-        <el-form-item label="任务:">
+        <el-form-item label="任务名称">
           <el-input v-model="queryForm.name" placeholder="请输入任务名称" class="custom-input" ></el-input>
         </el-form-item>
         <el-form-item label="计划类型:">
