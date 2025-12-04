@@ -19,5 +19,6 @@ public class WaylineUrlConfig {
         private String singleWayline;
         private String workingWayline;
         private String stopWayline;
+        private String interestPointWayline;
     }
 }
