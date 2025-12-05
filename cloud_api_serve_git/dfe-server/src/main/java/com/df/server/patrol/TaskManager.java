@@ -48,7 +48,7 @@ public class TaskManager {
      * 定时执行，按变电站分组，进行任务执行表扫描
      * 按变电站分组的目的是区域主机中直接接入型多个变电站并发执行视频任务
      */
-    @Scheduled(fixedRate = 5 * 1000, initialDelay = 15 * 1000)
+//    @Scheduled(fixedRate = 5 * 1000, initialDelay = 15 * 1000)
     public void fixedRateJob() {
         if (!vTaskConfig.isEnabled()) {
             return;

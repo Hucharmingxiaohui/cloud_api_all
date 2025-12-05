@@ -92,7 +92,7 @@ public class UniPointExcelImportErrorServiceImpl extends ServiceImpl<UniPointExc
         baseMapper.clearErrorInfo();
     }
 
-    @Scheduled(fixedDelay = 3 * 1000L)
+//    @Scheduled(fixedDelay = 3 * 1000L)
     public void executeCheckExcel() {
         //没有正在执行生成时才去获取一个请求进入生成流程
         if (!isCheckRunning.get()) {
