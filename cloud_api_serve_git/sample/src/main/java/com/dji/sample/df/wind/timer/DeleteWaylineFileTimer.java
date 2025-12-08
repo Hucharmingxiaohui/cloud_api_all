@@ -63,7 +63,7 @@ public class DeleteWaylineFileTimer {
                 fileName = fileName.substring(0, i);
                 WaylineFileEntity waylineFileEntity = waylineFileMapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().
                         eq(WaylineFileEntity::getName, fileName));
-                if (waylineFileEntity != null && !fileName.contains("top")) {
+                if (waylineFileEntity != null && !fileName.contains("top")&& !fileName.contains("poi")) {
 //                  删除数据库
                     waylineFileMapper.deleteById(waylineFileEntity.getId());
 //                  删除minio
