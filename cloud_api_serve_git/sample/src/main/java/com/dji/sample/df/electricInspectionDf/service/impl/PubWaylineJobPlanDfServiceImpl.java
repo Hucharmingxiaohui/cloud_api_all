@@ -330,6 +330,15 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     }
 
     @Override
+    public boolean batchDeletePlanByIds(List<Integer> ids) {
+        int flag = pubWaylineJobPlanDfMapper.deleteBatchIds(ids);
+        if(flag>0){
+            return true;
+        }
+        return false;
+    }
+
+    @Override
     public boolean deleteJobByBobId(String job_id) {
         //1.删除图片
         List<MediaFileEntity> mediaFileEntities = fileMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()

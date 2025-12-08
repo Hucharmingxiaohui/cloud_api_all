@@ -9,10 +9,7 @@ import com.dji.sdk.cloudapi.wayline.api.IHttpWaylineService;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
@@ -50,6 +47,17 @@ public class WaylineFileController implements IHttpWaylineService {
     public HttpResultResponse deleteWayline(@PathVariable(name = "workspace_id") String workspaceId,
                                             @PathVariable(name = "wayline_id") String waylineId) {
         boolean isDel = waylineFileService.deleteByWaylineId(workspaceId, waylineId);
+        return isDel ? HttpResultResponse.success() : HttpResultResponse.error("Failed to delete wayline.");
+    }
+//  航线批量删除
+    @GetMapping("${url.wayline.prefix}${url.wayline.version}/workspaces/{workspace_id}/batchDelete")
+    public HttpResultResponse batchDeleteWayline(@PathVariable(name = "workspace_id") String workspaceId, @RequestParam String waylineIds) {
+        String[] split = waylineIds.split(",");
+        boolean isDel=true;
+        for(String waylineId : split) {
+            boolean isDel1 = waylineFileService.deleteByWaylineId(workspaceId, waylineId);
+            isDel = isDel1 && isDel;
+        }
         return isDel ? HttpResultResponse.success() : HttpResultResponse.error("Failed to delete wayline.");
     }
 

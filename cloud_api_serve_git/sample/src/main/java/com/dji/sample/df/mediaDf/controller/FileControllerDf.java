@@ -2,12 +2,15 @@ package com.dji.sample.df.mediaDf.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.server.entity.uni.UniPointEntity;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.model.JobIdEntity;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.Pagination;
@@ -37,6 +40,12 @@ public class FileControllerDf {
 
     @Autowired
     DefectEntityMapper defectEntityMapper;
+
+    @Autowired
+    private IWaylineJobMapper waylineJobMapper;
+
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
     @Value("${server.base-url:http://172.20.36.157:6789}")
     private String serverBaseUrl;
@@ -136,17 +145,23 @@ public class FileControllerDf {
                 })
                 .collect(Collectors.toList());
 
-
-        for (int j = 0; j < filteredFiles.size(); j++) {
-            DefectEntity defect = defectList.get(j);
-            String imagePath = defect.getImagePath();
-            if (imagePath != null && !imagePath.isEmpty()) {
-                // 转换为可访问的URL
-                String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
-                        URLEncoder.encode(imagePath, "UTF-8");
-                filteredFiles.get(j).setDefectImageUrl(imageUrl);
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, job_id));
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+//      如果为风机任务则加入分析图url
+        if(pubWaylineJobPlanDfEntity != null&&pubWaylineJobPlanDfEntity.getPlanType()==1){
+            for (int j = 0; j < filteredFiles.size(); j++) {
+                DefectEntity defect = defectList.get(j);
+                String imagePath = defect.getImagePath();
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    // 转换为可访问的URL
+                    String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
+                            URLEncoder.encode(imagePath, "UTF-8");
+                    filteredFiles.get(j).setDefectImageUrl(imageUrl);
+                }
             }
         }
+
         // 内存分页
         int total = filteredFiles.size();
         int fromIndex = (int) ((page - 1) * pageSize);

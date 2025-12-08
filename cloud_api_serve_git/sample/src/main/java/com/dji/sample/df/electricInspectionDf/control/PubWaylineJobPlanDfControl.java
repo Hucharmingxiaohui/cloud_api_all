@@ -13,7 +13,10 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
 
@@ -91,6 +94,22 @@ public class PubWaylineJobPlanDfControl {
            return HttpResultResponse.error("删除计划失败");
        }
     }
+
+    //删除飞行计划
+    @DeleteMapping("/batchDeletePlanByIds")
+    HttpResultResponse batchDeletePlanByIds(@RequestParam String ids){
+        List<Integer> intList = Arrays.stream(ids.split(","))
+                .map(String::trim)        // 去除空格
+                .map(Integer::parseInt)
+                .collect(Collectors.toList());
+        boolean flag= pubWaylineJobPlanDfService.batchDeletePlanByIds(intList);
+        if(flag){
+            return HttpResultResponse.success().setMessage("批量删除计划成功");
+        }else {
+            return HttpResultResponse.error("批量删除计划失败");
+        }
+    }
+//  删除飞行任务
     @DeleteMapping("/deleteJobByJobId")
     HttpResultResponse deleteJobByJobId(@RequestParam String job_id){
         boolean flag= pubWaylineJobPlanDfService.deleteJobByBobId(job_id);
@@ -100,7 +119,21 @@ public class PubWaylineJobPlanDfControl {
             return HttpResultResponse.error("删除任务失败");
         }
     }
-
+//  批量删除飞行任务，暂时不用，因为任务里准备中的任务是调取消任务的接口，应该分两类进行处理
+    @DeleteMapping("/batchDeleteJobByJobIds")
+    HttpResultResponse batchDeleteJobByJobIds(@RequestParam String jobIds){
+        String[] split = jobIds.split(",");
+        boolean flag = true;
+        for(String jobId:split){
+            boolean flag1= pubWaylineJobPlanDfService.deleteJobByBobId(jobId);
+            flag = flag1 && flag ;
+        }
+        if (flag){
+            return HttpResultResponse.success().setMessage("批量删除任务成功");
+        }else {
+            return HttpResultResponse.error("批量删除任务失败");
+        }
+    }
 
     // 初级版本（启用）
 //    @PostMapping("/createWaylinePlan2")
