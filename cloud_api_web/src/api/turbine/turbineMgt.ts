@@ -5,14 +5,13 @@ import { WaylineType } from '/@/types/wayline'
 
 const HTTP_PREFIX = '/api/windTurbine'
 const HTTP_PREFIX_TWO = '/api/WindTurbineWayline'
+const HTTP_PREFIX_POINT = '/api/pointOfInterest'
 
-// 获取航线
-// export const getWaylineFiles = async function (wid: string, body: {}): Promise<IWorkspaceResponse<any>> {
-//   const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines?order_by=${body.order_by}&page=${body.page}&page_size=${body.page_size}`
-//   const result = await request.get(url)
-//   return result.data
-// }
-
+/**
+ * 风机管理
+ * @param data
+ * @returns
+ */
 // 获取所有的风机参数
 export const getAllWindTurbineApi = async function (data): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/selectList?turbineName=${data.turbine_name}&id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
@@ -45,5 +44,38 @@ export const deleteWindTurbineApi = async function (id): Promise<IWorkspaceRespo
 export const executeFlyTaskApi = async function (data: any): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_TWO}/excute`
   const result = await request.post(url, data)
+  return result.data
+}
+
+/**
+ * 兴趣点管理
+ * @param data
+ * @returns
+ */
+// 获取所有的风机参数
+export const getAllInserestPointApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_POINT}/selectList?pointName=${data.point_name}&id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 新增兴趣点参数配置
+export const addInserestPointApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_POINT}/save`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 更新兴趣点参数配置
+export const updateInserestPointApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_POINT}/update`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 删除兴趣点参数配置
+export const deleteInserestPointApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_POINT}/delete?id=${id} `
+  const result = await request.get(url)
   return result.data
 }

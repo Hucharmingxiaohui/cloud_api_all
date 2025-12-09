@@ -163,12 +163,12 @@ const deviceInfo = ref(props.deviceInfo)
 watch(
   () => props.deviceInfo,
   (newVal) => {
-    console.log('更新前的值:',deviceInfo.value)
+    console.log('更新前的值:', deviceInfo.value)
     deviceInfo.value = newVal
-    console.log('更新后的值:',deviceInfo.value)
+    console.log('更新后的值:', deviceInfo.value)
   },
   { deep: true }
-);
+)
 // dock 控制面板
 const {
   dockControlPanelVisible,

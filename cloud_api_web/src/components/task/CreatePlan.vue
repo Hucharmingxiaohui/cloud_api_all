@@ -35,6 +35,36 @@
               </el-select>
             </el-form-item>
             <el-form-item
+              label="兴趣点"
+              required
+              prop="poiId"
+              v-if="type==='2'"
+            >
+              <el-select v-model="planBody.poi_id">
+                <el-option
+                  v-for="item in interestPointTable"
+                  :label="item.point_name"
+                  :value="item.id"
+                  :key="item.id"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item
+              label="环绕点类型"
+              required
+              label-position="top"
+              v-if="type==='2'"
+            >
+              <el-radio-group v-model="oibitType" size="large" @change="updateOibitType()">
+                <el-radio-button style="width: 0" />
+                <el-radio-button value="1" label="单点环绕" class="radio-custom"></el-radio-button>
+                <el-radio-button value="2" label="多点环绕" class="radio-custom"></el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="环绕点数量" required prop="poiOrbitNum" v-if="oibitType==='2'">
+              <el-input v-model="planBody.poiOrbitNum" maxlength="50"></el-input>
+            </el-form-item>
+            <el-form-item
               label="执行航线"
               required
               prop="file_id"
@@ -228,7 +258,7 @@ import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
 import SelectWayLine from '/@/pages/page-web/projects/wayline.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getAllWindTurbineApi } from '/@/api/turbine/turbineMgt'
+import { getAllWindTurbineApi, getAllInserestPointApi } from '/@/api/turbine/turbineMgt'
 import { getAllSub } from '/@/api/points'
 const router = useRouter()
 const route = useRoute()
@@ -246,6 +276,8 @@ const dock = computed<Device>(() => {
   return store.state.dockInfo
 })
 const fanTable = ref([]) // 风机列表
+const interestPointTable = ref([]) // 兴趣点列表
+const oibitType = ref('1') // 环绕点类型
 const routeName = ref('')
 const planBody = reactive({
   plan_source: '系统创建',
@@ -258,6 +290,8 @@ const planBody = reactive({
   end_time: '',
   status: 1,
   fan_id: '',
+  poi_id: '',
+  poiOrbitNum: 1,
   username: 'pilot',
   plan_type: type.value,
   rth_altitude: '',
@@ -290,6 +324,28 @@ const rules = {
       trigger: 'submit'
     }
   ],
+  poiOrbitNum: [
+    { required: true, message: '请输入环绕点数量', trigger: 'blur' },
+    {
+      pattern: /^[1-9]\d*$/,
+      message: '环绕点数量必须是正整数',
+      trigger: 'submit'
+    },
+    {
+      validator: (rule, value, callback) => {
+        const numValue = Number(value)
+        if (numValue < 1) {
+          callback(new Error('环绕点最低为1'))
+        } else if (numValue > 20) {
+          callback(new Error('返环绕点最高为20'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'submit'
+    }
+  ],
+  poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'blur' }],
   fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
@@ -329,9 +385,14 @@ const rules = {
 onMounted(() => {
   if (type.value === '1') {
     getSubInfo()
+  } else if (type.value === '2') {
+    getInterestPoint()
   }
 })
 
+/**
+ * 创建航线
+ */
 async function onSubmit () {
   try {
     const valid = await valueRef.value.validate()
@@ -376,11 +437,42 @@ function getSubInfo () {
   }
 }
 
+/**
+ * @description: 查询兴趣点ID列表
+ * @param {string}
+ * */
+function getInterestPoint () {
+  try {
+    getAllInserestPointApi({
+      pageSize: 10000,
+      pageNo: 1
+    }).then(res => {
+      if (res.code !== 0) {
+        return
+      }
+      interestPointTable.value = res.data.list
+    })
+  } catch (error) {
+  }
+}
+
+/**
+ * 更新环绕点类型
+ */
+
+function updateOibitType () {
+  if (oibitType.value === '1') {
+    planBody.poiOrbitNum = 1
+  }
+}
+
 function closePlan () {
   if (type.value === '1') {
-    router.push({ path: '/fly-fan-plan' })
+    router.push({ path: '/taskManage/fly-fan-plan' })
+  } else if (type.value === '0') {
+    router.push({ path: '/taskManage/fly-wanyline-plan' })
   } else {
-    router.push({ path: '/fly-wanyline-plan' })
+    router.push({ path: '/taskManage/interestPointPlan' })
   }
 }
 

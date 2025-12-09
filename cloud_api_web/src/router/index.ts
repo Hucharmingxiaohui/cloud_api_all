@@ -61,8 +61,8 @@ const routes: Array<RouteRecordRaw> = [
     children: [
       // 左侧菜单 - 变量管理（父菜单，含子路由）
       {
-        path: '/variable-manage',
-        name: 'variableManage',
+        path: '/variableMgt',
+        name: 'variableMgt',
         meta: {
           showInMenu: true,
           label: '变量管理',
@@ -71,18 +71,39 @@ const routes: Array<RouteRecordRaw> = [
         },
         children: [
           {
-            path: '/fanMgt',
+            path: '/variableMgt/fanMgt',
             name: 'fanMgt',
-            component: () => import('/@/components/fanMgt/index.vue'),
+            component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
             meta: {
               showInMenu: true,
               label: '风机管理',
               cache: true
             }
+          },
+          {
+            path: '/variableMgt/interestPointMgt',
+            name: 'interestPointMgt',
+            component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '兴趣点管理',
+              cache: true
+            }
           }
         ]
       },
-      // 左侧菜单 - 视频直播（无子女菜单）
+
+      {
+        path: '/' + ERouterName.DEVICES,
+        name: ERouterName.DEVICES,
+        component: () => import('/@/pages/page-web/projects/devices.vue'),
+        meta: {
+          showInMenu: true,
+          label: '设备管理',
+          position: 'left',
+          cache: true
+        }
+      },
       {
         path: '/' + ERouterName.LIVESTREAM,
         name: ERouterName.LIVESTREAM,
@@ -102,19 +123,6 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
-      // 左侧菜单 - 设备管理（无子女菜单）
-      {
-        path: '/' + ERouterName.DEVICES,
-        name: ERouterName.DEVICES,
-        component: () => import('/@/pages/page-web/projects/devices.vue'),
-        meta: {
-          showInMenu: true,
-          label: '设备管理',
-          position: 'left',
-          cache: true
-        }
-      },
-
       // 右侧菜单 - 航线管理（无子女菜单）
       {
         path: '/' + ERouterName.NEW_WAYLINE,
@@ -129,7 +137,7 @@ const routes: Array<RouteRecordRaw> = [
       },
       // 右侧菜单 - 任务管理（父菜单，含子路由）
       {
-        path: '/task-manage', // 父菜单路径
+        path: '/taskManage', // 父菜单路径
         name: 'taskManage',
         meta: {
           showInMenu: true,
@@ -140,7 +148,7 @@ const routes: Array<RouteRecordRaw> = [
         children: [
           // 子菜单 - 普通计划
           {
-            path: '/' + ERouterName.FLY_WAYLINE_PLAN,
+            path: '/taskManage/' + ERouterName.FLY_WAYLINE_PLAN,
             name: ERouterName.FLY_WAYLINE_PLAN,
             component: () => import('/@/components/task/flyWaylinePlan.vue'),
             meta: {
@@ -151,7 +159,7 @@ const routes: Array<RouteRecordRaw> = [
           },
           // 子菜单 - 风机计划
           {
-            path: '/' + ERouterName.FLY_FAN_PLAN,
+            path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
             name: ERouterName.FLY_FAN_PLAN,
             component: () => import('/@/components/task/flyFanPlan.vue'),
             meta: {
@@ -160,6 +168,17 @@ const routes: Array<RouteRecordRaw> = [
               cache: true
             }
           },
+          {
+            path: '/taskManage/interestPointPlan',
+            name: 'interestPointPlan',
+            component: () => import('/@/components/task/interestPointPlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '兴趣点环绕计划',
+              cache: true
+            }
+          },
+
           // 子菜单 - 飞行任务
           {
             path: '/' + ERouterName.TASK,

@@ -1,9 +1,9 @@
 <template>
   <div class="content">
 
-    <div class="title">
+    <!-- <div class="title">
       设备管理
-    </div>
+    </div> -->
     <div style="margin-top: 100px;" v-if="onlineDocks.data.length === 0">
       <a-empty :image="noData" :image-style="{ height: '60px' }" />
     </div>
@@ -722,6 +722,12 @@ function openLivestreamAgora () {
   background: url('/@/assets/v4/live-title.png') 100% no-repeat;
   border-bottom: 1px solid #455777;
 }
+.device{
+  border: 2px solid #11628a71;
+  margin-top: 15px;
+  margin-left: 15px;
+  margin-right: 15px;
+}
 .dock{
   background-color: rgba(0, 20, 59, 1);
   border-radius: 8px;
@@ -729,7 +735,7 @@ function openLivestreamAgora () {
   width: 394px;
   height: fit-content;
   border: 1px solid rgba(2, 29, 81, 1);
-  margin: 12px 0 0 11px;
+  // margin: 12px 0 0 11px;
   .group_4 {
     .group_30 {
       width: 377px;
@@ -1051,7 +1057,7 @@ function openLivestreamAgora () {
   width: 394px;
   height: 175px;
   border: 1px solid rgba(2, 29, 81, 1);
-  margin: 24px 0 0 11px;
+  margin: 24px 0 0 0px;
   .group_12 {
       .box_38 {
         width: 368px;
