@@ -9,6 +9,8 @@ import com.df.framework.utils.ParamsUtils;
 import com.df.framework.vo.Result;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
@@ -74,6 +76,9 @@ public class FjReportController {
     @Autowired
     FanWaylinePointsMapper  fanWaylinePointsMapper;
 
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
     /**
      * 保存巡检图片并分析
      */
@@ -82,6 +87,13 @@ public class FjReportController {
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
 //      正在分析（实则是正在保存加分析）
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+//      如果不是风机任务直接返回不分析，状态置为3
+        if(pubWaylineJobPlanDfEntity==null && pubWaylineJobPlanDfEntity.getPlanType()!=1){
+            waylineJobEntity.setIsAnalyzed(3);
+            waylineJobMapper.updateById(waylineJobEntity);
+            return Result.success("success");
+        }
         waylineJobEntity.setIsAnalyzed(2);
         waylineJobMapper.updateById(waylineJobEntity);
         log.info(jobId+"正在分析。。。");
@@ -134,6 +146,9 @@ public class FjReportController {
             return Result.success(1);
         }else if(isAnalyzed == 2){
             return Result.success(2);
+        } else if (isAnalyzed == 3) {
+//          不是风机任务，无需分析
+            return Result.success(3);
         }
         return Result.success(0);
     }

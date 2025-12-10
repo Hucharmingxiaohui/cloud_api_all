@@ -1,20 +1,28 @@
 package com.dji.sample.df.mediaDf.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.server.entity.uni.UniPointEntity;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.model.JobIdEntity;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
+import com.dji.sample.df.wind.dao.DefectEntityMapper;
+import com.dji.sample.df.wind.model.entity.DefectEntity;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.Pagination;
 import com.dji.sdk.common.PaginationData;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -30,6 +38,17 @@ public class FileControllerDf {
     @Autowired
     private IFileServiceDf fileService;
 
+    @Autowired
+    DefectEntityMapper defectEntityMapper;
+
+    @Autowired
+    private IWaylineJobMapper waylineJobMapper;
+
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
+    @Value("${server.base-url:http://172.20.36.157:6789}")
+    private String serverBaseUrl;
 
     //查询一张图片
     @GetMapping("/{workspace_id}/files/{file_name}")
@@ -106,6 +125,9 @@ public class FileControllerDf {
     public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id,@RequestParam(defaultValue = "1") Long page,
                                                   @RequestParam(defaultValue = "10") Long pageSize,@RequestParam Map map) throws Exception {
         List<MediaFileDTO> allFiles = fileService.getMediaDileByJobId3(job_id, workspace_id);
+
+        List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()
+                .eq(DefectEntity::getJobId,job_id).orderByAsc(DefectEntity::getId));
         // 条件过滤
         List<MediaFileDTO> filteredFiles = allFiles.stream()
                 .filter(file -> {
@@ -122,6 +144,24 @@ public class FileControllerDf {
                     return match;
                 })
                 .collect(Collectors.toList());
+
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, job_id));
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+//      如果为风机任务则加入分析图url
+        if(pubWaylineJobPlanDfEntity != null&&pubWaylineJobPlanDfEntity.getPlanType()==1){
+            for (int j = 0; j < filteredFiles.size(); j++) {
+                DefectEntity defect = defectList.get(j);
+                String imagePath = defect.getImagePath();
+                if (imagePath != null && !imagePath.isEmpty()) {
+                    // 转换为可访问的URL
+                    String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
+                            URLEncoder.encode(imagePath, "UTF-8");
+                    filteredFiles.get(j).setDefectImageUrl(imageUrl);
+                }
+            }
+        }
+
         // 内存分页
         int total = filteredFiles.size();
         int fromIndex = (int) ((page - 1) * pageSize);

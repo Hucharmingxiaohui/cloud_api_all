@@ -60,9 +60,12 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     public Map<String,Object> createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
         Map map=new HashMap();
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
-//      如果是风机计划则调用创建风机航线接口
         if(planType==1){
+//          普通风机巡检计划
             return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
+        }else if(planType==2){
+//          风机兴趣点环绕计划
+            return routePlanService.buildInterestPointWayline(pubWaylineJobPlanDfEntity);
         }else {
             //创建计划接口
             pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
@@ -320,6 +323,15 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     @Override
     public boolean deletePlanById(Integer id) {
         int flag = pubWaylineJobPlanDfMapper.deleteById(id);
+        if(flag>0){
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean batchDeletePlanByIds(List<Integer> ids) {
+        int flag = pubWaylineJobPlanDfMapper.deleteBatchIds(ids);
         if(flag>0){
             return true;
         }

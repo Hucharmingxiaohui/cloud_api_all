@@ -31,7 +31,7 @@ public class RobotDataTimer {
     /**
      * 巡视路线同步
      */
-    @Scheduled(fixedDelay = 5 * 60 * 1000L)
+//    @Scheduled(fixedDelay = 5 * 60 * 1000L)
     public void getDogMapCoordinatePixel() {
         if (!vTaskConfig.isEnabled()) {
             return;
@@ -42,7 +42,7 @@ public class RobotDataTimer {
     /**
      * 检查机器人是否在线
      */
-    @Scheduled(fixedDelay = 1000)
+//    @Scheduled(fixedDelay = 1000)
     public void fixedDelayJob() {
         String goApi = robotAPIService.getGoApi();
         String ipv4Pattern = "\\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\." +

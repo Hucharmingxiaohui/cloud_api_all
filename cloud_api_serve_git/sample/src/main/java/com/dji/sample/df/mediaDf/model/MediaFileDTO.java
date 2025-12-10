@@ -41,4 +41,6 @@ public class MediaFileDTO {
     private Long updateTime;
 
     private String jobId;
+
+    private String defectImageUrl;
 }

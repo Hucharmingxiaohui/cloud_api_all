@@ -170,8 +170,10 @@ public class SDKWaylineService extends AbstractWaylineService {
         Integer currentWaypointIndex = response.getData().getOutput().getExt().getCurrentWaypointIndex();
         String flightId = response.getData().getOutput().getExt().getFlightId();
 
-        String name = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                .eq(WaylineJobEntity::getJobId, flightId)).getName();
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, flightId));
+        String name = waylineJobEntity.getName();
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
 //      todo 航线mqtt返回job_id,空中航线返回需要修改
         log.info("执行航线任务-"+output.getExt().getFlightId()+"  当前航点号为"+currentWaypointIndex+"号");
 
@@ -236,8 +238,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                         redisUtils.set("turbineName", turbineName);
                                     } else if (jsonResponse.getString("desc").equals("0")) {
 //                           分析失败返航
-                                        DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-                                        this.returnHome(SDKManager.getDeviceSDK(deviceEntity.getDeviceSn()));
+                                        this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
                                     }
                                 }
                             }
@@ -307,7 +308,13 @@ public class SDKWaylineService extends AbstractWaylineService {
         String flightId = response.getData().getInFlightWaylineId();
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
         String workspaceId = workspaceEntity.getWorkspaceId();
-        DeviceEntity uavEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
+//      获取docksn
+        String jobId = redisUtils.get("jobId").toString();
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId));
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+
+        DeviceEntity dockEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDeviceSn, pubWaylineJobPlanDfEntity.getDockSn()));
         log.info("执行空中航线任务-"+flightId+"  当前航点号为"+currentWaypointIndex+"号");
         String fightState = redisUtils.get("in_fight_state").toString();
 //        String inFightAction = redisUtils.get("in_fight_action").toString();
@@ -320,12 +327,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                     String url = waylineUrlConfig.getWaylineStateUrl();
                     JSONObject jsonObject = new JSONObject();
                     String turbineName = redisUtils.get("turbineName").toString();
-                    String jobId = redisUtils.get("jobId").toString();
-//                    String windTurbineId = redisUtils.get("windTurbineId").toString();
-                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
-                            eq(WaylineJobEntity::getJobId, jobId));
-                    PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                            .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+
                     String windTurbineId = pubWaylineJobPlanDfEntity.getFanId();
                     WindTurbine windTurbine = windTurbineMapper.selectById(windTurbineId);
                     jsonObject.put("waylineType", "inFlightTask");
@@ -380,7 +382,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                             mediaFileEntity.setObjectKey(ObjectKey);
                                             mediaFileEntity.setJobId(jobId);
                                             mediaFileEntity.setWorkspaceId(workspaceId);
-                                            mediaFileEntity.setDrone(uavEntity.getDeviceSn());
+                                            mediaFileEntity.setDrone(dockEntity.getChildSn());
 //                                          负载暂时不写
                                             mediaFileEntity.setPayload(null);
                                             mediaFileEntity.setIsOriginal(true);
@@ -412,8 +414,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     log.info("处理返回图像---------------------");
                                 } else if (jsonResponse.getString("desc").equals("0")) {
     //                              分析失败返航
-                                    DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-                                    this.returnHome(SDKManager.getDeviceSDK(deviceEntity.getDeviceSn()));
+                                    this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
                                 }
                             }
                         }
@@ -491,8 +492,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     }
                                 } else {
                                     //分析失败返航
-                                    DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-                                    this.returnHome(SDKManager.getDeviceSDK(deviceEntity.getDeviceSn()));
+                                    this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
                                 }
                             }
                         } catch (Exception e) {

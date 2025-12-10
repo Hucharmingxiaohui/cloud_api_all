@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.dji.sample.df.wind.dao.PointOfInterestMapper">
+
+    <select id="selectList" resultType="com.dji.sample.df.wind.model.entity.PointOfInterest">
+        SELECT * FROM manage_point_of_interest
+        <where>
+            <if test="pointName!=null and pointName!=''">
+                AND point_name LIKE concat('%', #{pointName},'%')
+            </if>
+            <if test="id!=null and id!=''">
+                AND id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+
+
+    <select id="selectListCount" resultType="int">
+        SELECT count(*) FROM manage_point_of_interest
+        <where>
+            <if test="pointName!=null and pointName!=''">
+                AND point_name LIKE concat('%', #{pointName},'%')
+            </if>
+            <if test="id!=null and id!=''">
+                AND id = #{id}
+            </if>
+        </where>
+    </select>
+</mapper>

@@ -4,10 +4,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
-import com.dji.sample.common.model.CustomClaim;
-import com.dji.sample.control.model.param.FlyToPointParam;
 import com.dji.sample.control.model.param.InFlightWaylineDeliverParam;
-import com.dji.sample.control.service.IControlService;
 import com.dji.sample.control.service.IControlService2;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
@@ -15,8 +12,10 @@ import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.wind.dao.PointOfInterestMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
+import com.dji.sample.df.wind.model.entity.PointOfInterest;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.df.wind.service.WindTurbineService;
@@ -28,15 +27,17 @@ import com.dji.sample.wayline.model.entity.WaylineFileEntity;
 import com.dji.sample.wayline.model.param.CreateJobParam;
 import com.dji.sample.wayline.service.IWaylineFileService;
 import com.dji.sdk.cloudapi.control.FileParam;
-import com.dji.sdk.cloudapi.control.Point;
 import com.dji.sdk.cloudapi.device.ExitWaylineWhenRcLostEnum;
 import com.dji.sdk.cloudapi.wayline.*;
 import com.dji.sdk.common.HttpResultResponse;
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.commons.CommonsMultipartFile;
 
 import javax.annotation.Resource;
 import java.io.*;
@@ -47,9 +48,6 @@ import java.net.URL;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-
-import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
-import static com.dji.sample.df.wind.controller.WindTurbineWaylineController.convert;
 
 @Service
 public class RoutePlanServiceImpl implements RoutePlanService {
@@ -77,6 +75,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Resource
     WindTurbineMapper windTurbineMapper;
+
+    @Resource
+    PointOfInterestMapper pointOfInterestMapper;
 
     @Autowired
     private PubWaylineJobPlanDfService pubWaylineJobPlanDfService;
@@ -290,6 +291,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
                 log.info("执行飞向中心点空中航线6");
+//              todo 好像空中航线不需要创建任务，创建人物的代码也注释了，但是里面获取机场的时候是getone，后续多个机场可能会报错
                 performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
                 log.info("执行飞向中心点空中航线7----");
             }
@@ -713,39 +715,137 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
 
-    public static void main(String[] args) {
+    @Override
+    public Map<String,Object> buildInterestPointWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+        // 写发送逻辑
+        Map map = new HashMap();
+        String poiId = pubWaylineJobPlanDfEntity.getPoiId();
+        PointOfInterest pointOfInterest = pointOfInterestMapper.selectById(poiId);
+        String url = waylineUrlConfig.getBuildKmzUrl().getInterestPointWayline();
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("point_name", pointOfInterest.getPointName());
+        jsonObject.put("lon0", pointOfInterest.getPointLongitude());     // 经度
+        jsonObject.put("lat0", pointOfInterest.getPointLatitude());      // 纬度
+        jsonObject.put("h0", pointOfInterest.getPointAltitude());        // 高度
+        // 环绕参数
+        jsonObject.put("orbit_height", pointOfInterest.getOrbitHeight());    // 环绕高度
+        jsonObject.put("orbit_radius", pointOfInterest.getOrbitRadius());    // 环绕半径
+        jsonObject.put("init_direction", pointOfInterest.getInitDirection()); // 初始方向
+        jsonObject.put("orbit_points_num", pubWaylineJobPlanDfEntity.getPoiOrbitNum()); // 环绕点数
+        jsonObject.put("focalLength", pointOfInterest.getFocalLength());    // 焦距
+        String jsonInput = jsonObject.toString();
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            // 设置请求方法
+            con.setRequestMethod("POST");
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setDoOutput(true);
+            // 发送请求
+            try (OutputStream os = con.getOutputStream()) {
+                byte[] input = jsonInput.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+            // 获取响应
+            int responseCode = con.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+//          如果响应成功，则成功生成kmz文件转为multipartFile，导入minio
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(con.getInputStream(), "utf-8"))) {
+                    StringBuilder response1 = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response1.append(responseLine.trim());
+                    }
+                    JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
+                    String routeName = jsonResponse.getString("pointName");
+                    // 项目根目录下的文件路径（根据实际部署环境调整），注意linux是否可行
+                    String projectPath = System.getProperty("user.dir");
+                    String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
+                    MultipartFile file = convert(filePath);
+                    if (Objects.isNull(file)) {
+                        log.error("kmz文件未检测到");
+                    }
 
+                    String workspaceId = redisUtils.get("workspaceId").toString();
+                    String creator = redisUtils.get("creator").toString();
+                    importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
+                    String fileName = file.getOriginalFilename();
+                    if (fileName != null && fileName.endsWith(".kmz")) {
+                        fileName = fileName.substring(0, fileName.length() - 4);
+                    }
+                    WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
+                    if (Objects.isNull(entity)) {
+                        log.error("导入外部航线失败");
+                    }
+                    pubWaylineJobPlanDfEntity.setName(routeName);
+                    pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
+//                  航线类型：航点
+                    pubWaylineJobPlanDfEntity.setWaylineType(0);
+//                  创建计划存数据库
+                    pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+                    // 获取当前系统时间戳（以毫秒为单位）
+                    long currentTimeMillis = System.currentTimeMillis();
+                    //如果是立即执行任务，添加begin_time
+                    if(pubWaylineJobPlanDfEntity.getTaskType()==0){
+                        pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
+                    }
+                    pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
+                    pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+                    pubWaylineJobPlanDfEntity.setWaylineType(0);
+                    //校验paln_id是否重复
+                    PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
+                            eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
+                    if(entity1!=null){//plan_id重复
+                        map.put("result",false);
+                        return map;
+                    }else{//plan_id不重复
+                        pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
+                        map.put("result",true);
+                        map.put("plan",pubWaylineJobPlanDfEntity);
+                        return map;
+                    }
+                }
+            }
+        } catch (ProtocolException e) {
+            throw new RuntimeException(e);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        return map;
+    }
+    public static MultipartFile convert(String filePath) throws IOException {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            throw new IOException("文件不存在：" + filePath);
+        }
+        // 创建DiskFileItem（commons-fileupload核心类）
+        FileItem fileItem = new DiskFileItem(
+                "file", // form表单字段名
+                "application/vnd.google-earth.kmz", // KMZ文件MIME类型
+                false, // 是否为表单字段（false表示文件）
+                file.getName(), // 文件名
+                (int) file.length(), // 文件大小
+                file.getParentFile() // 临时文件存储目录
+        );
+
+        // 将文件内容写入FileItem
+        try (FileInputStream fis = new FileInputStream(file);
+             OutputStream os = fileItem.getOutputStream()) {
+            byte[] buffer = new byte[1024];
+            int len;
+            while ((len = fis.read(buffer)) != -1) {
+                os.write(buffer, 0, len);
+            }
+        }
+
+        // 包装为CommonsMultipartFile（Spring兼容的MultipartFile实现）
+        return new CommonsMultipartFile(fileItem);
     }
 
-    //                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity=new PubWaylineJobPlanDfEntity();
-//                pubWaylineJobPlanDfEntity.setName(routeName);
-//                WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
-//                pubWaylineJobPlanDfEntity.setWorkspaceId(workspaceEntity.getWorkspaceId());
-//                pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
-//                DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-//                pubWaylineJobPlanDfEntity.setDockSn(deviceEntity.getDeviceSn());
-////                  航线类型：航点
-//                pubWaylineJobPlanDfEntity.setWaylineType(0);
-////                  任务类型：立即任务
-//                pubWaylineJobPlanDfEntity.setTaskType(0);
-////                  返航高度30
-//                pubWaylineJobPlanDfEntity.setRthAltitude(30);
-////                  失控行为返航
-//                pubWaylineJobPlanDfEntity.setOutOfControl(1);
-////                  状态启用
-//                pubWaylineJobPlanDfEntity.setEnableStatus(0);
-////                  优先级为1
-//                pubWaylineJobPlanDfEntity.setPlanPriority(1);
-////                  变电站写死(380v变电站)
-//                pubWaylineJobPlanDfEntity.setSubCode("841419cf-4ee6-49e1-986e-60eefad401c7");
-//                pubWaylineJobPlanDfEntity.setPlanSource("系统创建");
-//                pubWaylineJobPlanDfEntity.setMajor("变电");
-//
-////                  创建计划存数据库
-//                pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
-////                  直接执行任务（可以不用查计划？）
-//                CustomClaim customClaim = new CustomClaim();
-//                customClaim.setWorkspaceId(workspaceId);
-//                customClaim.setUsername(creator);
-//                pubWaylineJobPlanDfService.expressPlan(customClaim,pubWaylineJobPlanDfEntity);
 }

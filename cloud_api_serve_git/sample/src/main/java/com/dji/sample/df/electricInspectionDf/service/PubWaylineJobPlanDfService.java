@@ -7,6 +7,7 @@ import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
 
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 
 
@@ -27,6 +28,8 @@ public interface PubWaylineJobPlanDfService {
     HttpResultResponse cancelPlan(CustomClaim customClaim, WaylineJobEntity waylineJobEntity) throws SQLException;
     //按id删除计划
     boolean deletePlanById(Integer id);
+    //按ids批量删除计划
+    boolean batchDeletePlanByIds(List<Integer> ids);
     //按job_id删除任务
     boolean deleteJobByBobId(String job_id);
 }

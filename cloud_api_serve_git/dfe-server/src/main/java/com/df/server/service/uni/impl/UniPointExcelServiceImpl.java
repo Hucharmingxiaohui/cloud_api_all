@@ -97,7 +97,7 @@ public class UniPointExcelServiceImpl extends ServiceImpl<UniPointExcelMapper, U
         baseMapper.clearExcel();
     }
 
-    @Scheduled(fixedDelay = 3 * 1000L)
+//    @Scheduled(fixedDelay = 3 * 1000L)
     public void executeCheckExcel() throws Exception {
         UniPointExcelEntity excel = ImportExcelQueue.poll();
         if (excel == null || StringUtils.isBlank(excel.getFilePath())) {

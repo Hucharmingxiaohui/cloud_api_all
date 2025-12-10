@@ -42,7 +42,7 @@ public class TaskControlTimer {
     /**
      * 扫描需要执行的巡视任务
      */
-    @Scheduled(fixedDelay = 5 * 1000L)
+//    @Scheduled(fixedDelay = 5 * 1000L)
     public void scanPatrolPlan() {
         //获取此时应该执行的任务，包括周期任务、定时任务、间隔任务
         List<UniTaskPlanEntity> list = iUniTaskPlanMapper.getScheduledPlan();

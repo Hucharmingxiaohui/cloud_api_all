@@ -99,8 +99,14 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @TableField("fan_id")
     private String fanId;//风机id
 
+    @TableField("poi_id")
+    private String poiId;//兴趣点id
+
     @TableField("plan_type")
-    private Integer planType;// 计划类型：0普通任务1风机任务
+    private Integer planType;// 计划类型：0普通任务1风机任务2兴趣点环绕任务
+
+    @TableField("poi_orbit_num")
+    private Integer poiOrbitNum;//兴趣点环绕数
 
     @Transient
     @TableField(exist = false)
