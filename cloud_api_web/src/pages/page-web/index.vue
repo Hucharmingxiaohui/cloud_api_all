@@ -89,10 +89,10 @@ const onSubmit = async (e: any) => {
     return
   }
   try {
-    // loading.value = true
-    // localStorage.setItem(STORAGE_KEY, '2')
+    //
+    // localStorage.setItem(STORAGE_KEY, 'devices')
     // root.$router.push(ERouterName.DEVICES)
-
+    loading.value = true
     const result = await login(formState)
     if (result.code === 0) {
       localStorage.setItem(ELocalStorageKey.Token, result.data.access_token)
@@ -101,7 +101,7 @@ const onSubmit = async (e: any) => {
       localStorage.setItem(ELocalStorageKey.UserId, result.data.user_id)
       localStorage.setItem(ELocalStorageKey.Flag, EUserType.Web.toString())
       localStorage.setItem(ELocalStorageKey.User_Type, result.data.user_type)
-      loading.value = true
+      loading.value = false
       // 跳转到成员页面
       localStorage.setItem(STORAGE_KEY, 'devices')
       root.$router.push(ERouterName.DEVICES)

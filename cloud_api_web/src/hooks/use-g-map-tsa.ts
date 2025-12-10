@@ -33,8 +33,8 @@ export function deviceTsaUpdate () {
   function initIcon (type: number) {
     return new AMap.Icon({
       image: icons.get(type),
-      imageSize: new AMap.Size(40, 40),
-      size: new AMap.Size(40, 40)
+      imageSize: new AMap.Size(60, 60),
+      size: new AMap.Size(60, 60)
     })
   }
 

@@ -37,7 +37,7 @@
             <el-form-item
               label="兴趣点"
               required
-              prop="poiId"
+              prop="poi_id"
               v-if="type==='2'"
             >
               <el-select v-model="planBody.poi_id">
@@ -329,7 +329,7 @@ const rules = {
     {
       pattern: /^[1-9]\d*$/,
       message: '环绕点数量必须是正整数',
-      trigger: 'submit'
+      trigger: 'blur'
     },
     {
       validator: (rule, value, callback) => {
@@ -342,10 +342,10 @@ const rules = {
           callback()
         }
       },
-      trigger: 'submit'
+      trigger: 'blur'
     }
   ],
-  poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'blur' }],
+  poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'change' }],
   fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
@@ -445,7 +445,9 @@ function getInterestPoint () {
   try {
     getAllInserestPointApi({
       pageSize: 10000,
-      pageNo: 1
+      pageNo: 1,
+      point_name: '',
+      id: ''
     }).then(res => {
       if (res.code !== 0) {
         return

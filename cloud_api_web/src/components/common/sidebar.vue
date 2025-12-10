@@ -4,9 +4,10 @@
       <div class="text-wrapper_1 ">
         <a-row class="ant-row">
           <a-col :span="1"></a-col>
-          <el-col :span="7" class="text_1">
+          <el-col :span="7" class="text_1"  style="display: flex; justify-content: center;">
             <!-- 左侧菜单 -->
-            <el-menu
+             <div style="width: 100%;">
+                          <el-menu
               :default-active="activeIndex"
               class="el-menu-demo"
               mode="horizontal"
@@ -36,15 +37,17 @@
                 </el-sub-menu>
               </template>
             </el-menu>
+             </div>
           </el-col>
           <a-col :span="1"></a-col>
           <a-col :span="6" class="text_2">
             <span>无人机任务规划与数据采集系统</span>
           </a-col>
-          <a-col :span="1"></a-col>
-          <a-col :span="7" class="text_1">
+          <a-col :span="1" ></a-col>
+          <a-col :span="8" class="text_1"  style="display: flex; justify-content: end;">
             <!-- 右侧菜单 -->
-            <el-menu
+              <div style="width: 100%; padding-left: 35px;">
+                            <el-menu
               class="el-menu-demo"
               mode="horizontal"
               :default-active="activeIndex"
@@ -89,37 +92,34 @@
                 </el-sub-menu>
               </template>
             </el-menu>
-          </a-col>
-          <a-col :span="1" class="text_1" style="margin-top: 30px;">
-            <div>
-              <a-dropdown>
-                <div class="height-100">
-                  <span
-                    class="fz20 mt20"
-                    style="border: 2px solid white; border-radius: 50%; display: inline-flex;"
-                    ><UserOutlined
-                  /></span>
-                  <!-- <span class="ml10 mr10" style="float: right;">{{ username }}</span> -->
-                </div>
-                <template #overlay>
-                  <a-menu
-                    theme="dark"
-                    class="flex-column flex-justify-between flex-align-center"
-                  >
-                    <a-menu-item>
-                      <span class="mr10" style="font-size: 16px;"
-                        ><ExportOutlined
-                      /></span>
-                      <span @click="logout">注销</span>
-                    </a-menu-item>
-                    <!-- <a-menu-item >
-                    <span class="mr10" style="font-size: 16px;"><ExportOutlined /></span>
-                    <span @click="goHome">返回</span>
-                  </a-menu-item> -->
-                  </a-menu>
-                </template>
-              </a-dropdown>
-            </div>
+              </div>
+
+            <!-- 退出 -->
+           <div style="position: absolute; right: 50px; top: -5px;">
+            <el-dropdown>
+              <div style="cursor: pointer;">
+                <span
+                  class="fz20 mt20"
+                  style="
+                    display: inline-flex;
+                    padding: 8px;
+                    border: transparent !important;
+                  "
+                >
+                 <!-- <img :src="userIcon" alt=""> -->
+                  <el-icon color="white" class="no-outline"><UserFilled /></el-icon>
+                </span>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="logout">
+                    <el-icon><SwitchButton /></el-icon>
+                    <span style="margin-left: 8px;">注销</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
           </a-col>
         </a-row>
       </div>
@@ -131,9 +131,9 @@
 <script lang="ts" setup>
 import { createVNode, defineComponent, ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { getRoot } from '/@/root'
-import * as icons from '@ant-design/icons-vue'
 import { ERouterName, ELocalStorageKey } from '/@/types'
 import { routes } from '/@/router'
+import { Avatar, UserFilled } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 const activeIndex = ref('2')
 const router = useRouter()
@@ -168,16 +168,13 @@ interface MenuItem {
 
 // 菜单自动隐藏
 const viewportWidth = ref<number>(window.innerWidth)
-const Icon = (props: {icon: string}) => {
-  return createVNode((icons as any)[props.icon])
-}
 
 const handleResize = () => {
   viewportWidth.value = window.innerWidth
 }
 onMounted(() => {
-  window.addEventListener('resize', handleResize)
-  handleResize() // Initialize viewportWidth
+  // window.addEventListener('resize', handleResize)
+  // handleResize() // Initialize viewportWidth
   activeIndex.value = localStorage.getItem(STORAGE_KEY) || '2'
 
   // const path = findPathByIndex(allMenuItems, activeIndex.value)
@@ -420,6 +417,7 @@ function goHome () {
         background: url('/@/assets/v4/header_bg1.png') 100%  no-repeat;
         background-size: 100% 100% ;
         padding: 0 0 10px 0;
+        position: relative;
       }
       .text_1 {
         // width: 81px;

@@ -8,7 +8,7 @@ import eslintPlugin from "vite-plugin-eslint";
 import OptimizationPersist from "vite-plugin-optimize-persist";
 import PkgConfig from "vite-plugin-package-config";
 import viteSvgIcons from "vite-plugin-svg-icons";
-import { viteVConsole } from "vite-plugin-vconsole";
+// import { viteVConsole } from "vite-plugin-vconsole";
 import cesium from "vite-plugin-cesium";
 
 // https://vitejs.dev/config/
@@ -31,16 +31,16 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         // 指定symbolId格式
         symbolId: "icon-[dir]-[name]",
       }),
-      viteVConsole({
-        entry: path.resolve(__dirname, "./src/main.ts"), // 入口文件
-        localEnabled: command === "serve", // serve开发环境下
-        // enabled: command !== 'serve' || mode === 'test', // 打包环境下/发布测试包,
-        config: {
-          // vconsole 配置项
-          maxLogNumber: 1000,
-          theme: "light",
-        },
-      }),
+      // viteVConsole({
+      //   entry: path.resolve(__dirname, "./src/main.ts"), // 入口文件
+      //   localEnabled: command === "serve", // serve开发环境下
+      //   // enabled: command !== 'serve' || mode === 'test', // 打包环境下/发布测试包,
+      //   config: {
+      //     // vconsole 配置项
+      //     maxLogNumber: 1000,
+      //     theme: "light",
+      //   },
+      // }),
       PkgConfig(),
       OptimizationPersist(),
       // [svgBuilder('./src/assets/icons/')] // All svg under src/icons/svg/ have been imported here, no need to import separately
