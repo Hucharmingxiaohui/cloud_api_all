@@ -663,11 +663,6 @@ async function handleDelete (row:any) {
   } catch (error) {
 
   }
-
-
-  } catch (error) {
-
-  }
 }
 // 获取风机信息查询
 function getWindTurbineConfig () {
