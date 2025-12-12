@@ -30,14 +30,11 @@ import com.dji.sdk.cloudapi.control.FileParam;
 import com.dji.sdk.cloudapi.device.ExitWaylineWhenRcLostEnum;
 import com.dji.sdk.cloudapi.wayline.*;
 import com.dji.sdk.common.HttpResultResponse;
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.commons.CommonsMultipartFile;
 
 import javax.annotation.Resource;
 import java.io.*;
@@ -49,6 +46,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static com.dji.sample.df.wind.utils.FileUtil.convert;
 @Service
 public class RoutePlanServiceImpl implements RoutePlanService {
 
@@ -291,7 +289,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
                 log.info("执行飞向中心点空中航线6");
-//              todo 好像空中航线不需要创建任务，创建人物的代码也注释了，但是里面获取机场的时候是getone，后续多个机场可能会报错
                 performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
                 log.info("执行飞向中心点空中航线7----");
             }
@@ -818,34 +815,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             throw new RuntimeException(e);
         }
         return map;
-    }
-    public static MultipartFile convert(String filePath) throws IOException {
-        File file = new File(filePath);
-        if (!file.exists()) {
-            throw new IOException("文件不存在：" + filePath);
-        }
-        // 创建DiskFileItem（commons-fileupload核心类）
-        FileItem fileItem = new DiskFileItem(
-                "file", // form表单字段名
-                "application/vnd.google-earth.kmz", // KMZ文件MIME类型
-                false, // 是否为表单字段（false表示文件）
-                file.getName(), // 文件名
-                (int) file.length(), // 文件大小
-                file.getParentFile() // 临时文件存储目录
-        );
-
-        // 将文件内容写入FileItem
-        try (FileInputStream fis = new FileInputStream(file);
-             OutputStream os = fileItem.getOutputStream()) {
-            byte[] buffer = new byte[1024];
-            int len;
-            while ((len = fis.read(buffer)) != -1) {
-                os.write(buffer, 0, len);
-            }
-        }
-
-        // 包装为CommonsMultipartFile（Spring兼容的MultipartFile实现）
-        return new CommonsMultipartFile(fileItem);
     }
 
 }

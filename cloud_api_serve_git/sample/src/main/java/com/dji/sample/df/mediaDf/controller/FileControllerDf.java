@@ -147,7 +147,8 @@ public class FileControllerDf {
 
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, job_id));
-        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
 //      如果为风机任务则加入分析图url
         if(pubWaylineJobPlanDfEntity != null&&pubWaylineJobPlanDfEntity.getPlanType()==1){
             for (int j = 0; j < filteredFiles.size(); j++) {

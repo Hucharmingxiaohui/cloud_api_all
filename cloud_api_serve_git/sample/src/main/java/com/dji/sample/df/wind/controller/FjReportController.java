@@ -89,7 +89,7 @@ public class FjReportController {
 //      正在分析（实则是正在保存加分析）
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
 //      如果不是风机任务直接返回不分析，状态置为3
-        if(pubWaylineJobPlanDfEntity==null && pubWaylineJobPlanDfEntity.getPlanType()!=1){
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()!=1){
             waylineJobEntity.setIsAnalyzed(3);
             waylineJobMapper.updateById(waylineJobEntity);
             return Result.success("success");
