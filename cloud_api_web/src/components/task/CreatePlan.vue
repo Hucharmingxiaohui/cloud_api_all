@@ -61,8 +61,8 @@
                 <el-radio-button value="2" label="多点环绕" class="radio-custom"></el-radio-button>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="环绕点数量" required prop="poiOrbitNum" v-if="oibitType==='2'">
-              <el-input v-model="planBody.poiOrbitNum" maxlength="50"></el-input>
+            <el-form-item label="环绕点数量" required prop="poi_orbit_num" v-if="oibitType==='2'">
+              <el-input v-model="planBody.poi_orbit_num" maxlength="50"></el-input>
             </el-form-item>
             <el-form-item
               label="执行航线"
@@ -291,7 +291,7 @@ const planBody = reactive({
   status: 1,
   fan_id: '',
   poi_id: '',
-  poiOrbitNum: 1,
+  poi_orbit_num: 1,
   username: 'pilot',
   plan_type: type.value,
   rth_altitude: '',
@@ -324,7 +324,7 @@ const rules = {
       trigger: 'submit'
     }
   ],
-  poiOrbitNum: [
+  poi_orbit_num: [
     { required: true, message: '请输入环绕点数量', trigger: 'blur' },
     {
       pattern: /^[1-9]\d*$/,
@@ -464,7 +464,7 @@ function getInterestPoint () {
 
 function updateOibitType () {
   if (oibitType.value === '1') {
-    planBody.poiOrbitNum = 1
+    planBody.poi_orbit_num = 1
   }
 }
 

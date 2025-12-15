@@ -29,6 +29,14 @@
             重置
           </el-button>
 
+          <el-button
+            class="new_btn1 delete-bg"
+            type="primary"
+            :icon="Delete"
+            @click="batchDeleteWayline"
+          >
+            删除
+          </el-button>
           <router-link to="/wayline/Model">
             <el-button
               class="new_btn iconfont icon-xinjianhangxian"
@@ -38,12 +46,6 @@
               <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
             </el-button>
           </router-link>
-
-          <!-- 导入按钮 -->
-          <!-- <el-button class="new_btn iconfont icon-daoruhangxian" type="primary" style="margin-left: 10px; width: 100px;"
-            @click="openWaylineDialog">
-            <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
-          </el-button> -->
 
           <el-upload
             :before-upload="beforeUpload"
@@ -104,7 +106,12 @@
     </div>
     <div class="content">
       <div class="table-container">
-        <el-table :data="waylinesData.data" stripe>
+        <el-table
+          :data="waylinesData.data"
+          stripe
+          @selection-change="handleSelectionChange"
+        >
+          <el-table-column type="selection" width="55" />
           <el-table-column label="序号" align="center" width="60">
             <template #default="scope">
               {{ scope.$index + (paginationProp.current - 1) * paginationProp.pageSize + 1 }}
@@ -190,9 +197,6 @@
           </el-table-column>
         </el-table>
       </div>
-      <!-- <el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange" :current-page="currentPage"
-        :page-sizes="[10, 20, 30, 40]" :page-size="pageSize" :total="total"
-        layout="total, sizes, prev, pager, next, jumper"></el-pagination> -->
     </div>
     <div class="pagination-container">
       <!-- 分页 -->
@@ -207,33 +211,28 @@
       ></el-pagination>
     </div>
     <!-- 弹窗 -->
-    <el-dialog v-model="showMap" title="航线预览" width="800px" style="height: 500px;">
+    <el-dialog
+      v-model="showMap"
+      title="航线预览"
+      width="800px"
+      style="height: 500px;"
+    >
       <div class="live">
         <waylineMap ref="wayLineid"></waylineMap>
       </div>
     </el-dialog>
-
-    <!-- 测温弹窗 -->
   </div>
-  <!-- </div> -->
-  <!-- <div class="project-wayline-wrapper height-100">
-    <a-spin :spinning="loading" :delay="300" tip="downloading" size="large">
-
-      <div :style="{ height: height + 'px' }" class="scrollbar">
-      </div>
-    </a-spin>
-  </div> -->
 </template>
 
 <script lang="ts" setup>
 import { reactive } from '@vue/reactivity'
 import { message } from 'ant-design-vue'
-import { ElButton, ElDialog, ElUpload, ElMessage } from 'element-plus'
+import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-plus'
 import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
-import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
+import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, batchDeleteWaylineFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName } from '/@/types'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { DEVICE_NAME } from '/@/types/device'
 import { useMyStore } from '/@/store'
 import { WaylineFile } from '/@/types/wayline'
@@ -268,85 +267,9 @@ const queryForm = reactive({
   name: '',
 })
 // --------------------------------航线导入-------------------------------------------------------
-const isImportWayline = ref(false)
-const StationOption = ref([])
-const selectedMajor = ref<any>(null) // 选择的专业
-const selectedStation = ref<any>(null) // 选择的场站
 const uploadWaylineId = ref(null)
 const uploadWaylineName = ref(null)
 
-/**
- * @description: 查询所有的场站
- * @param {string} waylineInfo 航线信息
- * */
-function getSubInfo () {
-  getAllSub().then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    StationOption.value = res.data.map(item => ({
-      value: item.sub_code,
-      label: item.sub_name
-    }))
-  })
-}
-
-/**
- * @description: 插入航线绑定信息
- * @param {string} wayline_id 航线id
- * @param {string} wayline_name 航线名称
- * @param {string} sub_code 场站编码
- * @param {string} major 专业
- * @param {string} workspace_id 工作空间 id
- * */
-function insertWayline () {
-  nextTick(() => {
-    const obj = {
-      wayline_id: uploadWaylineId.value,
-      wayline_name: uploadWaylineName.value,
-      sub_code: selectedStation.value,
-      major: selectedMajor.value,
-      workspace_id: workspaceId,
-    }
-    bindWaylineAndSub(obj).then(res => {
-      // 转换数据格式
-      if (res.code !== 0) {
-        return
-      }
-      body.total = 0
-      body.page = 1
-      waylinesData.data = []
-      getWaylines()
-      isImportWayline.value = false
-    })
-  })
-}
-
-/**
- * @description: 打开导入弹窗
- * */
-function openWaylineDialog () {
-  isImportWayline.value = true
-  getSubInfo()
-}
-
-/**
- * @description: 关闭航线导入弹窗
- * */
-function closeImportWayline () {
-  isImportWayline.value = false
-}
-
-/**
- * @description: 航线导入弹窗数据确定提交方法
- * */
-const uploadWayline = () => {
-  if (!selectedMajor.value || !selectedStation.value) {
-    ElMessage.error('请选择专业和场站')
-    return
-  }
-  insertWayline()
-}
 // --------------------------------------------------------------------------------------------
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '30', '40'],
@@ -356,7 +279,7 @@ const paginationProp = reactive({
   current: 1,
   total: 0
 })
-
+const selectedData = ref([]) // 表格选中的记录
 const waylinesData = reactive({
   data: [] as WaylineFile[]
 })
@@ -429,45 +352,19 @@ const droneOption = [
   }
 ]
 const selectedDroneModel = ref(77)
-// function updateDroneOption () {
-//   const points = store.state.Points
-//   points[0].missionConfig.droneInfo.droneEnumValue = selectedDroneModel.value
-// }
 
 const updateDroneOption = (value) => {
-  console.log('选项23', value)
   const points = store.state.Points
   points[0].missionConfig.droneInfo.droneEnumValue = value[0]
   points[0].missionConfig.droneInfo.droneSubEnumValue = value[1]
 }
 const showSelectDialog = ref(false)
-function selectDroneModel () {
-  showSelectDialog.value = true
-}
 // ==========================================================================跳转到航点界面==========================================================================================================
-/**
- * @description: 携带参数跳转到航点界面
- * @param [string] waylineId 航线id
- * */
-function openWaylinePoints (waylineId: any) {
-  // console.log('ssss', waylineId)
-  // store.commit('SET_WAYLINE_INFO', waylineId)
-  const obj = {
-    id: waylineId.id,
-    name: waylineId.name
-  }
-  localStorage.setItem('waylineId', JSON.stringify(obj))
-  router.push({ path: '/waylinePoints' })
-  // console.log('ssdfddd', store.state.waylineData.id)
-  // const points1 = computed(() => store.state.Points)
-}
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 // 控制航线是否可视化
 const showMap = ref(false)
-function closeDrag () {
-  showMap.value = false
-}
+
 const wayLineid = ref(null) // 节点
 function openDrag (waylineId: string, Waylinetype: Number) {
   if (Waylinetype !== 0) {
@@ -486,91 +383,10 @@ function openDrag (waylineId: string, Waylinetype: Number) {
   })
   // wayLineid.value.WaylineInfo(id) // 通过 ref.value 访问子组件的方法
 }
-// ----------------------------------------------------------------------------------------------------获取航线数据，改成相应的数据格式，添加航点-----------------------------------------------------
-let mypoints = null
-// 编辑航线信息
-function editDrag (waylineId: string, name: string, Waylinetype: Number) {
-  if (Waylinetype !== 0) {
-    ElMessage({
-      message: '暂不支持面状航线!.',
-      type: 'warning',
-    })
-    return
-  }
-  editWaylineInfo(workspaceId, waylineId).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    // 重置仓库数据
-    const newPoints = [
-      {
-        name: name,
-        id: '',
-        is_distributed: true,
-        elements: [],
-        is_check: false,
-        is_select: false,
-        type: 1,
-        missionConfig: res.data.missionConfig,
-        folder: res.data.folder,
-        editing: 1
-      },
-    ]
-    store.commit('SET_POINTS', newPoints)
-    // const points1 = computed(() => store.state.Points)
-    // 存放数据到仓库
-    let pinNum = 0
-    res.data.folder.placeMarks.forEach(item => {
-      mypoints = item
-      const coordinatesString = item.point.coordinates
-      const [longitude, latitude] = coordinatesString.split(',').map(Number)
-      // 转换为对象
-      const obj = {
-        title: '航点' + pinNum,
-        coordinates: {
-          lng: longitude,
-          lat: latitude
-        }
-      }
-      pinNum++
-      postPinPositionResource(obj)
-    })
-  })
-  router.push({ path: '/wayline/createWayline' })
-  // wayLineid.value.WaylineInfo(id) // 通过 ref.value 访问子组件的方法
-}
 
-// 坐标转object
-function getPinPositionResource (obj: any) {
-  const position = obj.coordinates
-  const resource = generatePointContent(position)
-  const name = obj.title
-  const id = uuidv4()
-  return {
-    id,
-    name,
-    resource
-  }
-}
-function postPinPositionResource (obj) {
-  const req = getPinPositionResource(obj)
-  setLayers(req)
-}
-
-function setLayers (resource: PostElementsBody) {
-  // 添加航点数据
-  // const points1 = store.state.Points
-  const points1 = store.state.Points
-  const exists1 = points1[0].elements.some(item => item.id === resource.id)
-  if (!exists1) {
-    // 添加航点数据
-    const Placemark = mypoints
-    resource.Placemark = Placemark
-    points1[0].elements.push(resource)
-    store.commit('SET_POINTS', points1)
-  }
-}
-// ----------------------------------------------------------------------------------------------------结束-----------------------------------------------------
+/**
+ * 获取航线列表数据
+ */
 function getWaylines () {
   if (!canRefresh.value) {
     return
@@ -601,7 +417,7 @@ function reset () {
 // 分页事件
 function handleSizeChange (val: number) {
   paginationProp.pageSize = val
-  // refreshData(paginationProp)
+
   paginationProp.current = 1 // 重置为第一页
   refreshData(paginationProp)
 }
@@ -616,33 +432,19 @@ function refreshData (page: Pagination) {
   getWaylines()
 }
 
-// 搜索航线
-function SearchWayline () {
-  if (!canRefresh.value) {
-    return
-  }
-  canRefresh.value = false
-  searchWaylineFiles(workspaceId, {
-    search_value: searchValue.value,
-    order_by: 'update_time desc'
-  }).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    waylinesData.data = []
-    waylinesData.data = [...waylinesData.data, ...res.data.list]
-    body.total = res.data.pagination.total
-    body.page = res.data.pagination.page
-  }).finally(() => {
-    canRefresh.value = true
-  })
+function handleSelectionChange (val:any) {
+  selectedData.value = val
 }
 
+/**
+ * 单个删除航线
+ * @param id
+ */
 function deleteWayline (id: string) {
   deleteWaylineId.value = id
   deleteWaylineFile(workspaceId, deleteWaylineId.value).then(res => {
     if (res.code === 0) {
-      message.success('Wayline file deleted')
+      message.success('航线删除成功!')
     }
     deleteWaylineId.value = ''
     deleteTip.value = false
@@ -653,6 +455,41 @@ function deleteWayline (id: string) {
   })
 }
 
+/**
+ * 批量下载航线
+ */
+async function batchDeleteWayline () {
+  try {
+    if (selectedData.value.length === 0) {
+      ElMessage.warning('请选择要删除的数据!')
+      return
+    }
+    const obj = selectedData.value.map(item => item.id)
+    ElMessageBox.confirm('确定要删除选中的数据吗?', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+      .then(async () => {
+        const res = await batchDeleteWaylineFile(workspaceId, obj)
+        if (res.code !== 0) {
+          return
+        }
+        ElMessage.success('删除成功!')
+        await getWaylines()
+      })
+  } catch (e) {
+
+  }
+}
+
+//  selectedData
+
+/**
+ * 下载航线
+ * @param waylineId
+ * @param fileName
+ */
 function downloadWayline (waylineId: string, fileName: string) {
   loading.value = true
   downloadWaylineFile(workspaceId, waylineId).then(res => {
@@ -698,25 +535,7 @@ function beforeUpload (file: FileItem) {
   loading.value = true
   return true
 }
-// const uploadFile = async () => {
-//   fileList.value.forEach(async (file: FileItem) => {
-//     const fileData = new FormData()
-//     fileData.append('file', file, file.name)
-//     await importKmzFile(workspaceId, fileData).then((res) => {
-//       if (res.code === 0) {
-//         message.success(`${file.name} file uploaded successfully`)
-//         canRefresh.value = true
-//         body.total = 0
-//         body.page = 1
-//         waylinesData.data = []
-//         getWaylines()
-//       }
-//     }).finally(() => {
-//       loading.value = false
-//       fileList.value = []
-//     })
-//   })
-// }
+
 const uploadFile = async () => {
   fileList.value.forEach(async (file: FileItem) => {
     const fileData = new FormData()
@@ -732,6 +551,7 @@ const uploadFile = async () => {
     }).finally(() => {
       loading.value = false
       fileList.value = []
+      getWaylines()
     })
   })
 }
@@ -995,7 +815,11 @@ const uploadFile = async () => {
     }
 
   }
-
+  .delete-bg{
+        background-image: linear-gradient(180deg,
+        rgb(243, 172, 172) 0,
+        rgb(213 53 5) 100%) !important;
+  }
   .new_btn1 {
     background-image: linear-gradient(180deg,
         rgba(248, 212, 94, 1) 0,

@@ -21,9 +21,12 @@
             @click="viewReport()">
             查看报告
           </el-button>
+
+          <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
+          </el-button>
         </el-form-item>
 
-</el-form>
+      </el-form>
         <!-- <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
         @click="CreateThumbnail">
         <span style="margin-left: 5px; font-size: 14px;">测试缩略图</span>
@@ -35,18 +38,20 @@
           <!-- 多选框 -->
           <el-table-column type="selection" width="55" />
           <!-- 序号列 -->
-          <!-- <el-table-column label="序号" type="index" width="80" /> -->
-          <el-table-column label="序号" align="center" width="60">
-            <template #default="scope">
-              {{ scope.$index + (currentPage - 1) * pageSize + 1 }}
-            </template>
-          </el-table-column>
+          <el-table-column label="序号" type="index" width="80" />
           <!-- 预览图 -->
-          <el-table-column label="预览图" width="150">
+          <el-table-column label="图片" width="150">
             <template #default="scope">
               <img :src="scope.row.url" alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
                 @click="openPreviewModal(scope.row)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="分析图" width="150">
+            <template #default="scope">
+              <img :src="scope.row.defect_image_url" alt="预览图"
+                style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
+                @click="openPreviewAnaysisModal(scope.row)" />
             </template>
           </el-table-column>
           <el-table-column label="名称">
@@ -103,7 +108,7 @@
     </el-dialog>
 
     <!-- 图片放大弹窗 -->
-    <el-dialog v-model="previewVisible" :before-close="handleClose" width="1000px">
+    <el-dialog v-model="previewVisible" title="图片预览"  width="1000px">
       <div class="preview-modal-content">
         <!-- 左侧显示放大图片 -->
         <!-- <div class="preview-main"> -->
@@ -196,6 +201,94 @@
         </div>
       </div>
     </el-dialog>
+    <el-dialog v-model="previewAnaysisVisible" title="分析图片预览" width="1000px">
+      <div class="preview-modal-content">
+        <!-- 左侧显示放大图片 -->
+        <!-- <div class="preview-main"> -->
+        <!-- 添加“上一张”和“下一张”按钮 -->
+        <button class="prev-image" @click="showPreviousImage">‹</button>
+        <div style="width: 500px; height: 500px;">
+          <img :src="selectedImage.defect_image_url" alt="放大图" class="preview-image" ref="previewImage"
+            style="object-fit: contain; width: 500px; height: 500px;" />
+        </div>
+
+        <button class="next-image" @click="showNextImage">›</button>
+        <!-- </div> -->
+
+        <!-- 右侧显示任务信息 -->
+        <div class="preview-info">
+          <div class="info-row">
+            <strong>任务名称:</strong>
+            <input type="text" :value="jobInfo.job_name" class="info-input" readonly />
+          </div>
+          <div class="info-row">
+            <strong>名称:</strong>
+            <input type="text" :value="selectedImage.file_name" class="info-input" readonly />
+          </div>
+          <!-- <div class="info-row">
+            <strong>关联点位:</strong>
+            <input type="text" :value="selectedImage.point_name" class="info-input" readonly />
+          </div> -->
+          <div class="info-row">
+            <strong>照片类型:</strong>
+            <input type="text" :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'" class="info-input"
+              readonly />
+          </div>
+          <div class="info-row">
+            <strong>航线名称:</strong>
+            <input type="text" :value="jobInfo.file_name" class="info-input" readonly />
+          </div>
+          <div class="info-row">
+            <strong>照片分辨率:</strong>
+            <input type="text" :value="`${selectedImage.width} * ${selectedImage.height}`" class="info-input"
+              readonly />
+          </div>
+          <div class="info-row">
+            <strong>拍摄时间:</strong>
+            <input type="text" :value="new Date(selectedImage.create_time).toLocaleString()" class="info-input"
+              readonly />
+          </div>
+          <div class="info-row">
+            <strong>文件大小:</strong>
+            <input type="text" :value="Number(selectedImage.size).toFixed(2) + 'M'" class="info-input" readonly />
+          </div>
+        </div>
+      </div>
+
+      <!-- 放大图操作按钮 -->
+      <div class="preview-container">
+        <div class="preview-actions">
+          <!-- 放大 -->
+          <!-- <el-button icon="el-icon-zoom-in" @click="zoomIn" size="small"></el-button> -->
+          <!-- 缩小 -->
+          <!-- <el-button icon="el-icon-zoom-out" @click="zoomOut" size="small"></el-button> -->
+          <!-- 旋转 -->
+          <el-button icon="el-icon-rotate-left" @click="rotate" size="small">旋转方向</el-button>
+          <!-- 重置方向 -->
+          <el-button icon="el-icon-refresh" @click="resetOrientation" size="small">重置方向</el-button>
+          <!-- 下载 -->
+          <el-button icon="el-icon-download" @click="downloadImageLocal(selectedImage)" size="small">下载图片</el-button>
+        </div>
+
+        <!-- 下方显示缩略图 -->
+        <div class="preview-thumbnails">
+          <!-- 左侧滚动按钮 -->
+          <!-- <button class="scroll-button left" @click="scrollLeft">&lt;</button> -->
+          <div class="thumbnail-container">
+            <!-- <el-row gutter="5">
+              <el-col  -->
+            <div v-for="(item, index) in mediaData.data" :key="index" class="thumbnail-item">
+              <img :src="item.defect_image_url" alt="" class="thumbnail-image" :class="{ active: selectedImage === item }"
+                @click="selectImage(item)" />
+              <!-- </el-col>
+            </el-row> -->
+            </div>
+          </div>
+          <!-- 右侧滚动按钮 -->
+          <!-- <button class="scroll-button right" @click="scrollRight">&gt;</button> -->
+        </div>
+      </div>
+    </el-dialog>
     <!-- 红外测温 -->
     <div class="TEMPPanel" v-show="showTempConfig" v-drag-window>
       <div style="height: 40px; width: 100%; border-bottom: 1px solid #fff; padding-left: 10px;" class="drag-title">
@@ -273,7 +366,7 @@ import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
 import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
-import { Search, Download, Document, Refresh } from '@element-plus/icons-vue'
+import { Search, Download, Document, Refresh, Delete } from '@element-plus/icons-vue'
 import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, createFlyTaskReportApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
@@ -311,21 +404,7 @@ const jobInfo = reactive({
 
 const origionImageUrls = ref([]) // 临时存放原图下载urls
 
-onMounted(() => {
-  const data = JSON.parse(localStorage.getItem('TaskInfo'))
-  jobInfo.job_id = data.job_id
-  // 'e955f015-0846-4304-be4e-d7ade4ef1e8b'
-  // data.job_id
-  jobInfo.job_name = data.job_name
-  jobInfo.begin_time = data.begin_time
-  jobInfo.end_time = data.end_time
-  jobInfo.status = data.status
-  jobInfo.file_name = data.file_name
-  jobInfo.file_id = data.file_id
-
-  getFiles()
-})
-
+// 图片预览参数
 interface MediaFile {
   fingerprint: string,
   drone: string,
@@ -340,6 +419,25 @@ interface MediaFile {
 
 const mediaData = reactive({
   data: [] as MediaFile[]
+})
+const previewVisible = ref(false) // 弹窗显示状态，初始值为 false
+const previewAnaysisVisible = ref(false) // 分析图片弹窗显示状态，初始值为 false
+const selectedImage = ref(mediaData.data[0]) // 初始选中第一个任务
+const selectedIndex = ref(0) // 当前图片索引
+const scale = ref(1) // 图片缩放比例
+const rotation = ref(0) // 图片旋转角度
+
+onMounted(() => {
+  const data = JSON.parse(localStorage.getItem('TaskInfo'))
+  jobInfo.job_id = data.job_id
+  jobInfo.job_name = data.job_name
+  jobInfo.begin_time = data.begin_time
+  jobInfo.end_time = data.end_time
+  jobInfo.status = data.status
+  jobInfo.file_name = data.file_name
+  jobInfo.file_id = data.file_id
+
+  getFiles()
 })
 
 /**
@@ -412,6 +510,9 @@ async function viewReport () {
  * */
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 async function getFiles () {
+  // mediaData.data = res.list
+  // paginationProp.total = res.pagination.total
+  // getUrls()
   getFlyTaskResultApi({
     job_id: jobInfo.job_id,
     workspace_id: workspaceId,
@@ -600,22 +701,65 @@ function downloadMediaLocal (media: any) {
 }
 
 /**
- * 生成缩略图
- * @param file_id
- * @param workspace_id
- */
-const file_id = '94ca802b-40a0-4731-bb59-1e9008d8d7b8'
-function CreateThumbnail () {
-  getThumbnailById('94ca802b-40a0-4731-bb59-1e9008d8d7b8', 'e3dea0f5-37f2-4d79-ae58-490af3228069').then(res => {
-    if (res.code !== 0) {
-      message.error('缩略图生成失败!')
-      return
-    }
-    message.success('缩略图生成成功')
-  })
+ * @description: 下载分析图片到本地
+ * @param {string} workspaceId 工作空间id
+ * */
+
+function downloadImageLocal (media: any) {
+  // 判断media是否包含url属性
+  if (!media || !media.defect_image_url) {
+    ElMessage.error('图片地址无效')
+    return
+  }
+
+  // 从图片地址下载
+  fetchImageFromUrl(media.defect_image_url, media.file_name)
+    .catch(error => {
+      console.error('下载失败:', error)
+      ElMessage.error('下载失败: ' + error.message)
+    })
+    .finally(() => {
+    })
 }
 
-// getTEMP
+// 从图片地址获取并下载
+async function fetchImageFromUrl (imageUrl: string, fileName: string) {
+  try {
+    // 获取图片数据
+    const response = await fetch(imageUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'image/*',
+      },
+      mode: 'cors',
+      credentials: 'omit',
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    // 获取blob数据
+    const blob = await response.blob()
+
+    if (blob.size === 0) {
+      throw new Error('获取的图片数据为空')
+    }
+
+    // 检查是否为有效的图片格式
+    if (!blob.type.startsWith('image/')) {
+      throw new Error('获取的不是有效的图片文件')
+    }
+
+    // 调用下载函数
+    downloadFile(blob, fileName)
+
+    ElMessage.success('下载成功')
+  } catch (error) {
+    console.error('获取图片失败:', error)
+  }
+}
+
 // ==========================================================================红外测温=====================================================================================
 
 /**
@@ -918,31 +1062,14 @@ function handleCurrentChange (val: number) {
   paginationProp.current = val
   getFiles()
 }
-// ============================================================分页数据==========================================================
-// 分页事件
-// function handleSizeChange (val: number) {
-//   paginationProp.pageSize = val
-//   refreshData(paginationProp)
-// }
-// function handleCurrentChange (val: number) {
-//   paginationProp.current = val
-//   refreshData(paginationProp)
-// }
 
-// function refreshData (page: Pagination) {
-//   body.page = page?.current!
-//   body.page_size = page?.pageSize!
-// }
-//= ================================================================================================================================
-
-const previewVisible = ref(false) // 弹窗显示状态，初始值为 false
-const selectedImage = ref(mediaData.data[0]) // 初始选中第一个任务
-const selectedIndex = ref(0) // 当前图片索引
-const scale = ref(1) // 图片缩放比例
-const rotation = ref(0) // 图片旋转角度
-
-// 打开预览弹窗
+/**
+ * 弹窗预览
+ * @param row
+ */
+// 打开预览原始图片弹窗
 async function openPreviewModal (row: any) {
+  origionImageUrls.value = []
   selectedImage.value = row // 设置选中的图像
   selectedIndex.value = mediaData.data.findIndex((item) => item.file_id === row.file_id) // 更新索引
   // 临时赋值，使得先展示弹窗，然后加载数据
@@ -958,6 +1085,94 @@ async function openPreviewModal (row: any) {
   } else {
     const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await getOrigionImage(selectedImage.value.file_id, selectedImage.value.file_name)
     updateSelectedImage({ url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, size: mediasize })
+  }
+}
+
+// 打开预览分析图片的弹窗
+async function openPreviewAnaysisModal (row:any) {
+  origionImageUrls.value = []
+  selectedImage.value = row // 设置选中的图像
+  selectedIndex.value = mediaData.data.findIndex((item) => item.file_id === row.file_id) // 更新索引
+  // 临时赋值，使得先展示弹窗，然后加载数据
+  selectedImage.value.Temp = ''
+  selectedImage.value.width = 0
+  selectedImage.value.height = 0
+  selectedImage.value.size = 0.00
+  // 将弹窗显示状态设为 true
+  previewAnaysisVisible.value = true
+  getImageAttributes(row.defect_image_url)
+}
+
+// 获取图片属性信息
+async function getImageAttributes (imageUrl: string) {
+  try {
+    // 先设置图片地址
+    // selectedImage.value.defect_image_url = imageUrl
+
+    // 获取图片信息
+    const img = new Image()
+
+    const imageInfo = await new Promise<{ width: number; height: number; size: number }>((resolve, reject) => {
+      img.onload = async () => {
+        try {
+          // 获取文件大小
+          let fileSize = 0.0
+
+          // 如果是远程图片，尝试获取文件大小
+          if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+            try {
+              const response = await fetch(imageUrl, { method: 'HEAD' })
+              const contentLength = response.headers.get('content-length')
+              if (contentLength) {
+                const sizeInBytes = parseInt(contentLength, 10)
+                fileSize = parseFloat((sizeInBytes / (1024 * 1024)).toFixed(2))
+              }
+            } catch (e) {
+              console.warn('无法获取远程图片大小:', e)
+            }
+          }
+
+          resolve({
+            width: img.width,
+            height: img.height,
+            size: fileSize
+          })
+        } catch (error) {
+          reject(error)
+        }
+      }
+
+      img.onerror = () => {
+        reject(new Error('图片加载失败'))
+      }
+
+      img.src = imageUrl
+
+      // 设置超时
+      setTimeout(() => {
+        if (!img.complete) {
+          reject(new Error('图片加载超时'))
+        }
+      }, 10000)
+    })
+    // 更新图片信息
+    selectedImage.value.width = imageInfo.width
+    selectedImage.value.height = imageInfo.height
+    selectedImage.value.size = imageInfo.size
+
+    return imageInfo
+  } catch (error) {
+    console.error('获取图片属性失败:', error)
+    selectedImage.value.width = 0
+    selectedImage.value.height = 0
+    selectedImage.value.size = 0.0
+
+    // 返回默认值
+    return {
+      width: 0,
+      height: 0,
+      size: 0.0
+    }
   }
 }
 
@@ -1227,7 +1442,11 @@ function scrollRight () {
     }
 
   }
-
+  .delete-bg{
+        background-image: linear-gradient(180deg,
+        rgb(243, 172, 172) 0,
+        rgb(213 53 5) 100%) !important;
+  }
   .new_btn1 {
     background-image: linear-gradient(180deg,
         rgba(248, 212, 94, 1) 0,

@@ -32,7 +32,14 @@
             <!-- 重置按钮 -->
             <el-button class="new_btn1" type="primary" style="margin-left: 10px" :icon="Refresh" @click="reset">重置
             </el-button>
-
+            <el-button
+              class="new_btn1 delete-bg"
+              type="primary"
+              :icon="Delete"
+              @click="batchDeletePlan"
+            >
+              删除
+            </el-button>
             <!-- 新建计划 -->
             <el-button class="new_btn" type="primary" style="margin-left: 10px" :icon="Plus" @click="toCreatePlan('1')">新建计划</el-button>
         </el-form-item>
@@ -40,7 +47,7 @@
     </div>
     <div class="content">
       <div class="table-container">
-        <el-table :data="tableData" stripe>
+        <el-table :data="tableData" stripe  @selection-change="handleSelectionChange">
 
           <!-- 序号列 -->
           <el-table-column type="selection" width="55" />
@@ -80,12 +87,23 @@
               <div class="ellipsis">{{ scope.row.plan_source }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="300px">
+          <el-table-column label="操作" width="300px" align="center">
             <template #default="scope">
               <div class="action-buttons">
-                <el-button size="small" type="primary" class="custom-execute-btn"
-                  @click="executeNow(scope.row)">下发任务</el-button>
-                <el-button size="small" type="danger" class="custom-delete-btn"
+
+                <div v-if="scope.row.task_type === 0">
+                    <el-button size="small" type="primary" class="custom-execute-btn" link
+                      @click="executeNow(scope.row)">下发任务</el-button>
+                </div>
+                <div v-else>
+                  <el-tooltip
+                    effect="dark"
+                    content="创建计划时,定时任务自动进入排队队列,无需执行"
+                  >
+                    <el-button size="small" type="primary" class="custom-execute-btn" disabled link>下发任务</el-button>
+                  </el-tooltip>
+                </div>
+                <el-button size="small" type="danger" class="custom-delete-btn" link
                   @click="deletePlan(scope.row)">删除</el-button>
               </div>
             </template>
@@ -108,8 +126,8 @@
 import { reactive, ref, onMounted, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
-import { Task, getFlyWaylinePlan, DistributeFlyPlan, deleteFlyPlan } from '/@/api/wayline'
+import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
+import { Task, getFlyWaylinePlan, DistributeFlyPlan, batchDeleteFlyPlan, deleteFlyPlan } from '/@/api/wayline'
 import { useRouter } from 'vue-router'
 import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
 
@@ -137,6 +155,7 @@ const queryForm = reactive({
   plan_type: '1'
 })
 
+const selectedData = ref([]) // 表格批量删除暂存
 onMounted(() => {
   getPlan()
 })
@@ -172,7 +191,12 @@ function executeNow (data: any) {
   })
 }
 
-// 删除任务
+function handleSelectionChange (val) {
+  // console.log(val)
+  selectedData.value = val
+}
+
+// 单个删除任务
 function deletePlan (val: any) {
   ElMessageBox.confirm('确定要删除本计划吗？', '提示', {
     confirmButtonText: '确定',
@@ -190,6 +214,32 @@ function deletePlan (val: any) {
     .catch(() => {
       ElMessage.info('已取消删除')
     })
+}
+
+// 批量删除
+function batchDeletePlan () {
+  try {
+    if (selectedData.value.length === 0) {
+      ElMessage.warning('请选择要删除的数据!')
+      return
+    }
+    const obj = selectedData.value.map(item => item.id)
+    ElMessageBox.confirm('确定要删除选中的数据吗?', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+      .then(async () => {
+        const res = await batchDeleteFlyPlan(obj)
+        if (res.code !== 0) {
+          return
+        }
+        ElMessage.success('删除成功!')
+        await getPlan()
+      })
+  } catch (e) {
+
+  }
 }
 
 // 新建任务 type  0普通航线计划  1 风机计划
@@ -425,7 +475,11 @@ function refreshData (page: Pagination) {
             margin: 9px 20px 0 8px;
         }
     }
-
+  .delete-bg{
+        background-image: linear-gradient(180deg,
+        rgb(243, 172, 172) 0,
+        rgb(213 53 5) 100%) !important;
+  }
     .new_btn1 {
         background-image: linear-gradient(180deg,
                 rgba(248, 212, 94, 1) 0,
@@ -538,8 +592,7 @@ function refreshData (page: Pagination) {
     /* 使用 flex 布局 */
     gap: 8px;
     /* 按钮之间的间距 */
-    justify-content: flex-start;
-    /* 如果需要调整对齐方式，可以改为 center 或 space-between */
+    justify-content: center;
     align-items: center;
     /* 垂直方向对齐 */
 }

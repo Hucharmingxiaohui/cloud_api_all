@@ -45,6 +45,16 @@ export const deleteWaylineFile = async function (workspaceId: string, waylineId:
   const result = await request.delete(url)
   return result.data
 }
+
+// 批量删除航线
+export const batchDeleteWaylineFile = async function (workspaceId: string, data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/batchDelete`
+  const result = await request.post(url, data)
+  return result.data
+}
+//  @selection-change="handleSelectionChange"
+
+//  @selection-change="handleSelectionChange"
 // 查询航线站点信息,可视化航线
 export const gethWaylineInfo = async function (wid: string, waylineId: string): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines/${waylineId}/llPoint`
@@ -280,6 +290,13 @@ export const getFlyWaylinePlan = async function (data: any): Promise<IWorkspaceR
 export async function deleteFlyPlan (planId: string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX3}/waylinePlan/deletePlanById?id=${planId}`
   const result = await request.delete(url)
+  return result.data
+}
+
+// 批量删除计划
+export async function batchDeleteFlyPlan (data: any): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX3}/waylinePlan/batchDeletePlanByIds`
+  const result = await request.post(url, data)
   return result.data
 }
 
