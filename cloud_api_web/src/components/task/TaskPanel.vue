@@ -25,19 +25,16 @@
             <!-- 重置按钮 -->
             <el-button class="new_btn1" type="primary" style="margin-left: 10px" :icon="Refresh" @click="reset">重置
             </el-button>
+            <el-button class="new_btn1 delete-bg" type="primary" :icon="Delete" @click="batchDeleteTask">删除 </el-button>
         </el-form-item>
       </el-form>
 
     </div>
     <div class="content">
       <div class="table-container">
-          <el-table :data="plansData.data" stripe
+          <el-table :data="plansData.data" stripe   @selection-change="handleSelectionChange" :row-key="row => row.job_id"
             :header-cell-style="{ height: '43px', color: 'rgba(255, 255, 255, 1)',fontSize: '16px', fontWeight: 'bold', backgroundColor: '#00399A',  borderLeft: '2px #01123288 solid', borderBottom: '1px #154480 solid' }">
-            <!-- <el-table-column  label="序号" align='center' width="60">
-                <template #default="scope">
-                      {{ scope.$index+1 }}
-                </template>
-            </el-table-column> -->
+            <el-table-column type="selection" width="55"  :selectable="isRowSelectable" />
             <el-table-column label="序号" align='center' width="60">
               <template #default="scope">
                 {{ scope.$index +(paginationProp.current - 1) * paginationProp.pageSize+ 1 }}
@@ -144,12 +141,12 @@
             </el-table-column>
             <el-table-column label="操作">
               <template #default="scope">
-                 <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">结果分析</el-button>
+                <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">结果分析</el-button>
                 <el-popconfirm v-if="scope.row.status === TaskStatus.Wait " width="220" confirm-button-text="确定"
-                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要删除飞行任务吗？"
+                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要取消飞行任务吗？"
                   @confirm="onDeleteTask(scope.row.job_id)">
                   <template #reference>
-                    <el-button size="small" link type="primary" class="preview">删除</el-button>
+                    <el-button size="small" link type="primary" class="preview">取消</el-button>
                   </template>
                 </el-popconfirm>
                 <el-popconfirm  v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel"  width="220" confirm-button-text="确定"
@@ -159,8 +156,6 @@
                     <el-button size="small" link type="primary" class="preview">删除</el-button>
                   </template>
                 </el-popconfirm>
-                <!-- <el-button size="small" type="text" @click="toTaskVideo(scope.row)">任务直播</el-button> -->
-                <!-- <el-button size="small" type="text" @click="toTaskResult(scope.row)"> 任务结果 </el-button> -->
                 <el-button size="small" link type="primary" class="preview" @click="toTaskResult(scope.row)">任务结果</el-button>
                 <el-popconfirm v-if="scope.row.status === TaskStatus.Carrying" width="220" confirm-button-text="确定"
                   cancel-button-text="取消" icon-color="#626AEF" title="你确定要挂起飞行任务吗？"
@@ -194,10 +189,11 @@
 
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
+import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-plus'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { onMounted, watch, provide, reactive, ref, nextTick, onUnmounted } from 'vue'
 import { IPage } from '/@/api/http/type'
-import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, deleteOtherTask } from '/@/api/wayline'
+import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, batchDeleteTaskApi, deleteOtherTask } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
 import { ELocalStorageKey, ERouterName } from '/@/types/enums'
 import { useFormatTask } from './use-format-task'
@@ -210,9 +206,10 @@ import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 const router = useRouter()
 
+const selectedData = ref([])
 // 存储已处理的任务ID，避免重复分析
 const analyzedTasks = ref(new Set())
 // 存储任务分析状态
@@ -246,8 +243,15 @@ const outControlAcion = {
   1: '悬停',
   2: '降落'
 } as { [key: string]: string }
-// import CreatePlan from './CreatePlan.vue'
-// import CreatePlan from '/@/pages/page-web/projects/task.vue'
+
+function isRowSelectable (row, index) {
+  return (
+    row.status === TaskStatus.Success ||
+    row.status === TaskStatus.Fail ||
+    row.status === TaskStatus.CanCel
+  )
+}
+
 const store = useMyStore()
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
@@ -613,28 +617,58 @@ function refreshData (page: Pagination) {
   getPlans()
 }
 //= ================================================================================================================================
-// 删除任务
+// 删除准备中的任务
 async function onDeleteTask (jobId: string) {
   const { code } = await deleteTask(workspaceId, {
     job_id: jobId
   })
   if (code === 0) {
-    message.success('任务删除成功!')
+    ElMessage.success('任务删除成功!')
     getPlans()
   }
   if (code === -1) {
-    message.error('设备不在线!')
+    ElMessage.error('设备不在线!')
   }
 }
 
+// 删除失败、成功、取消状态的任务
 async function onDeleteOtherTask (jobId: string) {
   deleteOtherTask(jobId).then(res => {
     if (res.code !== 0) {
       return
     }
-    message.success('任务删除成功!')
+    ElMessage.success('任务删除成功!')
     getPlans()
   })
+}
+
+// 批量删除失败、成功、取消状态的任务
+function handleSelectionChange (val:any) {
+  selectedData.value = val
+}
+async function batchDeleteTask () {
+  try {
+    if (selectedData.value.length === 0) {
+      ElMessage.warning('请选择要删除的数据!')
+      return
+    }
+    const obj = selectedData.value.map(item => item.job_id)
+    ElMessageBox.confirm('确定要删除选中的数据吗?', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+      .then(async () => {
+        const res = await batchDeleteTaskApi(obj)
+        if (res.code !== 0) {
+          return
+        }
+        ElMessage.success('删除成功!')
+        await getPlans()
+      })
+  } catch (e) {
+
+  }
 }
 
 // 挂起任务
@@ -644,7 +678,7 @@ async function onSuspendTask (jobId: string) {
     status: UpdateTaskStatus.Suspend
   })
   if (code === 0) {
-    message.success('任务挂起成功!')
+    ElMessage.success('任务挂起成功!')
     getPlans()
   }
 }
@@ -656,7 +690,7 @@ async function onResumeTask (jobId: string) {
     status: UpdateTaskStatus.Resume
   })
   if (code === 0) {
-    message.success('Resumed successfully')
+    ElMessage.success('解除挂起成功!')
     getPlans()
   }
 }
@@ -665,7 +699,7 @@ async function onResumeTask (jobId: string) {
 async function onUploadMediaFileNow (jobId: string) {
   const { code } = await uploadMediaFileNow(workspaceId, jobId)
   if (code === 0) {
-    message.success('Upload Media File successfully')
+    ElMessage.success('上传图片成功!')
     getPlans()
   }
 }
@@ -849,7 +883,11 @@ function toTaskVideo (val: any) {
     }
 
   }
-
+  .delete-bg{
+        background-image: linear-gradient(180deg,
+        rgb(243, 172, 172) 0,
+        rgb(213 53 5) 100%) !important;
+  }
   .new_btn1 {
     background-image: linear-gradient(180deg,
         rgba(248, 212, 94, 1) 0,

@@ -372,6 +372,13 @@ export async function deleteTask (workspaceId: string, params: DeleteTaskParams)
   return result.data
 }
 
+// 批量删除机场任务
+export async function batchDeleteTaskApi (data: any): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX3}/waylinePlan/batchDeleteJobByJobIds`
+  const result = await request.post(url, data)
+  return result.data
+}
+
 // 删除其他状态的机场任务
 export async function deleteOtherTask (job_id: string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX3}/waylinePlan/deleteJobByJobId?job_id=${job_id}`

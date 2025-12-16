@@ -22,8 +22,8 @@
             查看报告
           </el-button>
 
-          <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
-          </el-button>
+          <!-- <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
+          </el-button> -->
         </el-form-item>
 
       </el-form>
