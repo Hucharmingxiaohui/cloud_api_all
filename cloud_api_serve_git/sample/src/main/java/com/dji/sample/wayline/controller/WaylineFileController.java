@@ -1,5 +1,7 @@
 package com.dji.sample.wayline.controller;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.wayline.model.dto.WaylineFileDTO;
 import com.dji.sample.wayline.service.IWaylineFileService;
@@ -50,11 +52,10 @@ public class WaylineFileController implements IHttpWaylineService {
         return isDel ? HttpResultResponse.success() : HttpResultResponse.error("Failed to delete wayline.");
     }
 //  航线批量删除
-    @GetMapping("${url.wayline.prefix}${url.wayline.version}/workspaces/{workspace_id}/batchDelete")
-    public HttpResultResponse batchDeleteWayline(@PathVariable(name = "workspace_id") String workspaceId, @RequestParam String waylineIds) {
-        String[] split = waylineIds.split(",");
+    @PostMapping("${url.wayline.prefix}${url.wayline.version}/workspaces/{workspace_id}/batchDelete")
+    public HttpResultResponse batchDeleteWayline(@PathVariable(name = "workspace_id") String workspaceId, @RequestBody List<String> waylineIds) {
         boolean isDel=true;
-        for(String waylineId : split) {
+        for(String waylineId:waylineIds){
             boolean isDel1 = waylineFileService.deleteByWaylineId(workspaceId, waylineId);
             isDel = isDel1 && isDel;
         }

@@ -8,6 +8,7 @@ import lombok.Data;
 import org.hibernate.validator.constraints.Range;
 import javax.persistence.Transient;
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 @TableName("pub_wayline_job_plan_df")
@@ -115,4 +116,8 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @Transient
     @TableField(exist = false)
     private Integer deviceLevel;
+
+    @Transient
+    @TableField(exist = false)
+    private List<String> fanIdList;
 }

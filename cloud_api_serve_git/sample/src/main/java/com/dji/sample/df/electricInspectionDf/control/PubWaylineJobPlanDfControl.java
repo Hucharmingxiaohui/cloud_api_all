@@ -40,16 +40,53 @@ public class PubWaylineJobPlanDfControl {
         Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
         boolean result = (boolean) waylineJObPlan.get("result");
         if(result){
-            PubWaylineJobPlanDfEntity plan = (PubWaylineJobPlanDfEntity)waylineJObPlan.get("plan");
-//          定时任务则立即执行
-            if(plan.getTaskType()==1){
-                pubWaylineJobPlanDfService.expressPlan(customClaim,plan);
+            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
+//          定时任务则立即执行,要根据实际情况加上间隔(暂定1个小时）
+            // 获取第一个对象的beginTime作为基准时间
+            long baseTime = planDfEntityList.get(0).getBeginTime();
+            for (int i = 0; i < planDfEntityList.size(); i++) {
+                PubWaylineJobPlanDfEntity planDfEntity = planDfEntityList.get(i);
+                // 为每个对象设置新的beginTime：基准时间 + i * 1小时
+                long newBeginTime = baseTime + i * 3600000L; // 1小时 = 3600000毫秒
+                planDfEntity.setBeginTime(newBeginTime);
+                if (planDfEntity.getTaskType() == 1) {
+                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+                }
             }
-            return HttpResultResponse.success().setMessage("创建飞行计划成功");
+//            PubWaylineJobPlanDfEntity planDfEntity = (PubWaylineJobPlanDfEntity) waylineJObPlan.get("plan");
+////          定时任务则立即执行
+//            if(planDfEntity.getTaskType()==1) {
+//                pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+//            }
+            return HttpResultResponse.success(waylineJObPlan).setMessage("创建飞行计划成功");
         }else{
            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
         }
     }
+//    多机巢计划，和上述逻辑一样，只不过传多计划，一个机场对应一个计划
+//    @PostMapping("/createWaylinePlan")
+//    HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+//        CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
+//        String workspaceId = customClaim.getWorkspaceId();
+//        String creator = customClaim.getUsername();
+////      为了后续风机航线创建任务
+//        redisUtils.set("workspaceId", workspaceId);
+//        redisUtils.set("creator", creator);
+//        Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
+//        boolean result = (boolean) waylineJObPlan.get("result");
+//        if(result){
+//            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
+////          定时任务则立即执行,要根据实际情况加上间隔
+//            for (PubWaylineJobPlanDfEntity planDfEntity : planDfEntityList) {
+//                if(planDfEntity.getTaskType()==1){
+//                    pubWaylineJobPlanDfService.expressPlan(customClaim,planDfEntity);
+//                }
+//            }
+//            return HttpResultResponse.success().setMessage("创建飞行计划成功");
+//        }else{
+//            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
+//        }
+//    }
 
     @GetMapping("/plan_type/{plan_type}/getPlanByPlantype")
     public HttpResultResponse<PaginationData<PubWaylineJobPlanDfEntity>> getPlanByPlantype(@RequestParam(defaultValue = "1") Long page,
@@ -95,14 +132,10 @@ public class PubWaylineJobPlanDfControl {
        }
     }
 
-    //删除飞行计划
-    @DeleteMapping("/batchDeletePlanByIds")
-    HttpResultResponse batchDeletePlanByIds(@RequestParam String ids){
-        List<Integer> intList = Arrays.stream(ids.split(","))
-                .map(String::trim)        // 去除空格
-                .map(Integer::parseInt)
-                .collect(Collectors.toList());
-        boolean flag= pubWaylineJobPlanDfService.batchDeletePlanByIds(intList);
+    //批量删除飞行计划
+    @PostMapping("/batchDeletePlanByIds")
+    HttpResultResponse batchDeletePlanByIds(@RequestBody List<Integer> ids){
+        boolean flag= pubWaylineJobPlanDfService.batchDeletePlanByIds(ids);
         if(flag){
             return HttpResultResponse.success().setMessage("批量删除计划成功");
         }else {
@@ -119,12 +152,11 @@ public class PubWaylineJobPlanDfControl {
             return HttpResultResponse.error("删除任务失败");
         }
     }
-//  批量删除飞行任务，暂时不用，因为任务里准备中的任务是调取消任务的接口，应该分两类进行处理
-    @DeleteMapping("/batchDeleteJobByJobIds")
-    HttpResultResponse batchDeleteJobByJobIds(@RequestParam String jobIds){
-        String[] split = jobIds.split(",");
+//  批量删除飞行任务，暂时不用，因为任务里准备中的任务是调取消任务的接口，应该分两类进行处理,也要改成post
+    @PostMapping("/batchDeleteJobByJobIds")
+    HttpResultResponse batchDeleteJobByJobIds(@RequestBody List<String> jobIds){
         boolean flag = true;
-        for(String jobId:split){
+        for(String jobId:jobIds){
             boolean flag1= pubWaylineJobPlanDfService.deleteJobByBobId(jobId);
             flag = flag1 && flag ;
         }

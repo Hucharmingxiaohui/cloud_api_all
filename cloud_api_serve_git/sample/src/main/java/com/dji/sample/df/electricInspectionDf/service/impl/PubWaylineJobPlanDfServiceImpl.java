@@ -6,6 +6,8 @@ import com.df.server.dto.JobPlan.JobPlanItemPointDTO;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.model.CustomClaim;
+import com.dji.sample.component.redis.RedisConst;
+import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
@@ -62,7 +64,41 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         if(planType==1){
 //          普通风机巡检计划
-            return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
+            Map<String, Object> allResult =new HashMap<>();
+            List<PubWaylineJobPlanDfEntity> successPlans = new ArrayList<>();
+            boolean allSuccess = true;
+            List<String> fanIdList = pubWaylineJobPlanDfEntity.getFanIdList();
+            for (String fanId : fanIdList) {
+                PubWaylineJobPlanDfEntity copyPlanEntity = copyPlanEntity(pubWaylineJobPlanDfEntity);
+                copyPlanEntity.setFanId(fanId);
+                Map<String, Object> singleResult = routePlanService.buildFanWayline(copyPlanEntity);
+                // 检查结果
+                Boolean resultFlag = (Boolean) singleResult.get("result");
+                if (resultFlag != null && resultFlag) {
+                    // 成功：保存计划
+                    PubWaylineJobPlanDfEntity successPlan = (PubWaylineJobPlanDfEntity) singleResult.get("plan");
+                    if (successPlan != null) {
+                        successPlans.add(successPlan);
+                    }
+                } else {
+                    // 失败：标记为失败
+                    allSuccess = false;
+                    // 可以选择记录失败的风机ID
+                    allResult.put("failedFanId", fanId.trim());
+                    break; // 或者不break，继续处理其他风机
+                }
+            }
+            // 设置最终结果
+            allResult.put("result", allSuccess);
+            if (allSuccess && !successPlans.isEmpty()) {
+                allResult.put("plans", successPlans); // 返回所有成功计划
+            } else {
+                allResult.put("successCount", successPlans.size());
+                allResult.put("totalCount", fanIdList.size());
+            }
+            return allResult;
+
+//            return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
         }else if(planType==2){
 //          风机兴趣点环绕计划
             return routePlanService.buildInterestPointWayline(pubWaylineJobPlanDfEntity);
@@ -92,6 +128,28 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
                 return map;
             }
         }
+    }
+
+    // 复制计划实体的辅助方法
+    private PubWaylineJobPlanDfEntity copyPlanEntity(PubWaylineJobPlanDfEntity source) {
+        // 使用BeanUtils或手动复制
+        PubWaylineJobPlanDfEntity copy = new PubWaylineJobPlanDfEntity();
+        copy.setPlanSource(source.getPlanSource());
+        copy.setName(source.getName());
+        copy.setDockSn(source.getDockSn());
+        copy.setWorkspaceId(source.getWorkspaceId());
+        copy.setTaskType(source.getTaskType());
+        copy.setWaylineType(source.getWaylineType());
+        copy.setBeginTime(source.getBeginTime());
+        copy.setEndTime(source.getEndTime());
+        copy.setUsername(source.getUsername());
+        copy.setRthAltitude(source.getRthAltitude());
+        copy.setOutOfControl(source.getOutOfControl());
+        copy.setEnableStatus(source.getEnableStatus());
+        copy.setPlanPriority(source.getPlanPriority());
+        copy.setPlanType(source.getPlanType());
+        // 注意：fanId会在循环中单独设置
+        return copy;
     }
 
     @Override
@@ -319,9 +377,18 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         list.add(jobId);
         return flightTaskService.cancelFlightTask(workspaceId,list);
     }
-
+//  删除此计划下所有任务的redis定时数据
     @Override
     public boolean deletePlanById(Integer id) {
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(id);
+        List<WaylineJobEntity> waylineJobEntities = waylineJobMapper.selectList(new LambdaQueryWrapper<WaylineJobEntity>().
+                eq(WaylineJobEntity::getPlanId, pubWaylineJobPlanDfEntity.getPlanId()));
+        if(!waylineJobEntities.isEmpty()){
+            for (WaylineJobEntity waylineJob : waylineJobEntities) {
+                RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE,RedisConst.WAYLINE_JOB_TIMED_EXECUTE,
+                        waylineJob.getWorkspaceId() + RedisConst.DELIMITER + waylineJob.getDockSn() + RedisConst.DELIMITER + waylineJob.getJobId());
+            }
+        }
         int flag = pubWaylineJobPlanDfMapper.deleteById(id);
         if(flag>0){
             return true;
@@ -331,6 +398,17 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     @Override
     public boolean batchDeletePlanByIds(List<Integer> ids) {
+        for (Integer id : ids) {
+            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(id);
+            List<WaylineJobEntity> waylineJobEntities = waylineJobMapper.selectList(new LambdaQueryWrapper<WaylineJobEntity>().
+                    eq(WaylineJobEntity::getPlanId, pubWaylineJobPlanDfEntity.getPlanId()));
+            if(!waylineJobEntities.isEmpty()){
+                for (WaylineJobEntity waylineJob : waylineJobEntities) {
+                    RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_TIMED_EXECUTE,RedisConst.WAYLINE_JOB_TIMED_EXECUTE,
+                            waylineJob.getWorkspaceId() + RedisConst.DELIMITER + waylineJob.getDockSn() + RedisConst.DELIMITER + waylineJob.getJobId());
+                }
+            }
+        }
         int flag = pubWaylineJobPlanDfMapper.deleteBatchIds(ids);
         if(flag>0){
             return true;
