@@ -290,6 +290,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 param.setInFlightWaylineId(job_id);
                 log.info("执行飞向中心点空中航线6");
                 performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
+
                 log.info("执行飞向中心点空中航线7----");
             }
         } catch (Exception e) {
@@ -328,6 +329,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
         // 循环结束后，根据最终状态输出结果
         if (code != -1) {
+//           将不停机标准位放到这
+            redisUtils.set("in_fight_state","working");
             System.out.println("发送成功！最终返回码: " + code);
         } else {
             System.out.println("已达到最大重试次数 (" + MAX_RETRY_COUNT + ")，发送最终失败。");

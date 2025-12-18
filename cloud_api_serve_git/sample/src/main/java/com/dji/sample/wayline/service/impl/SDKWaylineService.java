@@ -184,8 +184,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                 if(currentWaypointIndex == 2){
                 if (processingFlags.putIfAbsent(flightId + "_" + currentWaypointIndex, true) == null) {
                     try {
-                        log.info("接受航线:" + flightId + "接受航点: " + currentWaypointIndex);
-
+                        log.info("接受顶端航线:" + flightId + "接受航点: " + currentWaypointIndex);
                         String url = waylineUrlConfig.getWaylineStateUrl();
                         log.info("url为："+url);
                         JSONObject jsonObject = new JSONObject();
@@ -218,7 +217,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     response1.append(responseLine.trim());
                                 }
                                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                                log.info("收到方法返回参数----" + jsonResponse);
+                                log.info("收到顶端方法返回参数----" + jsonResponse);
 //                              ypcx不为空代表为顶端航线，会返回偏航角，下发指令飞行至中心点
                                 if (jsonResponse.getString("desc").equals("1")) {
                                     if (jsonResponse.getString("ypcx") != null && jsonResponse.getString("ypcx") != "") {
@@ -237,6 +236,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     }
                                 }else if (jsonResponse.getString("desc").equals("0")) {
 //                                  分析失败返航
+                                    log.info("顶端分析失败返航-----");
                                     this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
                                 }
                             }
@@ -253,10 +253,13 @@ public class SDKWaylineService extends AbstractWaylineService {
         }
         int videoPointNum=0;
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId")));
+                .eq(FanWaylinePoints::getJobId, "1c6ff4e8-3232-4011-a0a9-f0479406cf33")
+                .orderByDesc(FanWaylinePoints::getId)
+                .last("LIMIT 1"));
         if(fanWaylinePoints!=null){
             Integer jobType = fanWaylinePoints.getJobType();
-            if (jobType == 1|| fanWaylinePoints.getVideoFanPoints()!=null) {
+            if (jobType == 1 && fanWaylinePoints.getVideoFanPoints()!=null) {
+//                videoPoints  可能是null
                 JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
                 videoPointNum = videoPoints.size();
             }
@@ -313,7 +316,7 @@ public class SDKWaylineService extends AbstractWaylineService {
         if("working".equals(fightState)){
             processedinWaypoints.compute(flightId, (key, current) -> {
                 if (current == null || current.get() < currentWaypointIndex) {
-                    log.info("接受空中航线:" + flightId + "接受航点: " + currentWaypointIndex);
+                    log.info("接受不停机空中航线:" + flightId + "接受航点: " + currentWaypointIndex);
 
                     String url = waylineUrlConfig.getWaylineStateUrl();
                     JSONObject jsonObject = new JSONObject();
@@ -426,6 +429,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 }
                             } else if (jsonResponse.getString("desc").equals("0")) {
 //                              分析失败返航
+                                log.info("不停机分析失败返航-----");
                                 this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
                             }
                         }
@@ -441,7 +445,7 @@ public class SDKWaylineService extends AbstractWaylineService {
             processedFlyTo.compute(flightId, (key, current) -> {
                 if (current == null) {
                     if(currentWaypointIndex == 2){
-
+                        log.info("接受中心点空中航线:" + flightId + "接受航点: " + currentWaypointIndex);
                         String url = waylineUrlConfig.getWaylineStateUrl();
                         JSONObject jsonObject = new JSONObject();
                         JSONObject jsonObject1 = new JSONObject();
@@ -458,6 +462,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                         jsonObject.put("centerPoint", jsonObject1);
                         jsonObject.put("wayPoint", currentWaypointIndex);
                         String jsonInput = jsonObject.toString();
+                        log.info("中心点发送参数：");
                         try {
                             URL obj = new URL(url);
                             HttpURLConnection con = (HttpURLConnection) obj.openConnection();
@@ -482,13 +487,13 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     response1.append(responseLine.trim());
                                 }
                                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                                log.info("接受空中航线下发条件---"+jsonResponse.toString());
+                                log.info("接受中心点分析返回参数---"+jsonResponse.toString());
                                 if (jsonResponse.getString("desc").equals("1")) {
                                     if (jsonResponse.getString("yppd") != null || jsonResponse.getString("ypjd") != null) {
                                         if (jsonResponse.getString("yppd") != null) {
                                             //不停机巡检
                                             turbineName = jsonResponse.getString("turbine_name");
-                                            redisUtils.set("in_fight_state","working");
+
                                             routePlan.workingWayline(turbineName);
                                         } else if (jsonResponse.getString("ypjd") != null) {
                                             //停机巡检
@@ -502,6 +507,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     }
                                 } else {
                                     //分析失败返航
+                                    log.info("巡视类型分析失败返航-----");
                                     String jobId = redisUtils.get("jobId").toString();
                                     WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                                             .eq(WaylineJobEntity::getJobId, jobId));
