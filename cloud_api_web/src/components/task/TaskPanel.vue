@@ -4,183 +4,284 @@
     <div class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right">
         <el-form-item label="任务名称">
-          <el-input v-model="queryForm.name" placeholder="请输入任务名称" class="custom-input" ></el-input>
+          <el-input
+            v-model="queryForm.name"
+            placeholder="请输入任务名称"
+            class="custom-input"
+          ></el-input>
         </el-form-item>
         <el-form-item label="计划类型:">
           <el-select
             v-model="queryForm.taskType"
             placeholder="请选择类型"
-            :teleported='false'
+            :teleported="false"
             class="select-operation"
           >
-          <el-option value="0" label="立即执行"></el-option>
-          <el-option value="1" label="定时执行"></el-option>
-        </el-select>
+            <el-option value="0" label="立即执行"></el-option>
+            <el-option value="1" label="定时执行"></el-option>
+          </el-select>
         </el-form-item>
         <el-form-item>
-            <!-- 查询按钮 -->
-            <el-button class="new_btn" type="primary" :icon="Search"
-              @click="getPlans">查询
-            </el-button>
-            <!-- 重置按钮 -->
-            <el-button class="new_btn1" type="primary" style="margin-left: 10px" :icon="Refresh" @click="reset">重置
-            </el-button>
-            <el-button class="new_btn1 delete-bg" type="primary" :icon="Delete" @click="batchDeleteTask">删除 </el-button>
+          <!-- 查询按钮 -->
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Search"
+            @click="getPlans"
+            >查询
+          </el-button>
+          <!-- 重置按钮 -->
+          <el-button
+            class="new_btn1"
+            type="primary"
+            style="margin-left: 10px"
+            :icon="Refresh"
+            @click="reset"
+            >重置
+          </el-button>
+          <el-button
+            class="new_btn1 delete-bg"
+            type="primary"
+            :icon="Delete"
+            @click="batchDeleteTask"
+            >删除
+          </el-button>
         </el-form-item>
       </el-form>
-
     </div>
     <div class="content">
       <div class="table-container">
-          <el-table :data="plansData.data" stripe   @selection-change="handleSelectionChange" :row-key="row => row.job_id"
-            :header-cell-style="{ height: '43px', color: 'rgba(255, 255, 255, 1)',fontSize: '16px', fontWeight: 'bold', backgroundColor: '#00399A',  borderLeft: '2px #01123288 solid', borderBottom: '1px #154480 solid' }">
-            <el-table-column type="selection" width="55"  :selectable="isRowSelectable" />
-            <el-table-column label="序号" align='center' width="60">
-              <template #default="scope">
-                {{ scope.$index +(paginationProp.current - 1) * paginationProp.pageSize+ 1 }}
-              </template>
-            </el-table-column>
+        <el-table
+          :data="plansData.data"
+          stripe
+          @selection-change="handleSelectionChange"
+          :row-key="row => row.job_id"
+          :header-cell-style="{ height: '43px', color: 'rgba(255, 255, 255, 1)',fontSize: '16px', fontWeight: 'bold', backgroundColor: '#00399A',  borderLeft: '2px #01123288 solid', borderBottom: '1px #154480 solid' }"
+        >
+          <el-table-column
+            type="selection"
+            width="55"
+            :selectable="isRowSelectable"
+          />
+          <el-table-column label="序号" align="center" width="60">
+            <template #default="scope">
+              {{ scope.$index +(paginationProp.current - 1) * paginationProp.pageSize+ 1 }}
+            </template>
+          </el-table-column>
 
-            <el-table-column label="任务时间" width="300px;">
-              <template #default="scope">
-                <div class="flex-row" style="white-space: pre-wrap; justify-content: center;">
-                  <!-- <div>
+          <el-table-column label="任务时间" width="300px;">
+            <template #default="scope">
+              <div
+                class="flex-row"
+                style="white-space: pre-wrap; justify-content: center;"
+              >
+                <!-- <div>
                     <div>{{ formatTaskTime(scope.row.begin_time) }}</div>
                     <div>{{ formatTaskTime(scope.row.end_time) }}</div>
                   </div> -->
-                  <div class="ml10">
-                    <div>{{ formatTaskTime(scope.row.execute_time) }}</div>
-                    <div>{{ formatTaskTime(scope.row.completed_time) }}</div>
-                  </div>
+                <div class="ml10">
+                  <div>{{ formatTaskTime(scope.row.execute_time) }}</div>
+                  <div>{{ formatTaskTime(scope.row.completed_time) }}</div>
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" >
-              <template #default="scope">
-                <div>
-                  <div class="flex-display " style="justify-content: center;">
-                    <span class="circle-icon" :style="{ backgroundColor: formatTaskStatus(scope.row).color }"></span>
-                    {{ taskStatusLabels[formatTaskStatus(scope.row).text] }}
-                    <a-tooltip v-if="!!scope.row.code" placement="bottom" arrow-point-at-center>
-                      <template #title>
-                        <div>{{ getCodeMessage(scope.row.code) }}</div>
-                      </template>
-                      <exclamation-circle-outlined class="ml5" :style="{ color: commonColor.WARN, fontSize: '16px' }" />
-                    </a-tooltip>
-                  </div>
-                  <div v-if="scope.row.status === TaskStatus.Carrying">
-                    <a-progress :percent="scope.row.progress || 0" />
-                  </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态">
+            <template #default="scope">
+              <div>
+                <div class="flex-display " style="justify-content: center;">
+                  <span
+                    class="circle-icon"
+                    :style="{ backgroundColor: formatTaskStatus(scope.row).color }"
+                  ></span>
+                  {{ taskStatusLabels[formatTaskStatus(scope.row).text] }}
+                  <a-tooltip
+                    v-if="!!scope.row.code"
+                    placement="bottom"
+                    arrow-point-at-center
+                  >
+                    <template #title>
+                      <div>{{ getCodeMessage(scope.row.code) }}</div>
+                    </template>
+                    <exclamation-circle-outlined
+                      class="ml5"
+                      :style="{ color: commonColor.WARN, fontSize: '16px' }"
+                    />
+                  </a-tooltip>
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="任务名称" show-overflow-tooltip="true">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.job_name }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="任务类型">
-              <template #default="scope">
-                <div>{{ taskTypeLabels[scope.row.task_type] }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="航线名称" show-overflow-tooltip="true">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.file_name }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="机场名称" show-overflow-tooltip="true">
-              <template #default="scope">
-                <div>{{ scope.row.dock_name }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="RTH相对于机场的高度(m)">
-              <template #default="scope">
-                <div>{{ scope.row.rth_altitude }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="失联动作" show-overflow-tooltip="true">
-              <template #default="scope">
-                <div>{{ outControlAcion[scope.row.out_of_control_action]  }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="用户" show-overflow-tooltip="true">
-              <template #default="scope">
-                <div>{{ scope.row.username }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="媒体文件上传"  width="200">
-              <template #default="scope">
-                <div>
-                  <div class="flex-display flex-align-center">
-                    <span class="circle-icon"
-                      :style="{ backgroundColor: formatMediaTaskStatus(scope.row).color }"></span>
-                    {{ formatMediaTaskStatus(scope.row).text }}
-                    {{ formatMediaTaskStatus(scope.row).number }}
-                    <!-- <br/> -->
-                    <span v-if="showAnalysisStatus(scope.row.job_id)"
-                      class="analysis-status"
-                      :style="{ color: getAnalysisStatusColor(scope.row.job_id), marginLeft: '8px' }">
-                      {{ getAnalysisStatusText(scope.row.job_id) }}
-                    </span>
-                  </div>
-                  <div class="pl15">
-                    <a-tooltip v-if="formatMediaTaskStatus(scope.row).status === MediaStatus.ToUpload"
-                      placement="bottom" arrow-point-at-center>
-                      <template #title>
-                        <div>立即上传</div>
-                      </template>
-                      <UploadOutlined class="ml5" :style="{ color: commonColor.BLUE, fontSize: '16px' }"
-                        @click="onUploadMediaFileNow(scope.row.job_id)" />
-                    </a-tooltip>
-                  </div>
-                  <!-- 显示分析状态 -->
-
+                <div v-if="scope.row.status === TaskStatus.Carrying">
+                  <a-progress :percent="scope.row.progress || 0" />
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="scope">
-                <el-button size="small" link type="primary" class="preview" @click="anaysisTaskResult(scope.row)">结果分析</el-button>
-                <el-popconfirm v-if="scope.row.status === TaskStatus.Wait " width="220" confirm-button-text="确定"
-                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要取消飞行任务吗？"
-                  @confirm="onDeleteTask(scope.row.job_id)">
-                  <template #reference>
-                    <el-button size="small" link type="primary" class="preview">取消</el-button>
-                  </template>
-                </el-popconfirm>
-                <el-popconfirm  v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel"  width="220" confirm-button-text="确定"
-                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要删除飞行任务吗？"
-                  @confirm="onDeleteOtherTask(scope.row.job_id)">
-                  <template #reference>
-                    <el-button size="small" link type="primary" class="preview">删除</el-button>
-                  </template>
-                </el-popconfirm>
-                <el-button size="small" link type="primary" class="preview" @click="toTaskResult(scope.row)">任务结果</el-button>
-                <el-popconfirm v-if="scope.row.status === TaskStatus.Carrying" width="220" confirm-button-text="确定"
-                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要挂起飞行任务吗？"
-                  @confirm="onSuspendTask(scope.row.job_id)">
-                  <template #reference>
-                    <el-button size="small" link type="primary" class="preview">挂起</el-button>
-                  </template>
-                </el-popconfirm>
-                <el-popconfirm v-if="scope.row.status === TaskStatus.Paused" width="220" confirm-button-text="确定"
-                  cancel-button-text="取消" icon-color="#626AEF" title="你确定要继续吗？"
-                  @confirm="onResumeTask(scope.row.job_id)">
-                  <template #reference>
-                    <el-button size="small" link type="primary" class="preview">继续</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-        <div class="pagination-container">
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="任务名称" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.job_name }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="任务类型">
+            <template #default="scope">
+              <div>{{ taskTypeLabels[scope.row.task_type] }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="航线名称" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.file_name }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="机场名称" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div>{{ scope.row.dock_name }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="RTH相对于机场的高度(m)">
+            <template #default="scope">
+              <div>{{ scope.row.rth_altitude }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="失联动作" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div>{{ outControlAcion[scope.row.out_of_control_action]  }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="用户" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div>{{ scope.row.username }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="媒体文件上传" width="200">
+            <template #default="scope">
+              <div>
+                <div class="flex-display flex-align-center">
+                  <span
+                    class="circle-icon"
+                    :style="{ backgroundColor: formatMediaTaskStatus(scope.row).color }"
+                  ></span>
+                  {{ formatMediaTaskStatus(scope.row).text }}
+                  {{ formatMediaTaskStatus(scope.row).number }}
+                  <!-- <br/> -->
+                  <span
+                    v-if="showAnalysisStatus(scope.row.job_id)"
+                    class="analysis-status"
+                    :style="{ color: getAnalysisStatusColor(scope.row.job_id), marginLeft: '8px' }"
+                  >
+                    {{ getAnalysisStatusText(scope.row.job_id) }}
+                  </span>
+                </div>
+                <div class="pl15">
+                  <a-tooltip
+                    v-if="formatMediaTaskStatus(scope.row).status === MediaStatus.ToUpload"
+                    placement="bottom"
+                    arrow-point-at-center
+                  >
+                    <template #title>
+                      <div>立即上传</div>
+                    </template>
+                    <UploadOutlined
+                      class="ml5"
+                      :style="{ color: commonColor.BLUE, fontSize: '16px' }"
+                      @click="onUploadMediaFileNow(scope.row.job_id)"
+                    />
+                  </a-tooltip>
+                </div>
+                <!-- 显示分析状态 -->
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作">
+            <template #default="scope">
+              <el-button
+                size="small"
+                link
+                type="primary"
+                class="preview"
+                @click="anaysisTaskResult(scope.row)"
+                >结果分析</el-button
+              >
+              <el-popconfirm
+                v-if="scope.row.status === TaskStatus.Wait "
+                width="220"
+                confirm-button-text="确定"
+                cancel-button-text="取消"
+                icon-color="#626AEF"
+                title="你确定要取消飞行任务吗？"
+                @confirm="onDeleteTask(scope.row.job_id)"
+              >
+                <template #reference>
+                  <el-button size="small" link type="primary" class="preview"
+                    >取消</el-button
+                  >
+                </template>
+              </el-popconfirm>
+              <el-popconfirm
+                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel"
+                width="220"
+                confirm-button-text="确定"
+                cancel-button-text="取消"
+                icon-color="#626AEF"
+                title="你确定要删除飞行任务吗？"
+                @confirm="onDeleteOtherTask(scope.row.job_id)"
+              >
+                <template #reference>
+                  <el-button size="small" link type="primary" class="preview"
+                    >删除</el-button
+                  >
+                </template>
+              </el-popconfirm>
+              <el-button
+                size="small"
+                link
+                type="primary"
+                class="preview"
+                @click="toTaskResult(scope.row)"
+                >任务结果</el-button
+              >
+              <el-popconfirm
+                v-if="scope.row.status === TaskStatus.Carrying"
+                width="220"
+                confirm-button-text="确定"
+                cancel-button-text="取消"
+                icon-color="#626AEF"
+                title="你确定要挂起飞行任务吗？"
+                @confirm="onSuspendTask(scope.row.job_id)"
+              >
+                <template #reference>
+                  <el-button size="small" link type="primary" class="preview"
+                    >挂起</el-button
+                  >
+                </template>
+              </el-popconfirm>
+              <el-popconfirm
+                v-if="scope.row.status === TaskStatus.Paused"
+                width="220"
+                confirm-button-text="确定"
+                cancel-button-text="取消"
+                icon-color="#626AEF"
+                title="你确定要继续吗？"
+                @confirm="onResumeTask(scope.row.job_id)"
+              >
+                <template #reference>
+                  <el-button size="small" link type="primary" class="preview"
+                    >继续</el-button
+                  >
+                </template>
+              </el-popconfirm>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div class="pagination-container">
         <!-- 分页 -->
-        <el-pagination v-model:current-page="paginationProp.current" v-model:page-size="paginationProp.pageSize"
-          :page-sizes="paginationProp.pageSizeOptions" :total="paginationProp.total"
-          layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-          @current-change="handleCurrentChange">
+        <el-pagination
+          v-model:current-page="paginationProp.current"
+          v-model:page-size="paginationProp.pageSize"
+          :page-sizes="paginationProp.pageSizeOptions"
+          :total="paginationProp.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        >
         </el-pagination>
       </div>
     </div>
@@ -311,7 +412,12 @@ function onTaskMediaProgressWs (data: MediaStatusProgressInfo) {
     taskItem.uploading = true
   }
   taskItem.media_count = mediaCount
-  taskItem.uploaded_count = uploadedCount
+  if (taskItem.saved_count && taskItem.saved_count > 0) {
+    taskItem.uploaded_count = uploadedCount + taskItem.saved_count
+  } else{
+    taskItem.uploaded_count = uploadedCount
+  }
+
 }
 
 function onoTaskMediaHighestPriorityWS (data: TaskMediaHighestPriorityProgressInfo) {
