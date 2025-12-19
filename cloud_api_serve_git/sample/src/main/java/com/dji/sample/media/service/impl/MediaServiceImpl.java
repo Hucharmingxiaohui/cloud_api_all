@@ -3,6 +3,7 @@ package com.dji.sample.media.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.df.framework.redis.RedisUtils;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
@@ -30,6 +31,7 @@ import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.Resource;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -67,6 +69,9 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
 
     @Autowired
     FanWaylinePointsMapper fanWaylinePointsMapper;
+
+    @Resource
+    private RedisUtils redisUtils;
 
     @Override
     public Boolean fastUpload(String workspaceId, String fingerprint) {
@@ -180,13 +185,16 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
         mediaFileCount.setTid(request.getTid());
         mediaFileCount.setUploadedCount(mediaFileCount.getUploadedCount() + 1);
 
-//      如果是不停机巡检任务，统计已上传图片要加上，用于删除redis中缓存
+//      如果是不停机巡检任务，已上传图片要加上
         int videoPointNum=0;
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                .eq(FanWaylinePoints::getJobId,jobId));
+                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId"))
+                .orderByDesc(FanWaylinePoints::getId)
+                .last("LIMIT 1"));
         if(fanWaylinePoints!=null){
             Integer jobType = fanWaylinePoints.getJobType();
-            if (jobType == 1) {
+            if (jobType == 1 && fanWaylinePoints.getVideoFanPoints()!=null) {
+//                videoPoints  可能是null
                 JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
                 videoPointNum = videoPoints.size();
             }
