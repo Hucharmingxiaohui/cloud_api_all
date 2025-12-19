@@ -121,6 +121,7 @@ public class FjReportController {
             }
              List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
              log.info("文件名为-------------"+fileNames);
+             log.info("request为-------------"+request);
              request.setFile_name(fileNames);
              AnalysisResponse response = fjReportService.sendAnalysisRequest(request);
              if (response != null) {

@@ -23,7 +23,9 @@ import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.model.entity.WorkspaceEntity;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineFileEntity;
+import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.model.param.CreateJobParam;
 import com.dji.sample.wayline.service.IWaylineFileService;
 import com.dji.sdk.cloudapi.control.FileParam;
@@ -88,6 +90,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Autowired
     FanWaylinePointsMapper fanWaylinePointsMapper;
+
+    @Autowired
+    private IWaylineJobMapper waylineJobMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -246,8 +251,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 }
                 log.info("执行飞向中心点空中航线4");
                 InFlightWaylineDeliverParam param = new InFlightWaylineDeliverParam();
-                DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-
+                String jobId = redisUtils.get("jobId").toString();
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
+                        eq(WaylineJobEntity::getJobId, jobId));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -272,7 +278,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 CreateJobParam createJobParam = new CreateJobParam();
                 createJobParam.setName(waylineName);
                 createJobParam.setFileId(entity.getWaylineId());
-                createJobParam.setDockSn(deviceEntity.getDeviceSn());
+                createJobParam.setDockSn(waylineJobEntity.getDockSn());
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
@@ -289,8 +295,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
                 log.info("执行飞向中心点空中航线6");
-                performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
-
+//              0不停机 1停机 2中心点
+                int planType=2;
+                performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
                 log.info("执行飞向中心点空中航线7----");
             }
         } catch (Exception e) {
@@ -298,7 +305,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
     }
 
-    public void performDeliveryWithRetry(String sn, InFlightWaylineDeliverParam param, CreateJobParam createJobParam) {
+    public void performDeliveryWithRetry(String sn, InFlightWaylineDeliverParam param, CreateJobParam createJobParam,int planType) {
         int retryCount = 0;
         int code = -1; // 初始化为-1以进入循环
 
@@ -329,8 +336,11 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
         // 循环结束后，根据最终状态输出结果
         if (code != -1) {
-//           将不停机标准位放到这
-            redisUtils.set("in_fight_state","working");
+            if(planType==0){
+                redisUtils.set("in_fight_state","working");
+            }else if(planType==1){
+                redisUtils.set("in_fight_state","stop");
+            }
             System.out.println("发送成功！最终返回码: " + code);
         } else {
             System.out.println("已达到最大重试次数 (" + MAX_RETRY_COUNT + ")，发送最终失败。");
@@ -390,7 +400,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 JSONArray points = jsonResponse.getJSONArray("points");
 //                redisUtils.set("fanPoints",points.toJSONString());
                 FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
-                fanWaylinePoints.setJobId(redisUtils.get("jobId").toString());
+                String jobId = redisUtils.get("jobId").toString();
+                fanWaylinePoints.setJobId(jobId);
                 fanWaylinePoints.setDjiFanPoints(points.toJSONString());
                 fanWaylinePoints.setJobType(1);
                 fanWaylinePointsMapper.insert(fanWaylinePoints);
@@ -414,8 +425,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     log.error("导入外部航线失败");
                 }
                 InFlightWaylineDeliverParam param = new InFlightWaylineDeliverParam();
-                DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
 
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
+                        eq(WaylineJobEntity::getJobId, jobId));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -440,7 +452,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 CreateJobParam createJobParam = new CreateJobParam();
                 createJobParam.setName(waylineName);
                 createJobParam.setFileId(entity.getWaylineId());
-                createJobParam.setDockSn(deviceEntity.getDeviceSn());
+                createJobParam.setDockSn(waylineJobEntity.getDockSn());
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
@@ -456,7 +468,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String job_id = UUID.randomUUID().toString();
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
-                performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
+//              0不停机 1停机 2中心点
+                int planType=0;
+                performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -518,7 +532,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 JSONArray points = jsonResponse.getJSONArray("points");
 //                redisUtils.set("fanPoints",points.toJSONString());
                 FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
-                fanWaylinePoints.setJobId(redisUtils.get("jobId").toString());
+                String jobId = redisUtils.get("jobId").toString();
+                fanWaylinePoints.setJobId(jobId);
                 fanWaylinePoints.setDjiFanPoints(points.toJSONString());
                 fanWaylinePoints.setJobType(0);
                 fanWaylinePointsMapper.insert(fanWaylinePoints);
@@ -544,8 +559,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     log.error("导入外部航线失败");
                 }
                 InFlightWaylineDeliverParam param = new InFlightWaylineDeliverParam();
-                DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
 
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
+                        eq(WaylineJobEntity::getJobId, jobId));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -575,7 +591,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 CreateJobParam createJobParam = new CreateJobParam();
                 createJobParam.setName(waylineName);
                 createJobParam.setFileId(entity.getWaylineId());
-                createJobParam.setDockSn(deviceEntity.getDeviceSn());
+                createJobParam.setDockSn(waylineJobEntity.getDockSn());
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
@@ -592,7 +608,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
                 log.info("空中航线前2----------");
-                performDeliveryWithRetry(deviceEntity.getDeviceSn(), param, createJobParam);
+//              0不停机 1停机 2中心点
+                int planType=1;
+                performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
             }
         }catch (Exception e){
             e.printStackTrace();

@@ -339,8 +339,14 @@ public class FileServiceImplDf implements IFileServiceDf {
 //          风机任务则按照命名规则，其余按大疆顺序显示
             if(fanWaylinePoints!=null){
                 Integer jobType = fanWaylinePoints.getJobType();
-                JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
-                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                JSONArray djiPoints = new JSONArray();
+                JSONArray videoPoints = new JSONArray();
+                if(fanWaylinePoints.getDjiFanPoints()!=null){
+                    djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+                }
+                if(fanWaylinePoints.getVideoFanPoints()!=null){
+                    videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                }
                 if(jobType==0){
                     jsonArray.addAll(djiPoints);
                 }else if(jobType==1){

@@ -357,10 +357,13 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 //      如果是不停机巡检任务，已上传图片要加上
         int videoPointNum=0;
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                .eq(FanWaylinePoints::getJobId,entity.getJobId()));
+                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId"))
+                .orderByDesc(FanWaylinePoints::getId)
+                .last("LIMIT 1"));
         if(fanWaylinePoints!=null){
             Integer jobType = fanWaylinePoints.getJobType();
-            if (jobType == 1) {
+            if (jobType == 1 && fanWaylinePoints.getVideoFanPoints()!=null) {
+//                videoPoints  可能是null
                 JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
                 videoPointNum = videoPoints.size();
             }

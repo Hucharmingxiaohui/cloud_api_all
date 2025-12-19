@@ -253,7 +253,7 @@ public class SDKWaylineService extends AbstractWaylineService {
         }
         int videoPointNum=0;
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                .eq(FanWaylinePoints::getJobId, "1c6ff4e8-3232-4011-a0a9-f0479406cf33")
+                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId"))
                 .orderByDesc(FanWaylinePoints::getId)
                 .last("LIMIT 1"));
         if(fanWaylinePoints!=null){
@@ -498,7 +498,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                         } else if (jsonResponse.getString("ypjd") != null) {
                                             //停机巡检
                                             log.info("执行停机巡检-------------");
-                                            redisUtils.set("in_fight_state","stop");
+
                                             turbineName = jsonResponse.getString("turbine_name");
                                             String ypjd = jsonResponse.getString("ypjd");
                                             double value = Double.parseDouble(ypjd);
