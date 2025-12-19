@@ -36,13 +36,13 @@ export function useGMapManage () {
       zIndex: 99,
     })
     state.map = new AMap.Map(container, {
-      center: [121.3574, 37.5419],
+      center: [121.371204, 37.521004],
       zoom: 16,
       layers: [customLayer]
     })
 
     const marker = new AMap.Marker({
-      position: [121.3574, 37.5419], // 位置
+      position: [121.371204, 37.521004], // 位置
     })
     state.map.add(marker) // 添加到地图
 

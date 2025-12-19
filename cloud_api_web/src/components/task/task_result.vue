@@ -40,26 +40,26 @@
           <!-- 序号列 -->
           <el-table-column label="序号" type="index" width="80" />
           <!-- 预览图 -->
-          <el-table-column label="图片" width="150">
+          <el-table-column label="图片" align="center">
             <template #default="scope">
               <img :src="scope.row.url" alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
                 @click="openPreviewModal(scope.row)" />
             </template>
           </el-table-column>
-          <el-table-column label="分析图" width="150">
+          <el-table-column label="分析图" align="center">
             <template #default="scope">
               <img :src="scope.row.defect_image_url" alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
                 @click="openPreviewAnaysisModal(scope.row)" />
             </template>
           </el-table-column>
-          <el-table-column label="名称">
+          <el-table-column label="名称" align="center">
             <template #default="scope">
               <div>{{ scope.row.file_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="文件类型" width="150">
+          <el-table-column label="文件类型" align="center">
             <template #default="scope">
               <div>
                 {{ scope.row.file_name.includes('_T') ? '红外图片' : '可见光图片' }}
@@ -73,17 +73,17 @@
                 </div>
               </template>
             </el-table-column> -->
-          <el-table-column label="采集时间">
+          <el-table-column label="采集时间" align="center">
             <template #default="scope">
               <div>{{ new Date(scope.row.create_time).toLocaleString() }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="是否原图">
-            <template #default="scope">
-              <div v-if="scope.row.is_original">是</div>
-              <div v-else>否</div>
-            </template>
-          </el-table-column>
+<!--          <el-table-column label="是否原图">-->
+<!--            <template #default="scope">-->
+<!--              <div v-if="scope.row.is_original">是</div>-->
+<!--              <div v-else>否</div>-->
+<!--            </template>-->
+<!--          </el-table-column>-->
           <el-table-column label="操作" width="250px">
             <template #default="scope">
               <el-button size="small" type="text" @click="downloadMediaLocal(scope.row)">下载</el-button>

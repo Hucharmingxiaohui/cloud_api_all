@@ -454,7 +454,7 @@ function switchRightTab (tab) {
 }
 
 .map-section {
-    height: 41%;
+    height: 50%;
     // width: 100%;
     // margin-bottom: 8%;
     margin: 5px 10px 0 10px;

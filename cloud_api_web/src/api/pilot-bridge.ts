@@ -1,4 +1,4 @@
-import {ElMessage } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { EComponentName, EPhotoType, ERouterName } from '../types'
 import { CURRENT_CONFIG } from './http/config'
 import { EVideoPublishType, LiveStreamStatus } from '../types/live-stream'

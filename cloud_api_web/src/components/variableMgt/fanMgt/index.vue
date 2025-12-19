@@ -646,19 +646,18 @@ async function handleEdit () {
  */
 async function handleDelete (row:any) {
   try {
-
     ElMessageBox.confirm('确定要删除该兴趣点吗?', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
       .then(async () => {
-     const res = await deleteWindTurbineApi(row.id)
-    if (res.code !== 0) {
-      return
-    }
-    ElMessage.success('删除成功!')
-    await handleRest()
+        const res = await deleteWindTurbineApi(row.id)
+        if (res.code !== 0) {
+          return
+        }
+        ElMessage.success('删除成功!')
+        await handleRest()
       })
   } catch (error) {
 
