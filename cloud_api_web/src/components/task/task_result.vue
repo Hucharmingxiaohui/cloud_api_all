@@ -101,7 +101,7 @@
       </div>
     </div>
     <!-- 查看报告 -->
-    <el-dialog title="报告预览" v-model="viewReportVisible" width="1000px" class="view">
+    <el-dialog title="报告预览" v-model="viewReportVisible" width="880px" class="view">
       <div v-loading="viewloading" class="doc-preview-container">
         <div id="docContainer" class="docx-container"></div>
       </div>
@@ -475,6 +475,12 @@ async function viewReport () {
   try {
     viewReportVisible.value = true
     viewloading.value = true
+
+    // const res = await fetch('/public/fj1top20251218084530.docx')
+    // const blob = await res.blob()
+    // const docContainer = document.getElementById('docContainer')
+    // docContainer.innerHTML = ''
+
     const response = await createFlyTaskReportApi({
       jobId: jobInfo.job_id
     })
@@ -492,7 +498,16 @@ async function viewReport () {
       docContainer.innerHTML = ''
 
       // 直接传递Blob对象给renderAsync
-      await renderAsync(data, docContainer)
+      // await renderAsync(data, docContainer)
+      await renderAsync(data, docContainer, null, {
+        className: 'docx',
+        inWrapper: true,
+        breakPages: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        ignoreLastRenderedPageBreak: false
+      })
     } else if (response.code === 601) {
       ElMessage.warning('任务结果分析中,请稍后重试!')
     }
@@ -1306,35 +1321,59 @@ function scrollRight () {
 </script>
 
 <style lang="scss" scoped>
-.docx-preview-container {
+
+.doc-preview-container {
   width: 100%;
   height: 600px;
   overflow: auto;
   background: #f5f5f5;
-  padding: 20px;
   display: flex;
   justify-content: center;
-}
+  /* 强制所有表格显示边框 */
+  :deep(table) {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    margin: 10px 0 !important;
+  }
 
-.docx-container {
-  background: white;
-  // box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-  min-height: 100%;
-  padding: 40px;
-  /* 模拟Word页面边距 */
-  box-sizing: border-box;
-}
+  :deep(table td),
+  :deep(table th) {
+    border: 1px solid #ddd !important;
+    padding: 6px 8px !important;
+    min-height: 20px !important;
+    vertical-align: top !important;
+  }
 
-:deep(.docx-wrapper) {
-  background: white;
-}
+  :deep(table th) {
+    background-color: #f5f5f5 !important;
+    font-weight: bold !important;
+    text-align: center !important;
+  }
 
-:deep(.el-dialog__title) {
-  color: white !important;
+  /* 确保表格在分页时不被截断 */
+  :deep(table) {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
 
 :deep(article) {
   padding: 50px;
+}
+
+/* 为所有段落添加分页控制 */
+// :deep(.docx-wrapper > section) {
+//   page-break-after: auto;
+//   page-break-inside: avoid;
+//   page-break-before: auto;
+// }
+
+// :deep(.docx-wrapper) {
+//   background: rgb(210, 210, 210);
+// }
+
+:deep(.el-dialog__title) {
+  color: white !important;
 }
 
 .container1 {
