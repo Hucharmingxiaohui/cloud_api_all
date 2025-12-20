@@ -473,7 +473,13 @@ function reset () {
 async function anaysisTaskResult (row) {
   try {
     const res = await startTaskAnasisyApi({ jobId: row.job_id })
-    // 开始分析后，将任务添加到分析列表
+
+    if (res.data === '603') {
+      // 图片部分上传，分析条件不成熟
+      taskAnalysisStatus.value.set(row.job_id, { status: 'waiting', loading: true})
+    }
+
+    // 开始分析后，将探测任务添加到分析列表
     if (!analyzingTasks.value.has(row.job_id)) {
       analyzingTasks.value.add(row.job_id)
     }
@@ -503,6 +509,13 @@ async function checkAnaysisStaus (row) {
       // 已经分析完成
       analyzingTasks.value.delete(row.job_id) // 从分析列表中移除
       taskAnalysisStatus.value.set(row.job_id, { status: 'completed', loading: false })
+    } else if (res.data === 4) {
+      // 分析条件不成熟，上传的图片不完整
+      if (!analyzingTasks.value.has(row.job_id)) {
+        analyzingTasks.value.add(row.job_id)
+      }
+      taskAnalysisStatus.value.set(row.job_id, { status: 'waiting', loading: true })
+
     } else {
       // 正在分析
       if (!analyzingTasks.value.has(row.job_id)) {
@@ -653,6 +666,8 @@ function getAnalysisStatusText (jobId) {
       return '分析中'
     case 'completed':
       return '分析完成'
+    case 'waiting':
+      return '部分文件上传'
     case 'none':
       return '分析异常'
     default:
