@@ -37,6 +37,9 @@ public class GlobalMVCConfigurer implements WebMvcConfigurer {
         excludePaths.add("/buildKmz");
         excludePaths.add("/updateKmz");
         excludePaths.add("/parseKmz");
+        excludePaths.add("/api/file/defect");
+        excludePaths.add("/fjReport/api/v1/savePic");
+//        excludePaths.add("/wayline/api/v1/**");
         // Intercept for all request interfaces.
         registry.addInterceptor(authInterceptor).addPathPatterns("/**").excludePathPatterns(excludePaths);
     }

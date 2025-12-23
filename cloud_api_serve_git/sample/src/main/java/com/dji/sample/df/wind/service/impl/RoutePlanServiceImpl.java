@@ -254,6 +254,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String jobId = redisUtils.get("jobId").toString();
                 WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
                         eq(WaylineJobEntity::getJobId, jobId));
+                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -271,7 +273,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 //              失控返航
                 param.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 param.setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION);
-                param.setRthAltitude(30);
+                Integer rthAltitude = pubWaylineJobPlanDfEntity.getRthAltitude();
+                param.setRthAltitude(rthAltitude);
                 param.setRthMode(RthModeEnum.PRESET_HEIGHT);
                 param.setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK);
                 String waylineName = entity.getName();
@@ -282,7 +285,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
-                createJobParam.setRthAltitude(30);
+                createJobParam.setRthAltitude(rthAltitude);
                 createJobParam.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 createJobParam.setMinBatteryCapacity(50);
                 createJobParam.setMinStorageCapacity(null);
@@ -428,6 +431,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
                 WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
                         eq(WaylineJobEntity::getJobId, jobId));
+                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -445,7 +450,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 //              失控返航
                 param.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 param.setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION);
-                param.setRthAltitude(30);
+                Integer rthAltitude = pubWaylineJobPlanDfEntity.getRthAltitude();
+                log.info("不停机航线返航高度---"+rthAltitude);
+                param.setRthAltitude(rthAltitude);
                 param.setRthMode(RthModeEnum.PRESET_HEIGHT);
                 param.setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK);
                 String waylineName = entity.getName();
@@ -456,7 +463,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
-                createJobParam.setRthAltitude(30);
+                createJobParam.setRthAltitude(rthAltitude);
                 createJobParam.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 createJobParam.setMinBatteryCapacity(50);
                 createJobParam.setMinStorageCapacity(null);
@@ -562,6 +569,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
                 WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
                         eq(WaylineJobEntity::getJobId, jobId));
+                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
                 // get wayline file
                 WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
 
@@ -584,7 +593,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 //              失控返航
                 param.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 param.setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION);
-                param.setRthAltitude(30);
+                Integer rthAltitude = pubWaylineJobPlanDfEntity.getRthAltitude();
+                param.setRthAltitude(rthAltitude);
                 param.setRthMode(RthModeEnum.PRESET_HEIGHT);
                 param.setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK);
                 String waylineName = entity.getName();
@@ -595,7 +605,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
 //              任务类型为立即执行，是否后续不需要额外判断了
                 createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
-                createJobParam.setRthAltitude(30);
+                createJobParam.setRthAltitude(rthAltitude);
                 createJobParam.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 createJobParam.setMinBatteryCapacity(50);
                 createJobParam.setMinStorageCapacity(null);
@@ -689,7 +699,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     if (Objects.isNull(entity)) {
                         log.error("导入外部航线失败");
                     }
-                    pubWaylineJobPlanDfEntity.setName(routeName);
+
                     pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
 //                  航线类型：航点
                     pubWaylineJobPlanDfEntity.setWaylineType(0);

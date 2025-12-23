@@ -1,5 +1,6 @@
 package com.dji.sample.df.mediaDf.model;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,4 +44,14 @@ public class MediaFileDTO {
     private String jobId;
 
     private String defectImageUrl;
+
+    private String defectType;
+
+    private String defectDescription;
+
+    private String fanCode;
+
+    private String fanPart;
+
+    private Integer defectId;
 }

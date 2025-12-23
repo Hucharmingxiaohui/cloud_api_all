@@ -425,7 +425,7 @@ public class FjReportServiceImpl implements FjReportService {
     /**
      * 统计缺陷类型数量
      */
-    private Map<String, Integer> countDefectTypes(List<String> defectTypes) {
+    public Map<String, Integer> countDefectTypes(List<String> defectTypes) {
         Map<String, Integer> countMap = new HashMap<>();
         for (String type : defectTypes) {
             countMap.put(type, countMap.getOrDefault(type, 0) + 1);
@@ -436,7 +436,7 @@ public class FjReportServiceImpl implements FjReportService {
     /**
      * 获取主要缺陷类型
      */
-    private String getMainDefectType(Map<String, Integer> defectCount) {
+    public String getMainDefectType(Map<String, Integer> defectCount) {
         return defectCount.entrySet().stream()
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
@@ -446,7 +446,7 @@ public class FjReportServiceImpl implements FjReportService {
     /**
      * 生成缺陷描述
      */
-    private String generateDefectDescription(Map<String, Integer> defectCount) {
+    public String generateDefectDescription(Map<String, Integer> defectCount) {
         StringBuilder description = new StringBuilder();
         for (Map.Entry<String, Integer> entry : defectCount.entrySet()) {
             if (description.length() > 0) {

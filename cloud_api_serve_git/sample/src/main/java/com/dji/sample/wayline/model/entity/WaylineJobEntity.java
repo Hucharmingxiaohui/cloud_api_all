@@ -124,4 +124,7 @@ public class WaylineJobEntity implements Serializable {
 
     @TableField("is_reported")
     private Integer isReported;
+
+    @TableField("is_saved")
+    private Integer isSaved;
 }

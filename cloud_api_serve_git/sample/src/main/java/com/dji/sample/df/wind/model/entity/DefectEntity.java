@@ -23,7 +23,7 @@ public class DefectEntity implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @TableId(type = IdType.AUTO)
-    private String id; // 主键ID
+    private Integer id; // 主键ID
 
     /**
      * 报告id

@@ -306,6 +306,21 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
             return null;
         }
 
+//      如果是不停机巡检任务，已上传图片要加上
+        int videoPointNum=0;
+        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId"))
+                .orderByDesc(FanWaylinePoints::getId)
+                .last("LIMIT 1"));
+        if(fanWaylinePoints!=null){
+            Integer jobType = fanWaylinePoints.getJobType();
+            if (jobType == 1 && fanWaylinePoints.getVideoFanPoints()!=null) {
+//                videoPoints  可能是null
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                videoPointNum = videoPoints.size();
+            }
+        }
+
         WaylineJobDTO.WaylineJobDTOBuilder builder = WaylineJobDTO.builder()
                 .jobId(entity.getJobId())
                 .jobName(entity.getName())
@@ -332,7 +347,8 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .waylineType(WaylineTypeEnum.find(entity.getWaylineType()))
                 .rthAltitude(entity.getRthAltitude())
                 .outOfControlAction(OutOfControlActionEnum.find(entity.getOutOfControlAction()))
-                .mediaCount(entity.getMediaCount());
+                .mediaCount(entity.getMediaCount())
+                .savedCount(videoPointNum);
 
         if (Objects.nonNull(entity.getEndTime())) {
             builder.endTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(entity.getEndTime()), ZoneId.systemDefault()));
@@ -354,20 +370,6 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         String countKey = RedisConst.MEDIA_FILE_PREFIX + entity.getDockSn();
         Object mediaFileCount = RedisOpsUtils.hashGet(countKey, entity.getJobId());
 
-//      如果是不停机巡检任务，已上传图片要加上
-        int videoPointNum=0;
-        FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                .eq(FanWaylinePoints::getJobId, redisUtils.get("jobId"))
-                .orderByDesc(FanWaylinePoints::getId)
-                .last("LIMIT 1"));
-        if(fanWaylinePoints!=null){
-            Integer jobType = fanWaylinePoints.getJobType();
-            if (jobType == 1 && fanWaylinePoints.getVideoFanPoints()!=null) {
-//                videoPoints  可能是null
-                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
-                videoPointNum = videoPoints.size();
-            }
-        }
 
         if (Objects.nonNull(mediaFileCount)) {
             builder.uploadedCount(((MediaFileCountDTO) mediaFileCount).getUploadedCount()+videoPointNum)

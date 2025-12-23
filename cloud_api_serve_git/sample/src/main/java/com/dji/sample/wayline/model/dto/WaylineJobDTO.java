@@ -63,6 +63,8 @@ public class WaylineJobDTO {
 
     private Integer uploadedCount;
 
+    private Integer savedCount;
+
     private Boolean uploading;
 
     private WaylineTaskConditionDTO conditions;

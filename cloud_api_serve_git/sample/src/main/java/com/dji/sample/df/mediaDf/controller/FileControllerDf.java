@@ -152,13 +152,20 @@ public class FileControllerDf {
 //      如果为风机任务则加入分析图url
         if(pubWaylineJobPlanDfEntity != null&&pubWaylineJobPlanDfEntity.getPlanType()==1){
             for (int j = 0; j < filteredFiles.size(); j++) {
-                DefectEntity defect = defectList.get(j);
-                String imagePath = defect.getImagePath();
-                if (imagePath != null && !imagePath.isEmpty()) {
-                    // 转换为可访问的URL
-                    String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
-                            URLEncoder.encode(imagePath, "UTF-8");
-                    filteredFiles.get(j).setDefectImageUrl(imageUrl);
+                if(defectList!=null&& !defectList.isEmpty()){
+                    DefectEntity defect = defectList.get(j);
+                    String imagePath = defect.getImagePath();
+                    if (imagePath != null && !imagePath.isEmpty()) {
+                        // 转换为可访问的URL
+                        String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
+                                URLEncoder.encode(imagePath, "UTF-8");
+                        filteredFiles.get(j).setDefectImageUrl(imageUrl);
+                    }
+                    filteredFiles.get(j).setDefectType(defect.getDefectType());
+                    filteredFiles.get(j).setDefectDescription(defect.getDefectDescription());
+                    filteredFiles.get(j).setFanCode(defect.getFanCode());
+                    filteredFiles.get(j).setFanPart(defect.getFanPart());
+                    filteredFiles.get(j).setDefectId(defect.getId());
                 }
             }
         }

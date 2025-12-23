@@ -47,7 +47,9 @@ public class Result<T> implements Serializable {
         ERROR(500, "请求失败"),
         WARN(600, "请求告警"),
         ANALYZING(601, "还在分析"),
-        DUPLICATE(602, "重复生成");
+        DUPLICATE(602, "重复生成"),
+        SAVING(603, "还在保存截图文件"),
+        NOTFAN(604, "不是风机任务");
 
         private final int value;
         private final String name;
@@ -114,5 +116,15 @@ public class Result<T> implements Serializable {
     // 返回重复生成结果, code=602, msg自定义，data=null
     public static Result duplicate(String msg) {
         return new Result(Type.DUPLICATE.value, msg, null);
+    }
+
+    // 返回还在保存截图文件, code=603, msg自定义，data=null
+    public static Result saving(String msg) {
+        return new Result(Type.SAVING.value, msg, null);
+    }
+
+    // 返回不是风机任务, code=604, msg自定义，data=null
+    public static Result notfan(String msg) {
+        return new Result(Type.NOTFAN.value, msg, null);
     }
 }

@@ -30,8 +30,10 @@ import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.model.MediaFileCountDTO;
 import com.dji.sample.media.model.MediaFileEntity;
 import com.dji.sample.media.service.IMediaRedisService;
+import com.dji.sample.wayline.dao.IWaylineFileMapper;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
+import com.dji.sample.wayline.model.entity.WaylineFileEntity;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.model.enums.WaylineJobStatusEnum;
 import com.dji.sample.wayline.service.IWaylineFileService;
@@ -131,6 +133,9 @@ public class SDKWaylineService extends AbstractWaylineService {
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
+    @Autowired
+    IWaylineFileMapper  waylineFileMapper;
+
     private final ConcurrentMap<String, AtomicInteger> processedWaypoints = new ConcurrentHashMap<>();
 
     private final ConcurrentMap<String, AtomicInteger> processedinWaypoints = new ConcurrentHashMap<>();
@@ -172,12 +177,14 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, flightId));
-        String name = waylineJobEntity.getName();
+        WaylineFileEntity waylineFileEntity = waylineFileMapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().
+                eq(WaylineFileEntity::getWaylineId, waylineJobEntity.getFileId()));
+        String name = waylineFileEntity.getName();
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         log.info("执行航线任务-"+output.getExt().getFlightId()+"  当前航点号为"+currentWaypointIndex+"号");
-
-        if(name.contains("fj")){
+//      之前判断条件  name.contains("fj"),现在判断为风机任务
+        if(pubWaylineJobPlanDfEntity.getPlanType()==1){
             // 快速检查航点是否变化
             AtomicInteger previous = processedWaypoints.get(flightId);
             if (!(previous != null && previous.get() >= currentWaypointIndex)) {
@@ -312,7 +319,7 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         log.info("执行空中航线任务-"+flightId+"  当前航点号为"+currentWaypointIndex+"号");
         String fightState = redisUtils.get("in_fight_state").toString();
-
+//      如果为多风机连续飞，要加风机策略标志位进行 &&
         if("working".equals(fightState)){
             processedinWaypoints.compute(flightId, (key, current) -> {
                 if (current == null || current.get() < currentWaypointIndex) {
@@ -424,6 +431,15 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     }
                                     fanWaylinePoints.setVideoFanPoints(jsonArray.toJSONString());
                                     fanWaylinePointsMapper.updateById(fanWaylinePoints);
+ //                                 保存job的保存标志位，正面保存完是1，反面保存完是2
+                                    String segment = jsonResponse.getString("segment");
+                                    if(segment.equals("front")){
+                                        waylineJobEntity.setIsSaved(1);
+                                        waylineJobMapper.updateById(waylineJobEntity);
+                                    }else  if(segment.equals("back")){
+                                        waylineJobEntity.setIsSaved(2);
+                                        waylineJobMapper.updateById(waylineJobEntity);
+                                    }
                                     log.info("截图点位入库---"+fanWaylinePoints);
                                     log.info("处理返回图像---------------------");
                                 }
