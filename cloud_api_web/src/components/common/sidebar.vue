@@ -41,7 +41,7 @@
           </el-col>
           <a-col :span="1"></a-col>
           <a-col :span="6" class="text_2">
-            <span>无人机任务规划与数据采集系统</span>
+            <span>无人机任务规划与综合运用系统</span>
           </a-col>
           <a-col :span="1" ></a-col>
           <a-col :span="8" class="text_1"  style="display: flex; justify-content: end;">

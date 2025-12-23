@@ -1,5 +1,5 @@
 <template>
-    <div>无人机任务规划与数据采集系统</div>
+    <div>无人机任务规划与综合运用系统</div>
 </template>
 <script></script>
 <style>

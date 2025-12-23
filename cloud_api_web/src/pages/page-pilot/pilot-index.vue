@@ -4,7 +4,7 @@
       style="width: 17vw; height: 10vw; margin-bottom: 50px"
       :src="dfeLogo"
     />
-    <p class="logo fz35 pb50">无人机任务规划与数据采集系统</p>
+    <p class="logo fz35 pb50">无人机任务规划与综合运用系统</p>
     <a-form
       layout="inline"
       :model="formState"
