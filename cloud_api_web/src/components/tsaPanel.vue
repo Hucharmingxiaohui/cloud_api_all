@@ -40,7 +40,7 @@
                   </div>
                   <!-- {{ (deviceInfo[dock.sn]?.mode_code !== EModeCode.Disconnected) ? '已连接' : '未连接' }} -->
                   <!-- <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code == 0"> 已连接</span> -->
-                  <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code === EModeCode.Disconnected || !deviceInfo[dock.sn]?.mode_cod"> 未连接</span>
+                  <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code === EModeCode.Disconnected">未连接</span>
                   <span class="text_15" v-else >已连接</span>
                 </div>
               </div>
