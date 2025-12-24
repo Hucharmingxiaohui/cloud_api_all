@@ -414,10 +414,9 @@ function onTaskMediaProgressWs (data: MediaStatusProgressInfo) {
   taskItem.media_count = mediaCount
   if (taskItem.saved_count && taskItem.saved_count > 0) {
     taskItem.uploaded_count = uploadedCount + taskItem.saved_count
-  } else{
+  } else {
     taskItem.uploaded_count = uploadedCount
   }
-
 }
 
 function onoTaskMediaHighestPriorityWS (data: TaskMediaHighestPriorityProgressInfo) {
@@ -476,7 +475,7 @@ async function anaysisTaskResult (row) {
 
     if (res.data === '603') {
       // 图片部分上传，分析条件不成熟
-      taskAnalysisStatus.value.set(row.job_id, { status: 'waiting', loading: true})
+      taskAnalysisStatus.value.set(row.job_id, { status: 'waiting', loading: true })
     }
 
     // 开始分析后，将探测任务添加到分析列表
@@ -515,7 +514,6 @@ async function checkAnaysisStaus (row) {
         analyzingTasks.value.add(row.job_id)
       }
       taskAnalysisStatus.value.set(row.job_id, { status: 'waiting', loading: true })
-
     } else {
       // 正在分析
       if (!analyzingTasks.value.has(row.job_id)) {

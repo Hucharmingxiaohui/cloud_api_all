@@ -16,7 +16,7 @@ export const TaskTypeMap = {
 export const TaskTypeOptions = [
   { value: TaskType.Immediate, label: TaskTypeMap[TaskType.Immediate] },
   { value: TaskType.Timed, label: TaskTypeMap[TaskType.Timed] },
-  { value: TaskType.Condition, label: TaskTypeMap[TaskType.Condition] },
+  // { value: TaskType.Condition, label: TaskTypeMap[TaskType.Condition] },
 ]
 
 // 失控动作

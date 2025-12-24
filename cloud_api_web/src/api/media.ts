@@ -104,6 +104,32 @@ export const downloadFlyTaskReportApi = async function (jobId: string): Promise<
   }
 }
 
+// 删除报告
+export async function deleteFlyTaskReportApi (job_id: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX_TWO}/deleteReport?jobId=${job_id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 下载结果数据集
+export const downloadImageZipApi = async function (jobId: string): Promise<any> {
+  const url = `${HTTP_PREFIX_TWO}/download-folder?jobId=${jobId}`
+  const result = await request.get(url, { responseType: 'blob' })
+  if (result.data.type === 'application/json') {
+    const reader = new FileReader()
+    reader.onload = function (e) {
+      const text = reader.result as string
+      const result = JSON.parse(text)
+      ElMessage.error(result.message)
+    }
+    reader.readAsText(result.data, 'utf-8')
+    console.log('json')
+  } else {
+    console.log('nojson')
+    return result.data
+  }
+}
+
 // 测试接口   根据worckspaceId 和fileId生成缩略图
 export async function getThumbnailById (file_id: string, workspace_id:string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX}/files/getThumbnailByJobId?file_id=${file_id}&workspace_id=${workspace_id}`

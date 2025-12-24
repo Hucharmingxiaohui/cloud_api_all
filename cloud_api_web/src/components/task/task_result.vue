@@ -21,6 +21,14 @@
             @click="viewReport()">
             查看报告
           </el-button>
+          <el-button class="new_btn" type="primary"  :icon="Refresh"
+            @click="resetReport()">
+            重置报告
+          </el-button>
+          <el-button class="new_btn" type="primary"  :icon="Download"
+            @click="exportImageZip()">
+            导出数据集
+          </el-button>
 
           <!-- <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
           </el-button> -->
@@ -66,27 +74,36 @@
               </div>
             </template>
           </el-table-column>
-          <!-- <el-table-column label="识别结果" width="150">
-              <template #default="scope">
-                <div>
-                  <div>{{ scope.row.file_name.includes('_T') ? getHighestTemp(scope.row.Temp) + '°C' : '' }}</div>
-                </div>
-              </template>
-            </el-table-column> -->
           <el-table-column label="采集时间" align="center">
             <template #default="scope">
               <div>{{ new Date(scope.row.create_time).toLocaleString() }}</div>
             </template>
           </el-table-column>
-<!--          <el-table-column label="是否原图">-->
-<!--            <template #default="scope">-->
-<!--              <div v-if="scope.row.is_original">是</div>-->
-<!--              <div v-else>否</div>-->
-<!--            </template>-->
-<!--          </el-table-column>-->
+          <el-table-column label="扇叶名称" align="center">
+            <template #default="scope">
+              <div>{{ scope.row.fan_code }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="扇叶部位" align="center">
+            <template #default="scope">
+              <div>{{ scope.row.fan_part }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="缺陷主要类型" align="center">
+            <template #default="scope">
+              <div>{{ scope.row.defect_type }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="缺陷描述" align="center">
+            <template #default="scope">
+              <div>{{ scope.row.defect_description  }}</div>
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="250px">
             <template #default="scope">
               <el-button size="small" type="text" @click="downloadMediaLocal(scope.row)">下载</el-button>
+              <el-button size="small" type="text" @click="defectSelect(scope.row)">人工修正</el-button>
+              <!-- manualCorrection -->
             </template>
           </el-table-column>
         </el-table>
@@ -100,6 +117,36 @@
         </el-pagination>
       </div>
     </div>
+
+    <!-- 人工修正 -->
+     <el-dialog title="人工修正" v-model="editDefectVisible" width="500px">
+         <div>
+      <el-form
+        :model="editForm"
+        label-width="100px"
+        :rules="formRules"
+        ref="editFormRef"
+      >
+        <el-form-item label="缺陷类型" prop="defects" required>
+          <el-select v-model="editForm.defects" multiple collapse-tags>
+            <el-option v-for="item in defectTypeMap" :label="item.name" :value="item.name" :key="item.code"></el-option>
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+         </div>
+               <template v-slot:footer>
+        <div class="dialog-footer">
+          <el-button @click="editDefectVisible = false" class="nobtn"
+            >取 消</el-button
+          >
+          <el-button type="primary" @click="handleCorrection()" class="okbtn"
+            >确 定</el-button
+          >
+        </div>
+      </template>
+     </el-dialog>
+
     <!-- 查看报告 -->
     <el-dialog title="报告预览" v-model="viewReportVisible" width="880px" class="view">
       <div v-loading="viewloading" class="doc-preview-container">
@@ -367,14 +414,15 @@ import { IPage } from '/@/api/http/type'
 import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, createFlyTaskReportApi, getMediaFiles, getOneImage, deleteOneImage, getTaskResultById, getThumbnailById, downloadThumbnail } from '/@/api/media'
+import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
+import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
 import { CloseOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
 import { renderAsync } from 'docx-preview'
 import { ElMessage } from 'element-plus'
 const viewReportVisible = ref(false)
+const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
 
@@ -390,7 +438,15 @@ const paginationProp = reactive({
 const queryForm = reactive({
   name: '',
 })
-
+const editForm = reactive({})
+const defectTypeMap = ref([])
+const editFormRef = ref(null)
+// 表单规则
+const formRules = {
+  defects: [
+    { required: true, message: '请选择缺陷类型', trigger: 'change' }
+  ]
+}
 // ===========================================================请求数据===========================================================================================
 const jobInfo = reactive({
   job_id: '',
@@ -438,7 +494,20 @@ onMounted(() => {
   jobInfo.file_id = data.file_id
 
   getFiles()
+  getDefectTypeMap()
 })
+
+/**
+ * 获取缺陷类型字典
+ */
+async function getDefectTypeMap () {
+  try {
+    const res = await getDefectTypeMapApi()
+    defectTypeMap.value = res
+  } catch (error) {
+    ElMessage.error('获取缺陷类型失败!')
+  }
+}
 
 /**
  * 生成任务结果报告
@@ -462,6 +531,51 @@ async function createReport () {
     }
   } catch (error) {
     console.error('生成报告失败:', error)
+    loading.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 重置任务报告
+ */
+async function resetReport () {
+  try {
+    loading.value = true
+    const response = await deleteFlyTaskReportApi(jobInfo.job_id)
+    if (response.code === 0) {
+      const res = await createFlyTaskReportApi({ jobId: jobInfo.job_id })
+      if (response.code !== 0 && response.code !== 602) {
+        loading.value = false
+        ElMessage.warning('重置报告失败!')
+        return
+      }
+    }
+    ElMessage.warning('重置报告成功!')
+  } catch (error) {
+    console.error('生成报告失败:', error)
+    loading.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 下载图片数据集
+ */
+async function exportImageZip () {
+  try {
+    loading.value = true
+    const res = await downloadImageZipApi(jobInfo.job_id)
+    if (!res) {
+      loading.value = false
+      return
+    }
+    const data = new Blob([res])
+    downloadFile(data, `${jobInfo.job_name}.zip`)
+  } catch (error) {
+    console.error('下载图片数据集失败:', error)
     loading.value = false
   } finally {
     loading.value = false
@@ -516,6 +630,35 @@ async function viewReport () {
     viewloading.value = false
   } finally {
     viewloading.value = false
+  }
+}
+
+/**
+ * 人工修正
+ */
+// 打开弹窗
+function defectSelect (row) {
+  editForm.id = row.defect_id
+  editDefectVisible.value = true
+}
+
+// 提交选项
+async function handleCorrection () {
+  try {
+    const valid = await editFormRef.value.validate()
+    if (!valid) {
+      ElMessage.warning('请检查表单是否填写!')
+    }
+    const res = await updateDefectTypeApi(editForm)
+    if (res.code !== 0) {
+      ElMessage.error('修正失败!')
+    } else {
+      ElMessage.success('修正成功!')
+      editDefectVisible.value = false
+      getFiles()
+    }
+  } catch (error) {
+
   }
 }
 
@@ -1321,6 +1464,28 @@ function scrollRight () {
 </script>
 
 <style lang="scss" scoped>
+
+:deep(.el-tag.el-tag--info){
+  --el-tag-text-color: #aeb5c3;
+  --el-tag-bg-color:rgb(39 75 109);
+}
+
+.okbtn {
+    background-color: rgba(7, 75, 208, 1);
+    // height: 40px;
+    border: 1px solid rgba(0, 64, 147, 1);
+}
+
+.okbtn:hover {
+    border: 1px solid rgba(0, 112, 209, 1);
+}
+
+.nobtn {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+    // height: 40px;
+    border: 1px solid rgba(206, 227, 255, 0.42);
+}
 
 .doc-preview-container {
   width: 100%;

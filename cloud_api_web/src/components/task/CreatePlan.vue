@@ -183,7 +183,7 @@
               <el-input v-model="planBody.rth_altitude"></el-input>
             </el-form-item>
             <!-- Lost Action -->
-            <el-form-item
+            <!-- <el-form-item
               label="失联动作"
               prop="out_of_control"
               label-position="top"
@@ -200,7 +200,7 @@
                   >
                 </el-radio-group>
               </div>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item style="margin-bottom: 40px;">
               <div class="footer">
                 <el-button
@@ -295,7 +295,7 @@ const planBody = reactive({
   username: 'pilot',
   plan_type: type.value,
   rth_altitude: '',
-  out_of_control: '',
+  out_of_control: 0, // 默认返回
   enable_status: 0,
   plan_priority: 1
 })
