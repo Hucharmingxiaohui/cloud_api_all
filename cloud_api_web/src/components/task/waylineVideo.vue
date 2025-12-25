@@ -5,7 +5,8 @@
             <div class="box-left">
                 <div class="nav">
                     <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/nav-icon.png" />
-                    <span class="text_9">{{ current_sub }}</span>
+                    <span class="text_9">蔚蓝风电场</span>
+                    <!-- {{ current_sub }} -->
                 </div>
                 <!-- 小标题部分 -->
                 <div class="title">
