@@ -53,10 +53,6 @@
 
                 <!-- 视频流部分 -->
                 <div class="uav-video">
-                    <!-- <video class="video-player" controls autoplay>
-                        <source v-bind:src="videoStreamUrl" type="video/mp4" />
-                        你的浏览器不支持 video 标签。
-                    </video> -->
                     <LivestreamOthers :sn="osdVisible.sn"  :deviceInfo="deviceInfo"></LivestreamOthers>
                 </div>
 
@@ -146,6 +142,7 @@ import { ref, computed, reactive, watch, onMounted } from 'vue'
 import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
 import LivestreamDock from '/@/components/livestream-dock-debug.vue'
 import LivestreamOthers from '/@/components/livestream-others-debug.vue'
+import {getNowTaskApi} from  '/@/api/wayline'
 import { useMyStore } from '/@/store'
 import droneControlPanel from '/@/components/devices/drone_control/drone-control.vue'
 import deviceState from '/@/components/devices/drone_control/device_state.vue'
@@ -200,9 +197,31 @@ const taskInfo = reactive({
   file_id: '',
   job_name: '',
   execute_time: '',
-  file_name: ''
+  file_name: '',
+  waylineId: ''
 
 })
+
+// 获取当前的任务信息
+async function getNowTask(){
+    try {
+      const res = await getNowTaskApi()
+      if(res.code!==0){
+        return
+      }
+    taskInfo.execute_time = res.data.executeTime
+    taskInfo.job_name = res.data.jobEntityName
+    taskInfo.file_name = res.data.waylineName
+    taskInfo.waylineId = res.data.waylineId
+
+    const waylineId = store.state.waylineInfo
+    waylineId.id = taskInfo.waylineId
+    store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
+
+    } catch (error) {
+        
+    }
+}
 
 const current_sub = ref('') // 当前变电站
 onMounted(() => {
@@ -212,27 +231,21 @@ onMounted(() => {
     const waylineId = store.state.waylineInfo
     waylineId.id = data1.file_id
     store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
-    taskInfo.execute_time = data1.execute_time
-    taskInfo.job_name = data1.job_name
-    taskInfo.file_id = data1.file_id
-    taskInfo.file_name = data1.file_name
+    // taskInfo.execute_time = data1.execute_time
+    // taskInfo.job_name = data1.job_name
+    // taskInfo.file_id = data1.file_id
+    // taskInfo.file_name = data1.file_name
   }
   store.commit('SET_OSD_VISIBLE_INFO', data)
-  //   console.log('sasas', osdVisible.value)
   current_sub.value = history.state.name
-//   console.log('传参数据', history.state.name)
+  getNowTask()
 })
 // 左侧视频流切换标签
 const activeTab = ref('load') // 默认选中负载直播标签
-const videoStreams = {
-  load: 'path-to-load-video-stream.mp4', // 负载直播视频流的路径
-  flight: 'path-to-flight-video-stream.mp4' // 飞行飞机视频流的路径
-}
+
 
 watch(() => store?.state.deviceState, data => {
   if (data.currentType === EDeviceTypeName.Gateway && data.gatewayInfo[data.currentSn]) {
-    // const coordinate = wgs84togcj02(data.gatewayInfo[data.currentSn].longitude, data.gatewayInfo[data.currentSn].latitude)
-    // deviceTsaUpdateHook.moveTo(data.currentSn, coordinate[0], coordinate[1])
     if (osdVisible.value.gateway_sn !== '') {
       deviceInfo.gateway = data.gatewayInfo[osdVisible.value.gateway_sn]
     }

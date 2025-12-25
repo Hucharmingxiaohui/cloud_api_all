@@ -284,12 +284,11 @@ export default defineComponent({
     // ========================================================================================航线标注==================================================================
     onMounted(() => {
       const app = getApp()
-      console.log('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', store.state.waylineInfo)
       useGMapManageHook.globalPropertiesConfig(app)
       setTimeout(() => {
         removeAllWayline()
         if (store.state.waylineInfo.id) {
-          console.log('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
+          console.log('waylineInfo.id=', store.state.waylineInfo.id)
           getWatlineInfo(store.state.waylineInfo.id)
         }
       }, 500)
@@ -321,12 +320,11 @@ export default defineComponent({
    * @param workspaceId 工作空间id
    * */
     const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
-    function getWatlineInfo (waylineId: string) {
+    function getWatlineInfo(waylineId: string) {
       gethWaylineInfo(workspaceId, waylineId).then(res => {
         if (res.code !== 0) {
           return
         }
-        // waylineInfo.value = res.data
         showWayline(res.data)
       })
     }

@@ -52,9 +52,7 @@ export const batchDeleteWaylineFile = async function (workspaceId: string, data)
   const result = await request.post(url, data)
   return result.data
 }
-//  @selection-change="handleSelectionChange"
 
-//  @selection-change="handleSelectionChange"
 // 查询航线站点信息,可视化航线
 export const gethWaylineInfo = async function (wid: string, waylineId: string): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines/${waylineId}/llPoint`
@@ -362,6 +360,14 @@ export const getWaylineJobs = async function (workspaceId: string, data: any): P
 export interface DeleteTaskParams {
   job_id: string
 }
+
+// 获取当前的任务信息
+export const getNowTaskApi = async function (): Promise<IListWorkspaceResponse<Task>> {
+  const url = `${HTTP_PREFIX3}/waylinePlan/getNowTask`
+  const result = await request.get(url)
+  return result.data
+}
+
 
 //  删除机场任务
 export async function deleteTask (workspaceId: string, params: DeleteTaskParams): Promise<IWorkspaceResponse<{}>> {

@@ -390,7 +390,6 @@ function getPlans () {
       return
     }
     plansData.data = res.data.list
-    // console.log('sss', plansData.data)
     paginationProp.total = res.data.pagination.total
     paginationProp.current = res.data.pagination.page
   })
@@ -463,7 +462,6 @@ function getOnlineTopo () {
         onlineDevices.data.push(device)
       }
     })
-    console.log('在线机场', onlineDocks)
   })
 }
 
@@ -507,10 +505,6 @@ function getCurrentDeviceBySub (sub_code:string) {
 
 // 跳转到远程调试界面
 function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
-  // if (!isClick) {
-  //   e.target.style.cursor = 'not-allowed'
-  //   return
-  // }
   if (device.sn === osdVisible.value.sn) {
     osdVisible.value.visible = false
   } else {
@@ -528,15 +522,12 @@ function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: 
 
   // 设置航线信息
   localStorage.setItem('currentTask', JSON.stringify(current_task.value))
-  // const waylineId = store.state.waylineInfo
-  // waylineId.id = current_wayline.value
-  // store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
+
   router.push({ path: '/remoteDebug', state: { name: current_sub.value } })
 }
 
 // 地图显示航线
 function showWayline () {
-  // current_wayline.value = '011cfcd3-07bb-4919-8dc4-15028cee4cff'
   const waylineId = store.state.waylineInfo
   if (waylineId.id === current_wayline.value) {
     waylineId.update_time = Math.floor(Date.now() / 1000)
@@ -576,7 +567,6 @@ function openLiveStream (device: OnlineDevice) {
   // if (device.sn === osdVisible.value.sn) {
   //   osdVisible.value.visible = !osdVisible.value.visible
   // }
-  console.log('在线设备', device)
   liveStream.value.visible = !liveStream.value.visible
   liveStream.value.dock_sn = device.gateway.sn
   liveStream.value.dorne_sn = device.sn
