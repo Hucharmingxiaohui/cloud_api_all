@@ -2,7 +2,7 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 import { App, reactive } from 'vue'
 import { AMapConfig } from '/@/constants/index'
 // import '/@/amap/AMap3.js'
-
+import fanIcon from '/@/assets/v4/fan.gif'
 declare const AMap: any
 
 export function useGMapManage () {
@@ -37,12 +37,14 @@ export function useGMapManage () {
     })
     state.map = new AMap.Map(container, {
       center: [109.026590883032, 22.702118868888],
-      zoom: 16,
+      zoom: 14,
       layers: [customLayer]
     })
 
     const marker = new AMap.Marker({
-      position: [109.026590883032, 22.702118868888], // 位置
+      position: [109.02655, 22.701153], // 位置
+      icon: fanIcon,
+      offset: [0, -20],
     })
     state.map.add(marker) // 添加到地图
 
@@ -64,10 +66,12 @@ export function useGMapManage () {
   //     })
   //     state.mouseTool = new AMap.MouseTool(state.map)
 
-  //     // const marker = new AMap.Marker({
-  //     //   position: [121.3588, 37.5179]
-  //     // })
-  //     // state.map.add(marker)
+  //     const marker = new AMap.Marker({
+  //       position: [121.3588, 37.5179],
+  //       icon: fanIcon,
+  //       offset: [0, -20],
+  //     })
+  //     state.map.add(marker)
 
   //     // 挂在到全局
   //     app.config.globalProperties.$aMap = state.aMap

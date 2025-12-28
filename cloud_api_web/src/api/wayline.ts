@@ -368,7 +368,6 @@ export const getNowTaskApi = async function (): Promise<IListWorkspaceResponse<T
   return result.data
 }
 
-
 //  删除机场任务
 export async function deleteTask (workspaceId: string, params: DeleteTaskParams): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs`
