@@ -222,6 +222,8 @@ function onTaskProgressWs (data) {
   if (output) {
     const { status, progress } = output || {}
     const taskItem = plansData.data.find(task => task.job_id === bid)
+    console.log('当前任务', taskItem)
+    console.log('renwuliebiao', plansData.data)
     taskInfo.execute_time = taskItem.begin_time
     taskInfo.job_name = taskItem.job_name
     taskInfo.file_name = taskItem.file_name
@@ -259,8 +261,8 @@ async function getNowTask () {
 
 const current_sub = ref('') // 当前变电站
 onMounted(() => {
-  const data = JSON.parse(localStorage.getItem('osdInfo'))
-  store.commit('SET_OSD_VISIBLE_INFO', data)
+//   const data = JSON.parse(localStorage.getItem('osdInfo'))
+//   store.commit('SET_OSD_VISIBLE_INFO', data)
   //   const data1 = JSON.parse(localStorage.getItem('currentTask'))
   //   if (data1) {
   //     const waylineId = store.state.waylineInfo

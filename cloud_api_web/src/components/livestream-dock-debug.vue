@@ -53,26 +53,14 @@ const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 
 const osdVisible = computed(() => {
-  return store.state.osdVisible
+  return store.state.osdVisible || { gateway_sn: '' }
 })
-const device_sn = ref(osdVisible.value.sn)
+const device_sn = ref(osdVisible.value.gateway_sn)
 cameraSelected.value = '165-0-7'
 const isPlay = ref(false)
+const isStartSteam = ref(false)
 onMounted(() => {
-  // refresh()
-  // videoRef.value?.addEventListener('play', () => {
-  //   const end = flvPlayer.value.buffered.end(0) - 1
-  //   flvPlayer.value.currentTime = end
-  // })
-
-  // window.onfocus = () => {
-  //   const end = flvPlayer.value.buffered.end(0) - 1
-  //   flvPlayer.value.currentTime = end
-  // }
-  getcameraInfo()
-  // setTimeout(() => {
-  //   initFlv()
-  // }, 1000)
+  // getcameraInfo()
 })
 
 /* 请求后端相机信息
@@ -83,21 +71,24 @@ const liveURL = config.rtmpURL + timestamp
 livetypeSelected.value = 1
 claritySelected.value = 2
 async function getcameraInfo () {
+  if (isStartSteam.value) return
   await getLiveCapacity({})
     .then(res => {
       if (res.code !== 0) {
         isPlay.value = false
         return
       }
-      console.log('eeeeerrrrrrrrrrrrrrrrrrrrrrrrrrrrrr')
       const cameraData = res.data.find(item => item.sn === device_sn.value)
+      console.log('获取设备', cameraData)
       if (!cameraData) {
         isPlay.value = false
         return
       }
+
       droneSelected.value = cameraData.sn
       // cameraSelected.value = cameraData.cameras_list[0].index
       videoId.value = droneSelected.value + '/' + cameraSelected.value + '/' + (videoSelected.value || nonSwitchable + '-0')
+
       getLiveHttp()
     })
 }
@@ -106,32 +97,30 @@ async function getcameraInfo () {
 *
 */
 async function getLiveHttp () {
-  await startLivestream({
-    url: liveURL,
-    video_id: videoId.value,
-    url_type: livetypeSelected.value,
-    video_quality: claritySelected.value
-  }).then(res => {
-    if (res.code === 0) {
-      flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-      initFlv()
-    }
-    if (res.code === 513003) {
-      isPlay.value = true
-      // rtmp://172.20.63.238:2035/live/
-      flvURL.value = config.rtmpURL.replace('rtmp://', 'http://').replace(':2035', ':9080') + '7CTDL9K00A0157-165-0-7.flv'
-      initFlv()
-      // console.log('sssssssssssssssssssssssssssssssssss')
-      // flvURL.value = http://172.20.63.238:9080/live/7CTDL9K00A0157-165-0-7.flv
-      // onStop()
-      // setTimeout(() => {
-      //   getLiveHttp()
-      // }, 500)
-      // setTimeout(() => {
-      //   initFlv()
-      // }, 1000)
-    }
-  })
+  try {
+    await startLivestream({
+      url: liveURL,
+      video_id: videoId.value,
+      url_type: livetypeSelected.value,
+      video_quality: claritySelected.value
+    }).then(res => {
+      if (res.code === 0) {
+        isStartSteam.value = true
+        flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        initFlv()
+      }
+      if (res.code === 513003) {
+        isPlay.value = true
+        onStop()
+        setTimeout(() => {
+          getLiveHttp()
+        }, 500)
+      }
+    })
+  } catch (error) {
+    isStartSteam.value = false
+    isPlay.value = false
+  }
 }
 
 /* 请求后端停止推流
@@ -156,15 +145,12 @@ const onStop = () => {
  * 初始化
  */
 function initFlv () {
-  console.log('机场视频', flvURL.value)
   videoRef.value = document.getElementById('videoElement1') as HTMLVideoElement
   if (videoRef.value) {
     if (flvjs.isSupported()) {
       try {
         flvPlayer.value = flvjs.createPlayer({
           type: 'flv',
-          // url: 'http://127.0.0.1:80/live?port=1935&app=live&stream=test',
-          // url: 'http://172.20.63.56:8180/live/12345.flv',
           url: flvURL.value,
           isLive: true,
           hasAudio: false,
@@ -204,10 +190,12 @@ function initFlv () {
         isPlay.value = true
       } catch (error) {
         isPlay.value = false
+        isStartSteam.value = false
         console.log('创建播放器实例时发生错误:', error)
       }
     } else {
       isPlay.value = false
+      isStartSteam.value = false
       console.log('由于视频文件损坏或是该视频使用了你的浏览器不支持的功能')
     }
   }
@@ -234,11 +222,6 @@ const onPause = () => flvPlayer.value.pause()
  * 销毁
  */
 const destory = () => {
-  // flvPlayer.value.pause()
-  // flvPlayer.value.unload()
-  // flvPlayer.value.detachMediaElement()
-  // flvPlayer.value.destroy()
-  // flvPlayer.value = null
 }
 onUnmounted(() => {
   destory()
@@ -247,12 +230,12 @@ onUnmounted(() => {
 
 // 根据设备osd信息更新信息
 watch(() => props.deviceInfo, (value) => {
-  // console.log('我被你检测11111')
   if (!isPlay.value) {
-    console.log('执行请求视频')
     isPlay.value = true
     device_sn.value = osdVisible.value.gateway_sn
-    getcameraInfo()
+    if (!isStartSteam.value) {
+      getcameraInfo()
+    }
   }
 }, {
   immediate: true,

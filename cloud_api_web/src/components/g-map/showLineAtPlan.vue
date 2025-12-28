@@ -166,9 +166,6 @@ export default defineComponent({
           }
           store.state.deviceStatusEvent.deviceOffline = {}
         }
-      },
-      {
-        deep: true
       }
     )
     watch(() => store.state.deviceState, data => {

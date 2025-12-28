@@ -87,7 +87,7 @@ const messageHandler = async (payload: any) => {
     case EBizCode.DockOsd: {
       const currentData = payload.data
       const hasEnvironmentTemperature = currentData.host?.environment_temperature !== ''
-      console.log(currentData.host?.environment_temperature)
+      // console.log(currentData.host?.environment_temperature)
 
       if (hasEnvironmentTemperature) {
         // 不为空，立即提交

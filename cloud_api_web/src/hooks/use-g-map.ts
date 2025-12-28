@@ -38,7 +38,11 @@ export function useGMapManage () {
     state.map = new AMap.Map(container, {
       center: [109.026590883032, 22.702118868888],
       zoom: 14,
-      layers: [customLayer]
+      layers: [customLayer],
+      animateEnable: false, // 关闭动画，加快初始加载
+      doubleClickZoom: false, // 初始时禁用双击缩放
+      dragEnable: true, // 初始时禁用拖拽
+      zoomEnable: false, // 初始时禁用缩放
     })
 
     const marker = new AMap.Marker({
