@@ -141,7 +141,7 @@ public class SDKControlService extends AbstractControlService {
                                             //不停机巡检
                                             turbineName = jsonResponse.getString("turbine_name");
                                             redisUtils.set("in_fight_state","working");
-                                            routePlan.workingWayline(turbineName);
+                                            routePlan.workingWayline(turbineName,null);
                                         } else if (jsonResponse.getString("ypjd") != null) {
                                             //停机巡检
                                             log.info("执行停机巡检-------------");
@@ -149,7 +149,7 @@ public class SDKControlService extends AbstractControlService {
                                             turbineName = jsonResponse.getString("turbine_name");
                                             String ypjd = jsonResponse.getString("ypjd");
                                             double value = Double.parseDouble(ypjd);
-                                            routePlan.stopWayline(turbineName, value);
+                                            routePlan.stopWayline(turbineName, value,null);
                                         }
                                     }
                                 } else {

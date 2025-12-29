@@ -8,10 +8,12 @@ public interface RoutePlanService {
 //     void flyToFront(String name, Double yaw);
 //   飞向中间点
      void flyToWayline(String name,Double value);
+//   飞向中间点
+     void nextTopWayline(String waylineId);
 //   不停机巡检
-     void workingWayline(String name);
+     void workingWayline(String name,String value);
 //   停机巡检
-     void stopWayline(String name, Double yaw);
+     void stopWayline(String name, Double yaw,String value);
 //   风机飞向顶端航线，任务名开头fj来判别
      Map<String,Object> buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
 //   风机兴趣点环绕航线，任务名开头fjip来判别

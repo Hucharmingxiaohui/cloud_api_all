@@ -4,6 +4,8 @@ import com.df.framework.config.FtpsConfig;
 import com.df.framework.utils.SpringUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.File;
+
 /**
  * FTP工具类 todo 2022.8.24 ftp 修改为资源池方式
  */
@@ -106,14 +108,28 @@ public class FtpUtils {
     }
 
     public static void main(String[] args) {
-        String localFile = "D:\\001.png";
-        String destDir = "烟台/XX区域/500kVXX桥变电站/缺陷/202204/";
-        String destFileName = "demo.jpg";
-        String passiveMode = "true";
+//        String localFile = "D:\\001.png";
+//        String destDir = "烟台/XX区域/500kVXX桥变电站/缺陷/202204/";
+//        String destFileName = "demo.jpg";
+//        String passiveMode = "true";
+//        FtpsHelper ftpClient = new FtpsHelper();
+//        try {
+//            ftpClient.login("172.20.63.150", 10012, "dfftp", "dfe2k_1500", true);
+//            ftpClient.uploadFile(localFile, "", "demo112.jpg","true");
+//            ftpClient.close();
+//        } catch (Exception exception) {
+//            exception.printStackTrace();
+//        } finally {
+//            ftpClient.close();
+//        }
+
+        String localFile = "D:\\配电房例行巡视任务.docx";;
+        String destName = new File(localFile).getName();
+        String destDir = "/df1560/";
         FtpsHelper ftpClient = new FtpsHelper();
         try {
             ftpClient.login("172.20.63.150", 10012, "dfftp", "dfe2k_1500", true);
-            ftpClient.uploadFile(localFile, "", "demo.jpg","true");
+            ftpClient.uploadFile(localFile, destDir, destName,"true");
             ftpClient.close();
         } catch (Exception exception) {
             exception.printStackTrace();

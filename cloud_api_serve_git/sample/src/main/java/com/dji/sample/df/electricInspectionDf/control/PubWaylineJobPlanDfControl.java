@@ -1,9 +1,14 @@
 package com.dji.sample.df.electricInspectionDf.control;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
+import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
+import com.dji.sample.wayline.dao.IWaylineFileMapper;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.entity.WaylineFileEntity;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
@@ -13,9 +18,8 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
@@ -29,6 +33,12 @@ public class PubWaylineJobPlanDfControl {
     @Resource
     private RedisUtils redisUtils;
 
+    @Autowired
+    private IWaylineJobMapper waylineJobMapper;
+
+    @Autowired
+    IWaylineFileMapper waylineFileMapper;
+
     @PostMapping("/createWaylinePlan")
     HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
         CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
@@ -40,24 +50,24 @@ public class PubWaylineJobPlanDfControl {
         Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
         boolean result = (boolean) waylineJObPlan.get("result");
         if(result){
-            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
-//          定时任务则立即执行,要根据实际情况加上间隔(暂定1个小时）
-            // 获取第一个对象的beginTime作为基准时间
-            long baseTime = planDfEntityList.get(0).getBeginTime();
-            for (int i = 0; i < planDfEntityList.size(); i++) {
-                PubWaylineJobPlanDfEntity planDfEntity = planDfEntityList.get(i);
-                // 为每个对象设置新的beginTime：基准时间 + i * 1小时
-                long newBeginTime = baseTime + i * 3600000L; // 1小时 = 3600000毫秒
-                planDfEntity.setBeginTime(newBeginTime);
-                if (planDfEntity.getTaskType() == 1) {
-                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
-                }
-            }
-//            PubWaylineJobPlanDfEntity planDfEntity = (PubWaylineJobPlanDfEntity) waylineJObPlan.get("plan");
-////          定时任务则立即执行
-//            if(planDfEntity.getTaskType()==1) {
-//                pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+//            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
+////          定时任务则立即执行,要根据实际情况加上间隔(暂定1个小时）
+//            // 获取第一个对象的beginTime作为基准时间
+//            long baseTime = planDfEntityList.get(0).getBeginTime();
+//            for (int i = 0; i < planDfEntityList.size(); i++) {
+//                PubWaylineJobPlanDfEntity planDfEntity = planDfEntityList.get(i);
+//                // 为每个对象设置新的beginTime：基准时间 + i * 1小时
+//                long newBeginTime = baseTime + i * 3600000L; // 1小时 = 3600000毫秒
+//                planDfEntity.setBeginTime(newBeginTime);
+//                if (planDfEntity.getTaskType() == 1) {
+//                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+//                }
 //            }
+            PubWaylineJobPlanDfEntity planDfEntity = (PubWaylineJobPlanDfEntity) waylineJObPlan.get("plan");
+//          定时任务则立即执行
+            if(planDfEntity.getTaskType()==1) {
+                pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+            }
             return HttpResultResponse.success(waylineJObPlan).setMessage("创建飞行计划成功");
         }else{
            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
@@ -165,6 +175,33 @@ public class PubWaylineJobPlanDfControl {
         }else {
             return HttpResultResponse.error("批量删除任务失败");
         }
+    }
+
+    //  批量删除飞行任务，暂时不用，因为任务里准备中的任务是调取消任务的接口，应该分两类进行处理,也要改成post
+    @GetMapping("/getNowTask")
+    HttpResultResponse getNowTask(){
+        Map map = new HashMap();
+        String jobId = redisUtils.get("jobId").toString();
+        if(StringUtils.isNotEmpty(jobId)){
+            WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                    .eq(WaylineJobEntity::getJobId, jobId));
+            String jobEntityName = waylineJobEntity.getName();
+            WaylineFileEntity waylineFileEntity = waylineFileMapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().
+                    eq(WaylineFileEntity::getWaylineId, waylineJobEntity.getFileId()));
+            String waylineName = waylineFileEntity.getName();
+            String waylineId = waylineFileEntity.getWaylineId();
+            Long executeTime = waylineJobEntity.getExecuteTime();
+            Date date = new Date(executeTime);
+            System.out.println(date); // 直接输出
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            String formattedDate = sdf.format(date);
+            map.put("jobEntityName",jobEntityName);
+            map.put("executeTime",formattedDate);
+            map.put("waylineName",waylineName);
+            map.put("waylineId",waylineId);
+            return HttpResultResponse.success().setData(map);
+        }
+        return HttpResultResponse.success().setData(map);
     }
 
     // 初级版本（启用）

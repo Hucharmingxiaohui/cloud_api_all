@@ -1,9 +1,12 @@
 package com.dji.sample.manage.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.DevicePayloadReceiver;
+import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.model.enums.DeviceFirmwareStatusEnum;
 import com.dji.sample.manage.model.param.DeviceQueryParam;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
@@ -14,6 +17,7 @@ import com.dji.sdk.cloudapi.device.*;
 import com.dji.sdk.cloudapi.device.api.AbstractDeviceService;
 import com.dji.sdk.cloudapi.tsa.DeviceIconUrl;
 import com.dji.sdk.cloudapi.tsa.IconUrlEnum;
+import com.dji.sdk.cloudapi.wayline.api.AbstractWaylineService;
 import com.dji.sdk.config.version.GatewayManager;
 import com.dji.sdk.common.SDKManager;
 import com.dji.sdk.mqtt.MqttReply;
@@ -23,10 +27,12 @@ import com.dji.sdk.mqtt.status.TopicStatusRequest;
 import com.dji.sdk.mqtt.status.TopicStatusResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -56,6 +62,13 @@ public class SDKDeviceService extends AbstractDeviceService {
 
     @Autowired
     private IDevicePayloadService devicePayloadService;
+
+    @Resource
+    private IDeviceMapper deviceMapper;
+
+    @Autowired
+    @Qualifier("SDKWaylineService")
+    private AbstractWaylineService abstractWaylineService;
 
     @Override
     public TopicStatusResponse<MqttReply> updateTopoOnline(TopicStatusRequest<UpdateTopo> request, MessageHeaders headers) {
@@ -177,8 +190,15 @@ public class SDKDeviceService extends AbstractDeviceService {
         DeviceDTO device = deviceOpt.get();
         deviceRedisService.setDeviceOnline(device);
         deviceRedisService.setDeviceOsd(from, request.getData());
-
-
+        String uavSN = request.getGateway();
+        DeviceEntity dockEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getChildSn, uavSN));
+        Integer capacityPercent = request.getData().getBattery().getCapacityPercent();
+        int code = request.getData().getModeCode().getCode();
+        if(code==5 && capacityPercent<=40){
+            abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockEntity.getDeviceSn()));
+            log.info("电量已小于40%触发返航");
+        }
         deviceService.pushOsdDataToWeb(device.getWorkspaceId(), BizCodeEnum.DEVICE_OSD, from, request.getData());
     }
 

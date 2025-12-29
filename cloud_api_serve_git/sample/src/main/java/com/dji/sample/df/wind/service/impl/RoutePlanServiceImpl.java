@@ -236,8 +236,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     log.error("kmz文件未检测到");
                 }
                 log.info("执行飞向中心点空中航线2");
-                String workspaceId = redisUtils.get("workspaceId").toString();
-                String creator = redisUtils.get("creator").toString();
+                String workspaceId = redisUtils.get("workspaceId") != null ?
+                        redisUtils.get("workspaceId").toString() :
+                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = redisUtils.get("creator") != null ?
+                        redisUtils.get("creator").toString() :
+                        "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -308,6 +312,140 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
     }
 
+    // 飞向下个风机top的空中航线
+    public void nextTopWayline(String waylineId) {
+
+        WindTurbine windTurbine = windTurbineMapper.selectById(waylineId);
+        String url = waylineUrlConfig.getBuildKmzUrl().getTopWayline();
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("turbine_name", windTurbine.getTurbineName());
+        jsonObject.put("lon0_deg", windTurbine.getAirportLongitude());
+        jsonObject.put("lat0_deg", windTurbine.getAirportLatitude());
+        jsonObject.put("h0", windTurbine.getAirportAltitude());
+        //      转向角为获取
+        jsonObject.put("yaw_ver", windTurbine.getApproachYaw());
+        jsonObject.put("lon_in_deg", windTurbine.getPeakLongitude());
+        jsonObject.put("lat_in_deg", windTurbine.getPeakLatitude());
+        jsonObject.put("h_in", windTurbine.getPeakAltitude());
+        jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
+        jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
+        jsonObject.put("length", windTurbine.getBladeLength());
+        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+        jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
+        jsonObject.put("blade_points", windTurbine.getBladePoints());
+        jsonObject.put("tower_points", windTurbine.getTowerPoints());
+        String jsonInput = jsonObject.toString();
+        try {
+            URL obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+            // 设置请求方法
+            con.setRequestMethod("POST");
+            con.setRequestProperty("Content-Type", "application/json");
+            con.setDoOutput(true);
+            // 发送请求
+            try (OutputStream os = con.getOutputStream()) {
+                byte[] input = jsonInput.getBytes("utf-8");
+                os.write(input, 0, input.length);
+            }
+            // 获取响应
+            int responseCode = con.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+//          如果响应成功，则成功生成kmz文件转为multipartFile，导入minio
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                try (BufferedReader br = new BufferedReader(
+                        new InputStreamReader(con.getInputStream(), "utf-8"))) {
+                    StringBuilder response1 = new StringBuilder();
+                    String responseLine;
+                    while ((responseLine = br.readLine()) != null) {
+                        response1.append(responseLine.trim());
+                    }
+                    JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
+                    String routeName = jsonResponse.getString("routeName");
+                    // 项目根目录下的文件路径（根据实际部署环境调整），注意linux是否可行
+                    String projectPath = System.getProperty("user.dir");
+                    String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
+                    MultipartFile file = convert(filePath);
+                    if (Objects.isNull(file)) {
+                        log.error("kmz文件未检测到");
+                    }
+
+                    String workspaceId = redisUtils.get("workspaceId").toString();
+                    String creator = redisUtils.get("creator").toString();
+                    importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
+                    String fileName = file.getOriginalFilename();
+                    if (fileName != null && fileName.endsWith(".kmz")) {
+                        fileName = fileName.substring(0, fileName.length() - 4);
+                    }
+                    WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
+                    if (Objects.isNull(entity)) {
+                        log.error("导入外部航线失败");
+                    }
+
+                    InFlightWaylineDeliverParam param = new InFlightWaylineDeliverParam();
+                    String jobId = redisUtils.get("jobId").toString();
+                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
+                            eq(WaylineJobEntity::getJobId, jobId));
+                    PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                            .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+                    // get wayline file
+                    WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
+
+                    Optional<GetWaylineListResponse> waylineFile = waylineFileService.getWaylineByWaylineId(workspaceEntity.getWorkspaceId(), entity.getWaylineId());
+                    if (waylineFile.isEmpty()) {
+                        log.error("The wayline file doesn't exist.");
+                    }
+                    // get file url
+                    URL url1 = waylineFileService.getObjectUrl(workspaceEntity.getWorkspaceId(), waylineFile.get().getId());
+
+                    FileParam fileParam = new FileParam();
+                    fileParam.setFingerprint(waylineFile.get().getSign());
+                    fileParam.setUrl(url1.toString());
+                    param.setFile(fileParam);
+//                  失控返航
+                    param.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
+                    param.setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION);
+                    Integer rthAltitude = pubWaylineJobPlanDfEntity.getRthAltitude();
+                    param.setRthAltitude(rthAltitude);
+                    param.setRthMode(RthModeEnum.PRESET_HEIGHT);
+                    param.setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK);
+                    String waylineName = entity.getName();
+                    CreateJobParam createJobParam = new CreateJobParam();
+                    createJobParam.setName(waylineName);
+                    createJobParam.setFileId(entity.getWaylineId());
+                    createJobParam.setDockSn(waylineJobEntity.getDockSn());
+                    createJobParam.setWaylineType(WaylineTypeEnum.WAYPOINT);
+//                  任务类型为立即执行，是否后续不需要额外判断了
+                    createJobParam.setTaskType(TaskTypeEnum.IMMEDIATE);
+                    createJobParam.setRthAltitude(rthAltitude);
+                    createJobParam.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
+                    createJobParam.setMinBatteryCapacity(50);
+                    createJobParam.setMinStorageCapacity(null);
+                    List<Long> task_days = new ArrayList<>();
+                    createJobParam.setTaskDays(task_days);
+                    List<List<Long>> task_periods = new ArrayList<>();
+                    createJobParam.setTaskPeriods(task_periods);
+//                  空中航线没有创建计划，计划id和job_id设为一样
+                    String job_id = UUID.randomUUID().toString();
+                    createJobParam.setPlanId(job_id);
+                    param.setInFlightWaylineId(job_id);
+//                  0不停机 1停机 2中心点 3 top航线
+                    int planType=3;
+                    performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } catch (ProtocolException e) {
+            throw new RuntimeException(e);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void performDeliveryWithRetry(String sn, InFlightWaylineDeliverParam param, CreateJobParam createJobParam,int planType) {
         int retryCount = 0;
         int code = -1; // 初始化为-1以进入循环
@@ -351,7 +489,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
     // 不停机巡检
-    public void workingWayline(String name) {
+    public void workingWayline(String name,String value) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);
 //        String url = "http://172.20.63.157:5001/working";
@@ -415,8 +553,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-                String workspaceId = redisUtils.get("workspaceId").toString();
-                String creator = redisUtils.get("creator").toString();
+                String workspaceId = redisUtils.get("workspaceId") != null ?
+                        redisUtils.get("workspaceId").toString() :
+                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = redisUtils.get("creator") != null ?
+                        redisUtils.get("creator").toString() :
+                        "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -486,7 +628,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     // 停机巡检
 //  todo 停机巡检也得空中下发航线，需验证是否照片存入minio
-    public void stopWayline(String name, Double yaw) {
+    public void stopWayline(String name, Double yaw,String value) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);
 //        String url = "http://172.20.63.157:5001/stop";
@@ -551,9 +693,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-
-                String workspaceId = redisUtils.get("workspaceId").toString();
-                String creator = redisUtils.get("creator").toString();
+                String workspaceId = redisUtils.get("workspaceId") != null ?
+                        redisUtils.get("workspaceId").toString() :
+                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = redisUtils.get("creator") != null ?
+                        redisUtils.get("creator").toString() :
+                        "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -618,6 +763,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
                 log.info("空中航线前2----------");
+//              在此处停机直接默认保存了背面，适配保存分析接口
+                waylineJobEntity.setIsSaved(2);
+                waylineJobMapper.updateById(waylineJobEntity);
 //              0不停机 1停机 2中心点
                 int planType=1;
                 performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
@@ -630,6 +778,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     @Override
     public Map<String,Object> buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
         // 写发送逻辑
+//        String fanId =null;
+//        if(pubWaylineJobPlanDfEntity.getStrategyType()==1){
+//             fanId = pubWaylineJobPlanDfEntity.getFanIdList().get(0);
+//        }else {
+//            fanId = pubWaylineJobPlanDfEntity.getFanId();
+//        }
         Map map = new HashMap();
         String fanId = pubWaylineJobPlanDfEntity.getFanId();
         redisUtils.set("windTurbineId", fanId);

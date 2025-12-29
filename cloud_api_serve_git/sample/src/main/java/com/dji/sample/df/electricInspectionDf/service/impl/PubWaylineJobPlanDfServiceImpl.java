@@ -6,6 +6,8 @@ import com.df.server.dto.JobPlan.JobPlanItemPointDTO;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.model.CustomClaim;
+import com.dji.sample.component.oss.model.OssConfiguration;
+import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
@@ -13,6 +15,7 @@ import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.waylineDf.dao.IWaylineFileMapperDf;
 import com.dji.sample.df.waylineDf.model.entity.WaylineFileEntity;
+import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.model.MediaFileEntity;
@@ -32,6 +35,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.xml.transform.ErrorListener;
+import java.io.File;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -56,6 +60,11 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     private IWaylineFileMapperDf waylineFileMapperDf;
     @Resource
     RoutePlanService routePlanService;
+    @Autowired
+    private OssServiceContext ossService;
+    @Autowired
+    private FjFileConfig fileConfig;
+
 
     //创建计划
     @Override
@@ -63,42 +72,42 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         Map map=new HashMap();
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         if(planType==1){
-//          普通风机巡检计划
-            Map<String, Object> allResult =new HashMap<>();
-            List<PubWaylineJobPlanDfEntity> successPlans = new ArrayList<>();
-            boolean allSuccess = true;
-            List<String> fanIdList = pubWaylineJobPlanDfEntity.getFanIdList();
-            for (String fanId : fanIdList) {
-                PubWaylineJobPlanDfEntity copyPlanEntity = copyPlanEntity(pubWaylineJobPlanDfEntity);
-                copyPlanEntity.setFanId(fanId);
-                Map<String, Object> singleResult = routePlanService.buildFanWayline(copyPlanEntity);
-                // 检查结果
-                Boolean resultFlag = (Boolean) singleResult.get("result");
-                if (resultFlag != null && resultFlag) {
-                    // 成功：保存计划
-                    PubWaylineJobPlanDfEntity successPlan = (PubWaylineJobPlanDfEntity) singleResult.get("plan");
-                    if (successPlan != null) {
-                        successPlans.add(successPlan);
-                    }
-                } else {
-                    // 失败：标记为失败
-                    allSuccess = false;
-                    // 可以选择记录失败的风机ID
-                    allResult.put("failedFanId", fanId.trim());
-                    break; // 或者不break，继续处理其他风机
-                }
-            }
-            // 设置最终结果
-            allResult.put("result", allSuccess);
-            if (allSuccess && !successPlans.isEmpty()) {
-                allResult.put("plans", successPlans); // 返回所有成功计划
-            } else {
-                allResult.put("successCount", successPlans.size());
-                allResult.put("totalCount", fanIdList.size());
-            }
-            return allResult;
+////          普通风机巡检计划
+//            Map<String, Object> allResult =new HashMap<>();
+//            List<PubWaylineJobPlanDfEntity> successPlans = new ArrayList<>();
+//            boolean allSuccess = true;
+//            List<String> fanIdList = pubWaylineJobPlanDfEntity.getFanIdList();
+//            for (String fanId : fanIdList) {
+//                PubWaylineJobPlanDfEntity copyPlanEntity = copyPlanEntity(pubWaylineJobPlanDfEntity);
+//                copyPlanEntity.setFanId(fanId);
+//                Map<String, Object> singleResult = routePlanService.buildFanWayline(copyPlanEntity);
+//                // 检查结果
+//                Boolean resultFlag = (Boolean) singleResult.get("result");
+//                if (resultFlag != null && resultFlag) {
+//                    // 成功：保存计划
+//                    PubWaylineJobPlanDfEntity successPlan = (PubWaylineJobPlanDfEntity) singleResult.get("plan");
+//                    if (successPlan != null) {
+//                        successPlans.add(successPlan);
+//                    }
+//                } else {
+//                    // 失败：标记为失败
+//                    allSuccess = false;
+//                    // 可以选择记录失败的风机ID
+//                    allResult.put("failedFanId", fanId.trim());
+//                    break; // 或者不break，继续处理其他风机
+//                }
+//            }
+//            // 设置最终结果
+//            allResult.put("result", allSuccess);
+//            if (allSuccess && !successPlans.isEmpty()) {
+//                allResult.put("plans", successPlans); // 返回所有成功计划
+//            } else {
+//                allResult.put("successCount", successPlans.size());
+//                allResult.put("totalCount", fanIdList.size());
+//            }
+//            return allResult;
 
-//            return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
+            return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
         }else if(planType==2){
 //          风机兴趣点环绕计划
             return routePlanService.buildInterestPointWayline(pubWaylineJobPlanDfEntity);
@@ -418,14 +427,35 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     @Override
     public boolean deleteJobByBobId(String job_id) {
-        //1.删除图片
+//      1.删除图片（数据库和minio)
         List<MediaFileEntity> mediaFileEntities = fileMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
                 .eq(MediaFileEntity::getJobId,job_id));
         if(mediaFileEntities.size()>0){
             fileMapper.delete(new LambdaQueryWrapper<MediaFileEntity>()
                     .eq(MediaFileEntity::getJobId,job_id));
+//      删除minio数据
+            for(MediaFileEntity mediaFileEntity : mediaFileEntities){
+                ossService.deleteObject(OssConfiguration.bucket, mediaFileEntity.getObjectKey());
+            }
         }
-        //2.删除任务
+//      2.删除图片文件夹（服务器）
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(
+                new LambdaQueryWrapper<WaylineJobEntity>()
+                        .eq(WaylineJobEntity::getJobId, job_id)
+        );
+//      3.删除报告（服务器）
+        String filePictrueUrl = fileConfig.getFilePictrueUrl() + job_id;
+        boolean isPicDeleted = deletePicFolder(filePictrueUrl);
+        if(isPicDeleted){
+            log.info("已成功删除图片");
+        }
+        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
+        File reportFile = new File(reportPath);
+        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
+        if(isFileDeleted){
+            log.info("已成功删除报告");
+        }
+//      4.删除任务
         int flag = waylineJobMapper.delete(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId,job_id));
         if(flag>0){
@@ -434,5 +464,82 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         return false;
     }
 
+    /**
+     * 删除报告文件
+     */
+    private boolean deleteReportFile(File reportFile, String fileName) {
+        if (reportFile.exists()) {
+            if (reportFile.delete()) {
+                log.info("报告文件删除成功: {}", fileName);
+                return true;
+            } else {
+                log.error("报告文件删除失败: {}", fileName);
+                return false;
+            }
+        } else {
+            log.warn("报告文件不存在: {}", fileName);
+            return true; // 文件不存在也算删除成功
+        }
+    }
+
+    /**
+     * 删除图片文件夹及其所有内容
+     * @param reportPath 文件夹路径
+     * @return 删除成功返回true，否则返回false
+     */
+    public static boolean deletePicFolder(String reportPath) {
+        if (reportPath == null || reportPath.trim().isEmpty()) {
+            return false;
+        }
+
+        File folder = new File(reportPath);
+
+        // 如果文件夹不存在，直接返回true
+        if (!folder.exists()) {
+            return true;
+        }
+
+        // 检查是否是文件夹
+        if (!folder.isDirectory()) {
+            System.err.println("指定的路径不是文件夹: " + reportPath);
+            return false;
+        }
+
+        try {
+            return deleteFolderRecursive(folder);
+        } catch (Exception e) {
+            System.err.println("删除文件夹失败: " + reportPath);
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * 递归删除文件夹
+     */
+    private static boolean deleteFolderRecursive(File folder) {
+        if (folder == null) {
+            return false;
+        }
+
+        File[] files = folder.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    // 递归删除子目录
+                    deleteFolderRecursive(file);
+                } else {
+                    // 删除文件
+                    boolean deleted = file.delete();
+                    if (!deleted) {
+                        System.err.println("删除文件失败: " + file.getAbsolutePath());
+                    }
+                }
+            }
+        }
+
+        // 删除空文件夹
+        return folder.delete();
+    }
 
 }

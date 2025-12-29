@@ -101,6 +101,8 @@ public class FjReportController {
     public Result pictureSave(@RequestBody JSONObject jsonObject) {
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        waylineJobEntity.setIsReported(0);
+        waylineJobMapper.updateById(waylineJobEntity);
 //      正在分析（实则是正在保存加分析）
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
 //      如果不是风机任务直接返回不分析，状态置为3
