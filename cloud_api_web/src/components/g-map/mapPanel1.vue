@@ -624,7 +624,6 @@ export default defineComponent({
       }
     )
     watch(() => store?.state.deviceState, data => {
-      console.log('当前的设备位置信息', data)
       if (data.currentType === EDeviceTypeName.Gateway && data.gatewayInfo[data.currentSn]) {
         const coordinate = wgs84togcj02(data.gatewayInfo[data.currentSn].longitude, data.gatewayInfo[data.currentSn].latitude)
         deviceTsaUpdateHook.moveTo(data.currentSn, coordinate[0], coordinate[1])

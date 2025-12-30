@@ -166,9 +166,6 @@ export default defineComponent({
           }
           store.state.deviceStatusEvent.deviceOffline = {}
         }
-      },
-      {
-        deep: true
       }
     )
     watch(() => store.state.deviceState, data => {
@@ -320,7 +317,7 @@ export default defineComponent({
    * @param workspaceId 工作空间id
    * */
     const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
-    function getWatlineInfo(waylineId: string) {
+    function getWatlineInfo (waylineId: string) {
       gethWaylineInfo(workspaceId, waylineId).then(res => {
         if (res.code !== 0) {
           return

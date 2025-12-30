@@ -142,20 +142,27 @@ import { ref, computed, reactive, watch, onMounted } from 'vue'
 import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
 import LivestreamDock from '/@/components/livestream-dock-debug.vue'
 import LivestreamOthers from '/@/components/livestream-others-debug.vue'
-import {getNowTaskApi} from  '/@/api/wayline'
+import { getNowTaskApi, getWaylineJobs } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
+import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
 import droneControlPanel from '/@/components/devices/drone_control/drone-control.vue'
 import deviceState from '/@/components/devices/drone_control/device_state.vue'
 import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
 import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
+import { ELocalStorageKey, EDeviceTypeName } from '/@/types'
 import {
   DeviceOsd, DeviceStatus, DockOsd, EGear, EModeCode, GatewayOsd, EDockModeCode,
   NetworkStateQualityEnum, NetworkStateTypeEnum, RainfallEnum, DroneInDockEnum
 } from '/@/types/device'
 import { useRoute } from 'vue-router'
-import { EDeviceTypeName } from '/@/types'
+const body = {
+  page: 1,
+  total: 0,
+  page_size: 100
+}
 const str: string = '--'
 const store = useMyStore()
+const workspaceId = ref(localStorage.getItem(ELocalStorageKey.WorkspaceId)!)
 const route = useRoute()
 const deviceInfo = reactive({
   gateway: {
@@ -201,14 +208,44 @@ const taskInfo = reactive({
   waylineId: ''
 
 })
+const plansData = reactive({
+  data: []
+})
 
 // 获取当前的任务信息
-async function getNowTask(){
-    try {
-      const res = await getNowTaskApi()
-      if(res.code!==0){
-        return
-      }
+useTaskWsEvent({
+  onTaskProgressWs
+})
+// 设备任务执行进度更新
+function onTaskProgressWs (data) {
+  const { bid, output } = data
+  if (output) {
+    const { status, progress } = output || {}
+    const taskItem = plansData.data.find(task => task.job_id === bid)
+    console.log('当前任务', taskItem)
+    console.log('renwuliebiao', plansData.data)
+    taskInfo.execute_time = taskItem.begin_time
+    taskInfo.job_name = taskItem.job_name
+    taskInfo.file_name = taskItem.file_name
+    taskInfo.waylineId = taskItem.file_id
+    store.commit('SET_SELECT_WAYLINE_INFO', taskInfo.waylineId)
+  }
+}
+
+function getPlans () {
+  getWaylineJobs(workspaceId.value, { ...body, name: '', taskType: '' }).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    plansData.data = res.data.list
+  })
+}
+async function getNowTask () {
+  try {
+    const res = await getNowTaskApi()
+    if (res.code !== 0) {
+      return
+    }
     taskInfo.execute_time = res.data.executeTime
     taskInfo.job_name = res.data.jobEntityName
     taskInfo.file_name = res.data.waylineName
@@ -217,32 +254,32 @@ async function getNowTask(){
     const waylineId = store.state.waylineInfo
     waylineId.id = taskInfo.waylineId
     store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
+  } catch (error) {
 
-    } catch (error) {
-        
-    }
+  }
 }
 
 const current_sub = ref('') // 当前变电站
 onMounted(() => {
-  const data = JSON.parse(localStorage.getItem('osdInfo'))
-  const data1 = JSON.parse(localStorage.getItem('currentTask'))
-  if (data1) {
-    const waylineId = store.state.waylineInfo
-    waylineId.id = data1.file_id
-    store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
-    // taskInfo.execute_time = data1.execute_time
-    // taskInfo.job_name = data1.job_name
-    // taskInfo.file_id = data1.file_id
-    // taskInfo.file_name = data1.file_name
-  }
-  store.commit('SET_OSD_VISIBLE_INFO', data)
-  current_sub.value = history.state.name
-  getNowTask()
+//   const data = JSON.parse(localStorage.getItem('osdInfo'))
+//   store.commit('SET_OSD_VISIBLE_INFO', data)
+  //   const data1 = JSON.parse(localStorage.getItem('currentTask'))
+  //   if (data1) {
+  //     const waylineId = store.state.waylineInfo
+  //     waylineId.id = data1.file_id
+  //     store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
+  //     // taskInfo.execute_time = data1.execute_time
+  //     // taskInfo.job_name = data1.job_name
+  //     // taskInfo.file_id = data1.file_id
+  //     // taskInfo.file_name = data1.file_name
+  //   }
+
+  //   current_sub.value = history.state.name
+  //   getNowTask()
+  getPlans()
 })
 // 左侧视频流切换标签
 const activeTab = ref('load') // 默认选中负载直播标签
-
 
 watch(() => store?.state.deviceState, data => {
   if (data.currentType === EDeviceTypeName.Gateway && data.gatewayInfo[data.currentSn]) {

@@ -77,7 +77,6 @@ claritySelected.value = 2
 async function getcameraInfo () {
   await getLiveCapacity({})
     .then(res => {
-      console.log('wdsdsdaaa', res.data)
       const cameraData = res.data.find(item => item.sn === device_sn.value)
       droneSelected.value = cameraData.sn
       // cameraSelected.value = cameraData.cameras_list[0].index

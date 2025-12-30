@@ -275,7 +275,7 @@ const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
 const body: IPage = {
   page: 1,
   total: 0,
-  page_size: 5
+  page_size: 100
 }
 const paginationProp = reactive({
   pageSizeOptions: ['5', '10', '15'],
@@ -326,6 +326,7 @@ const task_zh = [
   }
 ]
 const current_task = ref('')
+
 // 设备任务执行进度更新
 function onTaskProgressWs (data: TaskProgressInfo) {
   const { bid, output } = data
@@ -385,7 +386,7 @@ useTaskWsEvent({
 })
 
 function getPlans () {
-  getWaylineJobs(workspaceId.value, body).then(res => {
+  getWaylineJobs(workspaceId.value, { ...body, name: '', taskType: '' }).then(res => {
     if (res.code !== 0) {
       return
     }
@@ -397,7 +398,6 @@ function getPlans () {
 
 // ------------------------------------------------
 onMounted(() => {
-  getSubInfo()
   getOnlineTopo()
   setTimeout(() => {
     watch(() => store?.state.deviceStatusEvent,
@@ -467,41 +467,6 @@ function getOnlineTopo () {
 
 // 获取所有的场站信息
 const current_sub = ref('')
-const subOption = ref([])
-function getSubInfo () {
-  getAllSub().then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    subOption.value = res.data.map(item => ({
-      value: item.sub_code,
-      label: item.sub_name
-    }))
-    current_sub.value = subOption.value[0].label
-    // console.log('打印的数据',subOption.value[0].value )
-    getCurrentDeviceBySub(subOption.value[0].value)
-  })
-}
-
-// 切换场站
-function changeSub (val:any) {
-  const selectedOption = subOption.value.find(item => item.value === val)
-  current_sub.value = selectedOption.label
-  getCurrentDeviceBySub(val)
-}
-
-const currentDeviceForSub = ref([])
-// 根据场站展示对应的设备
-function getCurrentDeviceBySub (sub_code:string) {
-  getDeviceBySub(sub_code).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-
-    currentDeviceForSub.value = res.data.map(device => device.device_sn)
-    // console.log('输出的数据', currentDeviceForSub.value)
-  })
-}
 
 // 跳转到远程调试界面
 function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
@@ -523,7 +488,7 @@ function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: 
   // 设置航线信息
   localStorage.setItem('currentTask', JSON.stringify(current_task.value))
 
-  router.push({ path: '/remoteDebug', state: { name: current_sub.value } })
+  router.push({ path: '/remoteDebug', state: { name: '' } })
 }
 
 // 地图显示航线

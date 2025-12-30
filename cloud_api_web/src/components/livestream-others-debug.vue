@@ -56,7 +56,7 @@ const lensOption: SelectOption[] = [
 ]
 // 需要传递参数
 const osdVisible = computed(() => {
-  return store.state.osdVisible
+  return store.state.osdVisible || { sn: '' }
 })
 const device_sn = ref(osdVisible.value.sn)
 const videowebrtc = ref(null)
@@ -83,21 +83,9 @@ const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 
 const isPlay = ref(false)
+const isStartSteam = ref(false)
 onMounted(() => {
-  // onRefresh()
-  videoRef.value?.addEventListener('play', () => {
-    const end = flvPlayer.value.buffered.end(0) - 1
-    flvPlayer.value.currentTime = end
-  })
-
-  window.onfocus = () => {
-    const end = flvPlayer.value.buffered.end(0) - 1
-    flvPlayer.value.currentTime = end
-  }
   // getcameraInfo()
-  // setTimeout(() => {
-  //   initFlv()
-  // }, 1000)
 })
 
 /* 请求后端相机信息
@@ -122,7 +110,6 @@ async function getcameraInfo () {
       droneSelected.value = cameraData.sn
       cameraSelected.value = cameraData.cameras_list[0].index
       videoId.value = droneSelected.value + '/' + cameraSelected.value + '/' + (videoSelected.value || nonSwitchable + '-0')
-      console.log(res.data)
       getLiveHttp()
     })
 }
@@ -131,31 +118,34 @@ async function getcameraInfo () {
 *
 */
 async function getLiveHttp () {
-  await startLivestream({
-    url: liveURL,
-    video_id: videoId.value,
-    url_type: livetypeSelected.value,
-    video_quality: claritySelected.value
-  }).then(res => {
+  try {
+    await startLivestream({
+      url: liveURL,
+      video_id: videoId.value,
+      url_type: livetypeSelected.value,
+      video_quality: claritySelected.value
+    }).then(res => {
     // if (res.code !== 0) {
     //   return
     // }
-    // flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-    if (res.code === 0) {
-      flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-      initFlv()
-    }
-    if (res.code === 513003) {
-      onStop()
-      isPlay.value = false
-      // setTimeout(() => {
-      //   getLiveHttp()
-      // }, 500)
-      // setTimeout(() => {
-      //   initFlv()
-      // }, 1000)
-    }
-  })
+      console.log('获取地址', res)
+      if (res.code === 0) {
+        // isStartSteam.value = true
+        flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        initFlv()
+      }
+      if (res.code === 513003) {
+        onStop()
+        isPlay.value = true
+        setTimeout(() => {
+          getLiveHttp()
+        }, 500)
+      }
+    })
+  } catch (error) {
+    isStartSteam.value = false
+    isPlay.value = false
+  }
 }
 
 /* 请求后端停止推流
@@ -172,7 +162,7 @@ const onStop = () => {
       // message.success(res.message)
       liveState.value = false
       lensSelected.value = undefined
-      console.log('stop play livestream')
+      // console.log('stop play livestream')
     }
   })
 }
@@ -180,7 +170,6 @@ const onStop = () => {
  * 初始化
  */
 function initFlv () {
-  console.log('无人机视频', flvURL.value)
   videoRef.value = document.getElementById('videoElement') as HTMLVideoElement
   if (videoRef.value) {
     if (flvjs.isSupported()) {
@@ -264,12 +253,14 @@ onUnmounted(() => {
 
 // 根据设备osd信息更新信息
 watch(() => props.deviceInfo, (value) => {
-  // console.log('我被你检测11111')
+  console.log('已经监听')
   if (value.device && !isPlay.value) {
-    console.log('执行请求视频')
     isPlay.value = true
+    console.log('开始执行')
     device_sn.value = osdVisible.value.sn
-    getcameraInfo()
+    if (!isStartSteam.value) {
+      getcameraInfo()
+    }
   }
 }, {
   immediate: true,
