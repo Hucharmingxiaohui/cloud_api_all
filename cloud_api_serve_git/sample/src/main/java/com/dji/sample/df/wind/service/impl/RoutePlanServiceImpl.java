@@ -236,12 +236,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                     log.error("kmz文件未检测到");
                 }
                 log.info("执行飞向中心点空中航线2");
-                String workspaceId = redisUtils.get("workspaceId") != null ?
-                        redisUtils.get("workspaceId").toString() :
-                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
-                String creator = redisUtils.get("creator") != null ?
-                        redisUtils.get("creator").toString() :
-                        "adminPC";
+                String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -369,8 +365,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                         log.error("kmz文件未检测到");
                     }
 
-                    String workspaceId = redisUtils.get("workspaceId").toString();
-                    String creator = redisUtils.get("creator").toString();
+                    String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                    String creator = "adminPC";
                     importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                     String fileName = file.getOriginalFilename();
                     if (fileName != null && fileName.endsWith(".kmz")) {
@@ -553,12 +549,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-                String workspaceId = redisUtils.get("workspaceId") != null ?
-                        redisUtils.get("workspaceId").toString() :
-                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
-                String creator = redisUtils.get("creator") != null ?
-                        redisUtils.get("creator").toString() :
-                        "adminPC";
+                String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -693,12 +685,14 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-                String workspaceId = redisUtils.get("workspaceId") != null ?
-                        redisUtils.get("workspaceId").toString() :
-                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
-                String creator = redisUtils.get("creator") != null ?
-                        redisUtils.get("creator").toString() :
-                        "adminPC";
+//                String workspaceId = redisUtils.get("workspaceId") != null ?
+//                        redisUtils.get("workspaceId").toString() :
+//                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
+//                String creator = redisUtils.get("creator") != null ?
+//                        redisUtils.get("creator").toString() :
+//                        "adminPC";
+                String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                String creator = "adminPC";
 
                 importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                 String fileName = file.getOriginalFilename();
@@ -842,8 +836,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                          log.error("kmz文件未检测到");
                     }
 
-                    String workspaceId = redisUtils.get("workspaceId").toString();
-                    String creator = redisUtils.get("creator").toString();
+                    String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                    String creator = "adminPC";
                     importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                     String fileName = file.getOriginalFilename();
                     if (fileName != null && fileName.endsWith(".kmz")) {
@@ -950,8 +944,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                         log.error("kmz文件未检测到");
                     }
 
-                    String workspaceId = redisUtils.get("workspaceId").toString();
-                    String creator = redisUtils.get("creator").toString();
+                    String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+                    String creator = "adminPC";
                     importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
                     String fileName = file.getOriginalFilename();
                     if (fileName != null && fileName.endsWith(".kmz")) {

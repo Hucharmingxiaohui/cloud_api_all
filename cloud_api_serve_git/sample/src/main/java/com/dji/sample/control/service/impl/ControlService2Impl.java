@@ -84,8 +84,8 @@ public class ControlService2Impl implements IControlService2 {
                     if (TaskTypeEnum.IMMEDIATE != createJobParam.getTaskType() && endTime < System.currentTimeMillis()) {
                         continue;
                     }
-                    String creator = redisUtils.get("creator").toString();
-                    String workspaceId = redisUtils.get("workspaceId").toString();
+//                    String creator = redisUtils.get("creator").toString();
+//                    String workspaceId = redisUtils.get("workspaceId").toString();
 //                    Optional<WaylineJobDTO> waylineJobOpt = waylineJobService.createWaylineJob2(createJobParam,workspaceId, creator, beginTime, endTime);
 //                    if (waylineJobOpt.isEmpty()) {
 //                        throw new SQLException("Failed to create wayline job.");

@@ -70,5 +70,15 @@ public class WindTurbineController {
         Map<String, Object> stringObjectMap = windTurbineService.selectList(map);
         return Result.success(stringObjectMap);
     }
+    
+    /**
+     * 根据ID增加风机点位模型
+     */
+    @GetMapping("/addPointsById")
+    public Result addPointsById(@RequestParam String id) {
+        boolean b = windTurbineService.addPointsById(id);
+
+        return Result.success(b);
+    }
 
 }
