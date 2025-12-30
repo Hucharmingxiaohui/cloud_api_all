@@ -19,7 +19,9 @@ import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.controller.FjReportController;
+import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
 import com.dji.sample.media.controller.FileController;
@@ -86,6 +88,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     private IFileService fileService;
     @Autowired
     private OssServiceContext ossService;
+    @Resource
+    FanStationPointsMapper fanStationPointsMapper;
+
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
 
@@ -247,34 +252,42 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         List<WindTurbine> windTurbines = windTurbineMapper.selectList(new HashMap());
 
         for (WindTurbine windTurbine : windTurbines) {
+            List<FanStationPoints> fanStationPoints = fanStationPointsMapper.selectList(new LambdaQueryWrapper<FanStationPoints>()
+                    .eq(FanStationPoints::getMainDeviceId, windTurbine.getId()));
             // 示例数据1
-            Map<String, Object> point1 = new HashMap<>();
-            point1.put("stationName", "龙源风电场");
-            point1.put("stationCode", stationCode);
-            point1.put("areaId", "A001");
-            point1.put("areaName", "风电场区域");
-            point1.put("bayId", "BAY001");
-            point1.put("bayName", "1号间隔");
-            point1.put("mainDeviceId", windTurbine.getId());
-            point1.put("mainDeviceName", windTurbine.getTurbineName());
-            point1.put("componentId", "");
-            point1.put("componentName", "");
-            point1.put("pointId", "");
-            point1.put("pointName", "");
-            point1.put("deviceType", "1");
-            point1.put("meterType", "1");
-            point1.put("appearanceType", "1");
-            point1.put("saveType", "3");
-            point1.put("recognitionType", "2");
-            point1.put("phase", "");
-            point1.put("deviceInfo", "");
-            point1.put("dataType",00100);
-            point1.put("lowerValue", "");
-            point1.put("upperValue", "");
-            point1.put("videoPos", "");
-            point1.put("pointType", "1");
-            point1.put("labelAttrib", "");
-            models.add(point1);
+            if (!fanStationPoints.isEmpty()) {
+                for (FanStationPoints fanStationPoint : fanStationPoints) {
+                    Map<String, Object> point1 = new HashMap<>();
+
+                    point1.put("stationName", fanStationPoint.getStationName());
+                    point1.put("stationCode", stationCode);
+                    point1.put("areaId", fanStationPoint.getAreaId());
+                    point1.put("areaName", fanStationPoint.getAreaName());
+                    point1.put("bayId", fanStationPoint.getBayId());
+                    point1.put("bayName", fanStationPoint.getBayName());
+                    point1.put("mainDeviceId", fanStationPoint.getMainDeviceId());
+                    point1.put("mainDeviceName", fanStationPoint.getMainDeviceName());
+                    point1.put("componentId", fanStationPoint.getComponentId());
+                    point1.put("componentName", fanStationPoint.getComponentName());
+                    point1.put("pointId", fanStationPoint.getPointId());
+                    point1.put("pointName", fanStationPoint.getPointName());
+                    point1.put("deviceType", fanStationPoint.getDeviceType());
+                    point1.put("meterType", fanStationPoint.getMeterType());
+                    point1.put("appearanceType", fanStationPoint.getAppearanceType());
+                    point1.put("saveType", fanStationPoint.getSaveType());
+                    point1.put("recognitionType", fanStationPoint.getRecognitionType());
+                    point1.put("phase", fanStationPoint.getPhase());
+                    point1.put("deviceInfo", fanStationPoint.getDeviceInfo());
+                    point1.put("dataType", fanStationPoint.getDataType());
+                    point1.put("lowerValue", fanStationPoint.getLowerValue());
+                    point1.put("upperValue", fanStationPoint.getUpperValue());
+                    point1.put("videoPos", fanStationPoint.getVideoPos());
+                    point1.put("pointType", fanStationPoint.getPointType());
+                    point1.put("labelAttrib", fanStationPoint.getLabelAttrib());
+                    models.add(point1);
+                }
+            }
+
         }
         return models;
     }
@@ -519,6 +532,14 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 resultMessage.put("category", "task");
                 resultMessage.put("action", "result");
 
+                FanStationPoints fanStationPoints = fanStationPointsMapper.selectOne(new LambdaQueryWrapper<FanStationPoints>()
+                        .eq(FanStationPoints::getPointName, waylineJobEntity.getFanName() + "-" + mediaFileDTO.getFanCode() + "-" + mediaFileDTO.getFanPart()));
+                String pointId ="-----";
+                String pointName ="错误点位";
+                if (fanStationPoints != null) {
+                    pointName=fanStationPoints.getPointName();
+                    pointId=fanStationPoints.getPointId();
+                }
                 String taskPatrolledId = String.format("%s_%s_%s",
                         stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
                 Map<String, Object> data = new HashMap<>();
@@ -527,8 +548,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 data.put("taskName", taskName);
                 data.put("taskCode", taskCode);
 //              点位名称是拼接，点位id是文件id
-                data.put("pointName", mediaFileDTO.getFanCode()+mediaFileDTO.getFanPart());
-                data.put("pointId", mediaFileDTO.getFileId());
+                data.put("pointName", pointName);
+                data.put("pointId", pointId);
                 data.put("valueType", ""); // 4=红外测温
                 data.put("value", "");
                 data.put("valueUnit", "");

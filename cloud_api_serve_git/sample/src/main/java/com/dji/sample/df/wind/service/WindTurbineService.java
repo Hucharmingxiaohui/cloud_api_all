@@ -43,4 +43,6 @@ public interface WindTurbineService  extends IService<WindTurbine> {
     Map<String,Object> selectList(Map map);
 
     WindTurbine selectByName(String name);
+
+    public boolean addPointsById(String id);
 }
