@@ -142,6 +142,12 @@
               <el-button link type="danger" @click="handleDelete(scope.row)"
                 >删除</el-button
               >
+              <el-button link type="primary" @click="createPoints(scope.row)"
+                >生成点位</el-button
+              >
+              <el-button link type="primary" @click="showPoints(scope.row)"
+                >查看点位</el-button
+              >
               <!-- <el-button link type="primary" @click="handleTask(scope.row)"
                 >执行任务</el-button
               > -->
@@ -448,6 +454,12 @@
         </div>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="pointsDialog" title="点位详情">
+      <div>
+        <PointsDetail :id="currentId"></PointsDetail>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -455,8 +467,9 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
-import { addWindTurbineConfigApi, executeFlyTaskApi, getAllWindTurbineApi, updateWindTurbineConfigApi, deleteWindTurbineApi } from '/@/api/turbine/turbineMgt'
-
+import { addWindTurbineConfigApi, executeFlyTaskApi, createWindTurbinePointsApi, getAllWindTurbineApi, updateWindTurbineConfigApi, deleteWindTurbineApi } from '/@/api/turbine/turbineMgt'
+import PointsDetail from './pointsDetail.vue'
+const currentId = ref('')
 // 表单
 const queryForm = reactive({
   turbine_name: '',
@@ -503,13 +516,13 @@ const editForm = reactive({
   blade_points: '',
   tower_points: ''
 })
-
 // 表格
 const tableData = ref([])
 
 // 弹窗
 const insertDialog = ref(false)
 const editDialog = ref(false)
+const pointsDialog = ref(false)
 
 // 表单规则
 const formRules = {
@@ -580,9 +593,10 @@ onMounted(() => {
 async function handleInsert () {
   try {
     const valid = await formRef.value.validate()
-    //   if (!valid) {
-    //     ElMessage.warning('请检查表单是否填写!')
-    //   }
+    if (!valid) {
+      ElMessage.warning('请检查表单是否填写!')
+      return
+    }
     const res = await addWindTurbineConfigApi(insertForm)
     if (res.code !== 0) {
     // 异常
@@ -625,9 +639,10 @@ function openEditDialog (row:any) {
 async function handleEdit () {
   try {
     const valid = await editFormRef.value.validate()
-    //   if (!valid) {
-    //     ElMessage.warning('请检查表单是否填写!')
-    //   }
+    if (!valid) {
+      ElMessage.warning('请检查表单是否填写!')
+      return
+    }
     const res = await updateWindTurbineConfigApi(editForm)
     if (res.code !== 0) {
     // 异常
@@ -705,6 +720,30 @@ async function handleTask (row) {
   } catch (error) {
 
   }
+}
+
+/**
+ * 生成站点
+ */
+async function createPoints (row) {
+  try {
+    const res = await createWindTurbinePointsApi(row.id)
+    if (res.code !== 0) {
+      ElMessage.error('点位生成失败!')
+      return
+    }
+    ElMessage.success('点位生成成功!')
+  } catch (error) {
+
+  }
+}
+
+/**
+ * 查看站点
+ */
+function showPoints (row) {
+  currentId.value = row.id
+  pointsDialog.value = true
 }
 
 /**

@@ -47,6 +47,20 @@ export const executeFlyTaskApi = async function (data: any): Promise<IWorkspaceR
   return result.data
 }
 
+// 生成点位
+export const createWindTurbinePointsApi = async function (id:string): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/addPointsByld?id=${id} `
+  const result = await request.get(url)
+  return result.data
+}
+
+// 查询点位
+export const getWindTurbinePointsApi = async function (data:any): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/getPointsByld?id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo} `
+  const result = await request.get(url)
+  return result.data
+}
+
 /**
  * 兴趣点管理
  * @param data
