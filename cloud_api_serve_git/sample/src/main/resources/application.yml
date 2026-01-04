@@ -1,5 +1,6 @@
 server:
   port: 6789
+  base-url: "http://172.20.63.157:6789"
 spring:
   main:
     allow-bean-definition-overriding: true
@@ -84,7 +85,7 @@ mqtt:
 cloud-sdk:
   mqtt:
     # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
-    inbound-topic: sys/product/+/status,thing/product/+/requests
+    inbound-topic: sys/product/+/status,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
 
 url:
   manage:
@@ -213,7 +214,7 @@ centernormal:
 
 #国网规范对接上级ftp
 centerftpsnormal:
-  ftpIp: 172.20.63.136
+  ftpIp: 172.20.63.150
   ftpPort: 10012
   userName: dfftp
   password: dfe2k_1500
@@ -238,7 +239,7 @@ mybatis-plus:
 #  巡视
 #FTPS相关配置
 ftps:
-  ftpIp: 127.20.63.150
+  ftpIp: 172.20.63.150
   ftpPort: 10012
   userName: dfftp
   password: dfe2k_1500
@@ -291,8 +292,23 @@ wayline:
     single-wayline: "http://172.20.63.157:5001/single"
     working-wayline: "http://172.20.63.157:5001/working"
     stop-wayline: "http://172.20.63.157:5001/stop"
+    interest-point-wayline: "http://172.20.63.157:5001/poi"
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20012/api"
 
+longyuan:
+  sender: "UpperPlatform"
+  stationCode: "Sub_WeiLan"
+uavPlatform:
+  sender: "UavPatrolSystem"
+  stationCode: "Sub_WeiLan"
+
+lyftps:
+  ftpIp: 172.20.63.150
+  ftpPort: 10012
+  userName: dfftp
+  password: dfe2k_1500
+  #false显式，true隐式
+  implicit: true
 
 

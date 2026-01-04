@@ -166,6 +166,16 @@ public class FileServiceImplDf implements IFileServiceDf {
                 .map(this::entityConvertToDto).collect(Collectors.toList());
     }
 
+    @Override
+    public List<MediaFileDTO> getFilesByJobIdTime(String jobId) {
+        return iFileMapperDf.selectList(
+                        new LambdaQueryWrapper<MediaFileEntity>()
+                                .eq(MediaFileEntity::getJobId, jobId)
+                                .last("ORDER BY SUBSTRING(file_name, 5, 14) ASC")
+                ).stream()
+                .map(this::entityConvertToDto).collect(Collectors.toList());
+    }
+
 
     @Override
     public PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName) {
@@ -332,7 +342,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     public List<MediaFileDTO> getMediaDileByJobId3(String job_id, String workspace_id) throws Exception {
         synchronized (lock) {
 
-            List<MediaFileDTO> mediaFileDTOList = this.getFilesByJobId(job_id);
+            List<MediaFileDTO> mediaFileDTOList =new ArrayList<>();
             FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
                     .eq(FanWaylinePoints::getJobId, job_id));
             JSONArray jsonArray = new JSONArray();
@@ -347,14 +357,25 @@ public class FileServiceImplDf implements IFileServiceDf {
                 if(fanWaylinePoints.getVideoFanPoints()!=null){
                     videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
                 }
+                List<MediaFileEntity> mediaFileEntities = new ArrayList<>();
                 if(jobType==0){
+//                  停机的按大疆图片时间排序
                     jsonArray.addAll(djiPoints);
+                    mediaFileDTOList = this.getFilesByJobIdTime(job_id);
+                    mediaFileEntities = iFileMapperDf.selectList(
+                            new LambdaQueryWrapper<MediaFileEntity>()
+                                    .eq(MediaFileEntity::getJobId, job_id)
+                                    .last("ORDER BY SUBSTRING(file_name, 5, 14) ASC")
+                    );
                 }else if(jobType==1){
+//                  不停机的按图片id排序
                     jsonArray.addAll(videoPoints);
                     jsonArray.addAll(djiPoints);
+                    mediaFileDTOList = this.getFilesByJobId(job_id);
+                    mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
+                            eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
                 }
-                List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
-                        eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
+
                 List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
 
                 if (fileNames.size() == mediaFileDTOList.size()) {
@@ -364,7 +385,7 @@ public class FileServiceImplDf implements IFileServiceDf {
                 }
                 return mediaFileDTOList;
             }else {
-
+                mediaFileDTOList = this.getFilesByJobId(job_id);
                 // 分离DJI文件和非DJI文件
                 List<MediaFileDTO> djiFiles = new ArrayList<>();
                 List<MediaFileDTO> nonDjiFiles = new ArrayList<>();

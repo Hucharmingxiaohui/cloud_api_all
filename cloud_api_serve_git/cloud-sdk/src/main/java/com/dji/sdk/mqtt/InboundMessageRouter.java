@@ -1,8 +1,13 @@
 package com.dji.sdk.mqtt;
 
 import com.dji.sdk.common.SpringBeanUtils;
+import com.dji.sdk.mqtt.longyuan.MqttMessageHandler;
+import com.dji.sdk.mqtt.longyuan.MqttMessageParser;
+import com.dji.sdk.mqtt.longyuan.MqttStandardMessage;
+import com.dji.sdk.mqtt.longyuan.SpringContextHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.integration.annotation.Router;
 import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.integration.router.AbstractMessageRouter;
@@ -13,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 
 /**
  *
@@ -27,18 +33,19 @@ public class InboundMessageRouter extends AbstractMessageRouter {
 
     /**
      * All mqtt broker messages will arrive here before distributing them to different channels.
+     *
+     * @param message message from mqtt broker
      * @param message message from mqtt broker
      * @return channel
      * All mqtt broker messages will arrive here before distributing them to different channels.
-     * @param message message from mqtt broker
      * @return channel
-     *
+     * <p>
      * 全部节点的信息都会先从这里过，然后再查询TopicEnum中的方法，寻找到相应的通道（也就是代码中已经注册的Channel）
      * 举个例子：就比如我现在使用MQTTX向 mysys/envents_test （broker）发送一个消息
      * 首先会经过这里，然后我们根据 mysys/envents_test 在 TopicEnum.find(topic) 寻找，
      * 找到相应的通道为：STATE_ENVENTS(Pattern.compile("^"+MY_BASIC_PRE+ENVENTS_TEST+"$"), ChannelName.ENVENTS_INBOUND_TEST),
      * 即找到一个 ChannelName 为 ENVENTS_INBOUND_TEST 通道（这个通道我们已经注册在Spring 中啦）
-     *
+     * <p>
      * 找到这个通道后，我们会将消息投递到这个通道去
      * 接下来就是看是谁订阅了这个通道的消息，那么就会接着处理这个消息
      * 比如我们的案例中是由 EnventsTestRouter 这个二级路由订阅了消息通道，来进行消息的再次分发，
@@ -52,13 +59,74 @@ public class InboundMessageRouter extends AbstractMessageRouter {
     protected Collection<MessageChannel> determineTargetChannels(Message<?> message) {
         MessageHeaders headers = message.getHeaders();
         String topic = headers.get(MqttHeaders.RECEIVED_TOPIC).toString();
-        byte[] payload = (byte[])message.getPayload();
+        byte[] payload = (byte[]) message.getPayload();
 
 //        log.debug("received topic: {} \t payload =>{}", topic, new String(payload));
-
+        String data = new String(payload);
         CloudApiTopicEnum topicEnum = CloudApiTopicEnum.find(topic);
+        // 直接判断是否是 patrol/data 主题
+        // 1. 先尝试调用业务处理器（如果存在）
+        if("/patrol/data/LyGroupToSub/guangxi_weilan".equals(topic)){
+            try {
+                // 使用反射或Spring上下文调用业务处理
+                callBusinessHandler(topic, data);
+            } catch (Exception e) {
+                log.error("业务处理失败", e);
+            }
+
+            // 2. 原有逻辑继续
+            if ("/patrol/data/LyGroupToSub/guangxi_weilan".equals(topic)) {
+                return Collections.emptyList();
+            }
+        }
+
         MessageChannel bean = (MessageChannel) SpringBeanUtils.getBean(topicEnum.getBeanName());
 
         return Collections.singleton(bean);
+    }
+
+  // sdk模块的消息接收类
+    private void callBusinessHandler(String topic, String data) {
+        try {
+            ApplicationContext context = SpringContextHolder.getApplicationContext();
+            if (context == null) {
+                log.debug("Spring上下文未初始化");
+                return;
+            }
+
+            // 1. 尝试解析为标准消息
+            MqttStandardMessage standardMessage = MqttMessageParser.parseSafe(data);
+
+            // 2. 获取所有处理器
+            Map<String, MqttMessageHandler> handlers =
+                    context.getBeansOfType(MqttMessageHandler.class);
+
+            if (handlers.isEmpty()) {
+                log.debug("未注册任何MQTT处理器");
+                return;
+            }
+
+            // 3. 调用处理器
+            for (MqttMessageHandler handler : handlers.values()) {
+                if (!handler.supports(topic)) {
+                    continue;
+                }
+
+                try {
+                    // 如果有标准消息，优先使用标准消息处理方法
+                    if (standardMessage != null) {
+                        handler.handleStandardMessage(topic, standardMessage);
+                    } else {
+                        // 否则使用原始处理方法
+                        handler.handleMessage(topic, data);
+                    }
+                } catch (Exception e) {
+                    log.error("处理器 [{}] 执行失败", handler.getHandlerName(), e);
+                }
+            }
+
+        } catch (Exception e) {
+            log.debug("调用业务处理器失败: {}", e.getMessage());
+        }
     }
 }

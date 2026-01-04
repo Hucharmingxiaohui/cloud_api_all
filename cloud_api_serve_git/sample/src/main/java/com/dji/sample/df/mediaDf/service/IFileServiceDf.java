@@ -62,7 +62,10 @@ public interface IFileServiceDf {
      * @param jobId
      * @return
      */
+//   按id查询
     List<MediaFileDTO> getFilesByJobId( String jobId);
+//  按时间查询
+    public List<MediaFileDTO> getFilesByJobIdTime(String jobId);
 
     PaginationData<MediaFileDTO> getMediaFilesPaginationByFileName(String workspaceId, long page, long pageSize, String fileName);
 

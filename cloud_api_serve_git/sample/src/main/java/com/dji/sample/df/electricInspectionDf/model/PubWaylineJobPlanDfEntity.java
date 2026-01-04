@@ -109,6 +109,9 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @TableField("poi_orbit_num")
     private Integer poiOrbitNum;//兴趣点环绕数
 
+    @TableField("strategy_type")
+    private Integer strategyType;//策略类型：0普通1多机连续执行
+
     @Transient
     @TableField(exist = false)
     private String deviceList;

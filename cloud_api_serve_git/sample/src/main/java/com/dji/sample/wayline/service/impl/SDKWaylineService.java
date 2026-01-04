@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
+import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.error.CommonErrorEnum;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.component.oss.model.OssConfiguration;
@@ -64,9 +65,7 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -183,7 +182,7 @@ public class SDKWaylineService extends AbstractWaylineService {
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         log.info("执行航线任务-"+output.getExt().getFlightId()+"  当前航点号为"+currentWaypointIndex+"号");
-//      之前判断条件  name.contains("fj"),现在判断为风机任务
+//      之前判断条件  name.contains("fj"),现在判断为风机任务，只有第一个风机的top会走普通航线，其他都是空中航线
         if(pubWaylineJobPlanDfEntity.getPlanType()==1){
             // 快速检查航点是否变化
             AtomicInteger previous = processedWaypoints.get(flightId);
@@ -319,6 +318,16 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         log.info("执行空中航线任务-"+flightId+"  当前航点号为"+currentWaypointIndex+"号");
         String fightState = redisUtils.get("in_fight_state").toString();
+//        String rthParam1 = redisUtils.get("rthParam").toString();
+////      如果是停机/不停机航线，并且任务完成，且返航标志位为0,则进行下一个风机top航线下发
+//        if(("working".equals(fightState) ||"stop".equals(fightState)) && "0".equals(rthParam1) && status == 6){
+//            String turbineName = redisUtils.get("turbineName").toString();
+//            if (StringUtils.isNotEmpty(turbineName) && !"noNextTurbine".equals(turbineName)) {
+////              下发top空中航线
+//                String windTurbineId = redisUtils.get("windTurbineId").toString();
+//                routePlan.nextTopWayline(windTurbineId);
+//            }
+//        }
 //      如果为多风机连续飞，要加风机策略标志位进行 &&
         if("working".equals(fightState)){
             processedinWaypoints.compute(flightId, (key, current) -> {
@@ -504,32 +513,78 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 }
                                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
                                 log.info("接受中心点分析返回参数---"+jsonResponse.toString());
+//                                String jobId = redisUtils.get("jobId").toString();
+//                                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+//                                        .eq(WaylineJobEntity::getJobId, jobId));
+//                                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+//                                        .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+//                                Integer strategyType = pubWaylineJobPlanDfEntity.getStrategyType();
+//                                List<String> fanIdList=new ArrayList<>();
+//                                if(strategyType==1){
+//                                    fanIdList = pubWaylineJobPlanDfEntity.getFanIdList();
+//                                }else {
+//                                    fanIdList.add(pubWaylineJobPlanDfEntity.getFanId());
+//                                }
+//                                String lastFanId = fanIdList.get(fanIdList.size() - 1);
+//                                WindTurbine lastFanIdwindTurbine = windTurbineMapper.selectById(lastFanId);
+////                              返航标志位，1返航 0不返航（也是风机位次标志位，1是最后一个风机 0不是最后一个风机）,注意是string类型！！！
+//                                String rthParam = "1";
                                 if (jsonResponse.getString("desc").equals("1")) {
                                     if (jsonResponse.getString("yppd") != null || jsonResponse.getString("ypjd") != null) {
                                         if (jsonResponse.getString("yppd") != null) {
+//                                          如果是最后一个风机，就返航，如果不是就不返航，测试先都不返航
                                             //不停机巡检
+                                            log.info("执行不停机巡检-------------");
                                             turbineName = jsonResponse.getString("turbine_name");
-
-                                            routePlan.workingWayline(turbineName);
+//                                            if(lastFanIdwindTurbine.getTurbineName().equals(turbineName)){
+//                                                rthParam = "1";
+//                                                redisUtils.set("turbineName", "noNextTurbine");
+//                                            }else {
+//                                                rthParam = "0";
+//                                                for (int i=0;i<fanIdList.size();i++) {
+//                                                    WindTurbine nowFanIdwindTurbine = windTurbineMapper.selectById(fanIdList.get(i));
+//                                                    if(nowFanIdwindTurbine.getTurbineName().equals(turbineName)) {
+//                                                        WindTurbine nextTurbine = windTurbineMapper.selectById(fanIdList.get(i+1));
+//                                                        redisUtils.set("turbineName", nextTurbine.getTurbineName());
+//                                                        redisUtils.set("windTurbineId",nextTurbine.getId());
+//                                                    }
+//                                                }
+//                                            }
+//                                            redisUtils.set("rthParam",rthParam);
+                                            routePlan.workingWayline(turbineName,null);
                                         } else if (jsonResponse.getString("ypjd") != null) {
                                             //停机巡检
                                             log.info("执行停机巡检-------------");
-
                                             turbineName = jsonResponse.getString("turbine_name");
+//                                            if(lastFanIdwindTurbine.getTurbineName().equals(turbineName)){
+//                                                rthParam = "1";
+//                                                redisUtils.set("turbineName", "noNextTurbine");
+//                                            }else {
+//                                                rthParam = "0";
+//                                                for (int i=0;i<fanIdList.size();i++) {
+//                                                    WindTurbine nowFanIdwindTurbine = windTurbineMapper.selectById(fanIdList.get(i));
+//                                                    if(nowFanIdwindTurbine.getTurbineName().equals(turbineName)) {
+//                                                        WindTurbine nextTurbine = windTurbineMapper.selectById(fanIdList.get(i+1));
+//                                                        redisUtils.set("turbineName", nextTurbine.getTurbineName());
+//                                                        redisUtils.set("windTurbineId",nextTurbine.getId());
+//                                                    }
+//                                                }
+//                                            }
                                             String ypjd = jsonResponse.getString("ypjd");
                                             double value = Double.parseDouble(ypjd);
-                                            routePlan.stopWayline(turbineName, value);
+//                                            redisUtils.set("rthParam",rthParam);
+                                            routePlan.stopWayline(turbineName, value,null);
                                         }
                                     }
                                 } else {
                                     //分析失败返航
                                     log.info("巡视类型分析失败返航-----");
-                                    String jobId = redisUtils.get("jobId").toString();
-                                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                                            .eq(WaylineJobEntity::getJobId, jobId));
-                                    PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                                            .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
-                                    this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity.getDockSn()));
+                                    String jobId1 = redisUtils.get("jobId").toString();
+                                    WaylineJobEntity waylineJobEntity1 = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                                            .eq(WaylineJobEntity::getJobId, jobId1));
+                                    PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                                            .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity1.getPlanId()));
+                                    this.returnHome(SDKManager.getDeviceSDK(pubWaylineJobPlanDfEntity1.getDockSn()));
                                 }
                             }
                         } catch (Exception e) {

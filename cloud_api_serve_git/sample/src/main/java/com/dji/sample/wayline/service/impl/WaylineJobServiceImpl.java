@@ -301,7 +301,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         return WaylineJobStatusEnum.UNKNOWN;
     }
 
-    private WaylineJobDTO entity2Dto(WaylineJobEntity entity) {
+    public WaylineJobDTO entity2Dto(WaylineJobEntity entity) {
         if (entity == null) {
             return null;
         }
