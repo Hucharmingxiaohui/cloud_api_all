@@ -594,12 +594,13 @@ async function viewReport () {
     // const blob = await res.blob()
     // const docContainer = document.getElementById('docContainer')
     // docContainer.innerHTML = ''
-
+    // 生成报告
     const response = await createFlyTaskReportApi({
       jobId: jobInfo.job_id
     })
 
     if (response.code === 0 || response.code === 602) {
+      // 下载报告
       const res = await downloadFlyTaskReportApi(jobInfo.job_id)
       if (!res) {
         viewloading.value = false
