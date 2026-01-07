@@ -6,25 +6,15 @@
     <div class="operation">
       <el-button class="new_btn iconfont icon-uav" type="primary" style="margin-left: 10px; width: 100px;"
         @click="select(EDeviceTypeName.Aircraft)">
-        <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
         <span style="margin-left: 5px; font-size: 14px;">无人机</span>
       </el-button>
       <el-button class="new_btn iconfont icon-wurenjijichang" type="primary" style="margin-left: 10px; width: 100px;"
         @click="select(EDeviceTypeName.Dock)">
-        <!-- <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/search.png" /> -->
         <span style="margin-left: 5px; font-size: 14px;">机场</span>
       </el-button>
     </div>
 
   </div>
-  <!-- <a-menu v-model:selectedKeys="current" mode="horizontal" @select="select">
-    <a-menu-item :key="EDeviceTypeName.Aircraft" class="ml20">
-      Aircraft
-    </a-menu-item>
-    <a-menu-item :key="EDeviceTypeName.Dock">
-      Dock
-    </a-menu-item>
-  </a-menu> -->
   <div class="content">
       <div class="table-container">
         <el-table
@@ -209,12 +199,6 @@
     </div>
     </div>
 
-    <!-- <div class="pagination-container">
-      <el-pagination v-model:current-page="paginationProp.current" v-model:page-size="paginationProp.pageSize"
-        :page-sizes="paginationProp.pageSizeOptions" :total="paginationProp.total"
-        layout="total, sizes, prev, pager, next, jumper" @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"></el-pagination>
-    </div> -->
     <!-- 设备升级 -->
     <DeviceFirmwareUpgradeModal title="设备升级" v-model:visible="deviceFirmwareUpgradeModalVisible" :device="selectedDevice"
       @ok="onUpgradeDeviceOk"></DeviceFirmwareUpgradeModal>
@@ -245,6 +229,7 @@ import DeviceHmsDrawer from '/@/components/devices/device-hms/DeviceHmsDrawer.vu
 import { message, notification } from 'ant-design-vue'
 
 //= ========================================================================================
+const activeBtn = ref('1') // 1: 无人机  2: 机场
 // 控制是否显示复选框列
 const showSelectionColumn = ref(true) // 控制复选框列是否显示
 const selectable = (record: any) => {
@@ -461,7 +446,6 @@ function showHms (dock: Device) {
 }
 
 onMounted(() => {
-  console.log('测试', current)
   getDevices(current.value[0])
 })
 </script>
@@ -859,9 +843,9 @@ table tbody .ant-table-row-selected > td {
   }
 
   .new_btn1 {
-    background-image: linear-gradient(180deg,
-        rgba(248, 212, 94, 1) 0,
-        rgba(227, 157, 6, 1) 100%);
+    background-image:  linear-gradient(180deg,
+        rgba(70, 145, 217, 1) 0,
+        rgba(21, 81, 181, 1) 100%);
     border-radius: 4px;
     width: 70px;
     height: 37px;

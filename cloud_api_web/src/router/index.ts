@@ -60,38 +60,38 @@ const routes: Array<RouteRecordRaw> = [
     meta: { showInMenu: false, cache: false },
     children: [
       // 左侧菜单 - 变量管理（父菜单，含子路由）
-      {
-        path: '/variableMgt',
-        name: 'variableMgt',
-        meta: {
-          showInMenu: true,
-          label: '变量管理',
-          position: 'left',
-          cache: false
-        },
-        children: [
-          {
-            path: '/variableMgt/fanMgt',
-            name: 'fanMgt',
-            component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
-            meta: {
-              showInMenu: true,
-              label: '风机管理',
-              cache: true
-            }
-          },
-          {
-            path: '/variableMgt/interestPointMgt',
-            name: 'interestPointMgt',
-            component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
-            meta: {
-              showInMenu: true,
-              label: '兴趣点管理',
-              cache: true
-            }
-          }
-        ]
-      },
+      // {
+      //   path: '/variableMgt',
+      //   name: 'variableMgt',
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '变量管理',
+      //     position: 'left',
+      //     cache: false
+      //   },
+      //   children: [
+      //     {
+      //       path: '/variableMgt/fanMgt',
+      //       name: 'fanMgt',
+      //       component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
+      //       meta: {
+      //         showInMenu: true,
+      //         label: '风机管理',
+      //         cache: true
+      //       }
+      //     },
+      //     {
+      //       path: '/variableMgt/interestPointMgt',
+      //       name: 'interestPointMgt',
+      //       component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
+      //       meta: {
+      //         showInMenu: true,
+      //         label: '兴趣点管理',
+      //         cache: true
+      //       }
+      //     }
+      //   ]
+      // },
 
       {
         path: '/' + ERouterName.DEVICES,
@@ -123,7 +123,7 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
-      // 右侧菜单 - 航线管理（无子女菜单）
+      // 左侧菜单 - 航线管理（无子女菜单）
       {
         path: '/' + ERouterName.NEW_WAYLINE,
         name: ERouterName.NEW_WAYLINE,
@@ -131,7 +131,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           showInMenu: true,
           label: '航线管理',
-          position: 'right',
+          position: 'left',
           cache: true
         }
       },
@@ -153,31 +153,31 @@ const routes: Array<RouteRecordRaw> = [
             component: () => import('/@/components/task/flyWaylinePlan.vue'),
             meta: {
               showInMenu: true,
-              label: '普通计划',
+              label: '航线计划',
               cache: true
             }
           },
-          // 子菜单 - 风机计划
-          {
-            path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
-            name: ERouterName.FLY_FAN_PLAN,
-            component: () => import('/@/components/task/flyFanPlan.vue'),
-            meta: {
-              showInMenu: true,
-              label: '风机计划',
-              cache: true
-            }
-          },
-          {
-            path: '/taskManage/interestPointPlan',
-            name: 'interestPointPlan',
-            component: () => import('/@/components/task/interestPointPlan.vue'),
-            meta: {
-              showInMenu: true,
-              label: '兴趣点环绕计划',
-              cache: true
-            }
-          },
+          // // 子菜单 - 风机计划
+          // {
+          //   path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
+          //   name: ERouterName.FLY_FAN_PLAN,
+          //   component: () => import('/@/components/task/flyFanPlan.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '风机计划',
+          //     cache: true
+          //   }
+          // },
+          // {
+          //   path: '/taskManage/interestPointPlan',
+          //   name: 'interestPointPlan',
+          //   component: () => import('/@/components/task/interestPointPlan.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '兴趣点环绕计划',
+          //     cache: true
+          //   }
+          // },
 
           // 子菜单 - 飞行任务
           {
