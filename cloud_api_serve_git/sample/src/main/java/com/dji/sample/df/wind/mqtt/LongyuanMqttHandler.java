@@ -410,7 +410,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         if(waylineJobDTO.getUploadedCount()==waylineJobDTO.getMediaCount()){
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
-//                          需要区分是风机任务和普通任务
+//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果
 
                             log.info("进入分析逻辑---------");
                             // 1. 异步启动图片保存分析

@@ -1,5 +1,6 @@
 package com.dji.sample.df.wind.controller;
 
+import com.df.framework.vo.Result;
 import com.df.server.utils.ExcelUtil;
 import com.dji.sample.df.wind.model.entity.UniPointImportExcel2;
 import com.dji.sample.df.wind.service.ImportPointService;
@@ -8,23 +9,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.http.HttpHeaders;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/point")
@@ -37,6 +38,7 @@ public class ImportPointController {
 
     @Autowired
     ImportPointService importPointService;
+
 
     @GetMapping("/import")
     public ResponseEntity<String> importPoint(@RequestParam("file") MultipartFile file,
@@ -75,10 +77,12 @@ public class ImportPointController {
             // 5. 处理导入数据
             int successCount = 0;
             int failCount = 0;
-
-            for (UniPointImportExcel2 point : points) {
+            UniPointImportExcel2 point = new  UniPointImportExcel2();
+            for (int i=0;i<points.size();i++) {
                 try {
                     // 针对填写的每行点位数据新增点位信息
+                    point = points.get(i);
+                    point.setPointCode("YIXIA-"+i);
                     importPointService.importPoint(point);
                     successCount++;
                 } catch (Exception e) {
@@ -100,7 +104,7 @@ public class ImportPointController {
                     .body("导入失败: " + e.getMessage());
         }
     }
-
+//  导出模版
     @GetMapping("/export")
     public ResponseEntity<Resource> exportPoint() throws Exception {
         // 验证文件路径和扩展名
@@ -118,10 +122,39 @@ public class ImportPointController {
         Resource resource = new FileSystemResource(file);
         String fileName = file.getName();
 
+        // 编码文件名
+        String encodedFileName = java.net.URLEncoder.encode(fileName, "UTF-8").replaceAll("\\+", "%20");
+
+        // 设置Content-Disposition
+        String contentDisposition = String.format(
+                "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+                encodedFileName, encodedFileName
+        );
+
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .contentType(MediaType.parseMediaType(getContentType(fileName)))
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .contentLength(file.length())
                 .body(resource);
+    }
+
+        private String getContentType(String fileName) {
+            if (fileName.toLowerCase().endsWith(".xlsx")) {
+                return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            } else if (fileName.toLowerCase().endsWith(".xls")) {
+                return "application/vnd.ms-excel";
+            } else {
+                return "application/octet-stream";
+            }
+        }
+
+    /**
+     * 查询点表列表
+     */
+    @GetMapping("selectList")
+    public Result<Map> selectList(@RequestParam Map <String, Object> map) {
+        Map<String, Object> stringObjectMap = importPointService.selectList(map);
+        return Result.success(stringObjectMap);
     }
 
 }

@@ -97,6 +97,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Autowired
     private FjReportService fjReportService;
 
+
     private Optional<MediaFileEntity> getMediaByFingerprint(String workspaceId, String fingerprint) {
         MediaFileEntity fileEntity = mapper.selectOne(new LambdaQueryWrapper<MediaFileEntity>()
                 .eq(MediaFileEntity::getWorkspaceId, workspaceId)
@@ -337,7 +338,18 @@ public class FileServiceImplDf implements IFileServiceDf {
             return pointResult;
         }
     }
-//  最新版接口，不分析航点
+
+    @Override
+    public int getPlanType(String job_id) throws Exception {
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, job_id));
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+
+        return pubWaylineJobPlanDfEntity.getPlanType();
+    }
+
+    //  最新版接口，不分析航点
     @Override
     public List<MediaFileDTO> getMediaDileByJobId3(String job_id, String workspace_id) throws Exception {
         synchronized (lock) {

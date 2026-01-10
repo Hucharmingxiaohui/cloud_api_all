@@ -4,15 +4,16 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.server.dto.uniPoint.UniPointImportExcel;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.df.commonDf.util.PageUtil;
 import com.dji.sample.df.wind.model.entity.UniPointImportExcel2;
+import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.ImportPointService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class ImportPointServiceImpl implements ImportPointService {
@@ -161,5 +162,20 @@ public class ImportPointServiceImpl implements ImportPointService {
             // 不存在则插入
             uniPointMapper2.insert(uniPoint);
         }
+    }
+
+    @Override
+    public Map<String, Object> selectList(Map map) {
+        PageUtil.setPageArgs(map);
+        List<UniPoint> uniPoints = uniPointMapper2.selectList(map);
+        int count = uniPointMapper2.selectListCount(map);
+        Map result = new HashMap();
+        Map pagination = new HashMap();
+        pagination.put("page",Integer.parseInt(map.get("page").toString()));
+        pagination.put("pageSize",Integer.parseInt(map.get("pageSize").toString()));
+        pagination.put("total",count);
+        result.put("list", uniPoints);
+        result.put("pagination", pagination);
+        return result;
     }
 }
