@@ -25,7 +25,7 @@
             @click="resetReport()">
             重置报告
           </el-button>
-          <el-button class="new_btn" type="primary"  :icon="Download"
+          <el-button class="new_btn" type="primary"  :icon="Download" v-if="resultType === 1"
             @click="exportImageZip()">
             导出数据集
           </el-button>
@@ -55,7 +55,7 @@
                 @click="openPreviewModal(scope.row)" />
             </template>
           </el-table-column>
-          <el-table-column label="分析图" align="center">
+          <el-table-column label="分析图" align="center" v-if="resultType === 1">
             <template #default="scope">
               <img :src="scope.row.defect_image_url" alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
@@ -79,22 +79,22 @@
               <div>{{ new Date(scope.row.create_time).toLocaleString() }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="扇叶名称" align="center">
+          <el-table-column label="扇叶名称" align="center" v-if="resultType === 1">
             <template #default="scope">
               <div>{{ scope.row.fan_code }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="扇叶部位" align="center">
+          <el-table-column label="扇叶部位" align="center" v-if="resultType === 1">
             <template #default="scope">
               <div>{{ scope.row.fan_part }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="缺陷主要类型" align="center">
+          <el-table-column label="缺陷主要类型" align="center" v-if="resultType === 1">
             <template #default="scope">
               <div>{{ scope.row.defect_type }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="缺陷描述" align="center">
+          <el-table-column label="缺陷描述" align="center" v-if="resultType === 1">
             <template #default="scope">
               <div>{{ scope.row.defect_description  }}</div>
             </template>
@@ -414,7 +414,7 @@ import { IPage } from '/@/api/http/type'
 import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
+import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
@@ -425,6 +425,8 @@ const viewReportVisible = ref(false)
 const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
+
+const resultType = ref(1)
 
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '40'],
@@ -492,10 +494,27 @@ onMounted(() => {
   jobInfo.status = data.status
   jobInfo.file_name = data.file_name
   jobInfo.file_id = data.file_id
-
+  getTaskResultType()
   getFiles()
   getDefectTypeMap()
 })
+
+/**
+ * 获取任务结果显示类型
+ */
+
+async function getTaskResultType () {
+  try {
+    const res = await getTaskResultTypeApi(jobInfo.job_id)
+    if (res.code !== 0) {
+      ElMessage.error('系统异常')
+      return
+    }
+    resultType.value = res.data
+  } catch (error) {
+
+  }
+}
 
 /**
  * 获取缺陷类型字典

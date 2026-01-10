@@ -7,6 +7,56 @@ const HTTP_PREFIX = '/point/api/v1'
 const HTTP_PREFIX1 = '/pub/api/v1'
 const HTTP_PREFIX2 = '/tem/api/v1'
 
+/**
+ * 河北变电站点位管理
+ */
+
+// 查询点位列表
+export const getPointList = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `/api/point/selectList?page=${data.pageNo}&pageSize=${data.pageSize}&id=${data.id}&pointName=${data.pointName}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 导出模板文件
+export const exportPointTemplate = async function (): Promise<any> {
+  const url = '/api/point/export'
+  const result = await request.get(url, { responseType: 'blob' })
+  if (result.data.type === 'application/json') {
+    const reader = new FileReader()
+    reader.onload = function (e) {
+      const text = reader.result as string
+      const result = JSON.parse(text)
+      message.error(result.message)
+    }
+    reader.readAsText(result.data, 'utf-8')
+  } else {
+    return result.data
+  }
+}
+
+// 导入点位
+export const importPointList = async function (file: {}): Promise<IWorkspaceResponse<any>> {
+  const url = '/api/point/import'
+  const result = await request.post(url, file, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    }
+  })
+  return result.data
+}
+
+// 删除点位
+export const deletePointListapi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = '/api/point/batchDelete'
+  const result = await request.post(url, data)
+  return result.data
+}
+
+/**
+ * 暂时不用
+ */
+
 // 导入台账
 export interface PointData {
   area_name: string; // 区域名称
@@ -139,32 +189,12 @@ interface PointTem {
   point_y: number;
 }
 
-// /home/ych/ych_ros/UAVMP/yuanma/FuJIan20241016/backup/linuxsdk/dji_thermal_sdk_v1.5_20240507/utility/bin/linux/release_x64/dji_irp
-// export const insertTEMPConfig = async function (file_path: String, left_top_x:String, left_top_y:String, right_bottom_x:String, right_bottom_y:string): Promise<IWorkspaceResponse<any>> {
-//   const url = `${HTTP_PREFIX1}/temPicture/getTem?file_path=${file_path}&left_top_x=${left_top_x}&left_top_y=${left_top_y}&right_bottom_x=${right_bottom_x}&right_bottom_y=${right_bottom_y}`
-//   const result = await request.get(url)
-//   return result.data
-// }
-
-// http://172.20.63.238:6789/tem/api/v1/workspace/getTemByWorkSpaceIdAndFileId?workspace_id=e3dea0f5-37f2-4d79-ae58-490af3228069&file_id=28d79348-55a9-4114-953f-a8abfd804d36
-
-// export const insertTEMPConfig = async function (workspace_id:string, file_id: String, left_top_x:number, left_top_y:number, right_bottom_x:number, right_bottom_y:number): Promise<IWorkspaceResponse<any>> {
-//   const url = `${HTTP_PREFIX2}/workspace/${workspace_id}/file/${file_id}/getTem?left_top_x=${left_top_x}&left_top_y=${left_top_y}&right_bottom_x=${right_bottom_x}&right_bottom_y=${right_bottom_y}`
-//   const result = await request.get(url)
-//   return result.data
-// }
-
 export const insertTEMPConfig = async function (workspace_id: string, file_id: String, data: RegionTem): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX2}/workspace/getTemByWorkSpaceIdAndFileId?workspace_id=${workspace_id}&file_id=${file_id}`
   const result = await request.post(url, data)
   // const result = await request.get(url, data)
   return result.data
 }
-// export const insertTEMPConfig = async (workspace_id:string, file_id: String, data: RegionTem): Promise<IWorkspaceResponse<any>> => {
-//   const url = `${HTTP_PREFIX2}/workspace/getTemByWorkSpaceIdAndFileId?workspace_id=${workspace_id}&file_id=${file_id}`
-//   const result = await request.get(url, data)
-//   return result.data
-// }
 
 export const insertTEMPConfig1 = async function (workspace_id: string, file_id: String, data: PointTem): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX2}/workspace/getTemByWorkSpaceIdAndFileId?workspace_id=${workspace_id}&file_id=${file_id}`

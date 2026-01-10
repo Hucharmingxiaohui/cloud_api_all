@@ -43,8 +43,8 @@
           <a-col :span="6" class="text_2">
             <span>河北华电220kV尹夏储能站</span>
           </a-col>
-          <a-col :span="2" ></a-col>
-          <a-col :span="7" class="text_1"  style="display: flex; justify-content: end;">
+          <a-col :span="1" ></a-col>
+          <a-col :span="8" class="text_1"  style="display: flex; justify-content: end;">
             <!-- 右侧菜单 -->
               <div style="width: 100%; padding-left: 35px;">
                             <el-menu

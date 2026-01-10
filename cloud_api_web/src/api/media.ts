@@ -130,6 +130,13 @@ export const downloadImageZipApi = async function (jobId: string): Promise<any> 
   }
 }
 
+// 获取任务结果显示类型,决定显示内容
+export async function getTaskResultTypeApi (job_id: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/files/getPlanType?job_id=${job_id}`
+  const result = await request.get(url)
+  return result.data
+}
+
 // 测试接口   根据worckspaceId 和fileId生成缩略图
 export async function getThumbnailById (file_id: string, workspace_id:string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX}/files/getThumbnailByJobId?file_id=${file_id}&workspace_id=${workspace_id}`

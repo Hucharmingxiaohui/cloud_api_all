@@ -92,6 +92,17 @@ const routes: Array<RouteRecordRaw> = [
       //     }
       //   ]
       // },
+      {
+        path: '/' + ERouterName.Points_Management,
+        name: ERouterName.Points_Management,
+        component: () => import('/@/components/points/points_manage.vue'),
+        meta: {
+          showInMenu: true,
+          label: '点位管理',
+          position: 'left',
+          cache: true
+        }
+      },
 
       {
         path: '/' + ERouterName.DEVICES,
@@ -123,7 +134,6 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
-      // 左侧菜单 - 航线管理（无子女菜单）
       {
         path: '/' + ERouterName.NEW_WAYLINE,
         name: ERouterName.NEW_WAYLINE,
@@ -131,7 +141,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           showInMenu: true,
           label: '航线管理',
-          position: 'left',
+          position: 'right',
           cache: true
         }
       },
@@ -293,12 +303,6 @@ const routes: Array<RouteRecordRaw> = [
         name: ERouterName.HOSTCONNECT,
         component: () => import('/@/components/hostConnect.vue'),
         meta: { showInMenu: false, cache: false }
-      },
-      {
-        path: '/' + ERouterName.Points_Management,
-        name: ERouterName.Points_Management,
-        component: () => import('/@/components/points/points_manage.vue'),
-        meta: { showInMenu: false, cache: true }
       },
       {
         path: '/' + ERouterName.Setup_Management,

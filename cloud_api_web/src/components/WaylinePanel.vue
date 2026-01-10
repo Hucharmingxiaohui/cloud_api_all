@@ -244,7 +244,6 @@ import { useRouter } from 'vue-router'
 import { uuidv4 } from '/@/utils/uuid'
 import { PostElementsBody } from '/@/types/mapLayer'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
-import { getAllSub } from '/@/api/points'
 import {
   generateLineContent,
   generatePointContent,

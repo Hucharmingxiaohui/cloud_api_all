@@ -259,7 +259,6 @@ import SelectWayLine from '/@/pages/page-web/projects/wayline.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllWindTurbineApi, getAllInserestPointApi } from '/@/api/turbine/turbineMgt'
-import { getAllSub } from '/@/api/points'
 const router = useRouter()
 const route = useRoute()
 const type = ref(localStorage.getItem('createPlan_query')) // 获取计划类型

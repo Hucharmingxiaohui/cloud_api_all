@@ -238,8 +238,6 @@ import { IPage } from '/@/api/http/type'
 import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf } from '/@/api/wayline'
 import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusMap, MediaStatus, MediaStatusProgressInfo, TaskMediaHighestPriorityProgressInfo } from '/@/types/task'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
-import { getAllSub } from '/@/api/points'
-import { getDeviceBySub } from '/@/api/subAndvideo'
 
 // ---------------------------------
 const router = useRouter()
