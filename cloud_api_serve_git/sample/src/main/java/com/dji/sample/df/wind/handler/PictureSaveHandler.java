@@ -30,7 +30,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class PictureSaveHandler {
@@ -53,7 +55,7 @@ public class PictureSaveHandler {
     @Resource
     FanWaylinePointsMapper fanWaylinePointsMapper;
 
-    public Result pictureSave(String jobId) {
+    public Result<Map> pictureSave(String jobId) {
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
         // 分离DJI文件和非DJI文件
         List<MediaFileEntity> djiFiles = new ArrayList<>();
@@ -69,38 +71,66 @@ public class PictureSaveHandler {
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
         // 从数据库获取图片命名规则
 //        String fanPointsJson = redisUtils.get("fanPoints").toString();
+
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
                 .eq(FanWaylinePoints::getJobId, jobId));
-        JSONArray points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
-
-        if (points == null || points.isEmpty()) {
-            System.err.println("错误：从数据库获取图片命名规则失败");
-            return Result.error("错误：从数据库获取图片命名规则失败");
-        }
-
-        try {
-            int index = 0;
-            for (MediaFileEntity mediaFileEntity : djiFiles) {
-                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+        JSONArray points =new JSONArray();
+        if (fanWaylinePoints != null) {
+//           风机存在本地
+            points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+            Map map = new HashMap();
+            try {
+                int index = 0;
+                for (MediaFileEntity mediaFileEntity : djiFiles) {
+                    URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
 //               // 使用Redis中的命名规则
-                String fileName;
-                if (index < points.size()) {
-                    String pointName = points.getString(index);
-                    fileName = pointName;
-                } else {
-                    // 如果图片数量超过Redis规则，使用原始文件名
-                    fileName = mediaFileEntity.getFileName() != null ?
-                            mediaFileEntity.getFileName() :
-                            "file_" + mediaFileEntity.getFileId() + ".dat";
+                    String fileName;
+                    if (index < points.size()) {
+                        String pointName = points.getString(index);
+                        fileName = pointName;
+                    } else {
+                        // 如果图片数量超过Redis规则，使用原始文件名
+                        fileName = mediaFileEntity.getFileName() != null ?
+                                mediaFileEntity.getFileName() :
+                                "file_" + mediaFileEntity.getFileId() + ".dat";
+                    }
+                    String filePictrueUrl = fileConfig.getFilePictrueUrl();
+                    String localFileName = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                    map.put(fileName, localFileName);
+                    index++;
                 }
-                String filePictrueUrl = fileConfig.getFilePictrueUrl();
-                String localFileName = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
-                index++;
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+            return Result.success(map);
+        }else {
+            Map map = new HashMap();
+            try {
+                int index = 0;
+                for (MediaFileEntity mediaFileEntity : djiFiles) {
+                    URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+//               // 使用Redis中的命名规则
+                    String fileName;
+                    if (index < points.size()) {
+                        String pointName = points.getString(index);
+                        fileName = pointName;
+                    } else {
+                        // 如果图片数量超过Redis规则，使用原始文件名
+                        fileName = mediaFileEntity.getFileName() != null ?
+                                mediaFileEntity.getFileName() :
+                                "file_" + mediaFileEntity.getFileId() + ".dat";
+                    }
+                    String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
+                    String localFileName = downloadAndConvertToJpeg2(url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
+                    map.put(fileName, localFileName);
+                    index++;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return Result.success(map);
         }
-        return Result.success("保存结果成功");
+
     }
 
     public static String downloadAndConvertToJpeg(String url, String localFileName, String filePictrueUrl,String jobId) throws IOException {
@@ -140,6 +170,50 @@ public class PictureSaveHandler {
 
             System.out.println("JPEG图片保存成功: " + localFilePath);
             return localFilePath;
+
+        } catch (IOException e) {
+            System.err.println("图片转换失败: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    public static String downloadAndConvertToJpeg2(String url, String localFileName, String filePictrueUrl,String jobId,String nativePath) throws IOException {
+        String tempDir = filePictrueUrl + "/" +jobId;
+        Path tempPath = Paths.get(tempDir);
+        if (!Files.exists(tempPath)) {
+            Files.createDirectories(tempPath);
+        }
+
+        // 修复：检查文件名是否有后缀，如果没有则直接添加.jpg
+        String fileNameWithoutExt;
+        if (localFileName.contains(".")) {
+            fileNameWithoutExt = localFileName.substring(0, localFileName.lastIndexOf('.'));
+        } else {
+            fileNameWithoutExt = localFileName;
+        }
+        localFileName = fileNameWithoutExt + ".jpg";
+
+        String localFilePath = tempDir + "/" + localFileName;
+
+        try {
+            // 从URL读取图片
+            URL imageUrl = new URL(url);
+            BufferedImage image = ImageIO.read(imageUrl);
+
+            if (image == null) {
+                throw new IOException("无法从URL读取图片: " + url);
+            }
+
+            // 创建JPG文件并保存
+            File outputFile = new File(localFilePath);
+            boolean success = ImageIO.write(image, "jpg", outputFile);
+
+            if (!success) {
+                throw new IOException("无法将图片保存为JPEG格式");
+            }
+
+            System.out.println("JPEG图片保存成功: " + localFilePath);
+            return nativePath + jobId+ "/" + localFileName;
 
         } catch (IOException e) {
             System.err.println("图片转换失败: " + e.getMessage());

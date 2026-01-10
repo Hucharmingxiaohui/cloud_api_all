@@ -130,7 +130,7 @@ public class TaskTimerManager {
                             taskDetail.put("actualStartTime", String.valueOf(currentTime));
                             redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
 
-                            // 这里需要调用你的执行逻辑
+                            // 这里需要调用你的执行逻辑,需要区分风机任务和普通任务
                             // executeTaskLogic(taskCode, taskDetail);
                             String singleDeviceId = taskDetail.get("deviceId");
                             String taskName = taskDetail.get("taskName");

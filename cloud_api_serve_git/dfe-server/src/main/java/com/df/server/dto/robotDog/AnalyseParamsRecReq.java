@@ -1,5 +1,7 @@
 package com.df.server.dto.robotDog;
 
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -12,6 +14,7 @@ import java.util.List;
 @Data
 @ToString
 @NoArgsConstructor
+@JsonNaming(PropertyNamingStrategies.UpperCamelCaseStrategy.class)
 public class AnalyseParamsRecReq {
     /**
      * 请求唯一标识
@@ -20,7 +23,7 @@ public class AnalyseParamsRecReq {
     /**
      * 结果集
      */
-    private List<ResultList> resultsList;
+    private List<ResultList> resultList;
 
     @Data
     @NoArgsConstructor
@@ -40,7 +43,7 @@ public class AnalyseParamsRecReq {
             private String code;
             private String conf;
             private String desc;
-            private String resImageUrl;
+            private String resImagePath;
             private String type;
             private String value;
             private List<Pos> pos;

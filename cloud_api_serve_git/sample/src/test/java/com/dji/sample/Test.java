@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.ftp.FtpUtils;
+import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.center.thread.ExecutorFactory;
 
@@ -12,9 +13,12 @@ import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.IOssService;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.control.model.enums.TestEnum;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
+import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.controller.FjReportController;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
@@ -63,6 +67,15 @@ public class Test {
     @Autowired
     MqttGatewayPublish mqttGatewayPublish;
 
+    @Autowired
+    LyFtpsProperties lyFtpsProperties;
+    @Autowired
+    IWaylineJobMapper waylineJobMapper;
+
+
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
     @org.junit.jupiter.api.Test
     void test() throws IOException {
 
@@ -80,11 +93,39 @@ public class Test {
 
 //        deleteWaylineFileTimer.deleteKmzFiles();
 //        throw new UnsupportedOperationException("airsenseWarning not implemented");
-        String localFile = "C:/Users/90828/Desktop/mqtt.txt";
-        String destName = new File(localFile).getName();
-        String destDir = "/df1560/mqtt.txt";
-        FtpUtils instance = FtpUtils.getInstance();
-        instance.downloadFromFtps(destDir,localFile);
+//        String localFile = "C:/Users/90828/Desktop/mqtt.txt";
+//        String destName = new File(localFile).getName();
+//        String destDir = "/df1560/mqtt.txt";
+//        FtpUtils instance = FtpUtils.getInstance();
+//        instance.downloadFromFtps(destDir,localFile);
+
+
+//            String localFile = "C:/Users/90828/Desktop/mqtt.txt";;
+//            String destName = new File(localFile).getName();
+//            String destDir = "/uav";
+//            FtpsHelper ftpClient = new FtpsHelper();
+//
+//            try {
+//                ftpClient.login(lyFtpsProperties.getFtpIp(), lyFtpsProperties.getFtpPort(), lyFtpsProperties.getUserName(),lyFtpsProperties.getPassword(), lyFtpsProperties.getImplicit());
+//                ftpClient.uploadFile(localFile, destDir, destName,"true");
+//                ftpClient.close();
+//            } catch (Exception exception) {
+//                exception.printStackTrace();
+//            } finally {
+//                ftpClient.close();
+//            }
+
+
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, "9d90a318-7b5c-4228-a062-562244e52a3a"));
+        waylineJobEntity.setIsReported(0);
+        waylineJobMapper.updateById(waylineJobEntity);
+//      正在分析（实则是正在保存加分析）
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+//      如果不是风机任务直接返回不分析，状态置为3（改为对接分析服务）
+        System.out.println(pubWaylineJobPlanDfEntity);
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==0){
+            System.out.println("111");
+        }
     }
 
     @org.junit.jupiter.api.Test

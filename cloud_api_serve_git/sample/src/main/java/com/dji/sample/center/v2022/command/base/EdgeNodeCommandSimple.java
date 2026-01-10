@@ -7,7 +7,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.Serializable;
 
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "PatrolHost")
+@XmlRootElement(name = "PatrolDevice")
 public class EdgeNodeCommandSimple implements Serializable {
     private static final long serialVersionUID = -4770113769299694976L;
 

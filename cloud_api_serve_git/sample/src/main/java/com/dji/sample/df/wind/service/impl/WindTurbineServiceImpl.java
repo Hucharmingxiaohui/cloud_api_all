@@ -115,6 +115,21 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
         return true;
     }
 
+    @Override
+    public Map<String,Object> getPointsByFanId(Map map) {
+        PageUtil.setPageArgs(map);
+        List<FanStationPoints> fanStationPoints = fanStationPointsMapper.selectListById(map);
+        int count = fanStationPointsMapper.selectListCount(map);
+        Map result = new HashMap();
+        Map pagination = new HashMap();
+        pagination.put("page",Integer.parseInt(map.get("page").toString()));
+        pagination.put("pageSize",Integer.parseInt(map.get("pageSize").toString()));
+        pagination.put("total",count);
+        result.put("list", fanStationPoints);
+        result.put("pagination", pagination);
+        return result;
+    }
+
     /**
      * 生成点位列表
      */

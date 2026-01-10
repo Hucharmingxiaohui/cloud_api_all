@@ -13,6 +13,7 @@ import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
+import com.dji.sample.df.electricInspectionDf.service.ResultService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
@@ -94,22 +95,34 @@ public class FjReportController {
     @Autowired
     private IWorkspaceMapper workspaceMapper;
 
+    @Autowired
+    private ResultService resultService;
+
     /**
      * 保存巡检图片并分析
      */
     @PostMapping("/pictureSave")
-    public Result pictureSave(@RequestBody JSONObject jsonObject) {
+    public Result pictureSave(@RequestBody JSONObject jsonObject) throws Exception {
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         waylineJobEntity.setIsReported(0);
         waylineJobMapper.updateById(waylineJobEntity);
 //      正在分析（实则是正在保存加分析）
-        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
-//      如果不是风机任务直接返回不分析，状态置为3
-        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()!=1){
-            waylineJobEntity.setIsAnalyzed(3);
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+//      如果不是风机任务直接返回不分析，状态置为3（改为对接分析服务）
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==0){
+
+            waylineJobEntity.setIsAnalyzed(2);
             waylineJobMapper.updateById(waylineJobEntity);
-            return Result.notfan("不是风机任务");
+            Result<Map> result = pictureSaveHandler.pictureSave(jobId);
+            if(result.getCode() == 0){
+                Map data = result.getData();
+                resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
+                log.info("进行分析------");
+                return Result.success("success");
+            }
+//          return Result.notfan("不是风机任务");
         }
 //      查询job的保存标志位，未保存完就setIsAnalyzed(4)，就不执行下面逻辑直接return,前端显示正在保存，显示正在保存则一直调这个接口直到返回成功
         Integer isSaved = waylineJobEntity.getIsSaved();
@@ -199,9 +212,21 @@ public class FjReportController {
                 return Result.duplicate("巡检结果已生成巡检报告，无需重复生成");
             }
         }
-        String reportId = fjReportService.createNewReport(jobId);
-//        ExecuteFJReportGenTimer.putMap(id, jobId);
-        fjReportService.genPatrolTaskWordNew(reportId,jobId);
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+        Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+        String reportId =null;
+        if(planType==0){
+//         普通任务生成报告
+             reportId = fjReportService.createNewReport(jobId);
+             fjReportService.genNormalPatrolTaskWordNew(reportId,jobId);
+             log.info("生成普通报告------");
+        }else if(planType==1){
+             reportId = fjReportService.createNewReport(jobId);
+
+            fjReportService.genPatrolTaskWordNew(reportId,jobId);
+        }
+
 //      已进行巡检
         waylineJobEntity.setIsReported(1);
         waylineJobMapper.updateById(waylineJobEntity);

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.dji.sample.df.wind.dao.FanStationPointsMapper">
+
+    <select id="selectListById" resultType="com.dji.sample.df.wind.model.entity.FanStationPoints">
+        SELECT * FROM fan_station_points
+        <where>
+            <if test="id!=null and id!=''">
+                and main_device_id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+
+
+    <select id="selectListCount" resultType="int">
+        SELECT COUNT(*) FROM fan_station_points
+        <where>
+            <if test="id!=null and id!=''">
+                and main_device_id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+</mapper>

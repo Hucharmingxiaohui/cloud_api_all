@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 @Slf4j
 @RestController
-@RequestMapping("")
+@RequestMapping("/aaa")
 @AuthInterceptor.IgnoreAuth
 public class AnalyseResultController {
 
