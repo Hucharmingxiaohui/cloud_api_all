@@ -11,4 +11,6 @@ public class FjFileConfig {
 
     private String filePictrueUrl;
     private String fileReportPath;
+    private String recfilePath;
+    private String recfileNativePath;
 }

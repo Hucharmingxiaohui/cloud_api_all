@@ -128,7 +128,7 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
         Integer alarmLevel = null;
 
         AnalyseParamsRecReq.ResultList.Result result = null;
-        List<AnalyseParamsRecReq.ResultList> resultsList = analyseParamsRecReq.getResultsList();
+        List<AnalyseParamsRecReq.ResultList> resultsList = analyseParamsRecReq.getResultList();
         if (resultsList != null && !resultsList.isEmpty()) {
             AnalyseParamsRecReq.ResultList resultList = resultsList.get(0);
             if (resultList != null && resultList.getResults() != null) {
@@ -136,7 +136,7 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
                 if (!results.isEmpty()) {
                     result = results.get(0);
                     code = result.getCode();
-                    resImageUrl = result.getResImageUrl();
+                    resImageUrl = result.getResImagePath();
                     pointValUnit = result.getDesc();
                     if ("2002".equals(code)) {
                         if (StringUtils.isNotBlank(pointValUnit)) {
@@ -223,14 +223,14 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
         HashMap<String, String> valeResult = new HashMap<>();
 
         //从返回值中找到识别值
-        AnalyseParamsRecReq.ResultList resultList = analyseParamsRecReq.getResultsList().get(0);
+        AnalyseParamsRecReq.ResultList resultList = analyseParamsRecReq.getResultList().get(0);
         List<AnalyseParamsRecReq.ResultList.Result> results = resultList.getResults();
         //1.默认认为结果只返回一个值
         AnalyseParamsRecReq.ResultList.Result result = results.get(0);
         String valid = "1"; //识别正常，默认给1
         String point_val = result.getValue();
         String point_val_unit = result.getDesc();
-        String resImageUrl = result.getResImageUrl();
+        String resImageUrl = result.getResImagePath();
         String conf = result.getConf();
 
         //2.如果结果返回多个值，且点位是缺陷类识别，需要特殊处理
@@ -243,7 +243,7 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
             for (AnalyseParamsRecReq.ResultList.Result resultTemp : results) {
                 String value = resultTemp.getValue();
                 String desc = resultTemp.getDesc();
-                //List<String> listByDictType = sysDictDataMapper.getListByDictType("qxsb_type");
+//                List<String> listByDictType = sysDictDataMapper.getListByDictType("qxsb_type");
                 if ("1".equals(value)) {
                     valid = "2";//判别异常
                     point_val = "1"; //只要发现一个value=1，识别结果就是1

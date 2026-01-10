@@ -2,6 +2,7 @@ package com.dji.sample.df.wind.controller;
 
 import com.df.framework.vo.Result;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
+import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.df.wind.service.WindTurbineService;
@@ -70,7 +71,7 @@ public class WindTurbineController {
         Map<String, Object> stringObjectMap = windTurbineService.selectList(map);
         return Result.success(stringObjectMap);
     }
-    
+
     /**
      * 根据ID增加风机点位模型
      */
@@ -80,5 +81,16 @@ public class WindTurbineController {
 
         return Result.success(b);
     }
+
+    /**
+     * 根据ID获取风机点位模型
+     */
+    @GetMapping("/getPointsById")
+    public Result<Map> getPointsById(@RequestParam Map <String, Object> map) {
+        Map<String, Object> pointsList = windTurbineService.getPointsByFanId(map);
+
+        return Result.success(pointsList);
+    }
+
 
 }

@@ -1,6 +1,7 @@
 package com.dji.sample.df.wind.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 
 import java.util.List;
@@ -44,5 +45,7 @@ public interface WindTurbineService  extends IService<WindTurbine> {
 
     WindTurbine selectByName(String name);
 
-    public boolean addPointsById(String id);
+    boolean addPointsById(String id);
+
+    Map<String,Object> getPointsByFanId(Map map);
 }
