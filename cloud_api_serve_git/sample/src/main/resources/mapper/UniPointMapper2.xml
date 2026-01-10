@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+
+<mapper namespace="com.dji.sample.center.dao.UniPointMapper2">
+
+    <select id="selectList" resultType="com.dji.sample.center.entity.UniPoint">
+        SELECT * FROM df_uni_point
+        <where>
+            <if test="pointName!=null and pointName!=''">
+                and point_name LIKE concat('%', #{pointName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="id!=null and id!=''">
+                and id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+
+
+    <select id="selectListCount" resultType="int">
+        SELECT COUNT(*) FROM df_uni_point
+        <where>
+            <if test="pointName!=null and pointName!=''">
+                and point_name LIKE concat('%', #{pointName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="id!=null and id!=''">
+                and id = #{id}
+            </if>
+        </where>
+        <if test="pageSize != null and pageSize != '' ">
+            LIMIT ${startPos}, ${pageSize}
+        </if>
+    </select>
+</mapper>

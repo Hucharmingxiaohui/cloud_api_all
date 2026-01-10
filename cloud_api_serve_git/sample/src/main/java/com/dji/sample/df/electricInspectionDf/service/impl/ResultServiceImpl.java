@@ -38,7 +38,9 @@ import com.dji.sample.df.wind.model.entity.RecgPointsEntity;
 import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.google.common.collect.Lists;
 import com.sun.xml.bind.v2.TODO;
 import lombok.extern.slf4j.Slf4j;
@@ -110,61 +112,9 @@ public class ResultServiceImpl implements ResultService {
     RecgPointsEntityMapper recgPointsEntityMapper;
     @Autowired
     RecgFileEntityMapper recgFileEntityMapper;
+    @Autowired
+    WaylineJobServiceImpl waylineJobServiceimpl;
 
-//    //      只针对一个航点对应一个点位（因为点位导入的时候就是点位与一个航点预置位号绑定）
-//    @Override
-//    public void handleUavResult(Map<String,String> map,String workspaceId,String jobId) throws Exception {
-//
-//        List<MediaFileDTO> mediaFileDTOList = iFileServiceDf.getFilesByJobId(jobId);
-////       每次发一个照片
-//        for (MediaFileDTO mediaFileDTO : mediaFileDTOList) {
-//            String fileName = mediaFileDTO.getFileName();
-//
-//            int pointPos = extractWaypointNumber(fileName);
-//            WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-//                    .eq(WaylineJobEntity::getJobId, jobId));
-//            UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
-//                    .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
-//                    .eq(UniPoint::getWaylinePointPos, pointPos));
-//            String subCode = uniPoint.getSubCode();
-//            String pointCode = uniPoint.getPointCode();
-//            String requestId = UUID.randomUUID().toString();
-////          仿照巡视新建任务点位表和点位文件表，后续优化
-//            RecgPointsEntity recgPointsEntity=new RecgPointsEntity();
-//            recgPointsEntity.setRequestId(requestId);
-//            recgPointsEntity.setSubCode(subCode);
-//            recgPointsEntity.setPointCode(pointCode);
-//            recgPointsEntityMapper.insert(recgPointsEntity);
-//            RecgFileEntity recgFileEntity=new RecgFileEntity();
-//            recgFileEntity.setRequestId(requestId);
-//            recgFileEntityMapper.insert(recgFileEntity);
-//
-////          需要建一个分析表存requestId
-//            String filePath = map.get(fileName);
-//
-//            //发送智能分析
-//            AnalyseParamsReq analyseParamsReq = new AnalyseParamsReq();
-//
-//            analyseParamsReq.setObjectId(pointCode + "_1");
-//            analyseParamsReq.setImageUrlList(Lists.newArrayList(filePath));
-//            //typeList
-//            String pointAnalyseType = uniPoint.getPointAnalyseType();
-//            if (CustomStringUtils.isNotEmpty(pointAnalyseType)) {
-//                List<String> typeList = Arrays.asList(pointAnalyseType.split(","));
-//                analyseParamsReq.setTypeList(typeList);
-//            }
-//
-//            List<AnalyseParamsReq> analyseParamsReqList = new ArrayList<>();
-//            analyseParamsReqList.add(analyseParamsReq);
-//            AnalyseImageInfo analyseImageInfo = new AnalyseImageInfo();
-//            analyseImageInfo.setRequestId(requestId);
-//            analyseImageInfo.setAnalyseParamsReqList(analyseParamsReqList);
-////          taskPatrolledId用job_id（含义应该一样）,任务点位数的必须的吗
-//            analyseImageInfo.setTaskInfo(new TaskInfo(subCode,jobId, waylineJobEntity.getName(), waylineJobEntity.getPlanId(), null));
-//
-//            sendAnalyse(analyseImageInfo);
-//        }
-//    }
 
     //      只针对一个航点对应一个点位（因为点位导入的时候就是点位与一个航点预置位号绑定）
     @Override
@@ -249,45 +199,6 @@ public class ResultServiceImpl implements ResultService {
         return null;
     }
 
-    public String handleImage(String base64, String savePath, String subCode, String pointCode) {
-        try {
-            String suffix = "jpg"; // 默认 jpg
-            if (base64.contains("image/png")) {
-                suffix = "png";
-            } else if (base64.contains("image/jpeg")) {
-                suffix = "jpg";
-            }
-            // 获取当前年月日
-            LocalDate today = LocalDate.now();
-            String year = String.valueOf(today.getYear());
-            String month = String.format("%02d", today.getMonthValue());
-            String day = String.format("%02d", today.getDayOfMonth());
-            // 构建完整路径
-            String relativePath = Paths.get(subCode, year, month, day).toString();
-            String dirPath = Paths.get(savePath, relativePath).toString();
-            // 创建目录
-            File dir = new File(dirPath);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
-            LocalDateTime now = LocalDateTime.now();
-            String formatted = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-            // 生成唯一文件名
-            String fileName = formatted + "_" + pointCode + "." + suffix;
-            String fullPath = Paths.get(dirPath, fileName).toString();
-            log.info("【无人机图片文件存储，存储路径，{}】", fullPath);
-            // 解码Base64字符串为字节数组
-            // 解码并保存
-            byte[] imageBytes = Base64.getDecoder().decode(base64);
-            // 将字节数组写入到文件
-            Files.write(Paths.get(fullPath), imageBytes);
-            return Paths.get(relativePath, fileName).toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return "获取图片失败";
-        }
-    }
-
 
 //  todo 待验证
     @Override
@@ -298,14 +209,31 @@ public class ResultServiceImpl implements ResultService {
 
         log.info("【收到智能分析结果】 ：{}", JSONObject.toJSONString(analyseParamsRecReq));
         String requestId = analyseParamsRecReq.getRequestId();
-//        HisUniTaskItemFileEntity hisFile = hisUniTaskItemFileMapper.getByRequestId(requestId);
-//        HisUniTaskItemPointsEntity hisPoint = hisUniTaskItemPointsMapper.getByRequestId(requestId);
+
         RecgFileEntity recgFileEntity = recgFileEntityMapper.selectOne(new LambdaQueryWrapper<RecgFileEntity>().eq(RecgFileEntity::getRequestId, requestId));
         RecgPointsEntity recgPointsEntity = recgPointsEntityMapper.selectOne(new LambdaQueryWrapper<RecgPointsEntity>().eq(RecgPointsEntity::getRequestId, requestId));
-//        String taskPatrolledId = hisPoint.getTaskPatrolledId();
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, recgPointsEntity.getTaskPatrolledId()));
+        Integer analyzedNum = waylineJobEntity.getAnalyzedNum();
+        if(analyzedNum==null){
+            waylineJobEntity.setAnalyzedNum(1);
+            waylineJobMapper.updateById(waylineJobEntity);
+        }else {
+            waylineJobEntity.setAnalyzedNum(analyzedNum + 1);
+            waylineJobMapper.updateById(waylineJobEntity);
+        }
+        Integer analyzedNum1 = waylineJobEntity.getAnalyzedNum();
+        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
+        Integer mediaCount = waylineJobDTO.getMediaCount();
+        if(mediaCount == analyzedNum1){
+            waylineJobEntity.setIsAnalyzed(1);
+            waylineJobMapper.updateById(waylineJobEntity);
+            log.info("智能分析结束----------");
+        }else {
+            log.info("仍在智能分析中，分析照片数----"+analyzedNum1);
+        }
         String subCode = recgPointsEntity.getSubCode();
         String pointCode = recgPointsEntity.getPointCode();
-//        UniPointEntity uniPoint = uniPointMapper.getPointEntityByCode(subCode, pointCode);
+
         UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
                 .eq(UniPoint::getSubCode, subCode)
                 .eq(UniPoint::getPointCode, pointCode));
@@ -368,17 +296,7 @@ public class ResultServiceImpl implements ResultService {
 //          缩略图先不弄
 //            hisExePointAnalyseServiceImpl.updateRecgFilePathPress(resImageUrl, hisFile);
 
-
         }
-//        hisPoint.setPointVal(pointVal);
-//        hisPoint.setPointValUnit(pointValUnit);
-//        hisPoint.setValid(valid);
-//        hisPoint.setIsAlarm(alarmLevel != null ? 1 : 0);
-//        hisPoint.setIsFinished(1);
-//        hisPoint.setFinishedTime(new Date());
-//        hisPoint.setPointUnit("");
-//        hisUniTaskItemPointsMapper.finishResult(hisPoint);
-//        updatePointNum(taskPatrolledId);
 
         recgPointsEntity.setPointVal(pointVal);
         recgPointsEntity.setPointValUnit(pointValUnit);
@@ -393,7 +311,6 @@ public class ResultServiceImpl implements ResultService {
         recgPointsEntityMapper.update(recgPointsEntity, updateWrapper);
 //      先不更新点位数
 //        updatePointNum(taskPatrolledId);
-
 
 //        if (alarmLevel != null) {
 //            hisUniTaskItemAlarmService.createAlarm(hisPoint, alarmLevel);
