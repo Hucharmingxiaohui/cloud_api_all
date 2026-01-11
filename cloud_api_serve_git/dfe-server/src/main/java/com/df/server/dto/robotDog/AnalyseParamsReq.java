@@ -30,6 +30,6 @@ public class AnalyseParamsReq implements Serializable {
     /**
      * 图片URL列表
      */
-    private List<String> imageUrlList;
+    private List<String> imagePathList;
 
 }

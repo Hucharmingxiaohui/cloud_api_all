@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.app.AppContext;
 import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.center.utils.ftp.FtpUtils;
 import com.dji.sample.center.v2022.command.model.PatrolUavModelItem;
@@ -13,9 +15,7 @@ import com.dji.sample.center.v2022.enums.DeviceTypeEnum;
 import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper;
-import com.dji.sample.df.electricInspectionDf.model.PubSubstationDfEntity;
 import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
-import com.dji.sample.df.manageDf.model.entity.WaylinePointEntity;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -33,6 +33,7 @@ public class CenterModelSyncBuilder {
     private IWaylinePointMapper iWaylinePointMapper = AppContext.getBean(IWaylinePointMapper.class);
     private CenterNormalConfig centerNormalConfig = AppContext.getBean(CenterNormalConfig.class);
     private PubSubstationDfMapper pubSubstationDfMapper = AppContext.getBean(PubSubstationDfMapper.class);
+    private UniPointMapper2 uniPointMapper = AppContext.getBean(UniPointMapper2.class);
 
     private static CenterModelSyncBuilder instance = null;
 
@@ -52,21 +53,24 @@ public class CenterModelSyncBuilder {
     public List<BaseItem> genPatrolUavFile(String subCode) {
         List<BaseItem> items = new ArrayList<>();
         List<PatrolUavPointModelItem> data = new ArrayList<>();
-        List<WaylinePointEntity> list = iWaylinePointMapper.selectAllData(subCode);
-        List<PubSubstationDfEntity> pubSubstationDfEntities = pubSubstationDfMapper.selectList(
-                new LambdaQueryWrapper<PubSubstationDfEntity>()
-                        .eq(PubSubstationDfEntity::getSubCode, subCode)
-        );
-        System.out.println( pubSubstationDfEntities.get(0).getSubName());
-        String subName = pubSubstationDfEntities.get(0).getSubName();
-        if (list != null && list.size() > 0) {
-            for (WaylinePointEntity entity : list) {
+//        List<WaylinePointEntity> list = iWaylinePointMapper.selectAllData(subCode);
+//        List<PubSubstationDfEntity> pubSubstationDfEntities = pubSubstationDfMapper.selectList(
+//                new LambdaQueryWrapper<PubSubstationDfEntity>()
+//                        .eq(PubSubstationDfEntity::getSubCode, subCode)
+//        );
+//        System.out.println( pubSubstationDfEntities.get(0).getSubName());
+//        String subName = pubSubstationDfEntities.get(0).getSubName();
+        List<UniPoint> uniPoints = uniPointMapper.selectList(new LambdaQueryWrapper<>());
+
+        if (uniPoints != null && uniPoints.size() > 0) {
+            for (UniPoint entity : uniPoints) {
                 PatrolUavPointModelItem item = new PatrolUavPointModelItem();
                 item.setStation_code(subCode);
-                item.setStation_name(subName);
+                item.setStation_name(entity.getSubName());
                 item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
                 item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
-                item.setData_type("2");
+//              需要确认一下类型
+                item.setData_type("4");
                 item.setLower_value("");
                 item.setUpper_value("");
                 item.setVideo_pos("");
@@ -78,7 +82,7 @@ public class CenterModelSyncBuilder {
                 item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
                 item.setMain_device_id(Optional.ofNullable(entity.getDeviceId()).orElse(""));
                 item.setMain_device_name(Optional.ofNullable(entity.getDeviceName()).orElse(""));
-                item.setDevice_type(deviceTypeNum(entity.getDeviceType()));
+                item.setDevice_type(deviceTypeNum(entity.getDeviceName()));
                 //无人机航拍不巡视表计，暂时设置为空
                 item.setMeter_type("");
                 //无人机点位外观类型，暂时设置为空
@@ -87,11 +91,7 @@ public class CenterModelSyncBuilder {
                 item.setRecognition_type_list(Optional.ofNullable(entity.getPointAnalyseType()).orElse(""));
                 item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
                 item.setDevice_info("");
-                if (entity.getTemType() == null) {
-                    item.setSave_type_list("2");
-                } else {
-                    item.setSave_type_list("1");
-                }
+                item.setSave_type_list("2");
                 data.add(item);
             }
 

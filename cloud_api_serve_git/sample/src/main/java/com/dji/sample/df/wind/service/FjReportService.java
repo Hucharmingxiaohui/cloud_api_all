@@ -25,11 +25,13 @@ public interface FjReportService {
     TaskReportDTO lookReport(HisUniTaskParamsDTO params);
 
     /**
-     * 生成巡视报告
+     * 生成巡视报告（风机）
      *
 
      */
     void genPatrolTaskWordNew(String reportId, String jobId);
+
+    void genNormalPatrolTaskWordNew(String reportId, String jobId);
 
     String createNewReport(String jobId);
 

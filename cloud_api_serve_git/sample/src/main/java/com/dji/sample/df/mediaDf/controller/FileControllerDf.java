@@ -121,6 +121,12 @@ public class FileControllerDf {
         return HttpResultResponse.success(pointResult).setMessage("查询任务结果成功");
     }
 
+    @GetMapping("/getPlanType")
+    public HttpResultResponse getPlanType(String job_id) throws Exception {
+        int planType = fileService.getPlanType(job_id);
+        return HttpResultResponse.success(planType).setMessage("查询任务结果成功");
+    }
+
     @GetMapping("/getMediaFileByJobId")
     public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id,@RequestParam(defaultValue = "1") Long page,
                                                   @RequestParam(defaultValue = "10") Long pageSize,@RequestParam Map map) throws Exception {
@@ -169,6 +175,10 @@ public class FileControllerDf {
                 }
             }
         }
+
+//      如果为普通任务加上智能分析图url
+
+
 
         // 内存分页
         int total = filteredFiles.size();

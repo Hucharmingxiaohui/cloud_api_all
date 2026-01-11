@@ -4,10 +4,18 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
+import com.dji.sample.center.config.CenterNormalConfig;
+import com.dji.sample.center.model.entity.CenterToUavPlanEntity;
+import com.dji.sample.center.utils.DateUtils;
+import com.dji.sample.center.utils.StringUtil;
 import com.dji.sample.center.utils.ftp.FtpUtils;
+import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
+import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
+import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
@@ -90,6 +98,10 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     private OssServiceContext ossService;
     @Resource
     FanStationPointsMapper fanStationPointsMapper;
+    @Autowired
+    private PatrolHostSocketClient patrolHostSocketClient;
+    @Autowired
+    private CenterNormalConfig centerConfig;
 
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
@@ -329,14 +341,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         taskTimerManager.addScheduledTask(taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
-//                        executeTask(singleDeviceId,fixedStartTime,taskCode,taskName);
-//                        log.info("开始执行任务-------------"+matchedTurbine);
-//                        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-//                                .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
-//                               );
-//                        // 1. 启动状态监控
-//                        startMonitoringTask(waylineJobEntity.getJobId(), taskName);
-
                     }
                 }
             }
@@ -345,29 +349,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
             log.error("任务处理失败", e);
             sendErrorResponse(message, "task", "dispatch_ack", "TASK_PROCESS_ERROR", e.getMessage());
         }
-    }
-
-    /**
-     * 执行任务
-     */
-    private void executeTask(String singleDeviceId,String fixedStartTime,String taskCode,String taskName) {
-            try {
-                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                        .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
-                        .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
-                        .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
-                        .last("LIMIT 1"));
-                CustomClaim customClaim = new CustomClaim();
-                customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
-                customClaim.setUsername("adminPC");
-                pubWaylineJobPlanDfEntity.setName(taskName);
-                HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
-                if (httpResultResponse.getCode() == 0) {
-                    log.info("成功执行上级任务------");
-                }
-            } catch (Exception e) {
-                log.error("任务执行异常", e);
-            }
     }
 
     /**
@@ -429,6 +410,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         if(waylineJobDTO.getUploadedCount()==waylineJobDTO.getMediaCount()){
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
+//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果
+
                             log.info("进入分析逻辑---------");
                             // 1. 异步启动图片保存分析
                             new Thread(() -> {
@@ -449,8 +432,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             monitoringTasks.remove(taskCode);
                             log.info("任务完成，停止监控: taskCode={}", taskCode);
                         }
-//                        monitoringTasks.remove(taskCode);
-//                        log.info("任务完成，停止监控: taskCode={}", taskCode);
+
+
                     }else {
                         monitoringTasks.remove(taskCode);
                         log.info("任务失败/取消/终止，停止监控: taskCode={}", taskCode);
@@ -674,8 +657,28 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         data.put("description", "正在进行风机巡视，已完成"+progress+"%的巡视任务");
 
         statusMessage.put("data", data);
+//      需要改成tcp上报状态
+//        mqttSender.sendToPatrolData(statusMessage);
 
-        mqttSender.sendToPatrolData(statusMessage);
+        List<PatrolStatusItem> patrolStatusItems = new ArrayList<>();
+        PatrolStatusItem item = new PatrolStatusItem();
+        item.setTask_patrolled_id(taskPatrolledId);
+        item.setTask_name(taskName);
+        item.setTask_code(taskCode);
+        item.setTask_state(mappedState);
+        item.setStart_time(waylineJobDTO.getExecuteTime().toString());
+        item.setPlan_start_time(waylineJobDTO.getBeginTime().toString());
+        item.setTask_progress(progress + "%");
+        item.setTask_estimated_time("");
+        item.setDescription("");
+        patrolStatusItems.add(item);
+
+        PatrolHostCommand commandData = new PatrolHostCommand();
+        commandData.addItems(patrolStatusItems);
+        commandData.setSendCode(centerConfig.getStationCode());
+        commandData.setReceiveCode(centerConfig.getServerCode());
+        commandData.setType("41");
+        patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
 
         log.info("上报任务状态: taskCode={}, state={}, progress={}%",
                 taskCode, mappedState, progress);

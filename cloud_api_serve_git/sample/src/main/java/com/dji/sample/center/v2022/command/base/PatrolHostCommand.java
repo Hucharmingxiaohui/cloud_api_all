@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "PatrolHost")
+@XmlRootElement(name = "PatrolDevice")
 public class PatrolHostCommand implements Serializable {
     private static final long serialVersionUID = -7241252023624476312L;
 

@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 @RestController
-@RequestMapping("result/api/v1/files")
+@RequestMapping("/")
 public class ResultController {
 
     private static ConcurrentLinkedQueue<AnalyseParamsRecReq> AnalyseResultQueue = new ConcurrentLinkedQueue<>();
@@ -26,7 +26,7 @@ public class ResultController {
 
         CustomExecutorFactory.AnalyseHandlePool.execute(() -> {
             try {
-                resultService.handleUavResult(workspaceId,jobId,response);
+                resultService.handleUavResult(null,workspaceId,jobId);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -41,6 +41,7 @@ public class ResultController {
      */
     @PostMapping("/picAnalyseRetNotify")
     public Result picAnalyseRetNotify(@RequestBody AnalyseParamsRecReq params) {
+        System.out.println("结果=========="+params.toString());
         AnalyseResultQueue.add(params);
         return Result.success();
     }
