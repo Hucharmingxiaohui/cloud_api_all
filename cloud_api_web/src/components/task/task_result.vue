@@ -29,9 +29,10 @@
             @click="exportImageZip()">
             导出数据集
           </el-button>
-
-          <!-- <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
-          </el-button> -->
+          <el-button class="new_btn" type="primary"  :icon="Download" v-if="resultType === 0"
+            @click="exportOriginImage()">
+            导出原图
+          </el-button>
         </el-form-item>
 
       </el-form>
@@ -413,8 +414,8 @@ import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
 import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
-import { Search, Download, Document, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
+import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
+import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
@@ -449,6 +450,7 @@ const formRules = {
     { required: true, message: '请选择缺陷类型', trigger: 'change' }
   ]
 }
+
 // ===========================================================请求数据===========================================================================================
 const jobInfo = reactive({
   job_id: '',
@@ -600,6 +602,29 @@ async function exportImageZip () {
     loading.value = false
   }
 }
+
+/**
+ * 下载初始图片
+ */
+
+async function exportOriginImage () {
+  try {
+    loading.value = true
+    const res = await downloadOriginImageZipApi(jobInfo.job_id)
+    if (!res) {
+      loading.value = false
+      return
+    }
+    const data = new Blob([res])
+    downloadFile(data, `${jobInfo.job_name}.zip`)
+  } catch (error) {
+    console.error('下载图片数据集失败:', error)
+    loading.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
 
 /**
  * 查看报告

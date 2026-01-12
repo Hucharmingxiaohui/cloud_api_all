@@ -84,7 +84,13 @@
           <el-table-column label="主设备名称" prop="device_name" align="center"></el-table-column>
           <el-table-column label="部件名称" prop="component_name" align="center"></el-table-column>
           <el-table-column label="关联航线" prop="wayline_id" align="center"></el-table-column>
-          <el-table-column label="关联航点号" prop="wayline id" align="center"></el-table-column>
+          <el-table-column label="关联航点号" prop="wayline_point_pos" align="center"></el-table-column>
+          <el-table-column label="图片类型" prop="pic_type" align="center">
+            <template #default="scope">
+              {{ scope.row.pic_type === 0? '可见光':'红外' }}
+            </template>
+          </el-table-column>
+
           <el-table-column label="操作" width="150">
             <template #default="scope">
               <el-button link type="danger" @click="handleDelete(scope.row)"

@@ -130,6 +130,39 @@ export const downloadImageZipApi = async function (jobId: string): Promise<any> 
   }
 }
 
+
+// 下载所有原始图片
+export const downloadOriginImageZipApi = async function (jobId: string): Promise<any> {
+  const url = `${HTTP_PREFIX_TWO}/exportPic?jobId=${jobId}`
+  const result = await request.get(url, { responseType: 'blob' })
+  if (result.data.type === 'application/json') {
+    const reader = new FileReader()
+    reader.onload = function (e) {
+      const text = reader.result as string
+      const result = JSON.parse(text)
+      ElMessage.error(result.message)
+    }
+    reader.readAsText(result.data, 'utf-8')
+    console.log('json')
+  } else {
+    console.log('nojson')
+    return result.data
+  }
+}
+
+// 导入标注图片
+export const importLabelImageApi = async function (file: {}): Promise<IWorkspaceResponse<any>> {
+  const url = '/fjReport/api/v1/batch/upload'
+  const result = await request.post(url, file, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    }
+  })
+  return result.data
+}
+
+// 手动分析
+
 // 获取任务结果显示类型,决定显示内容
 export async function getTaskResultTypeApi (job_id: string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX}/files/getPlanType?job_id=${job_id}`
