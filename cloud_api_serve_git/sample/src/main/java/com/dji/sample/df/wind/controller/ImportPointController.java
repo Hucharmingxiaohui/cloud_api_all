@@ -10,10 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
@@ -40,8 +37,8 @@ public class ImportPointController {
     ImportPointService importPointService;
 
 
-    @GetMapping("/import")
-    public ResponseEntity<String> importPoint(@RequestParam("file") MultipartFile file,
+    @PostMapping("/import")
+    public ResponseEntity<String> importPoint(@RequestPart("file") MultipartFile file ,
                                               HttpServletResponse response) throws Exception {
 
         // 1. 验证文件是否为空
@@ -155,6 +152,25 @@ public class ImportPointController {
     public Result<Map> selectList(@RequestParam Map <String, Object> map) {
         Map<String, Object> stringObjectMap = importPointService.selectList(map);
         return Result.success(stringObjectMap);
+    }
+
+    @PostMapping("batchDelete")
+    public Result<String> batchDelete(@RequestBody Map<String, Object> params) {
+        try {
+            // 从参数中获取ID列表
+            List<Integer> ids = (List<Integer>) params.get("ids");
+
+            if (ids == null || ids.isEmpty()) {
+                return Result.error("请选择要删除的数据");
+            }
+            // 调用服务层进行批量删除
+            int deletedCount = importPointService.batchDelete(ids);
+
+            return Result.success("成功删除 " + deletedCount + " 条数据");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("删除失败: " + e.getMessage());
+        }
     }
 
 }

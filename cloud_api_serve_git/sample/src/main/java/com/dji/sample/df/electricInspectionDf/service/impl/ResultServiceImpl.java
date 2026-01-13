@@ -126,11 +126,19 @@ public class ResultServiceImpl implements ResultService {
             String fileName = mediaFileDTO.getFileName();
 
             int pointPos = extractWaypointNumber(fileName);
+            String picType = extractTOrV(fileName);
+            Integer picType1 = 0;
+            if(picType.equals("V")){
+                picType1 = 0;
+            }else if(picType.equals("T")){
+                picType1 = 1;
+            }
             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                     .eq(WaylineJobEntity::getJobId, jobId));
             UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
                     .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
-                    .eq(UniPoint::getWaylinePointPos, pointPos));
+                    .eq(UniPoint::getWaylinePointPos, pointPos)
+                    .eq(UniPoint::getPicType,picType1));
             String subCode = uniPoint.getSubCode();
             String pointCode = uniPoint.getPointCode();
             String pointName = uniPoint.getPointName();
@@ -143,7 +151,18 @@ public class ResultServiceImpl implements ResultService {
             recgPointsEntity.setPointName(pointName);
             recgPointsEntity.setTaskPatrolledId(jobId);
             recgPointsEntity.setPresetNo(pointPos);
-            recgPointsEntityMapper.insert(recgPointsEntity);
+            recgPointsEntity.setPicType(picType1);
+            UpdateWrapper<RecgPointsEntity> updateWrapper = new UpdateWrapper<>();
+            updateWrapper.eq("task_patrolled_id", recgPointsEntity.getTaskPatrolledId());
+            updateWrapper.eq("preset_no", recgPointsEntity.getPresetNo());
+            updateWrapper.eq("pic_type", recgPointsEntity.getPicType());
+            RecgPointsEntity recgPointsEntity1 = recgPointsEntityMapper.selectOne(updateWrapper);
+            if(recgPointsEntity1==null){
+                recgPointsEntityMapper.insert(recgPointsEntity);
+            }else {
+                recgPointsEntityMapper.update(recgPointsEntity, updateWrapper);
+            }
+
             RecgFileEntity recgFileEntity=new RecgFileEntity();
             recgFileEntity.setRequestId(requestId);
             recgFileEntity.setPointCode(pointCode);
@@ -151,12 +170,25 @@ public class ResultServiceImpl implements ResultService {
             String filePath = map.get(fileName);
             recgFileEntity.setFilePath(fjFileConfig.getRecfilePath()+filePath);
             recgFileEntity.setPresetNo(pointPos);
-            recgFileEntityMapper.insert(recgFileEntity);
+            recgFileEntity.setPicType(picType1);
+
+            UpdateWrapper<RecgFileEntity> updateWrapper1 = new UpdateWrapper<>();
+//            updateWrapper.eq("point_code", recgFileEntity.getPointCode());
+            updateWrapper1.eq("task_patrolled_id", recgFileEntity.getTaskPatrolledId());
+            updateWrapper1.eq("preset_no", recgFileEntity.getPresetNo());
+            updateWrapper1.eq("pic_type", recgFileEntity.getPicType());
+            RecgFileEntity recgFileEntity1 = recgFileEntityMapper.selectOne(updateWrapper1);
+            if(recgFileEntity1==null){
+                recgFileEntityMapper.insert(recgFileEntity);
+            }else {
+                recgFileEntityMapper.update(recgFileEntity, updateWrapper1);
+            }
 
             //发送智能分析
             AnalyseParamsReq analyseParamsReq = new AnalyseParamsReq();
-
-            analyseParamsReq.setObjectId(pointCode + "_1");
+            String regId=uniPoint.getPointCode()+picType;
+//          唯一编码是regId,ObjectId是点位编码+2,1是视频2是机器人
+            analyseParamsReq.setObjectId(regId + "_2");
             analyseParamsReq.setImagePathList(Lists.newArrayList(filePath));
             //typeList
             String pointAnalyseType = uniPoint.getPointAnalyseType();
@@ -196,6 +228,26 @@ public class ResultServiceImpl implements ResultService {
             }
         }
 
+        return null;
+    }
+
+    public static String extractTOrV(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 移除路径和扩展名，只获取文件名部分
+        String nameWithoutPath = fileName.substring(fileName.lastIndexOf('/') + 1);
+        nameWithoutPath = nameWithoutPath.substring(nameWithoutPath.lastIndexOf('\\') + 1);
+        String nameWithoutExt = nameWithoutPath.split("\\.", 2)[0];
+
+        // 方法1：使用正则表达式匹配_T_或_V_模式
+        Pattern pattern = Pattern.compile("_(T|V)_");
+        Matcher matcher = pattern.matcher(nameWithoutExt);
+
+        if (matcher.find()) {
+            return matcher.group(1);  // 直接返回字符串
+        }
         return null;
     }
 
@@ -291,7 +343,10 @@ public class ResultServiceImpl implements ResultService {
 
             recgFileEntity.setRecgFilePath(resImageUrl);
             UpdateWrapper<RecgFileEntity> updateWrapper = new UpdateWrapper<>();
-            updateWrapper.eq("point_code", recgFileEntity.getPointCode());
+//            updateWrapper.eq("point_code", recgFileEntity.getPointCode());
+            updateWrapper.eq("task_patrolled_id", recgFileEntity.getTaskPatrolledId());
+            updateWrapper.eq("preset_no", recgFileEntity.getPresetNo());
+            updateWrapper.eq("pic_type", recgFileEntity.getPicType());
             recgFileEntityMapper.update(recgFileEntity, updateWrapper);
 //          缩略图先不弄
 //            hisExePointAnalyseServiceImpl.updateRecgFilePathPress(resImageUrl, hisFile);
@@ -307,7 +362,10 @@ public class ResultServiceImpl implements ResultService {
         recgPointsEntity.setPointUnit("");
 
         UpdateWrapper<RecgPointsEntity> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("point_code", recgPointsEntity.getPointCode());
+//        updateWrapper.eq("point_code", recgPointsEntity.getPointCode());
+        updateWrapper.eq("task_patrolled_id", recgPointsEntity.getTaskPatrolledId());
+        updateWrapper.eq("preset_no", recgPointsEntity.getPresetNo());
+        updateWrapper.eq("pic_type", recgPointsEntity.getPicType());
         recgPointsEntityMapper.update(recgPointsEntity, updateWrapper);
 //      先不更新点位数
 //        updatePointNum(taskPatrolledId);

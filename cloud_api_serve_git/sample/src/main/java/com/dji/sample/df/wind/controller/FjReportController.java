@@ -4,10 +4,13 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.df.framework.redis.RedisUtils;
 import com.df.framework.utils.ParamsUtils;
 import com.df.framework.vo.Result;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
@@ -15,13 +18,16 @@ import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.electricInspectionDf.service.ResultService;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
+import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
+import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
+import com.dji.sample.df.wind.model.entity.ImageUploadResult;
 import com.dji.sample.df.wind.service.FjReportService;
 
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -34,8 +40,10 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -43,16 +51,17 @@ import org.springframework.web.bind.annotation.*;
 
 
 import javax.servlet.http.HttpServletResponse;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @Slf4j
 @RestController
@@ -97,6 +106,15 @@ public class FjReportController {
 
     @Autowired
     private ResultService resultService;
+
+    @Autowired
+    private IFileServiceDf fileService;
+
+    @Autowired
+    FjFileConfig fjFileConfig;
+
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     /**
      * 保存巡检图片并分析
@@ -176,6 +194,13 @@ public class FjReportController {
         return Result.success("success");
     }
 
+//    @GetMapping("/sendRec")
+//    public Result sendRec(@RequestParam String jobId) throws Exception {
+//        Map<String,String> data = (Map<String,String>)redisTemplate.opsForHash().get("reg", jobId);
+//        resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
+//        return Result.success("success");
+//    }
+
     @GetMapping("/isAnalyzed")
     public Result isAnalyzed(@RequestParam String jobId) {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
@@ -194,6 +219,112 @@ public class FjReportController {
             return Result.success(4);
         }
         return Result.success(0);
+    }
+
+    @GetMapping("/exportPic")
+    public void exportPic(@RequestParam String jobId, HttpServletResponse response) throws Exception {
+        List<MediaFileDTO> allFiles = fileService.getMediaDileByJobId3(jobId, "e3dea0f5-37f2-4d79-ae58-490af3228069");
+
+        if (allFiles == null || allFiles.isEmpty()) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            response.getWriter().write("未找到相关图片文件");
+            return;
+        }
+
+        // 设置响应头
+        String zipFileName = "exported_images_" + jobId + ".zip";
+        response.setContentType("application/zip");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + zipFileName + "\"");
+
+        try (ZipOutputStream zipOut = new ZipOutputStream(response.getOutputStream())) {
+            for (MediaFileDTO mediaFileDTO : allFiles) {
+                // 获取原始文件名
+                String originalFileName = mediaFileDTO.getFileName();
+                // 将.jpeg替换为.jpg
+                String newFileName = originalFileName.replace(".jpeg", ".jpg");
+
+                Integer pointPos = extractWaypointNumber(newFileName);
+                String picType = extractTOrV(newFileName);
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                        .eq(WaylineJobEntity::getJobId, jobId));
+                UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
+                        .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                        .eq(UniPoint::getWaylinePointPos, pointPos)
+                        .eq(UniPoint::getPicType,picType));
+//                  对接分析服务唯一标识
+                String regId=uniPoint.getPointCode()+picType;
+
+                String filePictureUrl = fileConfig.getRecfilePath() + fileConfig.getRecfileNativePath() +
+                        jobId + "/" + regId +"_" + newFileName;  // 注意：这里还是使用原始文件名读取文件
+
+                File imageFile = new File(filePictureUrl);
+
+                if (imageFile.exists() && imageFile.isFile()) {
+                    // 创建ZIP条目，使用新的文件名
+                    String entryName = regId + "_" + newFileName;
+                    ZipEntry zipEntry = new ZipEntry(entryName);
+                    zipEntry.setSize(imageFile.length());
+                    zipEntry.setTime(imageFile.lastModified());
+                    zipOut.putNextEntry(zipEntry);
+
+                    // 将文件内容写入ZIP
+                    try (FileInputStream fis = new FileInputStream(imageFile)) {
+                        byte[] buffer = new byte[1024];
+                        int len;
+                        while ((len = fis.read(buffer)) > 0) {
+                            zipOut.write(buffer, 0, len);
+                        }
+                    }
+                    zipOut.closeEntry();
+                } else {
+                    // 可以记录日志，文件不存在
+                    System.out.println("文件不存在: " + filePictureUrl);
+                }
+            }
+            zipOut.finish();
+        }
+    }
+
+    public Integer extractWaypointNumber(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 正则表达式：匹配"航点"后面的一个或多个数字
+        // 注意：航点可能是中文，数字可能是一位或多位
+        Pattern pattern = Pattern.compile("航点(\\d+)");
+        Matcher matcher = pattern.matcher(fileName);
+
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                // 如果数字太大或格式错误，返回null
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    public static String extractTOrV(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 移除路径和扩展名，只获取文件名部分
+        String nameWithoutPath = fileName.substring(fileName.lastIndexOf('/') + 1);
+        nameWithoutPath = nameWithoutPath.substring(nameWithoutPath.lastIndexOf('\\') + 1);
+        String nameWithoutExt = nameWithoutPath.split("\\.", 2)[0];
+
+        // 方法1：使用正则表达式匹配_T_或_V_模式
+        Pattern pattern = Pattern.compile("_(T|V)_");
+        Matcher matcher = pattern.matcher(nameWithoutExt);
+
+        if (matcher.find()) {
+            return matcher.group(1);  // 直接返回字符串
+        }
+        return null;
     }
 
     /**

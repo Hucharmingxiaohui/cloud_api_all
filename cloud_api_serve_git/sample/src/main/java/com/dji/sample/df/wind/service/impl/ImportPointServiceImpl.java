@@ -48,7 +48,7 @@ public class ImportPointServiceImpl implements ImportPointService {
          uniPoint.setPointAnalyseCategory(Integer.parseInt(point.getPointAnalyseCategory()));
          uniPoint.setPointAnalyseType(point.getPointAnalyseType());
          uniPoint.setWaylineId(point.getWaylineId());
-         uniPoint.setWaylinePos(point.getWaylinePos());
+         uniPoint.setPicType(Integer.parseInt(point.getPicType()));
          uniPoint.setWaylinePointPos(point.getWaylinePointPos());
 
         // 需要类型转换的字段
@@ -150,7 +150,7 @@ public class ImportPointServiceImpl implements ImportPointService {
          uniPoint.setLabelAttri(null); // 标签属性
          uniPoint.setBaseImagePath(null); // 基准图路径
         LambdaQueryWrapper<UniPoint> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UniPoint::getPointName, uniPoint.getPointName());
+        queryWrapper.eq(UniPoint::getPointName, uniPoint.getPointName()).eq(UniPoint::getPicType, uniPoint.getPicType());
 
         UniPoint existingPoint = uniPointMapper2.selectOne(queryWrapper);
 
@@ -177,5 +177,13 @@ public class ImportPointServiceImpl implements ImportPointService {
         result.put("list", uniPoints);
         result.put("pagination", pagination);
         return result;
+    }
+
+    @Override
+    public int batchDelete(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+         return uniPointMapper2.deleteBatchIds(ids);
     }
 }

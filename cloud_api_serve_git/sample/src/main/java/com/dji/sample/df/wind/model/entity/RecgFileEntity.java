@@ -107,4 +107,7 @@ public class RecgFileEntity implements Serializable {
      */
     @TableField("preset_no")
     private Integer presetNo;
+
+    @TableField("pic_type")
+    private Integer picType;
 }

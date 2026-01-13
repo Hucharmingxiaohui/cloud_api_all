@@ -13,8 +13,23 @@
             </if>
         </where>
         <where>
-            <if test="id!=null and id!=''">
-                and id = #{id}
+            <if test="componentName!=null and componentName!=''">
+                and component_name LIKE concat('%', #{componentName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="deviceName!=null and deviceName!=''">
+                and device_name LIKE concat('%', #{deviceName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="bayName!=null and bayName!=''">
+                and bay_name LIKE concat('%', #{bayName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="areaName!=null and areaName!=''">
+                and area_name LIKE concat('%', #{areaName},'%')
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
@@ -31,8 +46,23 @@
             </if>
         </where>
         <where>
-            <if test="id!=null and id!=''">
-                and id = #{id}
+            <if test="componentName!=null and componentName!=''">
+                and component_name LIKE concat('%', #{componentName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="deviceName!=null and deviceName!=''">
+                and device_name LIKE concat('%', #{deviceName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="bayName!=null and bayName!=''">
+                and bay_name LIKE concat('%', #{bayName},'%')
+            </if>
+        </where>
+        <where>
+            <if test="areaName!=null and areaName!=''">
+                and area_name LIKE concat('%', #{areaName},'%')
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">

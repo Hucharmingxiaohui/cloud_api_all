@@ -1552,7 +1552,7 @@ public class FjReportServiceImpl implements FjReportService {
 
         XWPFParagraph notice2 = document.createParagraph();
         XWPFRun notice2Run = notice2.createRun();
-        notice2Run.setText("2．变电站无人机巡检结果分析报告主要依据电力行业标准《DL/T 664-2021 带电设备红外诊断技术规范》、国家标准《GB/T 35697-2017 架空输电线路无人机巡检系统技术规范》以及国家电网公司企业标准《Q/GDW 11399-2021 变电站无人机巡检技术导则》等相关技术要求进行编制，并提供缺陷诊断与处理建议。变电站运维单位在参照报告执行时，请结合设备历史状况、现场运行环境及安全规程等实际情况综合研判。");
+        notice2Run.setText("2．变电站无人机巡检结果分析报告主要依据国家标准《GB/T 35697-2017 架空输电线路无人机巡检系统技术规范》以及国家电网公司企业标准《Q/GDW 11399-2021 变电站无人机巡检技术导则》等相关技术要求进行编制，并提供缺陷诊断。变电站运维单位在参照报告执行时，请结合设备历史状况、现场运行环境及安全规程等实际情况综合研判。");
         notice2Run.setFontSize(11);
         notice2Run.setFontFamily("宋体");
         notice2.setAlignment(ParagraphAlignment.LEFT);
@@ -1642,7 +1642,7 @@ public class FjReportServiceImpl implements FjReportService {
         // 添加第一点巡检内容
         XWPFParagraph content1 = document.createParagraph();
         XWPFRun content1Run = content1.createRun();
-        content1Run.setText("1）变电站常规不停电巡检拍摄主要内容：拍摄站内变压器、断路器、隔离开关、绝缘子串及母线导线等主要设备的外观、连接点与绝缘子；停电检修精细化巡检拍摄主要内容：在设备断电后，可近距离、多角度拍摄设备本体特定部位、关键连接部件及接地装置等的细节状态");
+        content1Run.setText("1）变电站常规巡检拍摄主要内容：拍摄站内变压器、断路器、隔离开关、绝缘子串及母线导线等主要设备的外观、连接点与绝缘子。");
         content1Run.setFontSize(11);
         content1Run.setFontFamily("宋体");
         content1.setAlignment(ParagraphAlignment.LEFT);
@@ -1652,7 +1652,7 @@ public class FjReportServiceImpl implements FjReportService {
         // 添加第二点巡检内容
         XWPFParagraph content2 = document.createParagraph();
         XWPFRun content2Run = content2.createRun();
-        content2Run.setText("2）常规不停电巡检时，无人机自动起飞，识别变电站设备架构与空间位置关系，基于预置或实时生成的设备三维模型，自适应规划针对当前站内运行状态的巡检航线。在这个过程中，按最优路径依次拍摄：主变压器（含油枕、套管、冷却系统等）、各电压等级断路器、隔离开关、相关绝缘子串及母线设备（用户可自行设置各设备或区域的巡检精细度）。");
+        content2Run.setText("2）常规巡检时，无人机自动起飞，基于预先规划好的巡检航线进行飞行巡检。在这个过程中，按最优路径依次拍摄相关预设点位（用户可自行设置各设备或区域的巡检精细度）。");
         content2Run.setFontSize(11);
         content2Run.setFontFamily("宋体");
         content2.setAlignment(ParagraphAlignment.LEFT);
@@ -1988,10 +1988,11 @@ public class FjReportServiceImpl implements FjReportService {
 
             RecgFileEntity recgFileEntity = recgFileEntityMapper.selectOne(new LambdaQueryWrapper<RecgFileEntity>()
                     .eq(RecgFileEntity::getTaskPatrolledId, jobId)
-                    .eq(RecgFileEntity::getPresetNo, recgPointsEntity.getPresetNo()));
+                    .eq(RecgFileEntity::getPresetNo, recgPointsEntity.getPresetNo())
+                    .eq(RecgFileEntity::getPicType,recgPointsEntity.getPicType()));
 
-            String imagePath = recgFileEntity.getFilePath();
-
+            String imagePath1 = recgFileEntity.getRecgFilePath();
+            String imagePath = fileConfig.getRecfilePath()+imagePath1;
             if (new File(imagePath).exists()) {
                 try {
                     XWPFParagraph imagePara = document.createParagraph();
@@ -2215,43 +2216,6 @@ public class FjReportServiceImpl implements FjReportService {
         }
     }
 
-    /**
-     * 图片压缩方法
-     */
-    private byte[] compressImage(String imagePath, float quality, int maxWidth, int maxHeight) throws IOException {
-        BufferedImage originalImage = ImageIO.read(new File(imagePath));
-
-        // 计算缩放比例
-        int originalWidth = originalImage.getWidth();
-        int originalHeight = originalImage.getHeight();
-        double scale = Math.min((double) maxWidth / originalWidth, (double) maxHeight / originalHeight);
-        scale = Math.min(scale, 1.0); // 只缩小不放大
-
-        int scaledWidth = (int) (originalWidth * scale);
-        int scaledHeight = (int) (originalHeight * scale);
-
-        // 创建缩放后的图片
-        BufferedImage scaledImage = new BufferedImage(scaledWidth, scaledHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = scaledImage.createGraphics();
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(originalImage, 0, 0, scaledWidth, scaledHeight, null);
-        g.dispose();
-
-        // 压缩质量
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpeg").next();
-        ImageWriteParam param = writer.getDefaultWriteParam();
-        param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-        param.setCompressionQuality(quality);
-
-        try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {
-            writer.setOutput(ios);
-            writer.write(null, new IIOImage(scaledImage, null, null), param);
-        }
-        writer.dispose();
-
-        return baos.toByteArray();
-    }
 
     public static String extractFileName(String path) {
         if (path == null || path.isEmpty()) {
