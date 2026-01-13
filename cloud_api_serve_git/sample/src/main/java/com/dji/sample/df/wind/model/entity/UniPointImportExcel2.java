@@ -122,8 +122,8 @@ public class UniPointImportExcel2 {
     @Excel(name = "关联航线id")
     private String waylineId;
 
-    @Excel(name = "关联航线预置位号")
-    private String waylinePos;
+    @Excel(name = "照片类型")
+    private String picType;
     @Excel(name = "关联航点预置位号")
     private String waylinePointPos;
     @Excel(name = "分析识别种类")

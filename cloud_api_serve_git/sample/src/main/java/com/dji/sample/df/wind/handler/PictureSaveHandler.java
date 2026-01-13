@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
@@ -15,6 +17,8 @@ import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.media.service.IFileService;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -33,6 +37,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Component
 public class PictureSaveHandler {
@@ -54,6 +60,12 @@ public class PictureSaveHandler {
 
     @Resource
     FanWaylinePointsMapper fanWaylinePointsMapper;
+
+    @Autowired
+    private IWaylineJobMapper waylineJobMapper;
+
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     public Result<Map> pictureSave(String jobId) {
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
@@ -120,8 +132,19 @@ public class PictureSaveHandler {
                                 mediaFileEntity.getFileName() :
                                 "file_" + mediaFileEntity.getFileId() + ".dat";
                     }
+                    Integer pointPos = extractWaypointNumber(fileName);
+                    String picType = extractTOrV(fileName);
+                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                            .eq(WaylineJobEntity::getJobId, jobId));
+                    UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
+                            .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                            .eq(UniPoint::getWaylinePointPos, pointPos)
+                            .eq(UniPoint::getPicType,picType));
+//                  对接分析服务唯一标识
+                    String regId=uniPoint.getPointCode()+picType;
+
                     String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
-                    String localFileName = downloadAndConvertToJpeg2(url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
+                    String localFileName = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
                     map.put(fileName, localFileName);
                     index++;
                 }
@@ -176,9 +199,54 @@ public class PictureSaveHandler {
             throw e;
         }
     }
+//
+//    public static String downloadAndConvertToJpeg2(String url, String localFileName, String filePictrueUrl,String jobId,String nativePath) throws IOException {
+//        String tempDir = filePictrueUrl + "/" +jobId;
+//        Path tempPath = Paths.get(tempDir);
+//        if (!Files.exists(tempPath)) {
+//            Files.createDirectories(tempPath);
+//        }
+//
+//        // 修复：检查文件名是否有后缀，如果没有则直接添加.jpg
+//        String fileNameWithoutExt;
+//        if (localFileName.contains(".")) {
+//            fileNameWithoutExt = localFileName.substring(0, localFileName.lastIndexOf('.'));
+//        } else {
+//            fileNameWithoutExt = localFileName;
+//        }
+//        localFileName = fileNameWithoutExt + ".jpg";
+//
+//        String localFilePath = tempDir + "/" + localFileName;
+//
+//        try {
+//            // 从URL读取图片
+//            URL imageUrl = new URL(url);
+//            BufferedImage image = ImageIO.read(imageUrl);
+//
+//            if (image == null) {
+//                throw new IOException("无法从URL读取图片: " + url);
+//            }
+//
+//            // 创建JPG文件并保存
+//            File outputFile = new File(localFilePath);
+//            boolean success = ImageIO.write(image, "jpg", outputFile);
+//
+//            if (!success) {
+//                throw new IOException("无法将图片保存为JPEG格式");
+//            }
+//
+//            System.out.println("JPEG图片保存成功: " + localFilePath);
+//            return nativePath + jobId+ "/" + localFileName;
+//
+//        } catch (IOException e) {
+//            System.err.println("图片转换失败: " + e.getMessage());
+//            throw e;
+//        }
+//    }
 
-    public static String downloadAndConvertToJpeg2(String url, String localFileName, String filePictrueUrl,String jobId,String nativePath) throws IOException {
-        String tempDir = filePictrueUrl + "/" +jobId;
+    public static String downloadAndConvertToJpeg2(String regId,String url, String localFileName,
+                                                   String filePictrueUrl, String jobId, String nativePath) throws IOException {
+        String tempDir = filePictrueUrl + "/" + jobId;
         Path tempPath = Paths.get(tempDir);
         if (!Files.exists(tempPath)) {
             Files.createDirectories(tempPath);
@@ -193,32 +261,100 @@ public class PictureSaveHandler {
         }
         localFileName = fileNameWithoutExt + ".jpg";
 
-        String localFilePath = tempDir + "/" + localFileName;
+        String localFilePath = tempDir + "/" + regId+"_"+localFileName;
 
         try {
-            // 从URL读取图片
-            URL imageUrl = new URL(url);
-            BufferedImage image = ImageIO.read(imageUrl);
+            // 检查URL是否以jpg/jpeg结尾（不区分大小写）
+            String lowerUrl = url.toLowerCase();
 
-            if (image == null) {
-                throw new IOException("无法从URL读取图片: " + url);
+            // 注意：有些URL可能包含查询参数，所以先去除查询参数再检查扩展名
+            String urlWithoutQuery = lowerUrl.split("\\?")[0];
+
+            if (urlWithoutQuery.endsWith(".jpg") || urlWithoutQuery.endsWith(".jpeg")) {
+                // 如果是JPEG图片，直接下载保存，避免重新编码
+                System.out.println("检测到JPEG格式，直接下载保存...");
+
+                try (InputStream in = new URL(url).openStream();
+                     FileOutputStream out = new FileOutputStream(localFilePath)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("JPEG图片直接下载成功: " + localFilePath);
+                }
+
+            } else {
+                // 非JPEG格式，进行转换
+                System.out.println("非JPEG格式，进行转换...");
+
+                // 从URL读取图片
+                URL imageUrl = new URL(url);
+                BufferedImage image = ImageIO.read(imageUrl);
+
+                if (image == null) {
+                    throw new IOException("无法从URL读取图片: " + url);
+                }
+
+                // 创建JPG文件并保存
+                File outputFile = new File(localFilePath);
+                boolean success = ImageIO.write(image, "jpg", outputFile);
+
+                if (!success) {
+                    throw new IOException("无法将图片保存为JPEG格式");
+                }
+
+                System.out.println("图片成功转换为JPEG格式: " + localFilePath);
             }
 
-            // 创建JPG文件并保存
-            File outputFile = new File(localFilePath);
-            boolean success = ImageIO.write(image, "jpg", outputFile);
-
-            if (!success) {
-                throw new IOException("无法将图片保存为JPEG格式");
-            }
-
-            System.out.println("JPEG图片保存成功: " + localFilePath);
-            return nativePath + jobId+ "/" + localFileName;
+            return nativePath + jobId + "/" + regId+"_"+localFileName;
 
         } catch (IOException e) {
-            System.err.println("图片转换失败: " + e.getMessage());
+            System.err.println("图片处理失败: " + e.getMessage());
             throw e;
         }
+    }
+
+    public Integer extractWaypointNumber(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 正则表达式：匹配"航点"后面的一个或多个数字
+        // 注意：航点可能是中文，数字可能是一位或多位
+        Pattern pattern = Pattern.compile("航点(\\d+)");
+        Matcher matcher = pattern.matcher(fileName);
+
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                // 如果数字太大或格式错误，返回null
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    public static String extractTOrV(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 移除路径和扩展名，只获取文件名部分
+        String nameWithoutPath = fileName.substring(fileName.lastIndexOf('/') + 1);
+        nameWithoutPath = nameWithoutPath.substring(nameWithoutPath.lastIndexOf('\\') + 1);
+        String nameWithoutExt = nameWithoutPath.split("\\.", 2)[0];
+
+        // 方法1：使用正则表达式匹配_T_或_V_模式
+        Pattern pattern = Pattern.compile("_(T|V)_");
+        Matcher matcher = pattern.matcher(nameWithoutExt);
+
+        if (matcher.find()) {
+            return matcher.group(1);  // 直接返回字符串
+        }
+        return null;
     }
 
 }

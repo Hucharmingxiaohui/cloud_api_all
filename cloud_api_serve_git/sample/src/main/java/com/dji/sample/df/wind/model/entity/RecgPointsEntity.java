@@ -202,6 +202,9 @@ public class RecgPointsEntity implements Serializable {
     @TableField("preset_no")
     private Integer presetNo;
 
+    @TableField("pic_type")
+    private Integer picType;
+
     /**
      * 结束时间
      */

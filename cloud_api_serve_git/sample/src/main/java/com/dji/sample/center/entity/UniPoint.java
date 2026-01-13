@@ -333,8 +333,8 @@ public class UniPoint {
     @TableField("wayline_id")
     private String waylineId;
 
-    @TableField("wayline_pos")
-    private String waylinePos;
+    @TableField("pic_type")
+    private Integer picType;
 
     @TableField("wayline_point_pos")
     private String waylinePointPos;

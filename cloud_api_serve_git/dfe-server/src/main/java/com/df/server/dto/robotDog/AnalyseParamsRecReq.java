@@ -39,6 +39,7 @@ public class AnalyseParamsRecReq {
 
         @Data
         @NoArgsConstructor
+        @JsonNaming(PropertyNamingStrategies.UpperCamelCaseStrategy.class)
         public static class Result {
             private String code;
             private String conf;
