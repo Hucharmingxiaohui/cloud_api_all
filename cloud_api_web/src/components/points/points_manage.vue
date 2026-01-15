@@ -33,6 +33,14 @@
           >
             重置
           </el-button>
+          <el-button
+            class="new_btn2"
+            type="danger"
+            :icon="Delete"
+            @click="handleDelete()"
+          >
+            删除
+          </el-button>
           <el-upload
             :before-upload="beforeUpload"
             :show-file-list="false"
@@ -63,7 +71,7 @@
     </div>
     <div class="content">
       <div class="table-container">
-        <el-table :data="tableData" stripe>
+        <el-table :data="tableData" stripe  @selection-change="handleSelectionChange">
           <el-table-column type="selection"  align="center" width="60"></el-table-column>
           <el-table-column
             type="index"
@@ -91,13 +99,13 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="150">
+          <!-- <el-table-column label="操作" width="150">
             <template #default="scope">
               <el-button link type="danger" @click="handleDelete(scope.row)"
                 >删除</el-button
               >
             </template>
-          </el-table-column>
+          </el-table-column> -->
         </el-table>
       </div>
       <div class="pagination-container">
@@ -119,7 +127,7 @@
 
 <script lang="ts" setup>
 import { reactive, ref, computed, onMounted } from 'vue'
-import { Search, Refresh, Plus, Upload, Download } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { downloadFile } from '/@/utils/common'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
 import { getPointList, deletePointListapi, importPointList, exportPointTemplate } from '/@/api/points'
@@ -149,6 +157,8 @@ interface FileItem {
 const fileList = ref<FileItem[]>([])
 // 表格
 const tableData = ref([])
+
+const selectRows = ref([])
 
 onMounted(() => {
   getPoinntList()
@@ -219,10 +229,17 @@ const uploadFile = async () => {
  * 删除点位
  */
 
-async function handleDelete (row:any) {
+function handleSelectionChange (val) {
+  selectRows.value = val.map(item => item.id)
+}
+
+async function handleDelete () {
   try {
-    const obj = { ids: [] }
-    obj.ids.push(row.id)
+    const obj = { ids: selectRows.value }
+    if (selectRows.value.length === 0) {
+      ElMessage.warning('请选择要删除的数据！')
+      return
+    }
     ElMessageBox.confirm('确定要删除点位吗?', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
@@ -474,6 +491,28 @@ function handleCurrentChange (val: number) {
         background-image: linear-gradient(180deg,
                 rgba(248, 212, 94, 1) 0,
                 rgba(227, 157, 6, 1) 100%);
+        border-radius: 4px;
+        height: 30px;
+        .btn_text {
+            width: 30px;
+            height: 18px;
+            overflow-wrap: break-word;
+            color: rgba(255, 255, 255, 1);
+            font-size: 14px;
+            font-family: Google Sans-Medium;
+            font-weight: 500;
+            text-align: left;
+            white-space: nowrap;
+            line-height: 14px;
+            margin: 9px 20px 0 8px;
+        }
+
+    }
+
+    .new_btn2 {
+        background-image: linear-gradient(180deg,
+                rgb(246, 164, 132) 0,
+                rgb(190, 64, 22) 100%);
         border-radius: 4px;
         height: 30px;
         .btn_text {
