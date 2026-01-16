@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -60,7 +61,7 @@ public class CenterModelSyncBuilder {
 //        );
 //        System.out.println( pubSubstationDfEntities.get(0).getSubName());
 //        String subName = pubSubstationDfEntities.get(0).getSubName();
-        List<UniPoint> uniPoints = uniPointMapper.selectList(new LambdaQueryWrapper<>());
+        List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
 
         if (uniPoints != null && uniPoints.size() > 0) {
             for (UniPoint entity : uniPoints) {

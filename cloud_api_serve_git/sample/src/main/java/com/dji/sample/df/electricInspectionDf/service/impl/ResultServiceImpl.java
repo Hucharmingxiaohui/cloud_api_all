@@ -274,8 +274,12 @@ public class ResultServiceImpl implements ResultService {
             waylineJobMapper.updateById(waylineJobEntity);
         }
         Integer analyzedNum1 = waylineJobEntity.getAnalyzedNum();
-        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
-        Integer mediaCount = waylineJobDTO.getMediaCount();
+//        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
+//        Integer mediaCount = waylineJobDTO.getMediaCount();
+//        uniPointMapper2
+        Map map=new HashMap();
+        map.put("waylineId",waylineJobEntity.getFileId());
+        Integer mediaCount = uniPointMapper2.selectListCount(map);
         if(mediaCount == analyzedNum1){
             waylineJobEntity.setIsAnalyzed(1);
             waylineJobMapper.updateById(waylineJobEntity);

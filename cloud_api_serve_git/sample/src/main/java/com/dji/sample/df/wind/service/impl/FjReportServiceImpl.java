@@ -1403,7 +1403,10 @@ public class FjReportServiceImpl implements FjReportService {
 
         // 获取巡检点位信息
         WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
-        Integer pointCount = waylineJobDTO.getMediaCount();
+        Map map=new HashMap();
+        map.put("waylineId",waylineJobEntity.getFileId());
+        Integer pointCount = uniPointMapper2.selectListCount(map);
+//        Integer pointCount = waylineJobDTO.getMediaCount();
 
         // 2. 创建Word文档
         XWPFDocument document = new XWPFDocument();
@@ -1991,8 +1994,9 @@ public class FjReportServiceImpl implements FjReportService {
                     .eq(RecgFileEntity::getPresetNo, recgPointsEntity.getPresetNo())
                     .eq(RecgFileEntity::getPicType,recgPointsEntity.getPicType()));
 
-            String imagePath1 = recgFileEntity.getRecgFilePath();
-            String imagePath = fileConfig.getRecfilePath()+imagePath1;
+//            String imagePath1 = recgFileEntity.getRecgFilePath();
+//            String imagePath = fileConfig.getRecfilePath()+imagePath1;
+            String imagePath = recgFileEntity.getFilePath();
             if (new File(imagePath).exists()) {
                 try {
                     XWPFParagraph imagePara = document.createParagraph();

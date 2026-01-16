@@ -11,25 +11,20 @@
             <if test="pointName!=null and pointName!=''">
                 and point_name LIKE concat('%', #{pointName},'%')
             </if>
-        </where>
-        <where>
             <if test="componentName!=null and componentName!=''">
                 and component_name LIKE concat('%', #{componentName},'%')
             </if>
-        </where>
-        <where>
             <if test="deviceName!=null and deviceName!=''">
                 and device_name LIKE concat('%', #{deviceName},'%')
             </if>
-        </where>
-        <where>
             <if test="bayName!=null and bayName!=''">
                 and bay_name LIKE concat('%', #{bayName},'%')
             </if>
-        </where>
-        <where>
             <if test="areaName!=null and areaName!=''">
                 and area_name LIKE concat('%', #{areaName},'%')
+            </if>
+            <if test="waylineId!=null and waylineId!=''">
+                and wayline_id = #{waylineId}
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
@@ -44,29 +39,21 @@
             <if test="pointName!=null and pointName!=''">
                 and point_name LIKE concat('%', #{pointName},'%')
             </if>
-        </where>
-        <where>
             <if test="componentName!=null and componentName!=''">
                 and component_name LIKE concat('%', #{componentName},'%')
             </if>
-        </where>
-        <where>
             <if test="deviceName!=null and deviceName!=''">
                 and device_name LIKE concat('%', #{deviceName},'%')
             </if>
-        </where>
-        <where>
             <if test="bayName!=null and bayName!=''">
                 and bay_name LIKE concat('%', #{bayName},'%')
             </if>
-        </where>
-        <where>
             <if test="areaName!=null and areaName!=''">
                 and area_name LIKE concat('%', #{areaName},'%')
             </if>
+            <if test="waylineId!=null and waylineId!=''">
+                and wayline_id = #{waylineId}
+            </if>
         </where>
-        <if test="pageSize != null and pageSize != '' ">
-            LIMIT ${startPos}, ${pageSize}
-        </if>
     </select>
 </mapper>

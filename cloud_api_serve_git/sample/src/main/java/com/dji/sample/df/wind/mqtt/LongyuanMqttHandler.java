@@ -14,7 +14,9 @@ import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.StringUtil;
 import com.dji.sample.center.utils.ftp.FtpUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
+import com.dji.sample.center.v2022.command.upload.PatrolResultItem;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
+import com.dji.sample.center.v2022.enums.RecognitionTypeEnum;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.component.oss.model.OssConfiguration;
@@ -54,6 +56,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -338,7 +341,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     if (matchedTurbine!=null) {
 
                         // 存入定时任务
-                        taskTimerManager.addScheduledTask(taskCode, fixedStartTime,
+                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
                     }
@@ -410,29 +413,37 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         if(waylineJobDTO.getUploadedCount()==waylineJobDTO.getMediaCount()){
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
-//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果
+//                          需要区分是风机任务和普通任务，风机任务走分析逻辑，普通任务直接上传结果
+                            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+                            Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+                            if(planType==1){
+                                log.info("进入分析逻辑---------");
+                                // 1. 异步启动图片保存分析
+                                new Thread(() -> {
+                                    try {
+                                        // 调用分析接口（可能会很慢）
+                                        Result result = fjReportController.pictureSave(jsonObject);
+                                        log.info("图片分析已启动: jobId={}, result={}", jobId, result);
 
-                            log.info("进入分析逻辑---------");
-                            // 1. 异步启动图片保存分析
-                            new Thread(() -> {
-                                try {
-                                    // 调用分析接口（可能会很慢）
-                                    Result result = fjReportController.pictureSave(jsonObject);
-                                    log.info("图片分析已启动: jobId={}, result={}", jobId, result);
+                                        // 2. 开始轮询检查分析状态
+                                        startAnalysisMonitoring(jobId, taskCode,taskName);
 
-                                    // 2. 开始轮询检查分析状态
-                                    startAnalysisMonitoring(jobId, taskCode,taskName);
-
-                                } catch (Exception e) {
-                                    log.error("启动图片分析失败: jobId={}", jobId, e);
-                                    // 分析失败也要从监控中移除
-                                    monitoringTasks.remove(taskCode);
-                                }
-                            }).start();
-                            monitoringTasks.remove(taskCode);
-                            log.info("任务完成，停止监控: taskCode={}", taskCode);
+                                    } catch (Exception e) {
+                                        log.error("启动图片分析失败: jobId={}", jobId, e);
+                                        // 分析失败也要从监控中移除
+                                        monitoringTasks.remove(taskCode);
+                                    }
+                                }).start();
+                                monitoringTasks.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }else if(planType==0){
+//                              直接进行结果回传逻辑
+                                sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                monitoringTasks.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }
                         }
-
 
                     }else {
                         monitoringTasks.remove(taskCode);
@@ -547,7 +558,27 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                 resultMessage.put("data", data);
                 // 发送到MQTT
-                mqttSender.sendToPatrolData(resultMessage);
+//                mqttSender.sendToPatrolData(resultMessage);
+
+                PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                PatrolResultItem item = new PatrolResultItem();
+                item.setPatroldevice_name("大疆M4td");
+                item.setPatroldevice_code("1581F8HGX253800A030D");
+                item.setTask_name(taskName);
+                item.setTask_code(taskCode);
+                item.setDevice_name(pointName);
+                item.setDevice_id(pointId);
+                item.setValue("");
+                item.setUnit("");
+                item.setValue_unit("");
+                item.setTime(DateUtils.getNowDateTimeStr());
+                item.setFile_path("");
+                item.setRectangle("");
+                item.setTask_patrolled_id(taskPatrolledId);
+                item.setObj_id("");
+                item.setValid("1");
+                commandData.addItem(item);
+                patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
 
                 log.info("上报巡视图片--------: ");
             }
@@ -666,8 +697,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         item.setTask_name(taskName);
         item.setTask_code(taskCode);
         item.setTask_state(mappedState);
-        item.setStart_time(waylineJobDTO.getExecuteTime().toString());
-        item.setPlan_start_time(waylineJobDTO.getBeginTime().toString());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        item.setStart_time(waylineJobDTO.getExecuteTime().format(formatter));
+        item.setPlan_start_time(waylineJobDTO.getBeginTime().format(formatter));
         item.setTask_progress(progress + "%");
         item.setTask_estimated_time("");
         item.setDescription("");

@@ -1,7 +1,10 @@
 package com.dji.sample.center.v2022.runnable;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dji.sample.center.app.AppContext;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
@@ -33,6 +36,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     private PubWaylinePointDfMapper pubWaylinePointDfMapper = AppContext.getBean(PubWaylinePointDfMapper.class);
     private WindTurbineMapper windTurbineMapper = AppContext.getBean(WindTurbineMapper.class);
     private TaskTimerManager taskTimerManager = AppContext.getBean(TaskTimerManager.class);
+    private UniPointMapper2 uniPointMapper2 = AppContext.getBean(UniPointMapper2.class);
 
     public CenterTaskRunnable(CenterProtocolData protocolData) {
         super(protocolData);
@@ -95,13 +99,20 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     if (matchedTurbine!=null) {
 
                         // 存入定时任务
-                        taskTimerManager.addScheduledTask(taskCode, fixedStartTime,
+                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
                     }
                 }
-            }else if (deviceLevel == 3) {
+            }else if (deviceLevel == 1) {
+//              普通航线：规定选一个间隔
                 String[] deviceIds = deviceList.split(",");
+                if (deviceIds.length == 1) {
+                    String bayId = deviceIds[0].trim();
+                    // 存入定时任务
+                    taskTimerManager.addScheduledTask(0,taskCode, fixedStartTime,
+                            bayId, taskName);
+                }
             }
 
         } catch (Exception e) {

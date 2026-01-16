@@ -1,7 +1,10 @@
 package com.dji.sample.df.wind.timer;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.df.framework.redis.RedisUtils;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
@@ -34,6 +37,8 @@ public class TaskTimerManager {
     PubWaylineJobPlanDfService pubWaylineJobPlanDfService;
     @Autowired
     private IWaylineJobMapper waylineJobMapper;
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     // 使用有序集合存储定时任务，score为执行时间戳
     private static final String TASK_SCHEDULE_ZSET = "task_schedule:zset";
@@ -42,7 +47,7 @@ public class TaskTimerManager {
     /**
      * 添加定时任务到Redis
      */
-    public void addScheduledTask(String taskCode, String fixedStartTime,
+    public void addScheduledTask(Integer planType,String taskCode, String fixedStartTime,
                                  String deviceId, String taskName) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -55,6 +60,7 @@ public class TaskTimerManager {
             // 2. 存储任务详情到Hash
             Map<String, String> taskDetail = new HashMap<>();
             taskDetail.put("deviceId", deviceId);
+            taskDetail.put("planType", String.valueOf(planType));
             taskDetail.put("taskName", taskName);
             taskDetail.put("fixedStartTime", fixedStartTime);
             taskDetail.put("executeTimestamp", String.valueOf(executeTimestamp));
@@ -134,7 +140,8 @@ public class TaskTimerManager {
                             // executeTaskLogic(taskCode, taskDetail);
                             String singleDeviceId = taskDetail.get("deviceId");
                             String taskName = taskDetail.get("taskName");
-                            executeTask(singleDeviceId,taskCode,taskName);
+                            String planType = taskDetail.get("planType");
+                            executeTask(planType,singleDeviceId,taskCode,taskName);
 
                             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                                     .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
@@ -162,20 +169,41 @@ public class TaskTimerManager {
     /**
      * 执行任务
      */
-    private void executeTask(String singleDeviceId,String taskCode,String taskName) {
+    private void executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
         try {
-            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                    .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
-                    .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
-                    .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
-                    .last("LIMIT 1"));
-            CustomClaim customClaim = new CustomClaim();
-            customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
-            customClaim.setUsername("adminPC");
-            pubWaylineJobPlanDfEntity.setName(taskName);
-            HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
-            if (httpResultResponse.getCode() == 0) {
-                log.info("成功执行上级任务------");
+//          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
+            if("0".equals(planType)){
+                UniPoint uniPoint = uniPointMapper2.selectOne(
+                        new QueryWrapper<UniPoint>()
+                                .eq("bay_id", singleDeviceId)
+                                .orderByDesc("id")
+                                .last("LIMIT 1")
+                );
+                String waylineId = uniPoint.getWaylineId();
+                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanType, 0)
+                        .eq(PubWaylineJobPlanDfEntity::getFileId, waylineId)
+                        .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
+                        .last("LIMIT 1"));
+                CustomClaim customClaim = new CustomClaim();
+                customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
+                customClaim.setUsername("adminPC");
+                pubWaylineJobPlanDfEntity.setName(taskName);
+                HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+            }else if ("1".equals(planType)){
+                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
+                        .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
+                        .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
+                        .last("LIMIT 1"));
+                CustomClaim customClaim = new CustomClaim();
+                customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
+                customClaim.setUsername("adminPC");
+                pubWaylineJobPlanDfEntity.setName(taskName);
+                HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+                if (httpResultResponse.getCode() == 0) {
+                    log.info("成功执行上级任务------");
+                }
             }
         } catch (Exception e) {
             log.error("任务执行异常", e);

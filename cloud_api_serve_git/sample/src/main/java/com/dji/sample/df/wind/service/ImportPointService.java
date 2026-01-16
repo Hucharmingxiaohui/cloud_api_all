@@ -1,6 +1,7 @@
 package com.dji.sample.df.wind.service;
 
 import com.df.server.dto.uniPoint.UniPointImportExcel;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.wind.model.entity.UniPointImportExcel2;
 
 import java.util.List;
@@ -13,4 +14,6 @@ public interface ImportPointService {
     Map<String,Object> selectList(Map map);
 
     public int batchDelete(List<Integer> ids);
+
+    public UniPoint getPointByCode(String subCode, String pointCode);
 }

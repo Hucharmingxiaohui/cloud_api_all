@@ -129,7 +129,7 @@ public class UniPoint {
      * <28>: = 避雷器动作次数表
      */
     @TableField("device_type")
-    private Long deviceType;
+    private Integer deviceType;
 
     /**
      * 表计类型
