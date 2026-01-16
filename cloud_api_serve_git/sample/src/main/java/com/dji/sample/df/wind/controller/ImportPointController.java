@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/point")
@@ -79,7 +80,10 @@ public class ImportPointController {
                 try {
                     // 针对填写的每行点位数据新增点位信息
                     point = points.get(i);
-                    point.setPointCode("YIXIA-"+i);
+                    UUID uuid = UUID.randomUUID();
+                    // 生成8位数字
+                    String format = String.format("%08d", Math.abs(uuid.getLeastSignificantBits() % 100000000L));
+                    point.setPointCode("YIXIA-"+format);
                     importPointService.importPoint(point);
                     successCount++;
                 } catch (Exception e) {
