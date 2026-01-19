@@ -2,7 +2,7 @@
   <div class="login">
     <div class="header">
       <div class="name">
-        河北华电220kV尹夏储能站
+        {{ CURRENT_CONFIG.sysName }}
       </div>
     </div>
     <div class="login-wrapper">

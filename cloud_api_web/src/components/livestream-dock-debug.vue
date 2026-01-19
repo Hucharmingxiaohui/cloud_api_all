@@ -6,6 +6,7 @@
 import { message } from 'ant-design-vue'
 import { onMounted, reactive, ref, onUnmounted, defineProps, watch, computed } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
+import {getImageUrl} from '/@/common/url'
 import { DeviceInfoType } from '/@/types/device'
 import { changeLivestreamLens, getLiveCapacity, setLivestreamQuality, startLivestream, stopLivestream } from '/@/api/manage'
 import { getRoot } from '/@/root'
@@ -79,7 +80,7 @@ async function getcameraInfo () {
         return
       }
       const cameraData = res.data.find(item => item.sn === device_sn.value)
-      console.log('获取设备', cameraData)
+      // console.log('获取设备', cameraData)
       if (!cameraData) {
         isPlay.value = false
         return
@@ -106,7 +107,10 @@ async function getLiveHttp () {
     }).then(res => {
       if (res.code === 0) {
         isStartSteam.value = true
-        flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        // flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        const liveIndex = videoUrl.indexOf('/live/');
+        flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
         initFlv()
       }
       if (res.code === 513003) {

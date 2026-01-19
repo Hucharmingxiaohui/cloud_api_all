@@ -15,6 +15,7 @@ import { message } from 'ant-design-vue'
 import { onMounted, defineProps, reactive, ref, onUnmounted, watch, computed } from 'vue'
 import { DeviceInfoType } from '/@/types/device'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
+import {getImageUrl} from '/@/common/url'
 import { changeLivestreamLens, getLiveCapacity, setLivestreamQuality, startLivestream, stopLivestream } from '/@/api/manage'
 import { getRoot } from '/@/root'
 import { useMyStore } from '/@/store'
@@ -131,7 +132,9 @@ async function getLiveHttp () {
       console.log('获取地址', res)
       if (res.code === 0) {
         // isStartSteam.value = true
-        flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+      const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+      const liveIndex = videoUrl.indexOf('/live/');
+      flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
         initFlv()
       }
       if (res.code === 513003) {

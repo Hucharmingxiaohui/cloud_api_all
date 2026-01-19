@@ -23,7 +23,7 @@
     </div>
 </template>
 <script setup>
-import { reactive, defineModel, ref, computed, onMounted } from 'vue'
+import { reactive, defineModel, ref, watch, computed, onMounted } from 'vue'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
 import { getWindTurbinePointsApi } from '/@/api/turbine/turbineMgt'
 
@@ -35,9 +35,15 @@ const body = reactive({
   total: 0,
   pageSizeOptions: [10, 20, 40, 100]
 })
-onMounted(() => {
-  getPoints()
-})
+// onMounted(() => {
+//   getPoints()
+// })
+
+watch(id, (newId) => {
+  if (newId) {
+    getPoints()
+  }
+}, { immediate: true })
 
 // 获取站点信息
 async function getPoints () {

@@ -4,7 +4,7 @@
       style="width: 17vw; height: 10vw; margin-bottom: 50px"
       :src="dfeLogo"
     />
-    <p class="logo fz35 pb50">河北华电220kV尹夏储能站</p>
+    <p class="logo fz35 pb50">{{ CURRENT_CONFIG.sysName }}</p>
     <a-form
       layout="inline"
       :model="formState"

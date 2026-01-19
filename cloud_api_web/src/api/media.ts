@@ -130,7 +130,6 @@ export const downloadImageZipApi = async function (jobId: string): Promise<any> 
   }
 }
 
-
 // 下载所有原始图片
 export const downloadOriginImageZipApi = async function (jobId: string): Promise<any> {
   const url = `${HTTP_PREFIX_TWO}/exportPic?jobId=${jobId}`
