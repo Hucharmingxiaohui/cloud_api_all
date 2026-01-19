@@ -163,10 +163,14 @@ public class FileControllerDf {
                     String imagePath = defect.getImagePath();
                     if (imagePath != null && !imagePath.isEmpty()) {
                         // 转换为可访问的URL
-                        String imageUrl = serverBaseUrl + "/api/file/defect?path=" +
+                        String imageUrl = "/api/file/defect?path=" +
                                 URLEncoder.encode(imagePath, "UTF-8");
                         filteredFiles.get(j).setDefectImageUrl(imageUrl);
                     }
+                    String imagePath1="/home/uav_server/defect_images/"+job_id+"/"+defect.getFanCode()+"-"+defect.getFanPart()+".jpg";
+                    String imageUrl1 = "/api/file/defect?path=" +
+                            URLEncoder.encode(imagePath1, "UTF-8");
+                    filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
                     filteredFiles.get(j).setDefectType(defect.getDefectType());
                     filteredFiles.get(j).setDefectDescription(defect.getDefectDescription());
                     filteredFiles.get(j).setFanCode(defect.getFanCode());

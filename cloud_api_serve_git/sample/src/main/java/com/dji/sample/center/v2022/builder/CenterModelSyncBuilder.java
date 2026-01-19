@@ -16,8 +16,11 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper;
 import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
+import com.dji.sample.df.wind.dao.FanStationPointsMapper;
+import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.annotation.Resource;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +38,7 @@ public class CenterModelSyncBuilder {
     private CenterNormalConfig centerNormalConfig = AppContext.getBean(CenterNormalConfig.class);
     private PubSubstationDfMapper pubSubstationDfMapper = AppContext.getBean(PubSubstationDfMapper.class);
     private UniPointMapper2 uniPointMapper = AppContext.getBean(UniPointMapper2.class);
+    private FanStationPointsMapper fanStationPointsMapper = AppContext.getBean(FanStationPointsMapper.class);
 
     private static CenterModelSyncBuilder instance = null;
 
@@ -61,53 +65,103 @@ public class CenterModelSyncBuilder {
 //        );
 //        System.out.println( pubSubstationDfEntities.get(0).getSubName());
 //        String subName = pubSubstationDfEntities.get(0).getSubName();
-        List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
-
-        if (uniPoints != null && uniPoints.size() > 0) {
-            for (UniPoint entity : uniPoints) {
-                PatrolUavPointModelItem item = new PatrolUavPointModelItem();
-                item.setStation_code(subCode);
-                item.setStation_name(entity.getSubName());
-                item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
-                item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
+//      如果是普通类型查UniPoint。如果风机类型查FanStationPoints,先用场站code写死进行区分
+        if("Sub_WeiLan".equals(subCode)){
+            List<FanStationPoints> fanStationPoints = fanStationPointsMapper.selectList(new LambdaQueryWrapper<>());
+            if (fanStationPoints != null && fanStationPoints.size() > 0) {
+                for (FanStationPoints entity : fanStationPoints) {
+                    PatrolUavPointModelItem item = new PatrolUavPointModelItem();
+                    item.setStation_code(subCode);
+                    item.setStation_name(entity.getStationName());
+                    item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
+                    item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
 //              需要确认一下类型
-                item.setData_type("4");
-                item.setLower_value("");
-                item.setUpper_value("");
-                item.setVideo_pos("");
-                item.setDevice_id(Optional.ofNullable(entity.getPointCode()).orElse(""));
-                item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
-                item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
-                item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
-                item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));
-                item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
-                item.setMain_device_id(Optional.ofNullable(entity.getDeviceId()).orElse(""));
-                item.setMain_device_name(Optional.ofNullable(entity.getDeviceName()).orElse(""));
-                item.setDevice_type(deviceTypeNum(entity.getDeviceName()));
-                //无人机航拍不巡视表计，暂时设置为空
-                item.setMeter_type("");
-                //无人机点位外观类型，暂时设置为空
-                item.setAppearance_type("");
-                //现场不需要分析，暂时设置为空
-                item.setRecognition_type_list(Optional.ofNullable(entity.getPointAnalyseType()).orElse(""));
-                item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
-                item.setDevice_info("");
-                item.setSave_type_list("2");
-                data.add(item);
-            }
+                    item.setData_type("4");
+                    item.setLower_value("");
+                    item.setUpper_value("");
+                    item.setVideo_pos("");
+                    item.setDevice_id(Optional.ofNullable(entity.getPointId()).orElse(""));
+                    item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
+                    item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
+                    item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
+                    item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));
+                    item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
+                    item.setMain_device_id(Optional.ofNullable(entity.getMainDeviceId()).orElse(""));
+                    item.setMain_device_name(Optional.ofNullable(entity.getMainDeviceName()).orElse(""));
+                    item.setDevice_type(entity.getDeviceType());
+                    //无人机航拍不巡视表计，暂时设置为空
+                    item.setMeter_type("");
+                    //无人机点位外观类型，暂时设置为空
+                    item.setAppearance_type("");
+                    //现场不需要分析，暂时设置为空
+                    item.setRecognition_type_list("");
+                    item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
+                    item.setDevice_info("");
+                    item.setSave_type_list("2");
+                    data.add(item);
+                }
 
-            //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
-            String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
-            //生成模型文件
-            PatrolUavPointModelData modelData = new PatrolUavPointModelData();
-            modelData.item = data;
-            this.genModelFile(fileName, modelData);
-            //组织响应消息体
-            PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
-            patrolUavModelItem.setDevice_file_path(fileName);
-            items.add(patrolUavModelItem);
+                //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
+                String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
+                //生成模型文件
+                PatrolUavPointModelData modelData = new PatrolUavPointModelData();
+                modelData.item = data;
+                this.genModelFile(fileName, modelData);
+                //组织响应消息体
+                PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
+                patrolUavModelItem.setDevice_file_path(fileName);
+                items.add(patrolUavModelItem);
+            }
+            return items;
+        }else {
+            List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
+            if (uniPoints != null && uniPoints.size() > 0) {
+                for (UniPoint entity : uniPoints) {
+                    PatrolUavPointModelItem item = new PatrolUavPointModelItem();
+                    item.setStation_code(subCode);
+                    item.setStation_name(entity.getSubName());
+                    item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
+                    item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
+//              需要确认一下类型
+                    item.setData_type("4");
+                    item.setLower_value("");
+                    item.setUpper_value("");
+                    item.setVideo_pos("");
+                    item.setDevice_id(Optional.ofNullable(entity.getPointCode()).orElse(""));
+                    item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
+                    item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
+                    item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
+                    item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));
+                    item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
+                    item.setMain_device_id(Optional.ofNullable(entity.getDeviceId()).orElse(""));
+                    item.setMain_device_name(Optional.ofNullable(entity.getDeviceName()).orElse(""));
+                    item.setDevice_type(deviceTypeNum(entity.getDeviceName()));
+                    //无人机航拍不巡视表计，暂时设置为空
+                    item.setMeter_type("");
+                    //无人机点位外观类型，暂时设置为空
+                    item.setAppearance_type("");
+                    //现场不需要分析，暂时设置为空
+                    item.setRecognition_type_list(Optional.ofNullable(entity.getPointAnalyseType()).orElse(""));
+                    item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
+                    item.setDevice_info("");
+                    item.setSave_type_list("2");
+                    data.add(item);
+                }
+
+                //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
+                String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
+                //生成模型文件
+                PatrolUavPointModelData modelData = new PatrolUavPointModelData();
+                modelData.item = data;
+                this.genModelFile(fileName, modelData);
+                //组织响应消息体
+                PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
+                patrolUavModelItem.setDevice_file_path(fileName);
+                items.add(patrolUavModelItem);
+            }
+            return items;
         }
-        return items;
+
     }
 
     /**
