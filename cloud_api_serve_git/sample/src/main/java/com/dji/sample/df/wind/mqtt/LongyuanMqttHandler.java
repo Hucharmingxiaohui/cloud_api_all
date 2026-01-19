@@ -8,12 +8,14 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
+import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
 import com.dji.sample.center.model.entity.CenterToUavPlanEntity;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.StringUtil;
 import com.dji.sample.center.utils.ftp.FtpUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
+import com.dji.sample.center.v2022.command.upload.PatrolResultItem;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.common.model.CustomClaim;
@@ -27,8 +29,10 @@ import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.controller.FjReportController;
+import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
@@ -102,6 +106,10 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
+    @Autowired
+    CenterFtpsNormalConfig  centerFtpsNormalConfig;
+    @Autowired
+    DefectEntityMapper defectEntityMapper;
 
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
@@ -410,8 +418,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         if(waylineJobDTO.getUploadedCount()==waylineJobDTO.getMediaCount()){
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
-//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果
-
+//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果（风机任务也直接回传结果只不过继续执行分析逻辑）
+                            sendPatrolResult(taskCode, taskName, waylineJobEntity);
                             log.info("进入分析逻辑---------");
                             // 1. 异步启动图片保存分析
                             new Thread(() -> {
@@ -468,8 +476,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                             .eq(WaylineJobEntity::getJobId, jobId)
                     );
-                    log.info("开始发送图片报告结果----");
-                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
+//                    log.info("开始发送图片报告结果----");
+//                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     // 3. 清理监控
                     analyzingTasks.remove(taskCode);
                     analysisStartTime.remove(taskCode);
@@ -547,69 +555,60 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                 resultMessage.put("data", data);
                 // 发送到MQTT
-                mqttSender.sendToPatrolData(resultMessage);
+//                mqttSender.sendToPatrolData(resultMessage);
 
+                PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + taskPatrolledId + "/";
+//                String localFile = point.getMediaFileDTOS().get(0).getFilePath();
+                DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
+                        .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
+                        .eq(DefectEntity::getFanCode, mediaFileDTO.getFanCode())
+                        .eq(DefectEntity::getFanPart, mediaFileDTO.getFanPart()));
+                String imagePath = defectEntity.getImagePath();
+                String filePath = convertImagePath(imagePath);
+                String destName = new File(filePath).getName();
+                FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName);
+                //推送点位报文
+                String format = String.format("%s/%s", destDir, destName);
+
+                PatrolResultItem item = new PatrolResultItem();
+                item.setPatroldevice_name("大疆M4td");
+                item.setPatroldevice_code("1581F8HGX253800A030D");
+                item.setTask_name(taskName);
+                item.setTask_code(taskCode);
+                item.setDevice_name(pointName);
+                item.setDevice_id(pointId);
+                item.setValue("");
+                item.setUnit("");
+                item.setValue_unit("");
+                item.setTime(DateUtils.getNowDateTimeStr());
+//              识别类型先设置为空
+                item.setRecognition_type("");
+                item.setFile_path(format);
+                item.setRectangle("");
+                item.setTask_patrolled_id(taskPatrolledId);
+                item.setObj_id("");
+                item.setValid("1");
+                commandData.addItem(item);
+                patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
                 log.info("上报巡视图片--------: ");
             }
-
-//          上传报告
-//            Map<String, Object> resultMessage = new HashMap<>();
-//
-//            resultMessage.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
-//            resultMessage.put("timestamp", getCurrentTime());
-//            resultMessage.put("sender", sender);
-//            resultMessage.put("stationCode", stationCode);
-//            resultMessage.put("category", "task");
-//            resultMessage.put("action", "result");
-
-//            return ossService.getObjectUrl(OssConfiguration.bucket, mediaFileOpt.get().getObjectKey());
-
-//            String localFile = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";;
-//            String destName = new File(localFile).getName();
-//            String destDir = "/uav";
-//            FtpsHelper ftpClient = new FtpsHelper();
-//
-//            try {
-//                ftpClient.login(lyFtpsProperties.getFtpIp(), lyFtpsProperties.getFtpPort(), lyFtpsProperties.getUserName(),lyFtpsProperties.getPassword(), lyFtpsProperties.getImplicit());
-//                ftpClient.uploadFile(localFile, destDir, destName,"true");
-//                ftpClient.close();
-//            } catch (Exception exception) {
-//                exception.printStackTrace();
-//            } finally {
-//                ftpClient.close();
-//            }
-
-//            String taskPatrolledId = String.format("%s_%s_%s",
-//                    stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-//            Map<String, Object> data = new HashMap<>();
-//            data.put("patrolDeviceName","大疆M4td");
-//            data.put("patrolDeviceCode", "1581F8HGX253800A030D");
-//            data.put("taskName", taskName);
-//            data.put("taskCode", taskCode);
-//            data.put("pointName", "");
-//            data.put("pointId", "");
-//            data.put("valueType", ""); // 4=红外测温
-//            data.put("value", "");
-//            data.put("valueUnit", "");
-//            data.put("unit", "");
-//            data.put("time","");
-//            data.put("recognitionType", ""); // 4=红外识别
-//            data.put("fileType", "3"); // 1=图片
-//            data.put("filePath","");
-//            data.put("rectangle","");
-//            data.put("taskPatrolledId", taskPatrolledId);
-//            data.put("valid","1");
-//
-//            resultMessage.put("data", data);
-//
-//            // 发送到MQTT
-//            mqttSender.sendToPatrolData(resultMessage);
-//
-//            log.info("上报巡视结果--------: ");
 
         } catch (Exception e) {
             log.error("上报巡视结果失败: taskCode={}", taskCode, e);
         }
+    }
+
+    public static String convertImagePath(String imagePath) {
+        if (imagePath == null || imagePath.isEmpty()) {
+            return imagePath;
+        }
+
+        // 匹配 defect_out/ 和 _result数字 模式
+        String pattern = "defect_out/(.*?)_result\\d+(\\.\\w+)$";
+        String replacement = "$1$2";
+
+        return imagePath.replaceAll(pattern, replacement);
     }
 
 
@@ -666,8 +665,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         item.setTask_name(taskName);
         item.setTask_code(taskCode);
         item.setTask_state(mappedState);
-        item.setStart_time(waylineJobDTO.getExecuteTime().toString());
-        item.setPlan_start_time(waylineJobDTO.getBeginTime().toString());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        item.setStart_time(formatter.format(waylineJobDTO.getExecuteTime()));
+        item.setPlan_start_time(formatter.format(waylineJobDTO.getBeginTime()));
         item.setTask_progress(progress + "%");
         item.setTask_estimated_time("");
         item.setDescription("");

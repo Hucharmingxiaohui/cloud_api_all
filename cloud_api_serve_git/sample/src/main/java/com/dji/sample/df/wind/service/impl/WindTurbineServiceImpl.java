@@ -130,6 +130,12 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
         return result;
     }
 
+    @Override
+    public int deletePointsById(Map map) {
+         return fanStationPointsMapper.deleteByDeviceId(map);
+
+    }
+
     /**
      * 生成点位列表
      */

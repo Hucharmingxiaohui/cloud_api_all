@@ -774,7 +774,7 @@ public class FjReportServiceImpl implements FjReportService {
         String fanCode = waylineJobEntity.getFanName();
 
         // 风电场名称写死
-        String windFarmName = "广西龙源蔚蓝风电场";
+        String windFarmName = "云南高美风电场";
 
         // 获取缺陷列表
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()

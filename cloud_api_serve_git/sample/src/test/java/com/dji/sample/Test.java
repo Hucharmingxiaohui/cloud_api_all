@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.ftp.FtpUtils;
 import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
+import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.thread.ExecutorFactory;
 
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
@@ -31,7 +32,9 @@ import com.dji.sample.df.wind.service.FjReportService;
 
 import com.dji.sample.df.wind.timer.DeleteWaylineFileTimer;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.dji.sdk.mqtt.CommonTopicRequest;
 import com.dji.sdk.mqtt.MqttGatewayPublish;
 import lombok.extern.slf4j.Slf4j;
@@ -44,8 +47,10 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import java.io.*;
 import java.nio.file.Files;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 import static com.dji.sample.wayline.service.impl.SDKWaylineService.convert;
@@ -72,9 +77,15 @@ public class Test {
     @Autowired
     IWaylineJobMapper waylineJobMapper;
 
+    @Autowired
+    WaylineJobServiceImpl waylineJobServiceimpl;
+
 
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     @org.junit.jupiter.api.Test
     void test() throws IOException {
@@ -116,16 +127,25 @@ public class Test {
 //            }
 
 
-        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, "9d90a318-7b5c-4228-a062-562244e52a3a"));
-        waylineJobEntity.setIsReported(0);
-        waylineJobMapper.updateById(waylineJobEntity);
-//      正在分析（实则是正在保存加分析）
-        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
-//      如果不是风机任务直接返回不分析，状态置为3（改为对接分析服务）
-        System.out.println(pubWaylineJobPlanDfEntity);
-        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==0){
-            System.out.println("111");
-        }
+//        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, "9d90a318-7b5c-4228-a062-562244e52a3a"));
+//        waylineJobEntity.setIsReported(0);
+//        waylineJobMapper.updateById(waylineJobEntity);
+////      正在分析（实则是正在保存加分析）
+//        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(waylineJobEntity.getPlanId());
+////      如果不是风机任务直接返回不分析，状态置为3（改为对接分析服务）
+//        System.out.println(pubWaylineJobPlanDfEntity);
+//        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==0){
+//            System.out.println("111");
+//        }
+//        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+//                .eq(WaylineJobEntity::getJobId, "6b4b5d53-4fc9-421b-9909-726b14ad2f40")
+//        );
+//        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+//        System.out.println("------"+waylineJobDTO.getBeginTime().format(formatter));
+//        String format = waylineJobDTO.getBeginTime().format(formatter);
+        int i = uniPointMapper2.selectListCount(new HashMap());
+        System.out.println(i);
     }
 
     @org.junit.jupiter.api.Test

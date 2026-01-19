@@ -29,4 +29,13 @@
             LIMIT ${startPos}, ${pageSize}
         </if>
     </select>
+
+    <delete id="deleteByDeviceId">
+        DELETE FROM fan_station_points
+        <where>
+            <if test="id != null and id != ''">
+                main_device_id = #{id}
+            </if>
+        </where>
+    </delete>
 </mapper>

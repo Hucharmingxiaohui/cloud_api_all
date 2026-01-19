@@ -45,6 +45,8 @@ public class MediaFileDTO {
 
     private String defectImageUrl;
 
+    private String originalImageUrl;
+
     private String defectType;
 
     private String defectDescription;
