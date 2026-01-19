@@ -92,5 +92,19 @@ public class WindTurbineController {
         return Result.success(pointsList);
     }
 
+    /**
+     * 根据id重置风机点位模型
+     */
+    @GetMapping("/deletePointsById")
+    public Result<Map> deletePointsById(@RequestParam Map <String, Object> map) {
+        int i = windTurbineService.deletePointsById(map);
+        if (i > 0) {
+            return Result.success("删除成功");
+        }else {
+            return Result.error("删除失败");
+        }
+    }
+
+
 
 }
