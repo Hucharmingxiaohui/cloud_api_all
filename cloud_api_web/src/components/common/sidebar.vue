@@ -41,7 +41,7 @@
           </el-col>
           <a-col :span="1"></a-col>
           <a-col :span="6" class="text_2">
-            <span>河北华电220kV尹夏储能站</span>
+            <span>{{ CURRENT_CONFIG.sysName }}</span>
           </a-col>
           <a-col :span="1" ></a-col>
           <a-col :span="8" class="text_1"  style="display: flex; justify-content: end;">
@@ -134,6 +134,7 @@ import { getRoot } from '/@/root'
 import { ERouterName, ELocalStorageKey } from '/@/types'
 import { routes } from '/@/router'
 import { Avatar, UserFilled } from '@element-plus/icons-vue'
+import { CURRENT_CONFIG } from '/@/api/http/config'
 import { useRouter, useRoute } from 'vue-router'
 const activeIndex = ref('2')
 const router = useRouter()
