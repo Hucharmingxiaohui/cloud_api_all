@@ -107,7 +107,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     @Autowired
     private CenterNormalConfig centerConfig;
     @Autowired
-    CenterFtpsNormalConfig  centerFtpsNormalConfig;
+    CenterFtpsNormalConfig centerFtpsNormalConfig;
     @Autowired
     DefectEntityMapper defectEntityMapper;
 
@@ -346,7 +346,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     if (matchedTurbine!=null) {
 
                         // 存入定时任务
-                        taskTimerManager.addScheduledTask(taskCode, fixedStartTime,
+                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
                     }
@@ -558,7 +558,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //                mqttSender.sendToPatrolData(resultMessage);
 
                 PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + taskPatrolledId + "/";
+                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
 //                String localFile = point.getMediaFileDTOS().get(0).getFilePath();
                 DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
                         .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
@@ -586,7 +586,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 item.setRecognition_type("");
                 item.setFile_path(format);
                 item.setRectangle("");
-                item.setTask_patrolled_id(taskPatrolledId);
+                item.setTask_patrolled_id(waylineJobEntity.getJobId());
                 item.setObj_id("");
                 item.setValid("1");
                 commandData.addItem(item);
@@ -645,7 +645,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }else if(isFinished == 0){
             progress = waylineJobDTO.getProgress();
         }
-        data.put("taskPatrolledId", taskPatrolledId);
+        data.put("taskPatrolledId", waylineJobEntity.getJobId());
         data.put("taskName", taskName);
         data.put("taskCode", taskCode);
         data.put("taskState", mappedState);
@@ -661,7 +661,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
         List<PatrolStatusItem> patrolStatusItems = new ArrayList<>();
         PatrolStatusItem item = new PatrolStatusItem();
-        item.setTask_patrolled_id(taskPatrolledId);
+        item.setTask_patrolled_id(waylineJobEntity.getJobId());
         item.setTask_name(taskName);
         item.setTask_code(taskCode);
         item.setTask_state(mappedState);
