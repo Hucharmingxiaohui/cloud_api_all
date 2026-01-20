@@ -3,39 +3,70 @@
     <div class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right">
         <el-form-item label="图片名称:">
-          <el-input v-model="queryForm.name" placeholder="请输入图片名称" class="custom-input"></el-input>
+          <el-input
+            v-model="queryForm.name"
+            placeholder="请输入图片名称"
+            class="custom-input"
+          ></el-input>
         </el-form-item>
         <el-form-item>
           <!-- 查询按钮 -->
-            <el-button class="new_btn" type="primary" :icon='Search'
-              @click="getFiles">查询
-            </el-button>
-            <!-- 重置按钮 -->
-            <el-button class="new_btn1" type="info"  :icon="Refresh"  @click="reset">重置
-            </el-button>
-          <el-button class="new_btn" type="primary" :icon="Download"
-            @click="createReport()">
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Search"
+            @click="getFiles"
+            >查询
+          </el-button>
+          <!-- 重置按钮 -->
+          <el-button class="new_btn1" type="info" :icon="Refresh" @click="reset"
+            >重置
+          </el-button>
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Download"
+            @click="createReport()"
+          >
             下载报告
           </el-button>
-          <el-button class="new_btn" type="primary"  :icon="Document"
-            @click="viewReport()">
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Document"
+            @click="viewReport()"
+          >
             查看报告
           </el-button>
-          <el-button class="new_btn" type="primary"  :icon="Refresh"
-            @click="resetReport()">
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Refresh"
+            @click="resetReport()"
+          >
             重置报告
           </el-button>
-          <el-button class="new_btn" type="primary"  :icon="Download"
-            @click="exportImageZip()">
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Download"
+            v-if="resultType === 1"
+            @click="exportImageZip()"
+          >
             导出数据集
           </el-button>
-
-          <!-- <el-button class="new_btn1 delete-bg"  type="danger"  :icon="Delete"  @click="reset">删除
-          </el-button> -->
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Download"
+            v-if="resultType === 0"
+            @click="exportOriginImage()"
+          >
+            导出原图
+          </el-button>
         </el-form-item>
-
       </el-form>
-        <!-- <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
+      <!-- <el-button class="new_btn iconfont icon-chaxunhangxian" type="primary" style="margin-left: 30px; width: 70px;"
         @click="CreateThumbnail">
         <span style="margin-left: 5px; font-size: 14px;">测试缩略图</span>
       </el-button> -->
@@ -50,16 +81,26 @@
           <!-- 预览图 -->
           <el-table-column label="图片" align="center">
             <template #default="scope">
-              <img :src="scope.row.url" alt="预览图"
+              <img
+                :src="getImageUrl(scope.row.original_image_url)"
+                alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
-                @click="openPreviewModal(scope.row)" />
+                @click="openPreviewModal(scope.row)"
+              />
             </template>
           </el-table-column>
-          <el-table-column label="分析图" align="center">
+          <el-table-column
+            label="分析图"
+            align="center"
+            v-if="resultType === 1"
+          >
             <template #default="scope">
-              <img :src="scope.row.defect_image_url" alt="预览图"
+              <img
+                :src="getImageUrl(scope.row.defect_image_url)"
+                alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
-                @click="openPreviewAnaysisModal(scope.row)" />
+                @click="openPreviewAnaysisModal(scope.row)"
+              />
             </template>
           </el-table-column>
           <el-table-column label="名称" align="center">
@@ -79,30 +120,50 @@
               <div>{{ new Date(scope.row.create_time).toLocaleString() }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="扇叶名称" align="center">
+          <el-table-column
+            label="扇叶名称"
+            align="center"
+            v-if="resultType === 1"
+          >
             <template #default="scope">
               <div>{{ scope.row.fan_code }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="扇叶部位" align="center">
+          <el-table-column
+            label="扇叶部位"
+            align="center"
+            v-if="resultType === 1"
+          >
             <template #default="scope">
               <div>{{ scope.row.fan_part }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="缺陷主要类型" align="center">
+          <el-table-column
+            label="缺陷主要类型"
+            align="center"
+            v-if="resultType === 1"
+          >
             <template #default="scope">
               <div>{{ scope.row.defect_type }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="缺陷描述" align="center">
+          <el-table-column
+            label="缺陷描述"
+            align="center"
+            v-if="resultType === 1"
+          >
             <template #default="scope">
               <div>{{ scope.row.defect_description  }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="250px">
+          <el-table-column label="操作" min-width="100px" align="center">
             <template #default="scope">
-              <el-button size="small" type="text" @click="downloadMediaLocal(scope.row)">下载</el-button>
-              <el-button size="small" type="text" @click="defectSelect(scope.row)">人工修正</el-button>
+              <el-button
+                size="small"
+                type="text"
+                @click="defectSelect(scope.row)"
+                >人工修正</el-button
+              >
               <!-- manualCorrection -->
             </template>
           </el-table-column>
@@ -110,32 +171,41 @@
       </div>
       <div class="pagination-container">
         <!-- 分页 -->
-        <el-pagination @size-change="handleSizeChange" @current-change="handleCurrentChange"
-          :current-page="paginationProp.current" :page-sizes="paginationProp.pageSizeOptions"
-          :page-size="paginationProp.pageSize" :total="paginationProp.total"
-          layout="total, sizes, prev, pager, next, jumper">
+        <el-pagination
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+          :current-page="paginationProp.current"
+          :page-sizes="paginationProp.pageSizeOptions"
+          :page-size="paginationProp.pageSize"
+          :total="paginationProp.total"
+          layout="total, sizes, prev, pager, next, jumper"
+        >
         </el-pagination>
       </div>
     </div>
 
     <!-- 人工修正 -->
-     <el-dialog title="人工修正" v-model="editDefectVisible" width="500px">
-         <div>
-      <el-form
-        :model="editForm"
-        label-width="100px"
-        :rules="formRules"
-        ref="editFormRef"
-      >
-        <el-form-item label="缺陷类型" prop="defects" required>
-          <el-select v-model="editForm.defects" multiple collapse-tags>
-            <el-option v-for="item in defectTypeMap" :label="item.name" :value="item.name" :key="item.code"></el-option>
-          </el-select>
-        </el-form-item>
-      </el-form>
-
-         </div>
-               <template v-slot:footer>
+    <el-dialog title="人工修正" v-model="editDefectVisible" width="500px">
+      <div>
+        <el-form
+          :model="editForm"
+          label-width="100px"
+          :rules="formRules"
+          ref="editFormRef"
+        >
+          <el-form-item label="缺陷类型" prop="defects" required>
+            <el-select v-model="editForm.defects" multiple collapse-tags>
+              <el-option
+                v-for="item in defectTypeMap"
+                :label="item.name"
+                :value="item.name"
+                :key="item.code"
+              ></el-option>
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+      <template v-slot:footer>
         <div class="dialog-footer">
           <el-button @click="editDefectVisible = false" class="nobtn"
             >取 消</el-button
@@ -145,159 +215,104 @@
           >
         </div>
       </template>
-     </el-dialog>
+    </el-dialog>
 
     <!-- 查看报告 -->
-    <el-dialog title="报告预览" v-model="viewReportVisible" width="880px" class="view">
+    <el-dialog
+      title="报告预览"
+      v-model="viewReportVisible"
+      width="880px"
+      class="view"
+    >
       <div v-loading="viewloading" class="doc-preview-container">
         <div id="docContainer" class="docx-container"></div>
       </div>
     </el-dialog>
 
     <!-- 图片放大弹窗 -->
-    <el-dialog v-model="previewVisible" title="图片预览"  width="1000px">
+    <el-dialog v-model="previewVisible" title="原始预览" width="1000px">
       <div class="preview-modal-content">
         <!-- 左侧显示放大图片 -->
         <!-- <div class="preview-main"> -->
         <!-- 添加“上一张”和“下一张”按钮 -->
-        <button class="prev-image" @click="showPreviousImage">‹</button>
-        <img :src="selectedImage.url" alt="放大图" class="preview-image" ref="previewImage"
-          style="object-fit: contain; width: 500px; height: 500px;" />
-        <button class="next-image" @click="showNextImage">›</button>
-        <!-- </div> -->
-
-        <!-- 右侧显示任务信息 -->
-        <div class="preview-info">
-          <div class="info-row">
-            <strong>任务名称:</strong>
-            <input type="text" :value="jobInfo.job_name" class="info-input" readonly />
-          </div>
-          <div class="info-row">
-            <strong>名称:</strong>
-            <input type="text" :value="selectedImage.file_name" class="info-input" readonly />
-          </div>
-          <!-- <div class="info-row">
-            <strong>关联点位:</strong>
-            <input type="text" :value="selectedImage.point_name" class="info-input" readonly />
-          </div> -->
-          <div class="info-row">
-            <strong>照片类型:</strong>
-            <input type="text" :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'" class="info-input"
-              readonly />
-          </div>
-          <div class="info-row">
-            <strong>航线名称:</strong>
-            <input type="text" :value="jobInfo.file_name" class="info-input" readonly />
-          </div>
-          <div class="info-row">
-            <strong>照片分辨率:</strong>
-            <input type="text" :value="`${selectedImage.width} * ${selectedImage.height}`" class="info-input"
-              readonly />
-          </div>
-          <div class="info-row" v-if="selectedImage.file_name.includes('_T')">
-            <strong>温度:</strong>
-            <input type="text" :value="getHighestTemp(selectedImage.Temp) + '°C'" class="info-input" readonly />
-          </div>
-          <div class="info-row">
-            <strong>拍摄时间:</strong>
-            <input type="text" :value="new Date(selectedImage.create_time).toLocaleString()" class="info-input"
-              readonly />
-          </div>
-          <div class="info-row">
-            <strong>文件大小:</strong>
-            <input type="text" :value="Number(selectedImage.size).toFixed(2) + 'M'" class="info-input" readonly />
-          </div>
-          <button @click="handleTempConfig" class="btn" v-if="selectedImage.file_name.includes('_T')">
-            测温规则配置
-          </button>
-        </div>
-      </div>
-
-      <!-- 放大图操作按钮 -->
-      <div class="preview-container">
-        <div class="preview-actions">
-          <!-- 放大 -->
-          <!-- <el-button icon="el-icon-zoom-in" @click="zoomIn" size="small"></el-button> -->
-          <!-- 缩小 -->
-          <!-- <el-button icon="el-icon-zoom-out" @click="zoomOut" size="small"></el-button> -->
-          <!-- 旋转 -->
-          <el-button icon="el-icon-rotate-left" @click="rotate" size="small">旋转方向</el-button>
-          <!-- 重置方向 -->
-          <el-button icon="el-icon-refresh" @click="resetOrientation" size="small">重置方向</el-button>
-          <!-- 下载 -->
-          <el-button icon="el-icon-download" @click="downloadMediaLocal(selectedImage)" size="small">下载图片</el-button>
-        </div>
-
-        <!-- 下方显示缩略图 -->
-        <div class="preview-thumbnails">
-          <!-- 左侧滚动按钮 -->
-          <button class="scroll-button left" @click="scrollLeft">&lt;</button>
-          <div class="thumbnail-container">
-            <!-- <el-row gutter="5">
-              <el-col  -->
-            <div v-for="(item, index) in mediaData.data" :key="index" class="thumbnail-item">
-              <!-- <img :src="item.url" alt="缩略图" class="thumbnail-image" :class="{ active: selectedImage === item }" -->
-              <img :src="item.url" alt="" class="thumbnail-image" :class="{ active: selectedImage === item }"
-                @click="selectImage(item)" />
-              <!-- </el-col>
-            </el-row> -->
-            </div>
-          </div>
-          <!-- 右侧滚动按钮 -->
-          <button class="scroll-button right" @click="scrollRight">&gt;</button>
-        </div>
-      </div>
-    </el-dialog>
-    <el-dialog v-model="previewAnaysisVisible" title="分析图片预览" width="1000px">
-      <div class="preview-modal-content">
-        <!-- 左侧显示放大图片 -->
-        <!-- <div class="preview-main"> -->
-        <!-- 添加“上一张”和“下一张”按钮 -->
-        <button class="prev-image" @click="showPreviousImage">‹</button>
+        <button class="prev-image" @click="showPreviousImage('origin')">‹</button>
         <div style="width: 500px; height: 500px;">
-          <img :src="selectedImage.defect_image_url" alt="放大图" class="preview-image" ref="previewImage"
-            style="object-fit: contain; width: 500px; height: 500px;" />
+          <img
+            :src="getImageUrl(selectedImage.original_image_url)"
+            alt="放大图"
+            class="preview-image"
+            ref="previewImage"
+            style="object-fit: contain; width: 500px; height: 500px;"
+          />
         </div>
 
-        <button class="next-image" @click="showNextImage">›</button>
+        <button class="next-image" @click="showNextImage('origin')">›</button>
         <!-- </div> -->
 
         <!-- 右侧显示任务信息 -->
         <div class="preview-info">
           <div class="info-row">
             <strong>任务名称:</strong>
-            <input type="text" :value="jobInfo.job_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="jobInfo.job_name"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>名称:</strong>
-            <input type="text" :value="selectedImage.file_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="selectedImage.file_name"
+              class="info-input"
+              readonly
+            />
           </div>
-          <!-- <div class="info-row">
-            <strong>关联点位:</strong>
-            <input type="text" :value="selectedImage.point_name" class="info-input" readonly />
-          </div> -->
           <div class="info-row">
             <strong>照片类型:</strong>
-            <input type="text" :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'" class="info-input"
-              readonly />
+            <input
+              type="text"
+              :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>航线名称:</strong>
-            <input type="text" :value="jobInfo.file_name" class="info-input" readonly />
+            <input
+              type="text"
+              :value="jobInfo.file_name"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>照片分辨率:</strong>
-            <input type="text" :value="`${selectedImage.width} * ${selectedImage.height}`" class="info-input"
-              readonly />
+            <input
+              type="text"
+              :value="`${selectedImage.width} * ${selectedImage.height}`"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>拍摄时间:</strong>
-            <input type="text" :value="new Date(selectedImage.create_time).toLocaleString()" class="info-input"
-              readonly />
+            <input
+              type="text"
+              :value="new Date(selectedImage.create_time).toLocaleString()"
+              class="info-input"
+              readonly
+            />
           </div>
           <div class="info-row">
             <strong>文件大小:</strong>
-            <input type="text" :value="Number(selectedImage.size).toFixed(2) + 'M'" class="info-input" readonly />
+            <input
+              type="text"
+              :value="Number(selectedImage.size).toFixed(2) + 'M'"
+              class="info-input"
+              readonly
+            />
           </div>
         </div>
       </div>
@@ -310,11 +325,23 @@
           <!-- 缩小 -->
           <!-- <el-button icon="el-icon-zoom-out" @click="zoomOut" size="small"></el-button> -->
           <!-- 旋转 -->
-          <el-button icon="el-icon-rotate-left" @click="rotate" size="small">旋转方向</el-button>
+          <el-button icon="el-icon-rotate-left" @click="rotate" size="small"
+            >旋转方向</el-button
+          >
           <!-- 重置方向 -->
-          <el-button icon="el-icon-refresh" @click="resetOrientation" size="small">重置方向</el-button>
+          <el-button
+            icon="el-icon-refresh"
+            @click="resetOrientation"
+            size="small"
+            >重置方向</el-button
+          >
           <!-- 下载 -->
-          <el-button icon="el-icon-download" @click="downloadImageLocal(selectedImage)" size="small">下载图片</el-button>
+          <el-button
+            icon="el-icon-download"
+            @click="downloadImageLocal(selectedImage, 'origin')"
+            size="small"
+            >下载图片</el-button
+          >
         </div>
 
         <!-- 下方显示缩略图 -->
@@ -324,9 +351,18 @@
           <div class="thumbnail-container">
             <!-- <el-row gutter="5">
               <el-col  -->
-            <div v-for="(item, index) in mediaData.data" :key="index" class="thumbnail-item">
-              <img :src="item.defect_image_url" alt="" class="thumbnail-image" :class="{ active: selectedImage === item }"
-                @click="selectImage(item)" />
+            <div
+              v-for="(item, index) in mediaData.data"
+              :key="index"
+              class="thumbnail-item"
+            >
+              <img
+                :src="getImageUrl(item.original_image_url)"
+                alt=""
+                class="thumbnail-image"
+                :class="{ active: selectedImage === item }"
+                @click="selectImage(item, 'origin')"
+              />
               <!-- </el-col>
             </el-row> -->
             </div>
@@ -336,85 +372,168 @@
         </div>
       </div>
     </el-dialog>
-    <!-- 红外测温 -->
-    <div class="TEMPPanel" v-show="showTempConfig" v-drag-window>
-      <div style="height: 40px; width: 100%; border-bottom: 1px solid #fff; padding-left: 10px;" class="drag-title">
-        红外测温配置
-      </div>
-      <a style="position: absolute; right: 10px; top: 10px; font-size: 16px; color: white;" @click="closeTempConfig">
-        <CloseOutlined />
-      </a>
-      <div class="content1">
-        <div class="content-left">
-          <el-select v-model="tempType" placeholder="请选择" size="large" class="select-operation" :teleported="false"
-            @change="updateTempType">
-            <el-option v-for="item in tempTypeOption" :key="item.value" :label="item.label" :value="item.value" />
-          </el-select>
-          <div class="button-wrapper">
-            <!-- 新增字段和输入框 -->
-            <div class="temp-fields">
-              <el-form label-position="top" label-width="100px">
-                <el-row style="margin-top: 15px;">
-                  <!-- 最高温度 -->
-                  <el-col :span="24">
-                    <el-form-item label="最高温度°C" style="color: #fff;" v-if="tempType == 2">
-                      <el-input v-model="tt.max_tem" placeholder="最高温度" class="info-input1"></el-input>
-                    </el-form-item>
-                    <el-form-item label="温度°C" style="color: #fff;" v-else>
-                      <el-input v-model="tt.point_tem" placeholder="温度" class="info-input1">
-                      </el-input>
-                    </el-form-item>
-                  </el-col>
-                  <!-- 最高温度坐标 -->
-                  <!-- <el-col :span="24">
-                    <el-form-item label="最高温度坐标" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt" placeholder="最高温度坐标"></el-input>
-                    </el-form-item>
-                    <el-form-item label="温度坐标" :label-style="{ color: 'white' }" v-else>
-                      <el-input v-model="tt" placeholder="温度坐标"></el-input>
-                    </el-form-item>
-                  </el-col> -->
-                  <!-- 最低温度 -->
-                  <el-col :span="24">
-                    <el-form-item label="最低温度°C" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt.min_tem" placeholder="最低温度" class="info-input1"></el-input>
-                    </el-form-item>
-                  </el-col>
-                  <el-col :span="24">
-                    <el-form-item label="平均温度°C" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt.average_tem" placeholder="最低温度" class="info-input1"></el-input>
-                    </el-form-item>
-                  </el-col>
-                  <!-- 最低温度坐标 -->
-                  <!-- <el-col :span="24">
-                    <el-form-item label="最低温度坐标" :label-style="{ color: 'white' }"  v-if="tempType ==2">
-                      <el-input v-model="tt" placeholder="最低温度坐标"></el-input>
-                    </el-form-item>
-                  </el-col> -->
-                </el-row>
-              </el-form>
-            </div>
-            <!-- 保存按钮 -->
-            <!-- <el-button class="btn1" @click="saveTEMPConfig">保存</el-button> -->
+    <el-dialog
+      v-model="previewAnaysisVisible"
+      title="分析图片预览"
+      width="1000px"
+    >
+      <div class="preview-modal-content">
+        <!-- 左侧显示放大图片 -->
+        <!-- <div class="preview-main"> -->
+        <!-- 添加“上一张”和“下一张”按钮 -->
+        <button class="prev-image" @click="showPreviousImage('defect')">‹</button>
+        <div style="width: 500px; height: 500px;">
+          <img
+            :src="getImageUrl(selectedImage.defect_image_url)"
+            alt="放大图"
+            class="preview-image"
+            ref="previewImage"
+            style="object-fit: contain; width: 500px; height: 500px;"
+          />
+        </div>
+
+        <button class="next-image" @click="showNextImage('defect')">›</button>
+        <!-- </div> -->
+
+        <!-- 右侧显示任务信息 -->
+        <div class="preview-info">
+          <div class="info-row">
+            <strong>任务名称:</strong>
+            <input
+              type="text"
+              :value="jobInfo.job_name"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <div class="info-row">
+            <strong>名称:</strong>
+            <input
+              type="text"
+              :value="selectedImage.file_name"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <!-- <div class="info-row">
+            <strong>关联点位:</strong>
+            <input type="text" :value="selectedImage.point_name" class="info-input" readonly />
+          </div> -->
+          <div class="info-row">
+            <strong>照片类型:</strong>
+            <input
+              type="text"
+              :value="selectedImage.file_name.includes('_T') ? '红外图片' : '可见光图片'"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <div class="info-row">
+            <strong>航线名称:</strong>
+            <input
+              type="text"
+              :value="jobInfo.file_name"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <div class="info-row">
+            <strong>照片分辨率:</strong>
+            <input
+              type="text"
+              :value="`${selectedImage.width} * ${selectedImage.height}`"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <div class="info-row">
+            <strong>拍摄时间:</strong>
+            <input
+              type="text"
+              :value="new Date(selectedImage.create_time).toLocaleString()"
+              class="info-input"
+              readonly
+            />
+          </div>
+          <div class="info-row">
+            <strong>文件大小:</strong>
+            <input
+              type="text"
+              :value="Number(selectedImage.size).toFixed(2) + 'M'"
+              class="info-input"
+              readonly
+            />
           </div>
         </div>
-        <div class="content-right">
-          <canvas ref="canvas" @mousedown="startDrawing" @mousemove="draw" @mouseup="stopDrawing"
-            style="height: 100%;width: 100%"></canvas>
+      </div>
+
+      <!-- 放大图操作按钮 -->
+      <div class="preview-container">
+        <div class="preview-actions">
+          <!-- 放大 -->
+          <!-- <el-button icon="el-icon-zoom-in" @click="zoomIn" size="small"></el-button> -->
+          <!-- 缩小 -->
+          <!-- <el-button icon="el-icon-zoom-out" @click="zoomOut" size="small"></el-button> -->
+          <!-- 旋转 -->
+          <el-button icon="el-icon-rotate-left" @click="rotate" size="small"
+            >旋转方向</el-button
+          >
+          <!-- 重置方向 -->
+          <el-button
+            icon="el-icon-refresh"
+            @click="resetOrientation"
+            size="small"
+            >重置方向</el-button
+          >
+          <!-- 下载 -->
+          <el-button
+            icon="el-icon-download"
+            @click="downloadImageLocal(selectedImage,'defect')"
+            size="small"
+            >下载图片</el-button
+          >
+        </div>
+
+        <!-- 下方显示缩略图 -->
+        <div class="preview-thumbnails">
+          <!-- 左侧滚动按钮 -->
+          <!-- <button class="scroll-button left" @click="scrollLeft">&lt;</button> -->
+          <div class="thumbnail-container">
+            <!-- <el-row gutter="5">
+              <el-col  -->
+            <div
+              v-for="(item, index) in mediaData.data"
+              :key="index"
+              class="thumbnail-item"
+            >
+              <img
+                :src="getImageUrl(item.defect_image_url)"
+                alt=""
+                class="thumbnail-image"
+                :class="{ active: selectedImage === item }"
+                @click="selectImage(item, 'origin')"
+              />
+              <!-- </el-col>
+            </el-row> -->
+            </div>
+          </div>
+          <!-- 右侧滚动按钮 -->
+          <!-- <button class="scroll-button right" @click="scrollRight">&gt;</button> -->
         </div>
       </div>
-    </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted, inject } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
+import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { IPage } from '/@/api/http/type'
 import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
-import { Search, Download, Document, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getFlyTaskResultApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
+import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
+import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
@@ -425,6 +544,8 @@ const viewReportVisible = ref(false)
 const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
+
+const resultType = ref(1)
 
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '40'],
@@ -447,6 +568,7 @@ const formRules = {
     { required: true, message: '请选择缺陷类型', trigger: 'change' }
   ]
 }
+
 // ===========================================================请求数据===========================================================================================
 const jobInfo = reactive({
   job_id: '',
@@ -492,10 +614,44 @@ onMounted(() => {
   jobInfo.status = data.status
   jobInfo.file_name = data.file_name
   jobInfo.file_id = data.file_id
-
+  getTaskResultType()
   getFiles()
   getDefectTypeMap()
 })
+
+/**
+ * 工具函数，路径拼接
+ */
+function getImageUrl (path:string) {
+  if (!path) return ''
+
+  const baseURL = config.baseURL || ''
+  const imagePath = path.replace(/^\/+/, '') // 移除开头的斜杠
+
+  // 确保baseURL以斜杠结尾，路径不以斜杠开头
+  if (baseURL.endsWith('/')) {
+    return baseURL + imagePath
+  } else {
+    return baseURL + '/' + imagePath
+  }
+}
+
+/**
+ * 获取任务结果显示类型
+ */
+
+async function getTaskResultType () {
+  try {
+    const res = await getTaskResultTypeApi(jobInfo.job_id)
+    if (res.code !== 0) {
+      ElMessage.error('系统异常')
+      return
+    }
+    resultType.value = res.data
+  } catch (error) {
+
+  }
+}
 
 /**
  * 获取缺陷类型字典
@@ -568,6 +724,28 @@ async function exportImageZip () {
   try {
     loading.value = true
     const res = await downloadImageZipApi(jobInfo.job_id)
+    if (!res) {
+      loading.value = false
+      return
+    }
+    const data = new Blob([res])
+    downloadFile(data, `${jobInfo.job_name}.zip`)
+  } catch (error) {
+    console.error('下载图片数据集失败:', error)
+    loading.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+/**
+ * 下载初始图片
+ */
+
+async function exportOriginImage () {
+  try {
+    loading.value = true
+    const res = await downloadOriginImageZipApi(jobInfo.job_id)
     if (!res) {
       loading.value = false
       return
@@ -681,7 +859,6 @@ async function getFiles () {
   }).then(res => {
     mediaData.data = res.data.list
     paginationProp.total = res.data.pagination.total
-    getUrls()
   })
 }
 
@@ -691,188 +868,31 @@ function reset () {
   getFiles()
 }
 
-async function getUrls () {
-  for (const item of mediaData.data) {
-    const url = null
-    const Temp = null
-    const height = null
-    const width = null
-    const fileSizeInMB = null
-    // 解构赋值获取url、width和height
-    const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await downloadMedia(item.file_id, item.file_name)
-
-    // 将返回的值赋给item
-    item.url = mediaUrl
-  }
-}
-
-// 转换成目标数据格式
-function transformData (data) {
-  return data.pointCountList.map(item => {
-    return item.mediaFileDTOS.map(media => {
-      return {
-        file_id: media.file_id,
-        file_name: media.file_name,
-        create_time: media.create_time,
-        pointPosition: item.pointPosition,
-        point_name: item.pubWaylinePointDfEntity ? item.pubWaylinePointDfEntity.point_name : ''
-      }
-    })
-  }).flat() // 使用 flat() 将嵌套的数组扁平化
-}
-
-/**
- * @description: 下载图片，获取图片得地址
- * @param {string} workspaceId 工作空间id
- * */
-function downloadThumbnailInfo (file_id: string, file_name: string) {
-  return new Promise((resolve, reject) => {
-    // downloadMediaFile(workspaceId, file_id).then(res => {
-    downloadThumbnail(workspaceId, file_id).then(res => {
-      if (!res) {
-        return reject(new Error('Failed to download media file'))
-      }
-      const data = new Blob([res])
-      const imgUrl = URL.createObjectURL(data)
-      resolve({ url: imgUrl })
-    }).catch(error => {
-      reject(new Error(error.message || 'Failed to download media file'))
-    })
-  })
-}
-
-/**
- * @description: 下载图片，获取图片得地址
- * @param {string} workspaceId 工作空间id
- * */
-function downloadMedia (file_id: string, file_name: string) {
-  return new Promise((resolve, reject) => {
-    downloadMediaFile(workspaceId, file_id).then(res => {
-      if (!res) {
-        return reject(new Error('Failed to download media file'))
-      }
-      const data = new Blob([res])
-      const imgUrl = URL.createObjectURL(data)
-      const img = new Image()
-
-      // 等图片加载完成后获取其宽高
-      img.onload = async () => {
-        // 获取文件的宽高
-        const height = img.height
-        const width = img.width
-
-        // 获取文件的大小（字节）
-        const fileSizeInBytes = data.size
-        // console.log('文件字节大小:', fileSizeInBytes)
-
-        // 将字节转换为MB
-        const fileSizeInMB = fileSizeInBytes / (1024 * 1024)
-
-        let Temp = ''
-
-        // 如果文件名包含 '_T.'，调用 getTEMP 获取宽度
-        if (file_name.includes('_T')) {
-          Temp = await getTEMP(file_id, 1, 1, 500, 500)
-        }
-
-        // 返回图片的URL以及宽
-        resolve({ url: imgUrl, Temp, width, height, fileSizeInMB })
-      }
-      // 为Image对象设置图片的src属性，开始加载图片
-      img.src = imgUrl
-    }).catch(error => {
-      reject(new Error(error.message || 'Failed to download media file'))
-    })
-  })
-}
-
-/**
- * 下载原图相关信息，避免重复下载
- * @param file_id
- * @param file_name
- */
-function getOrigionImage (file_id: string, file_name: string) {
-  return new Promise((resolve, reject) => {
-    downloadMediaFile(workspaceId, file_id).then(res => {
-      if (!res) {
-        return reject(new Error('Failed to download media file'))
-      }
-      const data = new Blob([res])
-      const imgUrl = URL.createObjectURL(data)
-      const img = new Image()
-
-      // 等图片加载完成后获取其宽高
-      img.onload = async () => {
-        // 获取文件的宽高
-        const height = img.height
-        const width = img.width
-
-        // 获取文件的大小（字节）
-        const fileSizeInBytes = data.size
-        // console.log('文件字节大小:', fileSizeInBytes)
-
-        // 将字节转换为MB
-        const fileSizeInMB = fileSizeInBytes / (1024 * 1024)
-
-        let Temp = ''
-
-        // 如果文件名包含 '_T.'，调用 getTEMP 获取宽度
-        if (file_name.includes('_T')) {
-          Temp = await getTEMP(file_id, 1, 1, 500, 500)
-        }
-        const imageInfo = {
-          file_id: file_id as string,
-          url: imgUrl as string,
-          Temp: Temp as string,
-          width: width as number,
-          height: height as number,
-          size: fileSizeInMB as number
-        }
-        origionImageUrls.value.push(imageInfo)
-        // 返回图片的URL以及宽
-        resolve({ url: imgUrl, Temp, width, height, fileSizeInMB })
-      }
-      // 为Image对象设置图片的src属性，开始加载图片
-      img.src = imgUrl
-    }).catch(error => {
-      reject(new Error(error.message || 'Failed to download media file'))
-    })
-  })
-}
-
-/**
- * @description: 下载图片到本地
- * @param {string} workspaceId 工作空间id
- * */
-
-function downloadMediaLocal (media: any) {
-  loading.value = true
-  // downloadThumbnail(workspaceId, media.file_id).then(res => {
-  downloadMediaFile(workspaceId, media.file_id).then(res => {
-    if (!res) {
-      return
-    }
-    const data = new Blob([res])
-    downloadFile(data, media.file_name)
-  }).finally(() => {
-    loading.value = false
-  })
-}
-
 /**
  * @description: 下载分析图片到本地
  * @param {string} workspaceId 工作空间id
+ * @param {string} type 图片类型 origin：原图，defect:分析图
  * */
 
-function downloadImageLocal (media: any) {
+function downloadImageLocal (media: any, type: string) {
   // 判断media是否包含url属性
-  if (!media || !media.defect_image_url) {
-    ElMessage.error('图片地址无效')
-    return
+  let imageUrl = ''
+  if (type === 'defect') {
+    if (!media || !media.defect_image_url) {
+      ElMessage.error('图片地址无效')
+      return
+    }
+    imageUrl = getImageUrl(media.defect_image_ur)
+  } else {
+    if (!media || !media.original_image_url) {
+      ElMessage.error('图片地址无效')
+      return
+    }
+    imageUrl = getImageUrl(media.original_image_url)
   }
 
   // 从图片地址下载
-  fetchImageFromUrl(media.defect_image_url, media.file_name)
+  fetchImageFromUrl(imageUrl, media.file_name)
     .catch(error => {
       console.error('下载失败:', error)
       ElMessage.error('下载失败: ' + error.message)
@@ -919,299 +939,6 @@ async function fetchImageFromUrl (imageUrl: string, fileName: string) {
   }
 }
 
-// ==========================================================================红外测温=====================================================================================
-
-/**
- * @description: 打开测温弹窗
- * @param {string} waylineInfo 航线信息
- * */
-const context = ref<CanvasRenderingContext2D | null>(null)
-const canvas = ref<HTMLCanvasElement | null>(null)
-const send_image = ref()
-const image = ref<HTMLImageElement | null>(null) // 使用 ref 来处理响应式 Image
-const img_size = ref({ width: '', height: '', canvas_width: '', canvas_height: '' })
-const showTempConfig = ref(false)
-function handleTempConfig (val: any) {
-  tt.value = ''
-  showTempConfig.value = true
-  context.value?.clearRect(0, 0, canvas.value?.width || 0, canvas.value?.height || 0)
-  // console.log('saffwafa', selectedImage.value)
-  setTimeout(() => {
-    drawImage(selectedImage.value.url)
-  }, 1000)
-}
-
-/**
- * @description: 关闭测温弹窗
- * */
-function closeTempConfig () {
-  showTempConfig.value = false
-}
-
-const tempType = ref(1)
-const tempTypeOption = [
-  {
-    label: '点测温',
-    value: 1
-  },
-  {
-    label: '区域测温',
-    value: 2
-  }
-]
-
-/**
- * @description: 更新测温类型
- * @param {Number} selectedValue 选中类型
- * */
-function updateTempType (selectedValue) {
-  isDrawing = false
-  context.value.clearRect(0, 0, canvas.value.width, canvas.value.height)
-  context.value?.drawImage(image.value, 0, 0, canvas.value.width, canvas.value.height) // 重绘图片
-}
-
-/**
- * @description: 提交测温配置
- * @param {number} tempType 选中类型
- * @param {number} firstPoint_x  第一个点坐标
- * @param {number} firstPoint_y  第一个点坐标
- * @param {number} secondPoint_x  第一个点坐标
- * @param {number} secondPoint_y  第一个点坐标
- * */
-const points = reactive({
-  firstPoint_x: 0,
-  firstPoint_y: 0,
-  secondPoint_x: 0,
-  secondPoint_y: 0,
-})
-function saveTEMPConfig () {
-  if (tempType.value === 2) {
-    getTEMP(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y, points.secondPoint_x, points.secondPoint_y)
-  } else {
-    getTEMP1(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y)
-  }
-}
-
-/**
- * @description: 图片绘制方法实现
- * */
-// 计算并保存缩放比例
-let scaleX = 1
-let scaleY = 1
-let scaleX1 = 1
-let scaleY1 = 1
-// 加载并绘制图片
-const drawImage = (imageUrl: string) => {
-  context.value = canvas.value?.getContext('2d')
-  const img = new Image()
-  img.onload = () => {
-    send_image.value = imageUrl // 保存图片的 base64 数据或 URL
-    image.value = img
-    const height = 600 // 固定高度
-    const width = 600 // 固定宽度
-    scaleY = img.height / height
-    scaleX = img.width / width
-    scaleX1 = 512 / img.height
-    scaleY1 = 640 / img.width
-    if (canvas.value && context.value) {
-      canvas.value.width = width
-      canvas.value.height = height
-      context.value.clearRect(0, 0, canvas.value.width, canvas.value.height) // 清空 Canvas
-      context.value.drawImage(img, 0, 0, width, height) // 绘制图片
-      img_size.value = {
-        width: img.width.toString(),
-        height: img.height.toString(),
-        canvas_width: width.toString(),
-        canvas_height: height.toString(),
-      }
-    }
-  }
-  img.src = imageUrl // 设置图片来源
-}
-/**
- * @description: 鼠标触发绘制
- * */
-let isDrawing = false
-let startX = 0
-let startY = 0
-let dianx = 0
-let diany = 0
-// 开始画框的函数，鼠标点击时触发，
-const startDrawing = (event) => {
-  if (tempType.value === 2) { // 只在区域测温模式下启用绘制
-    isDrawing = true
-    startX = event.offsetX
-    startY = event.offsetY
-    dianx = event.offsetX
-    diany = event.offsetY
-  } else if (tempType.value === 1) { // 在点测温模式下启用点击绘制
-    // 点测温，记录点击的位置
-    drawPoint(event)
-  }
-}
-
-/**
- * @description: 绘制函数，绘制点和框
- * @param 鼠标对象 MouseEvent
- * */
-const aa = ref('')
-const result = ref()
-const draw = (event: MouseEvent) => {
-  if (tempType.value === 2 && isDrawing) { // 只有在区域测温时才执行绘制
-    const currentX = event.offsetX
-    const currentY = event.offsetY
-    const width = currentX - startX
-    const height = currentY - startY
-
-    // 清空之前的绘制内容
-    context.value?.clearRect(0, 0, canvas.value?.width || 0, canvas.value?.height || 0)
-
-    // 重新绘制图片
-    if (image.value) {
-      context.value?.drawImage(image.value, 0, 0, canvas.value.width, canvas.value.height)
-    }
-
-    // 计算矩形的起始位置和宽高，确保坐标顺序正确
-    const rectX = width < 0 ? currentX : startX
-    const rectY = height < 0 ? currentY : startY
-    const rectWidth = Math.abs(width)
-    const rectHeight = Math.abs(height)
-
-    // 绘制新的矩形
-    context.value!.strokeStyle = 'red' // 设置边框颜色为红色
-    context.value?.beginPath()
-    context.value?.rect(rectX, rectY, rectWidth, rectHeight)
-    context.value?.stroke()
-    points.firstPoint_x = Math.round(rectX * scaleX * scaleX1)
-    points.firstPoint_y = Math.round(rectY * scaleY * scaleY1)
-    points.secondPoint_x = Math.round(points.firstPoint_x + rectWidth * scaleX * scaleX1)
-    points.secondPoint_y = Math.round(points.firstPoint_y + rectHeight * scaleY * scaleY1)
-    console.log('测试',)
-    // points.firstPoint_x = Math.round(rectX)
-    // points.firstPoint_y = Math.round(rectY)
-    // points.secondPoint_x = Math.round(points.firstPoint_x + rectWidth)
-    // points.secondPoint_y = Math.round(points.firstPoint_y + rectHeight)
-
-    // insertTEMPConfig(file_path.value, left_top_x.value, left_top_y.value, right_bottom_x.value, right_bottom_y.value).then(res => {
-    //   if (!res) {
-    //     return
-    //   }
-    //   result.value = res.data
-    // })
-  }
-}
-
-/**
- * @description: 框测温，停止绘制框的函数，鼠标松开时触发
- * */
-
-const stopDrawing = () => {
-  if (isDrawing) {
-    isDrawing = false
-    console.log('Rectangular drawing stopped')
-
-    getTEMP(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y, points.secondPoint_x, points.secondPoint_y)
-    //   if (tempType.value === 2) {
-    //   getTEMP(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y, points.secondPoint_x, points.secondPoint_y)
-    // } else {
-    //   getTEMP1(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y)
-    // }
-  }
-}
-
-/**
- * @description: 绘制测温点
- * @param 鼠标对象 event
- * */
-function drawPoint (event) {
-  const pointX = event.offsetX
-  const pointY = event.offsetY
-
-  // 清空画布并重新绘制图片
-  context.value?.clearRect(0, 0, canvas.value?.width || 0, canvas.value?.height || 0)
-  if (image.value) {
-    context.value?.drawImage(image.value, 0, 0, canvas.value.width, canvas.value.height)
-  }
-
-  // 确保 context.value 是有效的 2d 上下文对象, 绘制一个圆点，作为测温点
-  if (context.value) {
-    const radius = 5
-    context.value.beginPath()
-    context.value.arc(pointX, pointY, radius, 0, Math.PI * 2)
-    context.value.fillStyle = 'red'
-    context.value.fill()
-  }
-  points.firstPoint_x = Math.round(pointX * scaleX * scaleX1)
-  points.firstPoint_y = Math.round(pointY * scaleY * scaleY1)
-  // points.firstPoint_x = Math.round(pointX)
-  // points.firstPoint_y = Math.round(pointY)
-  getTEMP1(selectedImage.value.file_id, points.firstPoint_x, points.firstPoint_y)
-}
-
-/**
- * @description: 获取测温结果
- * @param {string} file_id 文件名字
- * @param {number} firstPoint_x  第一个点坐标
- * @param {number} firstPoint_y  第一个点坐标
- * @param {number} secondPoint_x  第二个点坐标
- * @param {number} secondPoint_y  第二个点坐标
- * @param {string} workspaceId  工作空间id
- * */
-const tt = ref('')
-function getTEMP (file_id: string, firstPoint_x: number, firstPoint_y: number, secondPoint_x: number, secondPoint_y: number): Promise<string> {
-  const obj = {
-    left_top_x: firstPoint_x, // 可以是数字或字符串，具体根据实际需要调整
-    left_top_y: firstPoint_y,
-    right_bottom_x: secondPoint_x,
-    right_bottom_y: secondPoint_y
-  }
-  return insertTEMPConfig(workspaceId, file_id, obj)
-    .then(res => {
-      // res.data.average_tem = parseFloat(res.data.average_tem.toFixed(1))
-      tt.value = res.data
-      // console.log('1111111111111111', tt.value)
-      return res.data // 假设 res.data 是你想要的字符串
-    })
-}
-
-function getTEMP1 (file_id: string, firstPoint_x: number, firstPoint_y: number) {
-  const obj = {
-    point_x: firstPoint_x,
-    point_y: firstPoint_y,
-  }
-  return insertTEMPConfig1(workspaceId, file_id, obj)
-    .then(res => {
-      tt.value = res.data
-      return res.data // 假设 res.data 是你想要的字符串
-    })
-}
-
-/**
- * @description: 获取选中记录的最高温度
- * */
-function getHighestTemp (val: any) {
-  // console.log('测温结果', val)
-  if (!val) {
-    return ''
-  }
-  const Temp = '(最低温度:' + val.min_tem + ',最高温度:' + val.max_tem + ')'
-  return Temp // 返回最高温度（H）
-}
-// ======================================================================================================================================================================
-const body: IPage = {
-  page: 1,
-  total: 0,
-  page_size: 5
-}
-
-type Pagination = TableState['pagination']
-
-// 表格数据
-const plansData = reactive({
-  data: [] as Task[], // 任务列表
-  selectedTasks: [] as Task[], // 用户选中的任务
-})
-
 // ===========================================================前端分页功能实现==================================================
 function handleSizeChange (val: number) {
   paginationProp.pageSize = val
@@ -1238,13 +965,8 @@ async function openPreviewModal (row: any) {
   selectedImage.value.size = 0.00
   // 将弹窗显示状态设为 true
   previewVisible.value = true
-  const index = origionImageUrls.value.findIndex(val => val.file_id === selectedIndex.value.file_id)
-  if (index !== -1) {
-    updateSelectedImage(origionImageUrls.value[index])
-  } else {
-    const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await getOrigionImage(selectedImage.value.file_id, selectedImage.value.file_name)
-    updateSelectedImage({ url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, size: mediasize })
-  }
+
+  getImageAttributes(row.defect_image_url)
 }
 
 // 打开预览分析图片的弹窗
@@ -1263,10 +985,10 @@ async function openPreviewAnaysisModal (row:any) {
 }
 
 // 获取图片属性信息
-async function getImageAttributes (imageUrl: string) {
+async function getImageAttributes (Url: string) {
   try {
     // 先设置图片地址
-    // selectedImage.value.defect_image_url = imageUrl
+    const imageUrl = getImageUrl(Url)
 
     // 获取图片信息
     const img = new Image()
@@ -1276,7 +998,6 @@ async function getImageAttributes (imageUrl: string) {
         try {
           // 获取文件大小
           let fileSize = 0.0
-
           // 如果是远程图片，尝试获取文件大小
           if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
             try {
@@ -1335,56 +1056,41 @@ async function getImageAttributes (imageUrl: string) {
   }
 }
 
-// 赋值函数
-function updateSelectedImage (imageInfo: { url: string, Temp: string, width: number, height: number, size: number }) {
-  selectedImage.value.url = imageInfo.url
-  selectedImage.value.Temp = imageInfo.Temp
-  selectedImage.value.width = imageInfo.width
-  selectedImage.value.height = imageInfo.height
-  selectedImage.value.size = imageInfo.size
-}
-
 // 切换到上一张图片
-async function showPreviousImage () {
+async function showPreviousImage (type:string) {
   if (selectedIndex.value > 0) {
     selectedIndex.value -= 1
     selectedImage.value = mediaData.data[selectedIndex.value]
-    const index = origionImageUrls.value.findIndex(val => val.file_id === selectedIndex.value.file_id)
-    if (index !== -1) {
-      updateSelectedImage(origionImageUrls.value[index])
+    // 判断是分析图列表还是原始图列表
+    if (type === 'defect') {
+      getImageAttributes(selectedImage.value.defect_image_url)
     } else {
-      const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await getOrigionImage(selectedImage.value.file_id, selectedImage.value.file_name)
-      updateSelectedImage({ url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, size: mediasize })
+      getImageAttributes(selectedImage.value.original_image_url)
     }
   }
 }
 
 // 切换到下一张图片
-async function showNextImage () {
+async function showNextImage (type:string) {
   if (selectedIndex.value < mediaData.data.length - 1) {
     selectedIndex.value += 1
     selectedImage.value = mediaData.data[selectedIndex.value]
-    const index = origionImageUrls.value.findIndex(val => val.file_id === selectedIndex.value.file_id)
-    if (index !== -1) {
-      updateSelectedImage(origionImageUrls.value[index])
+    if (type === 'defect') {
+      getImageAttributes(selectedImage.value.defect_image_url)
     } else {
-      const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await getOrigionImage(selectedImage.value.file_id, selectedImage.value.file_name)
-      updateSelectedImage({ url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, size: mediasize })
+      getImageAttributes(selectedImage.value.original_image_url)
     }
   }
 }
 
 // 选择缩略图
-async function selectImage (item: any) {
+async function selectImage (item: any, type:string) {
   // 设置当前选中的图片
   selectedImage.value = item
-  // 判断选中图片是否已下载
-  const index = origionImageUrls.value.findIndex(val => val.file_id === item.file_id)
-  if (index !== -1) {
-    updateSelectedImage(origionImageUrls.value[index])
+  if (type === 'defect') {
+    getImageAttributes(selectedImage.value.defect_image_url)
   } else {
-    const { url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, fileSizeInMB: mediasize } = await getOrigionImage(item.file_id, item.file_name)
-    updateSelectedImage({ url: mediaUrl, Temp: mediaTemp, width: mediaWidth, height: mediaHeight, size: mediasize })
+    getImageAttributes(selectedImage.value.original_image_url)
   }
 
   // 获取缩略图容器和当前选中的图片
@@ -1411,11 +1117,6 @@ async function selectImage (item: any) {
       })
     }
   }
-}
-
-// 关闭弹窗
-function handleClose () {
-  previewVisible.value = false
 }
 
 // // 放大图片
