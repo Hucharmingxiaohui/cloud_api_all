@@ -1,7 +1,7 @@
 /**
  * 工具函数，路径拼接
  */
-export function getImageUrl (baseURL:string, path:string) {
+export function getImageUrl (baseURL, path) {
   if (!path) return ''
   if (!baseURL) return ''
 
