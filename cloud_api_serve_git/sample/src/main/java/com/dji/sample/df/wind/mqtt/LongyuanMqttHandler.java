@@ -8,12 +8,14 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
+import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
 import com.dji.sample.center.model.entity.CenterToUavPlanEntity;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.StringUtil;
 import com.dji.sample.center.utils.ftp.FtpUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
+import com.dji.sample.center.v2022.command.upload.PatrolResultItem;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.common.model.CustomClaim;
@@ -27,8 +29,10 @@ import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.controller.FjReportController;
+import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
@@ -103,7 +107,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     @Autowired
     private CenterNormalConfig centerConfig;
     @Autowired
-    CenterFtpsNormalConfig  centerFtpsNormalConfig;
+    CenterFtpsNormalConfig centerFtpsNormalConfig;
     @Autowired
     DefectEntityMapper defectEntityMapper;
 
@@ -342,7 +346,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     if (matchedTurbine!=null) {
 
                         // 存入定时任务
-                        taskTimerManager.addScheduledTask(taskCode, fixedStartTime,
+                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
                     }
@@ -554,7 +558,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //                mqttSender.sendToPatrolData(resultMessage);
 
                 PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + taskPatrolledId + "/";
+                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
 //                String localFile = point.getMediaFileDTOS().get(0).getFilePath();
                 DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
                         .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
@@ -582,7 +586,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 item.setRecognition_type("");
                 item.setFile_path(format);
                 item.setRectangle("");
-                item.setTask_patrolled_id(taskPatrolledId);
+                item.setTask_patrolled_id(waylineJobEntity.getJobId());
                 item.setObj_id("");
                 item.setValid("1");
                 commandData.addItem(item);
@@ -641,7 +645,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }else if(isFinished == 0){
             progress = waylineJobDTO.getProgress();
         }
-        data.put("taskPatrolledId", taskPatrolledId);
+        data.put("taskPatrolledId", waylineJobEntity.getJobId());
         data.put("taskName", taskName);
         data.put("taskCode", taskCode);
         data.put("taskState", mappedState);
@@ -657,7 +661,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
         List<PatrolStatusItem> patrolStatusItems = new ArrayList<>();
         PatrolStatusItem item = new PatrolStatusItem();
-        item.setTask_patrolled_id(taskPatrolledId);
+        item.setTask_patrolled_id(waylineJobEntity.getJobId());
         item.setTask_name(taskName);
         item.setTask_code(taskCode);
         item.setTask_state(mappedState);
