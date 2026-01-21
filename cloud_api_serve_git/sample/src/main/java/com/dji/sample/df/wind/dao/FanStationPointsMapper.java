@@ -13,7 +13,7 @@ public interface FanStationPointsMapper extends BaseMapper<FanStationPoints> {
 
     List<FanStationPoints> selectListById(Map map);
 
-    int deleteByDeviceId(Map map);
+    int deleteByDeviceId(String id);
 
     int selectListCount(Map map);
 }

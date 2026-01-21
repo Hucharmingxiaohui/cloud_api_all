@@ -2415,7 +2415,26 @@ public class FjReportServiceImpl implements FjReportService {
         for (int i = 0; i < defects.size(); i++) {
             DefectEntity defect = defects.get(i);
             defect.setJobId(jobId);
-            defectEntityMapper.insert(defect);
+            // 首先查询是否存在相同的记录
+            LambdaQueryWrapper<DefectEntity> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(DefectEntity::getJobId, defect.getJobId())
+                    .eq(DefectEntity::getFanCode, defect.getFanCode())
+                    .eq(DefectEntity::getFanPart, defect.getFanPart());
+
+            DefectEntity existingDefect = defectEntityMapper.selectOne(wrapper);
+
+            if (existingDefect != null) {
+                // 如果存在，设置ID并更新
+                defect.setId(existingDefect.getId());
+                defectEntityMapper.updateById(defect);
+            } else {
+                // 如果不存在，插入新记录
+                defectEntityMapper.insert(defect);
+            }
+//            defect.getJobId();
+//            defect.getFanCode();
+//            defect.getDefectType();
+//            defectEntityMapper.insert(defect);
             System.out.println((i + 1) + ". " + defect);
         }
 
