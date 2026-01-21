@@ -67,6 +67,8 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
     @Override
     public boolean addPointsById(String id) {
         // 1. 查询风机信息
+//      把原有数据删了
+        fanStationPointsMapper.deleteByDeviceId(id);
         WindTurbine windTurbine = windTurbineMapper.selectById(id);
         if (windTurbine == null) {
             throw new RuntimeException("未找到风机信息，ID: " + id);
@@ -130,11 +132,11 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
         return result;
     }
 
-    @Override
-    public int deletePointsById(Map map) {
-         return fanStationPointsMapper.deleteByDeviceId(map);
-
-    }
+//    @Override
+//    public int deletePointsById(Map map) {
+//         return fanStationPointsMapper.deleteByDeviceId(map);
+//
+//    }
 
     /**
      * 生成点位列表

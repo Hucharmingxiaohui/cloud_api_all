@@ -36,6 +36,7 @@ import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
+import com.dji.sample.df.wind.utils.FileNameUtils;
 import com.dji.sample.media.controller.FileController;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -411,7 +412,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 } else if (status == 3 || status == 1|| status == 5|| status == 4) {
                     // 如果任务已完成（假设状态3为完成，还有别的），停止监控
                     sendWindTurbineTaskStatus(taskCode,taskName,1);
-                    sendWindTurbineTaskStatus(taskCode,taskName,1);
+//                    sendWindTurbineTaskStatus(taskCode,taskName,1);
                     if(status == 3){
                         // 查询航线任务状态
                         log.info("上传数为"+waylineJobDTO.getUploadedCount()+"总数为"+waylineJobDTO.getMediaCount());
@@ -419,7 +420,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
 //                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果（风机任务也直接回传结果只不过继续执行分析逻辑）
-                            sendPatrolResult(taskCode, taskName, waylineJobEntity);
+//                            sendPatrolResult(taskCode, taskName, waylineJobEntity);
                             log.info("进入分析逻辑---------");
                             // 1. 异步启动图片保存分析
                             new Thread(() -> {
@@ -467,15 +468,17 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                 if (data==1) {
                     log.info("分析完成: taskCode={}, jobId={}", taskCode, jobId);
-
+                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                            .eq(WaylineJobEntity::getJobId, jobId)
+                    );
+                    log.info("分析完成上传照片--------");
+                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = fjReportController.createHisTaskReport(jsonObject);
                     log.info("已生成完报告-------");
-                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                            .eq(WaylineJobEntity::getJobId, jobId)
-                    );
+
 //                    log.info("开始发送图片报告结果----");
 //                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     // 3. 清理监控
@@ -530,6 +533,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 if (fanStationPoints != null) {
                     pointName=fanStationPoints.getPointName();
                     pointId=fanStationPoints.getPointId();
+                }else {
+//                  没有匹配到就不发送，是无人机多拍了
+                    continue;
                 }
                 String taskPatrolledId = String.format("%s_%s_%s",
                         stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
@@ -567,9 +573,10 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 String imagePath = defectEntity.getImagePath();
                 String filePath = convertImagePath(imagePath);
                 String destName = new File(filePath).getName();
-                FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName);
+                String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
+                FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName1);
                 //推送点位报文
-                String format = String.format("%s/%s", destDir, destName);
+                String format = String.format("%s/%s", destDir, destName1);
 
                 PatrolResultItem item = new PatrolResultItem();
                 item.setPatroldevice_name("大疆M4td");
@@ -585,6 +592,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //              识别类型先设置为空
                 item.setRecognition_type("");
                 item.setFile_path(format);
+                item.setFile_type("2");
                 item.setRectangle("");
                 item.setTask_patrolled_id(waylineJobEntity.getJobId());
                 item.setObj_id("");
