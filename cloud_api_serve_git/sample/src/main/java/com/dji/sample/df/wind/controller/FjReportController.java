@@ -135,9 +135,10 @@ public class FjReportController {
             waylineJobMapper.updateById(waylineJobEntity);
             Result<Map> result = pictureSaveHandler.pictureSave(jobId);
             if(result.getCode() == 0){
-                Map data = result.getData();
-                resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
-                log.info("进行分析------");
+//                先不不对接分析
+//                Map data = result.getData();
+//                resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
+//                log.info("进行分析------");
                 return Result.success("success");
             }
 //          return Result.notfan("不是风机任务");
