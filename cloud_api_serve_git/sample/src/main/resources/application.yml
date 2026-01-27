@@ -263,7 +263,8 @@ vtask:
   localIp: 172.20.63.157
 other:
   logFilePath: /dfe-patrol-dog/logs
-#本地文件相关配置
+
+#本地文件相关配置（没用）
 file:
   #文件url请求头部
   fileUrl: /dog/images/
@@ -286,9 +287,9 @@ fjfile:
   # 巡视报告位置，
 #  D:/report/, linux配/home/uav_server/report/
   fileReportPath: D:/report/
-
+# 分析服务上传ftp路径
   recfilePath: /ftpdir/admin_files/
-
+# 分析服务上传ftp相对路径
   recfileNativePath: /recfile_images/
 
 
@@ -301,13 +302,15 @@ wayline:
     interest-point-wayline: "http://172.20.63.157:5001/poi"
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20012/api"
-
+#  系统编码
 longyuan:
   sender: "UpperPlatform"
   stationCode: "Sub_WeiLan"
 uavPlatform:
   sender: "UavPatrolSystem"
   stationCode: "Sub_WeiLan"
+hebei:
+  stationCode: "HDCN"
 
 lyftps:
   ftpIp: 172.20.63.157

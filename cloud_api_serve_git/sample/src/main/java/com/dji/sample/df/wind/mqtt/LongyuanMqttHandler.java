@@ -4,21 +4,18 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
 import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
-import com.dji.sample.center.model.entity.CenterToUavPlanEntity;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.center.utils.DateUtils;
-import com.dji.sample.center.utils.StringUtil;
 import com.dji.sample.center.utils.ftp.FtpUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.PatrolResultItem;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
-import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
@@ -32,10 +29,12 @@ import com.dji.sample.df.wind.controller.FjReportController;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
+import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
+import com.dji.sample.df.wind.utils.FileNameUtils;
 import com.dji.sample.media.controller.FileController;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -65,6 +64,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Component
@@ -110,6 +111,10 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     CenterFtpsNormalConfig centerFtpsNormalConfig;
     @Autowired
     DefectEntityMapper defectEntityMapper;
+    @Autowired
+    private PictureSaveHandler pictureSaveHandler;
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
@@ -411,7 +416,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 } else if (status == 3 || status == 1|| status == 5|| status == 4) {
                     // 如果任务已完成（假设状态3为完成，还有别的），停止监控
                     sendWindTurbineTaskStatus(taskCode,taskName,1);
-                    sendWindTurbineTaskStatus(taskCode,taskName,1);
+//                    sendWindTurbineTaskStatus(taskCode,taskName,1);
                     if(status == 3){
                         // 查询航线任务状态
                         log.info("上传数为"+waylineJobDTO.getUploadedCount()+"总数为"+waylineJobDTO.getMediaCount());
@@ -419,29 +424,39 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
 //                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果（风机任务也直接回传结果只不过继续执行分析逻辑）
-                            sendPatrolResult(taskCode, taskName, waylineJobEntity);
-                            log.info("进入分析逻辑---------");
-                            // 1. 异步启动图片保存分析
-                            new Thread(() -> {
-                                try {
-                                    // 调用分析接口（可能会很慢）
-                                    Result result = fjReportController.pictureSave(jsonObject);
-                                    log.info("图片分析已启动: jobId={}, result={}", jobId, result);
+                            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+                            Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+                            if(planType==1){
+                                log.info("进入分析逻辑---------");
+                                // 1. 异步启动图片保存分析
+                                new Thread(() -> {
+                                    try {
+                                        // 调用分析接口（可能会很慢）
+                                        Result result = fjReportController.pictureSave(jsonObject);
+                                        log.info("图片分析已启动: jobId={}, result={}", jobId, result);
 
-                                    // 2. 开始轮询检查分析状态
-                                    startAnalysisMonitoring(jobId, taskCode,taskName);
+                                        // 2. 开始轮询检查分析状态
+                                        startAnalysisMonitoring(jobId, taskCode,taskName);
 
-                                } catch (Exception e) {
-                                    log.error("启动图片分析失败: jobId={}", jobId, e);
-                                    // 分析失败也要从监控中移除
-                                    monitoringTasks.remove(taskCode);
+                                    } catch (Exception e) {
+                                        log.error("启动图片分析失败: jobId={}", jobId, e);
+                                        // 分析失败也要从监控中移除
+                                        monitoringTasks.remove(taskCode);
+                                    }
+                                }).start();
+                                monitoringTasks.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }else if(planType==0){
+//                              普通任务先不分析直接保存
+                                Result<Map> result = pictureSaveHandler.pictureSave(jobId);
+                                if(result.getCode() == 0){
+                                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
                                 }
-                            }).start();
-                            monitoringTasks.remove(taskCode);
-                            log.info("任务完成，停止监控: taskCode={}", taskCode);
+                                monitoringTasks.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }
                         }
-
-
                     }else {
                         monitoringTasks.remove(taskCode);
                         log.info("任务失败/取消/终止，停止监控: taskCode={}", taskCode);
@@ -467,17 +482,17 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                 if (data==1) {
                     log.info("分析完成: taskCode={}, jobId={}", taskCode, jobId);
-
+                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                            .eq(WaylineJobEntity::getJobId, jobId)
+                    );
+                    log.info("分析完成上传照片--------");
+                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = fjReportController.createHisTaskReport(jsonObject);
                     log.info("已生成完报告-------");
-                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                            .eq(WaylineJobEntity::getJobId, jobId)
-                    );
-//                    log.info("开始发送图片报告结果----");
-//                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
+
                     // 3. 清理监控
                     analyzingTasks.remove(taskCode);
                     analysisStartTime.remove(taskCode);
@@ -507,97 +522,209 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
     public void sendPatrolResult(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
         try {
-            HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), "e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 500L, new HashMap<>());
-            PaginationData<MediaFileDTO> data1 = (PaginationData< MediaFileDTO >)mediaFileByJobId.getData();
-            List<MediaFileDTO> list = data1.getList();
-            for (MediaFileDTO mediaFileDTO : list) {
-                URL url = fileService.getObjectUrl("e3dea0f5-37f2-4d79-ae58-490af3228069",mediaFileDTO.getFileId());
-                String urlString = url.toString();
-                log.info("图片映射路径为"+urlString);
-                Map<String, Object> resultMessage = new HashMap<>();
+            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+            Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+            if(planType==1){
+                HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), "e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 500L, new HashMap<>());
+                PaginationData<MediaFileDTO> data1 = (PaginationData< MediaFileDTO >)mediaFileByJobId.getData();
+                List<MediaFileDTO> list = data1.getList();
+                for (MediaFileDTO mediaFileDTO : list) {
+                    URL url = fileService.getObjectUrl("e3dea0f5-37f2-4d79-ae58-490af3228069",mediaFileDTO.getFileId());
+                    String urlString = url.toString();
+                    log.info("图片映射路径为"+urlString);
+                    Map<String, Object> resultMessage = new HashMap<>();
 
-                resultMessage.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
-                resultMessage.put("timestamp", getCurrentTime());
-                resultMessage.put("sender", sender);
-                resultMessage.put("stationCode", stationCode);
-                resultMessage.put("category", "task");
-                resultMessage.put("action", "result");
+                    resultMessage.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
+                    resultMessage.put("timestamp", getCurrentTime());
+                    resultMessage.put("sender", sender);
+                    resultMessage.put("stationCode", stationCode);
+                    resultMessage.put("category", "task");
+                    resultMessage.put("action", "result");
 
-                FanStationPoints fanStationPoints = fanStationPointsMapper.selectOne(new LambdaQueryWrapper<FanStationPoints>()
-                        .eq(FanStationPoints::getPointName, waylineJobEntity.getFanName() + "-" + mediaFileDTO.getFanCode() + "-" + mediaFileDTO.getFanPart()));
-                String pointId ="-----";
-                String pointName ="错误点位";
-                if (fanStationPoints != null) {
-                    pointName=fanStationPoints.getPointName();
-                    pointId=fanStationPoints.getPointId();
-                }
-                String taskPatrolledId = String.format("%s_%s_%s",
-                        stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
-                Map<String, Object> data = new HashMap<>();
-                data.put("patrolDeviceName","大疆M4td");
-                data.put("patrolDeviceCode", "1581F8HGX253800A030D");
-                data.put("taskName", taskName);
-                data.put("taskCode", taskCode);
+                    FanStationPoints fanStationPoints = fanStationPointsMapper.selectOne(new LambdaQueryWrapper<FanStationPoints>()
+                            .eq(FanStationPoints::getPointName, waylineJobEntity.getFanName() + "-" + mediaFileDTO.getFanCode() + "-" + mediaFileDTO.getFanPart()));
+                    String pointId ="-----";
+                    String pointName ="错误点位";
+                    if (fanStationPoints != null) {
+                        pointName=fanStationPoints.getPointName();
+                        pointId=fanStationPoints.getPointId();
+                    }else {
+//                  没有匹配到就不发送，是无人机多拍了
+                        continue;
+                    }
+                    String taskPatrolledId = String.format("%s_%s_%s",
+                            stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("patrolDeviceName","大疆M4td");
+                    data.put("patrolDeviceCode", "1581F8HGX253800A030D");
+                    data.put("taskName", taskName);
+                    data.put("taskCode", taskCode);
 //              点位名称是拼接，点位id是文件id
-                data.put("pointName", pointName);
-                data.put("pointId", pointId);
-                data.put("valueType", ""); // 4=红外测温
-                data.put("value", "");
-                data.put("valueUnit", "");
-                data.put("unit", "");
-                data.put("time","");
-                data.put("recognitionType", ""); // 4=红外识别
-                data.put("fileType", "3"); // 1=图片
-                data.put("filePath",urlString);
-                data.put("rectangle","");
-                data.put("taskPatrolledId", taskPatrolledId);
-                data.put("valid","1");
+                    data.put("pointName", pointName);
+                    data.put("pointId", pointId);
+                    data.put("valueType", ""); // 4=红外测温
+                    data.put("value", "");
+                    data.put("valueUnit", "");
+                    data.put("unit", "");
+                    data.put("time","");
+                    data.put("recognitionType", ""); // 4=红外识别
+                    data.put("fileType", "3"); // 1=图片
+                    data.put("filePath",urlString);
+                    data.put("rectangle","");
+                    data.put("taskPatrolledId", taskPatrolledId);
+                    data.put("valid","1");
 
-                resultMessage.put("data", data);
-                // 发送到MQTT
+                    resultMessage.put("data", data);
+                    // 发送到MQTT
 //                mqttSender.sendToPatrolData(resultMessage);
 
-                PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                    PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                    String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
 //                String localFile = point.getMediaFileDTOS().get(0).getFilePath();
-                DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
-                        .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
-                        .eq(DefectEntity::getFanCode, mediaFileDTO.getFanCode())
-                        .eq(DefectEntity::getFanPart, mediaFileDTO.getFanPart()));
-                String imagePath = defectEntity.getImagePath();
-                String filePath = convertImagePath(imagePath);
-                String destName = new File(filePath).getName();
-                FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName);
-                //推送点位报文
-                String format = String.format("%s/%s", destDir, destName);
+                    DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
+                            .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
+                            .eq(DefectEntity::getFanCode, mediaFileDTO.getFanCode())
+                            .eq(DefectEntity::getFanPart, mediaFileDTO.getFanPart()));
+                    String imagePath = defectEntity.getImagePath();
+                    String filePath = convertImagePath(imagePath);
+                    String destName = new File(filePath).getName();
+                    String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
+                    FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName1);
+                    //推送点位报文
+                    String format = String.format("%s/%s", destDir, destName1);
 
-                PatrolResultItem item = new PatrolResultItem();
-                item.setPatroldevice_name("大疆M4td");
-                item.setPatroldevice_code("1581F8HGX253800A030D");
-                item.setTask_name(taskName);
-                item.setTask_code(taskCode);
-                item.setDevice_name(pointName);
-                item.setDevice_id(pointId);
-                item.setValue("");
-                item.setUnit("");
-                item.setValue_unit("");
-                item.setTime(DateUtils.getNowDateTimeStr());
+                    PatrolResultItem item = new PatrolResultItem();
+                    item.setPatroldevice_name("大疆M4td");
+                    item.setPatroldevice_code("1581F8HGX253800A030D");
+                    item.setTask_name(taskName);
+                    item.setTask_code(taskCode);
+                    item.setDevice_name(pointName);
+                    item.setDevice_id(pointId);
+                    item.setValue("");
+                    item.setUnit("");
+                    item.setValue_unit("");
+                    item.setTime(DateUtils.getNowDateTimeStr());
 //              识别类型先设置为空
-                item.setRecognition_type("");
-                item.setFile_path(format);
-                item.setRectangle("");
-                item.setTask_patrolled_id(waylineJobEntity.getJobId());
-                item.setObj_id("");
-                item.setValid("1");
-                commandData.addItem(item);
-                patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
-                log.info("上报巡视图片--------: ");
-            }
+                    item.setRecognition_type("");
+                    item.setFile_path(format);
+                    item.setFile_type("2");
+                    item.setRectangle("");
+                    item.setTask_patrolled_id(waylineJobEntity.getJobId());
+                    item.setObj_id("");
+                    item.setValid("1");
+                    commandData.addItem(item);
+                    patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
+                    log.info("上报巡视图片--------: ");
+                }
+            }else if(planType==0) {
+//                  普通计划上传照片（待测）
+                    HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), "e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 500L, new HashMap<>());
+                    PaginationData<MediaFileDTO> data1 = (PaginationData<MediaFileDTO>) mediaFileByJobId.getData();
+                    List<MediaFileDTO> list = data1.getList();
+                    for (MediaFileDTO mediaFileDTO : list) {
+                        String fileName = mediaFileDTO.getFileName();
+                        Integer pointPos = extractWaypointNumber(fileName);
+                        String picType = extractTOrV(fileName);
+                        Integer picType1 = 0;
+                        if(picType.equals("V")){
+                            picType1 = 0;
+                        }else if(picType.equals("T")){
+                            picType1 = 1;
+                        }
+                        UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
+                                .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                                .eq(UniPoint::getWaylinePointPos, pointPos)
+                                .eq(UniPoint::getPicType,picType1));
+                        if(uniPoint == null){
+                            log.info("未查到对应点位-----");
+                            continue;
+                        }
+
+                        PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                        String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                        String regId=uniPoint.getPointCode()+picType;
+                        String replace = fileName.replace(".jpeg", "");
+                        String filePath="/ftpdir/admin_files/recfile_images/"+waylineJobEntity.getJobId()+"/"+regId+"_"+replace+".jpg";
+                        String destName = new File(filePath).getName();
+                        String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
+                        FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName1);
+                        //推送点位报文
+                        String format = String.format("%s/%s", destDir, destName1);
+
+                        PatrolResultItem item = new PatrolResultItem();
+                        item.setPatroldevice_name("大疆M4td");
+                        item.setPatroldevice_code("1581F8HGX253800A030D");
+                        item.setTask_name(taskName);
+                        item.setTask_code(taskCode);
+                        item.setDevice_name(uniPoint.getPointName());
+                        item.setDevice_id(uniPoint.getPointCode());
+                        item.setValue("");
+                        item.setUnit("");
+                        item.setValue_unit("");
+                        item.setTime(DateUtils.getNowDateTimeStr());
+//              识别类型先设置为空
+                        item.setRecognition_type("");
+                        item.setFile_path(format);
+                        item.setFile_type("2");
+                        item.setRectangle("");
+                        item.setTask_patrolled_id(waylineJobEntity.getJobId());
+                        item.setObj_id("");
+                        item.setValid("1");
+                        commandData.addItem(item);
+                        patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
+                        log.info("上报巡视图片--------: ");
+                    }
+                }
 
         } catch (Exception e) {
             log.error("上报巡视结果失败: taskCode={}", taskCode, e);
         }
     }
+
+    public Integer extractWaypointNumber(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 正则表达式：匹配"航点"后面的一个或多个数字
+        // 注意：航点可能是中文，数字可能是一位或多位
+        Pattern pattern = Pattern.compile("航点(\\d+)");
+        Matcher matcher = pattern.matcher(fileName);
+
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                // 如果数字太大或格式错误，返回null
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    public static String extractTOrV(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 移除路径和扩展名，只获取文件名部分
+        String nameWithoutPath = fileName.substring(fileName.lastIndexOf('/') + 1);
+        nameWithoutPath = nameWithoutPath.substring(nameWithoutPath.lastIndexOf('\\') + 1);
+        String nameWithoutExt = nameWithoutPath.split("\\.", 2)[0];
+
+        // 方法1：使用正则表达式匹配_T_或_V_模式
+        Pattern pattern = Pattern.compile("_(T|V)_");
+        Matcher matcher = pattern.matcher(nameWithoutExt);
+
+        if (matcher.find()) {
+            return matcher.group(1);  // 直接返回字符串
+        }
+        return null;
+    }
+
+
 
     public static String convertImagePath(String imagePath) {
         if (imagePath == null || imagePath.isEmpty()) {

@@ -384,7 +384,7 @@
         <button class="prev-image" @click="showPreviousImage('defect')">‹</button>
         <div style="width: 500px; height: 500px;">
           <img
-            :src="selectedImage.defect_image_url"
+            :src="getImageUrl(selectedImage.defect_image_url)"
             alt="放大图"
             class="preview-image"
             ref="previewImage"

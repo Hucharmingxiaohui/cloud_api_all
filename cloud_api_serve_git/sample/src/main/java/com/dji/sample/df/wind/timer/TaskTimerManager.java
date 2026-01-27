@@ -172,6 +172,7 @@ public class TaskTimerManager {
     private void executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
         try {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
+//          间隔航线多对一可以，一对多不可以
             if("0".equals(planType)){
                 UniPoint uniPoint = uniPointMapper2.selectOne(
                         new QueryWrapper<UniPoint>()
@@ -190,6 +191,9 @@ public class TaskTimerManager {
                 customClaim.setUsername("adminPC");
                 pubWaylineJobPlanDfEntity.setName(taskName);
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+                if (httpResultResponse.getCode() == 0) {
+                    log.info("成功执行上级任务------");
+                }
             }else if ("1".equals(planType)){
                 PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                         .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)

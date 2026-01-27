@@ -2,6 +2,8 @@ package com.dji.sample.df.mediaDf.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.server.entity.uni.UniPointEntity;
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.model.JobIdEntity;
@@ -15,6 +17,7 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.Pagination;
 import com.dji.sdk.common.PaginationData;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +27,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -31,6 +36,7 @@ import java.util.stream.Collectors;
  * @version 0.2
  * @date 2021/12/9
  */
+@Slf4j
 @RestController
 @RequestMapping("${url.media.prefix}${url.media.version}/files")
 public class FileControllerDf {
@@ -49,6 +55,9 @@ public class FileControllerDf {
 
     @Value("${server.base-url:http://172.20.36.157:6789}")
     private String serverBaseUrl;
+
+    @Autowired
+    UniPointMapper2 uniPointMapper2;
 
     //查询一张图片
     @GetMapping("/{workspace_id}/files/{file_name}")
@@ -178,11 +187,37 @@ public class FileControllerDf {
                     filteredFiles.get(j).setDefectId(defect.getId());
                 }
             }
+        }else {
+            for (int j = 0; j < filteredFiles.size(); j++) {
+                String fileName = filteredFiles.get(j).getFileName();
+                Integer pointPos = extractWaypointNumber(fileName);
+                String picType = extractTOrV(fileName);
+                Integer picType1 = 0;
+                if(picType.equals("V")){
+                    picType1 = 0;
+                }else if(picType.equals("T")){
+                    picType1 = 1;
+                }
+                UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
+                        .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                        .eq(UniPoint::getWaylinePointPos, pointPos)
+                        .eq(UniPoint::getPicType,picType1));
+                if(uniPoint == null){
+                    log.info("未查到对应点位-----");
+                    filteredFiles.get(j).setOriginalImageUrl("未查到对应点位");
+                    continue;
+                }
+                String replace = fileName.replace(".jpeg", "");
+//                  对接分析服务唯一标识
+                String regId=uniPoint.getPointCode()+picType;
+                    String imagePath1="/ftpdir/admin_files/recfile_images/"+job_id+"/"+regId+"_"+replace+".jpg";
+                    String imageUrl1 = "/api/file/defect?path=" +
+                            URLEncoder.encode(imagePath1, "UTF-8");
+                    filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
+                }
         }
 
 //      如果为普通任务加上智能分析图url
-
-
 
         // 内存分页
         int total = filteredFiles.size();
@@ -197,6 +232,48 @@ public class FileControllerDf {
         PaginationData<MediaFileDTO> result = new PaginationData<>(pageList,
                 new Pagination(page, pageSize, total));
         return HttpResultResponse.success(result).setMessage("查询任务结果成功");
+    }
+
+    public Integer extractWaypointNumber(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 正则表达式：匹配"航点"后面的一个或多个数字
+        // 注意：航点可能是中文，数字可能是一位或多位
+        Pattern pattern = Pattern.compile("航点(\\d+)");
+        Matcher matcher = pattern.matcher(fileName);
+
+        if (matcher.find()) {
+            try {
+                return Integer.parseInt(matcher.group(1));
+            } catch (NumberFormatException e) {
+                // 如果数字太大或格式错误，返回null
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    public static String extractTOrV(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return null;
+        }
+
+        // 移除路径和扩展名，只获取文件名部分
+        String nameWithoutPath = fileName.substring(fileName.lastIndexOf('/') + 1);
+        nameWithoutPath = nameWithoutPath.substring(nameWithoutPath.lastIndexOf('\\') + 1);
+        String nameWithoutExt = nameWithoutPath.split("\\.", 2)[0];
+
+        // 方法1：使用正则表达式匹配_T_或_V_模式
+        Pattern pattern = Pattern.compile("_(T|V)_");
+        Matcher matcher = pattern.matcher(nameWithoutExt);
+
+        if (matcher.find()) {
+            return matcher.group(1);  // 直接返回字符串
+        }
+        return null;
     }
 
 

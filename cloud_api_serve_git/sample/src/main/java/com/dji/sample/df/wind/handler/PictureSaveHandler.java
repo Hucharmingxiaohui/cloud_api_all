@@ -19,6 +19,7 @@ import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -40,6 +41,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 @Component
 public class PictureSaveHandler {
 
@@ -134,17 +136,29 @@ public class PictureSaveHandler {
                     }
                     Integer pointPos = extractWaypointNumber(fileName);
                     String picType = extractTOrV(fileName);
+                    Integer picType1 = 0;
+                    if(picType.equals("V")){
+                        picType1 = 0;
+                    }else if(picType.equals("T")){
+                        picType1 = 1;
+                    }
+                    log.info(fileName+"的类型为"+picType);
                     WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                             .eq(WaylineJobEntity::getJobId, jobId));
                     UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
                             .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
                             .eq(UniPoint::getWaylinePointPos, pointPos)
-                            .eq(UniPoint::getPicType,picType));
+                            .eq(UniPoint::getPicType,picType1));
+                    if(uniPoint == null){
+                        log.info("未查到对应点位-----");
+                        continue;
+                    }
 //                  对接分析服务唯一标识
                     String regId=uniPoint.getPointCode()+picType;
 
                     String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
                     String localFileName = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
+                    log.info("保存对应点位-----");
                     map.put(fileName, localFileName);
                     index++;
                 }

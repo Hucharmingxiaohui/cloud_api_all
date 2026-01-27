@@ -49,5 +49,5 @@ public interface WindTurbineService  extends IService<WindTurbine> {
 
     Map<String,Object> getPointsByFanId(Map map);
 
-    int deletePointsById(Map map);
+//    int deletePointsById(Map map);
 }

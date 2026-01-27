@@ -60,49 +60,49 @@ const routes: Array<RouteRecordRaw> = [
     meta: { showInMenu: false, cache: false },
     children: [
       // 左侧菜单 - 变量管理（父菜单，含子路由）
-      // {
-      //   path: '/variableMgt',
-      //   name: 'variableMgt',
-      //   meta: {
-      //     showInMenu: true,
-      //     label: '变量管理',
-      //     position: 'left',
-      //     cache: false
-      //   },
-      //   children: [
-      //     {
-      //       path: '/variableMgt/fanMgt',
-      //       name: 'fanMgt',
-      //       component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
-      //       meta: {
-      //         showInMenu: true,
-      //         label: '风机管理',
-      //         cache: true
-      //       }
-      //     },
-      //     {
-      //       path: '/variableMgt/interestPointMgt',
-      //       name: 'interestPointMgt',
-      //       component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
-      //       meta: {
-      //         showInMenu: true,
-      //         label: '兴趣点管理',
-      //         cache: true
-      //       }
-      //     }
-      //   ]
-      // },
       {
-        path: '/' + ERouterName.Points_Management,
-        name: ERouterName.Points_Management,
-        component: () => import('/@/components/points/points_manage.vue'),
+        path: '/variableMgt',
+        name: 'variableMgt',
         meta: {
           showInMenu: true,
-          label: '点位管理',
+          label: '变量管理',
           position: 'left',
-          cache: true
-        }
+          cache: false
+        },
+        children: [
+          {
+            path: '/variableMgt/fanMgt',
+            name: 'fanMgt',
+            component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '风机管理',
+              cache: true
+            }
+          },
+          {
+            path: '/variableMgt/interestPointMgt',
+            name: 'interestPointMgt',
+            component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '兴趣点管理',
+              cache: true
+            }
+          }
+        ]
       },
+      // {
+      //   path: '/' + ERouterName.Points_Management,
+      //   name: ERouterName.Points_Management,
+      //   component: () => import('/@/components/points/points_manage.vue'),
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '点位管理',
+      //     position: 'left',
+      //     cache: true
+      //   }
+      // },
 
       {
         path: '/' + ERouterName.DEVICES,

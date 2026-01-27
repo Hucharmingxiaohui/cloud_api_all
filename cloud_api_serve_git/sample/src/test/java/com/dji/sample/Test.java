@@ -31,6 +31,7 @@ import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.service.FjReportService;
 
 import com.dji.sample.df.wind.timer.DeleteWaylineFileTimer;
+import com.dji.sample.df.wind.utils.FileNameUtils;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
@@ -86,6 +87,8 @@ public class Test {
 
     @Autowired
     UniPointMapper2 uniPointMapper2;
+
+
 
     @org.junit.jupiter.api.Test
     void test() throws IOException {
@@ -144,8 +147,9 @@ public class Test {
 //        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 //        System.out.println("------"+waylineJobDTO.getBeginTime().format(formatter));
 //        String format = waylineJobDTO.getBeginTime().format(formatter);
-        int i = uniPointMapper2.selectListCount(new HashMap());
-        System.out.println(i);
+        System.out.println(FileNameUtils.convertFileNameWithSeparators("A叶片-迎风面-1.jpg"));
+
+
     }
 
     @org.junit.jupiter.api.Test
