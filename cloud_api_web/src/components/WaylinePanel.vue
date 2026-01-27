@@ -37,7 +37,7 @@
           >
             删除
           </el-button>
-          <router-link to="/wayline/Model">
+          <!-- <router-link to="/wayline/Model">
             <el-button
               class="new_btn iconfont icon-xinjianhangxian"
               type="primary"
@@ -45,7 +45,7 @@
             >
               <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
             </el-button>
-          </router-link>
+          </router-link> -->
 
           <el-upload
             :before-upload="beforeUpload"

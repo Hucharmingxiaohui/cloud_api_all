@@ -6,7 +6,7 @@
 import { message } from 'ant-design-vue'
 import { onMounted, reactive, ref, onUnmounted, defineProps, watch, computed } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
-import {getImageUrl} from '/@/common/url'
+import { getImageUrl } from '/@/common/url'
 import { DeviceInfoType } from '/@/types/device'
 import { changeLivestreamLens, getLiveCapacity, setLivestreamQuality, startLivestream, stopLivestream } from '/@/api/manage'
 import { getRoot } from '/@/root'
@@ -109,7 +109,7 @@ async function getLiveHttp () {
         isStartSteam.value = true
         // flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
         const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-        const liveIndex = videoUrl.indexOf('/live/');
+        const liveIndex = videoUrl.indexOf('/live/')
         flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
         initFlv()
       }

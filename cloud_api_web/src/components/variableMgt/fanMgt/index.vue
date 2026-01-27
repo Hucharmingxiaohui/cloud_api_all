@@ -113,9 +113,18 @@
               <div class="ellipsis">{{ scope.row.blade_length }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="无人机距离(米)" align="center">
+          <el-table-column label="无人机距离(停机)" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.uav_blade_distance }}</div>
+              <div class="ellipsis">
+                {{ scope.row.uav_blade_distance_stop  }}
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="无人机距离(不停机)" align="center">
+            <template #default="scope">
+              <div class="ellipsis">
+                {{ scope.row.uav_blade_distance_working  }}
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="风机底部高度(米)" align="center">
@@ -283,19 +292,29 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item
-              label="无人机距离页面距离(米)"
-              prop="uav_blade_distance"
-              required
-            >
-              <el-input
-                v-model="insertForm.uav_blade_distance"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
             <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
               <el-input
                 v-model="insertForm.tower_points"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="无人机距离(停机)"
+              prop="uav_blade_distance_stop"
+              required
+            >
+              <el-input
+                v-model="insertForm.uav_blade_distance_stop"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="无人机距离(不停机)"
+              prop="uav_blade_distance_working"
+              required
+            >
+              <el-input
+                v-model="insertForm.uav_blade_distance_working"
                 maxlength="50"
               ></el-input>
             </el-form-item>
@@ -426,19 +445,29 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item
-              label="无人机距离页面距离(米)"
-              prop="uav_blade_distance"
-              required
-            >
-              <el-input
-                v-model="editForm.uav_blade_distance"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
             <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
               <el-input
                 v-model="editForm.tower_points"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="无人机距离(停机)"
+              prop="uav_blade_distance_stop"
+              required
+            >
+              <el-input
+                v-model="editForm.uav_blade_distance_stop"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item
+              label="无人机距离(不停机)"
+              prop="uav_blade_distance_working"
+              required
+            >
+              <el-input
+                v-model="editForm.uav_blade_distance_working"
                 maxlength="50"
               ></el-input>
             </el-form-item>
@@ -495,7 +524,8 @@ const insertForm = reactive({
   peak_altitude: '',
   blade_center_height: '',
   blade_length: '',
-  uav_blade_distance: '',
+  uav_blade_distance_stop: '',
+  uav_blade_distance_working: '',
   blade_bottom_height: '',
   blade_points: '',
   tower_points: ''
@@ -511,7 +541,8 @@ const editForm = reactive({
   peak_altitude: '',
   blade_center_height: '',
   blade_length: '',
-  uav_blade_distance: '',
+  uav_blade_distance_stop: '',
+  uav_blade_distance_working: '',
   blade_bottom_height: '',
   blade_points: '',
   tower_points: ''
@@ -565,8 +596,12 @@ const formRules = {
     { required: true, message: '请输入单个叶片长度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  uav_blade_distance: [
-    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+  uav_blade_distance_stop:[
+    { required: true, message: '请输入无人机距离（停机）', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  uav_blade_distance_working: [
+    { required: true, message: '请输入无人机距离（不停机）', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   blade_bottom_height: [
@@ -623,7 +658,8 @@ function openInsertDialog () {
     peak_altitude: '',
     blade_center_height: '',
     blade_length: '',
-    uav_blade_distance: ''
+    uav_blade_distance_stop: '',
+    uav_blade_distance_working: '',
   })
   insertDialog.value = true
 }
