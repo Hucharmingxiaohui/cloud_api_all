@@ -9,6 +9,7 @@ import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.WindTurbineService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,8 @@ import java.util.*;
 @Transactional
 public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindTurbine> implements WindTurbineService {
 
+    @Value("${longyuan.stationCode}")
+    private String longyuanStationCode;
     @Resource
     private WindTurbineMapper windTurbineMapper;
 
@@ -146,37 +149,89 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
 
         // 叶片类型数组
         String[] bladeTypes = {"A", "B", "C"};
-
+        Integer fanType = 1;
+//      以下生成不停机点位（点位加后缀_1）
         // 1. 生成迎风面点位
         // 叶片迎风面
         for (String bladeType : bladeTypes) {
             for (int i = 1; i <= bladePoints; i++) {
-                points.add(createPoint(fanName, fanId, String.format("%s叶片-迎风面-%d", bladeType, i)));
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-迎风面-%d_1", bladeType, i),fanType));
             }
         }
 
         // 轮毂迎风面
-        points.add(createPoint(fanName, fanId, "轮毂-迎风面"));
+        points.add(createPoint(fanName, fanId, "轮毂-迎风面_1",fanType));
 
         // 塔筒迎风面
         for (int i = 1; i <= towerPoints; i++) {
-            points.add(createPoint(fanName, fanId, String.format("塔筒-迎风面-%d", i)));
+            points.add(createPoint(fanName, fanId, String.format("塔筒-迎风面-%d_1", i),fanType));
         }
 
         // 2. 生成背风面点位
         // 叶片背风面
         for (String bladeType : bladeTypes) {
             for (int i = 1; i <= bladePoints; i++) {
-                points.add(createPoint(fanName, fanId, String.format("%s叶片-背风面-%d", bladeType, i)));
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-背风面-%d_1", bladeType, i),fanType));
             }
         }
 
         // 轮毂背风面
-        points.add(createPoint(fanName, fanId, "轮毂-背风面"));
+        points.add(createPoint(fanName, fanId, "轮毂-背风面_1",fanType));
 
         // 塔筒背风面
         for (int i = 1; i <= towerPoints; i++) {
-            points.add(createPoint(fanName, fanId, String.format("塔筒-背风面-%d", i)));
+            points.add(createPoint(fanName, fanId, String.format("塔筒-背风面-%d_1", i),fanType));
+        }
+
+
+         fanType = 0;
+//      以下生成停机点位（点位加后缀-0）
+        // 1. 生成迎风面点位
+        // 叶片迎风面
+        for (String bladeType : bladeTypes) {
+            for (int i = 1; i <= bladePoints; i++) {
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-迎风面-%d_0", bladeType, i),fanType));
+            }
+        }
+
+        // 2. 生成背风面点位
+        // 叶片背风面
+        for (String bladeType : bladeTypes) {
+            for (int i = 1; i <= bladePoints; i++) {
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-背风面-%d_0", bladeType, i),fanType));
+            }
+        }
+
+        // 3. 生成前缘点位
+        // 叶片前缘
+        for (String bladeType : bladeTypes) {
+            for (int i = 1; i <= bladePoints; i++) {
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-前缘-%d_0", bladeType, i),fanType));
+            }
+        }
+
+        // 3. 生成后缘点位
+        // 叶片后缘
+        for (String bladeType : bladeTypes) {
+            for (int i = 1; i <= bladePoints; i++) {
+                points.add(createPoint(fanName, fanId, String.format("%s叶片-后缘-%d_0", bladeType, i),fanType));
+            }
+        }
+
+        // 轮毂迎风面
+        points.add(createPoint(fanName, fanId, "轮毂-迎风面_0",fanType));
+
+        // 塔筒迎风面
+        for (int i = 1; i <= towerPoints; i++) {
+            points.add(createPoint(fanName, fanId, String.format("塔筒-迎风面-%d_0", i),fanType));
+        }
+
+        // 轮毂背风面
+        points.add(createPoint(fanName, fanId, "轮毂-背风面_0",fanType));
+
+        // 塔筒背风面
+        for (int i = 1; i <= towerPoints; i++) {
+            points.add(createPoint(fanName, fanId, String.format("塔筒-背风面-%d_0", i),fanType));
         }
 
         return points;
@@ -185,7 +240,7 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
     /**
      * 创建单个点位对象
      */
-    private FanStationPoints createPoint(String fanName, String fanId, String pointName) {
+    private FanStationPoints createPoint(String fanName, String fanId, String pointName,Integer fanType) {
         // 这里需要根据你的实际业务设置字段值
         // 假设你已经有了FanStationPoints实体类
 
@@ -201,7 +256,7 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
 
         // 设置其他固定字段（根据你的业务需求）
         point.setStationName("龙源风电场");          // 根据实际设置
-        point.setStationCode("Sub_WeiLan");        // 根据实际设置
+        point.setStationCode(longyuanStationCode);        // 根据实际设置
         point.setAreaName("风电场区域");            // 根据实际设置
         point.setAreaId("A001");                   // 根据实际设置
         point.setBayName("1号间隔");               // 根据实际设置
@@ -210,13 +265,14 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
         point.setComponentId(fanName+"Component001");                  // 根据实际设置
 
         // 设置其他固定字段（写死）
-        point.setDeviceType("1");
+        point.setDeviceType("");
         point.setSaveType("3");
         point.setDataType(4);
         point.setPointType("1");
         point.setRecognitionType("2");
         point.setMeterType("1");
         point.setAppearanceType("1");
+        point.setFanType(fanType);
 
         return point;
     }

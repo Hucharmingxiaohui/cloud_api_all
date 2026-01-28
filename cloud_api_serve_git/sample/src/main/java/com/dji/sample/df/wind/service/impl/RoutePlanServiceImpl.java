@@ -196,7 +196,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
         jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
         jsonObject.put("length", windTurbine.getBladeLength());
-        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+//      飞向中心点航线先传停机的
+        jsonObject.put("dist", windTurbine.getUavBladeDistanceStop());
         jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
         jsonObject.put("blade_points", windTurbine.getBladePoints());
         jsonObject.put("tower_points", windTurbine.getTowerPoints());
@@ -326,7 +327,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
         jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
         jsonObject.put("length", windTurbine.getBladeLength());
-        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+
+        jsonObject.put("dist", windTurbine.getUavBladeDistanceStop());
         jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
         jsonObject.put("blade_points", windTurbine.getBladePoints());
         jsonObject.put("tower_points", windTurbine.getTowerPoints());
@@ -503,7 +505,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
         jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
         jsonObject.put("length", windTurbine.getBladeLength());
-        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+        jsonObject.put("dist", windTurbine.getUavBladeDistanceWorking());
         jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
         jsonObject.put("blade_points", windTurbine.getBladePoints());
         jsonObject.put("tower_points", windTurbine.getTowerPoints());
@@ -638,7 +640,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
         jsonObject.put("theta_deg", yaw);
         jsonObject.put("length", windTurbine.getBladeLength());
-        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+        jsonObject.put("dist", windTurbine.getUavBladeDistanceStop());
         jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
         jsonObject.put("blade_points", windTurbine.getBladePoints());
         jsonObject.put("tower_points", windTurbine.getTowerPoints());
@@ -797,7 +799,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         jsonObject.put("h_c", windTurbine.getBladeCenterHeight());
         jsonObject.put("theta_deg", windTurbine.getBladeStopAngle());
         jsonObject.put("length", windTurbine.getBladeLength());
-        jsonObject.put("dist", windTurbine.getUavBladeDistance());
+//      设成停机的距离
+        jsonObject.put("dist", windTurbine.getUavBladeDistanceStop());
         jsonObject.put("h_b", windTurbine.getBladeBottomHeight());
         jsonObject.put("blade_points", windTurbine.getBladePoints());
         jsonObject.put("tower_points", windTurbine.getTowerPoints());

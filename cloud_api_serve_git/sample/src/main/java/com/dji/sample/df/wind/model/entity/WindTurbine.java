@@ -57,8 +57,11 @@ public class WindTurbine implements Serializable {
     @TableField("blade_length")
     private Double bladeLength; // 单个叶片长度
 
-    @TableField("uav_blade_distance")
-    private Double uavBladeDistance;//无人机距离叶片距离
+    @TableField("uav_blade_distance_working")
+    private Double uavBladeDistanceWorking;//无人机距离叶片距离(不停机）
+
+    @TableField("uav_blade_distance_stop")
+    private Double uavBladeDistanceStop;//无人机距离叶片距离(停机）
 
     @TableField("blade_bottom_height")
     private Double bladeBottomHeight;//风机底部的高度

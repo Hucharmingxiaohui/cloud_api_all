@@ -203,7 +203,8 @@ public class TaskTimerManager {
                 CustomClaim customClaim = new CustomClaim();
                 customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
                 customClaim.setUsername("adminPC");
-                pubWaylineJobPlanDfEntity.setName(taskName);
+                String fanName = pubWaylineJobPlanDfEntity.getFanName();
+                pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
                 if (httpResultResponse.getCode() == 0) {
                     log.info("成功执行上级任务------");

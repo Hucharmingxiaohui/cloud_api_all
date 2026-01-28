@@ -28,10 +28,12 @@ import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.controller.FjReportController;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
+import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
+import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
 import com.dji.sample.df.wind.utils.FileNameUtils;
@@ -115,6 +117,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     private PictureSaveHandler pictureSaveHandler;
     @Autowired
     UniPointMapper2 uniPointMapper2;
+    @Autowired
+    FanWaylinePointsMapper fanWaylinePointsMapper;
 
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
@@ -541,9 +545,11 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     resultMessage.put("stationCode", stationCode);
                     resultMessage.put("category", "task");
                     resultMessage.put("action", "result");
+                    FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>().eq(FanWaylinePoints::getJobId, waylineJobEntity.getJobId()));
+                    Integer jobType = fanWaylinePoints.getJobType();
 
                     FanStationPoints fanStationPoints = fanStationPointsMapper.selectOne(new LambdaQueryWrapper<FanStationPoints>()
-                            .eq(FanStationPoints::getPointName, waylineJobEntity.getFanName() + "-" + mediaFileDTO.getFanCode() + "-" + mediaFileDTO.getFanPart()));
+                            .eq(FanStationPoints::getPointName, waylineJobEntity.getFanName() + "-" + mediaFileDTO.getFanCode() + "-" + mediaFileDTO.getFanPart()+"_"+jobType));
                     String pointId ="-----";
                     String pointName ="错误点位";
                     if (fanStationPoints != null) {

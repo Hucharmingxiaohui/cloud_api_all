@@ -175,4 +175,9 @@ public class FanStationPoints implements Serializable {
     @TableField("appearance_type")
     private String appearanceType;
 
+    /**
+     * 风机任务类型(0停机1不停机)
+     */
+    @TableField("fan_type")
+    private Integer fanType;
 }
