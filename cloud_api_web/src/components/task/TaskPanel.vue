@@ -207,7 +207,7 @@
                 </template>
               </el-popconfirm>
               <el-popconfirm
-                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || (scope.row.status === TaskStatus.Carrying && scope.row.progress===0)"
+                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || (scope.row.status === TaskStatus.Carrying && scope.row.progress=== '')"
                 width="220"
                 confirm-button-text="确定"
                 cancel-button-text="取消"
