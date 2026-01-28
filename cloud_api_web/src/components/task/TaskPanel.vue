@@ -207,13 +207,13 @@
                 </template>
               </el-popconfirm>
               <el-popconfirm
-                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel"
+                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || (scope.row.status === TaskStatus.Carrying && scope.row.progress===0)"
                 width="220"
                 confirm-button-text="确定"
                 cancel-button-text="取消"
                 icon-color="#626AEF"
-                title="你确定要删除飞行任务吗？"
-                @confirm="onDeleteOtherTask(scope.row.job_id)"
+                title="你确定要删除飞行任务吗？请确保飞行器未起飞。"
+                @confirm="onDeleteOtherTask(scope.row.job_id, scope.row.status)"
               >
                 <template #reference>
                   <el-button size="small" link type="primary" class="preview"
@@ -743,14 +743,25 @@ async function onDeleteTask (jobId: string) {
 }
 
 // 删除失败、成功、取消状态的任务
-async function onDeleteOtherTask (jobId: string) {
-  deleteOtherTask(jobId).then(res => {
-    if (res.code !== 0) {
-      return
+async function onDeleteOtherTask (jobId: string, status: any) {
+   try {
+    // 执行状态，先进行挂起操作
+    if (status === TaskStatus.Carrying) {
+      const { code } = await updateTaskStatus(workspaceId, {
+        job_id: jobId,
+        status: UpdateTaskStatus.Suspend
+      })
     }
-    ElMessage.success('任务删除成功!')
-    getPlans()
-  })
+    deleteOtherTask(jobId).then(res => {
+      if (res.code !== 0) {
+        return
+      }
+      ElMessage.success('任务删除成功!')
+      getPlans()
+    })
+   } catch (error) {
+
+   }
 }
 
 // 批量删除失败、成功、取消状态的任务
