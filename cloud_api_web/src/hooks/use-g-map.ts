@@ -2,6 +2,7 @@ import AMapLoader from '@amap/amap-jsapi-loader'
 import { App, reactive } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { AMapConfig } from '/@/constants/index'
+import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
 // import '/@/amap/AMap3.js'
 import fanIcon from '/@/assets/v4/fan.gif'
 declare const AMap: any
@@ -60,7 +61,7 @@ export function useGMapManage () {
     const markerIcon = new AMap.Icon({
       image: fanIcon, // 图标图片
       size: new AMap.Size(72, 96), // 图标显示尺寸
-      imageSize: new AMap.Size(96, 128), // 图片实际尺寸
+      imageSize: new AMap.Size(72, 96), // 图片实际尺寸
       imageOffset: new AMap.Pixel(0, 0), // 图片内部偏移
     })
 
@@ -69,9 +70,9 @@ export function useGMapManage () {
     // 遍历数据创建标记
     fanData.forEach(([lng, lat, name]) => {
       const marker = new AMap.Marker({
-        position: [lng, lat],
+        position: wgs84togcj02(lng, lat),
         icon: markerIcon,
-        offset: new AMap.Pixel(0, -20),
+        offset: new AMap.Pixel(-36, -96),
         label: {
           content: `<div style="
           background: transparent;

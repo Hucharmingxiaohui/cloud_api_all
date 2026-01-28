@@ -6,7 +6,7 @@
 import { message } from 'ant-design-vue'
 import { onMounted, reactive, ref, onUnmounted, defineProps } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
-import {getImageUrl} from '/@/common/url'
+import { getImageUrl } from '/@/common/url'
 import { changeLivestreamLens, getLiveCapacity, setLivestreamQuality, startLivestream, stopLivestream } from '/@/api/manage'
 import { getRoot } from '/@/root'
 import jswebrtc from '/@/vendors/jswebrtc.min.js'
@@ -98,7 +98,7 @@ async function getLiveHttp () {
   }).then(res => {
     if (res.code === 0) {
       const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-      const liveIndex = videoUrl.indexOf('/live/');
+      const liveIndex = videoUrl.indexOf('/live/')
       flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
       initFlv()
     }

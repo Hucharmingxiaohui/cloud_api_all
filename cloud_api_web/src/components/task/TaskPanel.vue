@@ -191,15 +191,6 @@
           </el-table-column>
           <el-table-column label="操作">
             <template #default="scope">
-              <!--<el-button
-                size="small"
-                link
-                type="primary"
-                class="preview"
-                @click="anaysisTaskResult(scope.row)"
-                >结果分析</el-button
-              >
-               -->
               <el-popconfirm
                 v-if="scope.row.status === TaskStatus.Wait "
                 width="220"

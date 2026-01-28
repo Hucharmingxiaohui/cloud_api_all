@@ -132,9 +132,9 @@ async function getLiveHttp () {
       console.log('获取地址', res)
       if (res.code === 0) {
         // isStartSteam.value = true
-      const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-      const liveIndex = videoUrl.indexOf('/live/');
-      flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
+        const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
+        const liveIndex = videoUrl.indexOf('/live/')
+        flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
         initFlv()
       }
       if (res.code === 513003) {

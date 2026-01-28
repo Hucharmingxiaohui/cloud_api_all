@@ -89,7 +89,7 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         //   rewrite: (path) => path.replace(/^\/mapi/, ''),
         // },
         '/api': {
-          target: 'http://192.168.100.102:19921',  // 后端接口地址
+          target: 'http://192.168.160.1:19921',  // 后端接口地址
           changeOrigin: true,  // 是否更改请求头中的 Origin
           rewrite: (path) => path.replace(/^\/api/, '')  // 去除 /api 前缀
         }
