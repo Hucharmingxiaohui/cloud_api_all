@@ -292,7 +292,7 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
+            <el-form-item label="塔筒的点数" prop="tower_points" required>
               <el-input
                 v-model="insertForm.tower_points"
                 maxlength="50"
@@ -445,7 +445,7 @@
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="塔筒的点数" prop="uav_blade_distance" required>
+            <el-form-item label="塔筒的点数" prop="tower_points" required>
               <el-input
                 v-model="editForm.tower_points"
                 maxlength="50"
@@ -605,15 +605,15 @@ const formRules = {
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   blade_bottom_height: [
-    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { required: true, message: '请输入风机底部高度(米)', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   blade_points: [
-    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { required: true, message: '请输入单个扇叶的点数', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
   tower_points: [
-    { required: true, message: '请输入无人机距离页面距离', trigger: 'blur' },
+    { required: true, message: '请输入塔筒的点数', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ]
 }
