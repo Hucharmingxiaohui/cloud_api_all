@@ -5,6 +5,7 @@ const CURRENT_CONFIG = {
   websocketURL: 'ws://172.20.63.157:6789/api/v1/ws',
   rtmpURL: 'rtmp://172.20.63.157:2035/live/', // 视频请求推流地址
   flvURL: 'http://172.20.63.157:9080/live/',  // 视频流地址
+  UEPixURL: 'ws://localhost:901',  // 模型像素流播放
 
   // 风机坐标 用于地图初始显示风机marker,不需要时置空(高德地图坐标)
   // 由于遥控器获取的是WGS84坐标，而不是gcj02坐标。此处暂时放置WGS84坐标，代码中进行WGS84=>gcj02转换

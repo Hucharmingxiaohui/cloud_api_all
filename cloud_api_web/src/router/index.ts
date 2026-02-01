@@ -134,16 +134,48 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
+      // {
+      //   path: '/' + ERouterName.NEW_WAYLINE,
+      //   name: ERouterName.NEW_WAYLINE,
+      //   component: () => import('/@/components/WaylinePanel.vue'),
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '航线管理',
+      //     position: 'right',
+      //     cache: true
+      //   }
+      // },
       {
-        path: '/' + ERouterName.NEW_WAYLINE,
-        name: ERouterName.NEW_WAYLINE,
-        component: () => import('/@/components/WaylinePanel.vue'),
+        path: '/waylineMgt',
+        name: 'waylineMgt',
         meta: {
           showInMenu: true,
           label: '航线管理',
           position: 'right',
-          cache: true
-        }
+          cache: false
+        },
+        children: [
+          {
+            path: '/waylineMgt/' + ERouterName.NEW_WAYLINE,
+            name: ERouterName.LIVESTREAM,
+            component: () => import('/@/components/WaylinePanel.vue'),
+            meta: {
+              showInMenu: true,
+              label: '飞行航线',
+              cache: true
+            }
+          },
+          {
+            path: '/waylineMgt/UEPix',
+            name: 'UEPix',
+            component: () => import('/@/components/uePix/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '三维航线',
+              cache: true
+            }
+          }
+        ]
       },
       // 右侧菜单 - 任务管理（父菜单，含子路由）
       {
