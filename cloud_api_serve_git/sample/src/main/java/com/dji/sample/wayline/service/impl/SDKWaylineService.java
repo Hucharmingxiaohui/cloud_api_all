@@ -40,6 +40,7 @@ import com.dji.sample.wayline.model.enums.WaylineJobStatusEnum;
 import com.dji.sample.wayline.service.IWaylineFileService;
 import com.dji.sample.wayline.service.IWaylineJobService;
 import com.dji.sample.wayline.service.IWaylineRedisService;
+import com.dji.sdk.cloudapi.airsense.AirsenseWarning;
 import com.dji.sdk.cloudapi.wayline.*;
 import com.dji.sdk.cloudapi.wayline.api.AbstractWaylineService;
 import com.dji.sdk.common.SDKManager;
@@ -701,5 +702,15 @@ public class SDKWaylineService extends AbstractWaylineService {
             e.printStackTrace();
             return new TopicRequestsResponse().setData(MqttReply.error(CommonErrorEnum.SYSTEM_ERROR));
         }
+    }
+
+    @Override
+    public TopicEventsResponse<MqttReply> returnHomeInfo(TopicEventsRequest<ReturnHomeInfo> request, MessageHeaders headers)  {
+        // 空实现，只记录日志，不抛出异常
+        log.debug("飞行器已返航，收到返航信息");
+
+        // 返回空的成功响应
+        return new TopicEventsResponse<MqttReply>()
+                .setData(MqttReply.success());
     }
 }
