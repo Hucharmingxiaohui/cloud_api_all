@@ -495,7 +495,7 @@ async function checkAnaysisStaus (row) {
         analyzingTasks.value.add(row.job_id)
       }
       taskAnalysisStatus.value.set(row.job_id, { status: 'analyzing', loading: true })
-      await anaysisTaskResult(row)
+      // await anaysisTaskResult(row)
     } else if (res.data === 1) {
       // 已经分析完成
       analyzingTasks.value.delete(row.job_id) // 从分析列表中移除
