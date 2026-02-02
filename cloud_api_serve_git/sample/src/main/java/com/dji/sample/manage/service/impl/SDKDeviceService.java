@@ -190,14 +190,11 @@ public class SDKDeviceService extends AbstractDeviceService {
         DeviceDTO device = deviceOpt.get();
         deviceRedisService.setDeviceOnline(device);
         deviceRedisService.setDeviceOsd(from, request.getData());
-        String uavSN = request.getGateway();
-        DeviceEntity dockEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
-                .eq(DeviceEntity::getChildSn, uavSN));
+        String dockSN = request.getGateway();
         Integer capacityPercent = request.getData().getBattery().getCapacityPercent();
-        int code = request.getData().getModeCode().getCode();
-        if(code==5 && capacityPercent<=40){
-            abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockEntity.getDeviceSn()));
-            log.info("电量已小于40%触发返航");
+        if(capacityPercent<=30){
+            abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockSN));
+            log.info("电量已小于30%触发返航");
         }
         deviceService.pushOsdDataToWeb(device.getWorkspaceId(), BizCodeEnum.DEVICE_OSD, from, request.getData());
     }
