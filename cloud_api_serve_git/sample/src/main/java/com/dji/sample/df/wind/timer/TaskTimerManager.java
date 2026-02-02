@@ -142,11 +142,12 @@ public class TaskTimerManager {
                             String taskName = taskDetail.get("taskName");
                             String planType = taskDetail.get("planType");
                             executeTask(planType,singleDeviceId,taskCode,taskName);
+                            redisUtils.set("isCenterTask","1");
 
                             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                                     .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
                             );
-                            // 1. 启动状态监控
+                            // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
                             LongyuanMqttHandler.startMonitoringTask(waylineJobEntity.getJobId(), taskName);
 
                             // 从有序集合中移除已执行任务

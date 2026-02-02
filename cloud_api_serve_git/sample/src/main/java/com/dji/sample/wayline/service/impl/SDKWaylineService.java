@@ -228,7 +228,9 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 if (jsonResponse.getString("desc").equals("1")) {
                                     if (jsonResponse.getString("ypcx") != null && jsonResponse.getString("ypcx") != "") {
                                         String turbineName = jsonResponse.getString("turbine_name");
+                                        redisUtils.set("turbine_name",turbineName);
                                         String yaw = jsonResponse.getString("ypcx");
+                                        redisUtils.set("ypcx",yaw);
                                         double value = Double.parseDouble(yaw);
                                         WindTurbine windTurbine = windTurbineMapper.selectOne(new LambdaQueryWrapper<WindTurbine>().eq(WindTurbine::getTurbineName, turbineName));
                                         windTurbine.setApproachYaw(value);
@@ -313,10 +315,31 @@ public class SDKWaylineService extends AbstractWaylineService {
         Integer status = response.getData().getStatus();
         Integer currentWaypointIndex = response.getData().getWayPointIndex();
         String flightId = response.getData().getInFlightWaylineId();
+        redisUtils.set("inFlightWaylineId",flightId);
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
         String workspaceId = workspaceEntity.getWorkspaceId();
 
         log.info("执行空中航线任务-"+flightId+"  当前航点号为"+currentWaypointIndex+"号");
+//      如果为空且当前航电为0，则再次下发
+        if(flightId.isEmpty() && currentWaypointIndex==0){
+            log.info("空中下发失败。再次下发-----------");
+            String inFightState = redisUtils.get("in_fight_state").toString();
+            String turbineName = redisUtils.get("turbine_name").toString();
+            if(inFightState.equals("working")){
+                routePlan.workingWayline(turbineName,null);
+            }else if(inFightState.equals("stop")){
+                String ypjd = redisUtils.get("ypjd").toString();
+                double value = Double.parseDouble(ypjd);
+                routePlan.stopWayline(turbineName, value,null);
+            }else if(inFightState.equals("flyto")){
+                String ypcx = redisUtils.get("ypcx").toString();
+                double value = Double.parseDouble(ypcx);
+                routePlan.flyToWayline(turbineName, value);
+            }else {
+//               什么都不做
+            }
+            return new TopicEventsResponse<>();
+        }
         String fightState = redisUtils.get("in_fight_state").toString();
 //        String rthParam1 = redisUtils.get("rthParam").toString();
 ////      如果是停机/不停机航线，并且任务完成，且返航标志位为0,则进行下一个风机top航线下发
@@ -536,6 +559,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                             //不停机巡检
                                             log.info("执行不停机巡检-------------");
                                             turbineName = jsonResponse.getString("turbine_name");
+                                            redisUtils.set("turbine_name",turbineName);
 //                                            if(lastFanIdwindTurbine.getTurbineName().equals(turbineName)){
 //                                                rthParam = "1";
 //                                                redisUtils.set("turbineName", "noNextTurbine");
@@ -556,6 +580,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                             //停机巡检
                                             log.info("执行停机巡检-------------");
                                             turbineName = jsonResponse.getString("turbine_name");
+                                            redisUtils.set("turbine_name",turbineName);
 //                                            if(lastFanIdwindTurbine.getTurbineName().equals(turbineName)){
 //                                                rthParam = "1";
 //                                                redisUtils.set("turbineName", "noNextTurbine");
@@ -572,6 +597,7 @@ public class SDKWaylineService extends AbstractWaylineService {
 //                                            }
                                             String ypjd = jsonResponse.getString("ypjd");
                                             double value = Double.parseDouble(ypjd);
+                                            redisUtils.set("ypjd",ypjd);
 //                                            redisUtils.set("rthParam",rthParam);
                                             routePlan.stopWayline(turbineName, value,null);
                                         }

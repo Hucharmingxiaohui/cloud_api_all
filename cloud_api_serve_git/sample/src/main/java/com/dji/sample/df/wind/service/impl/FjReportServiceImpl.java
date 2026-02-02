@@ -2423,7 +2423,7 @@ public class FjReportServiceImpl implements FjReportService {
 
             DefectEntity existingDefect = defectEntityMapper.selectOne(wrapper);
 
-            if (existingDefect != null) {
+            if (existingDefect != null && !existingDefect.getFanCode().equals("未知风机")) {
                 // 如果存在，设置ID并更新
                 defect.setId(existingDefect.getId());
                 defectEntityMapper.updateById(defect);
