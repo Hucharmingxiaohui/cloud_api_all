@@ -412,14 +412,17 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                 WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
                 Integer status = waylineJobDTO.getStatus();
-
+                String isCenterTask = redisUtils.get("isCenterTask").toString();
                 // 如果状态为2（执行中），上报状态
                 if (status == 2) {
-                    sendWindTurbineTaskStatus(taskCode,taskName,0);
-
+                    if (isCenterTask.equals("1")) {
+                        sendWindTurbineTaskStatus(taskCode,taskName,0);
+                    }
                 } else if (status == 3 || status == 1|| status == 5|| status == 4) {
                     // 如果任务已完成（假设状态3为完成，还有别的），停止监控
-                    sendWindTurbineTaskStatus(taskCode,taskName,1);
+                    if (isCenterTask.equals("1")) {
+                        sendWindTurbineTaskStatus(taskCode,taskName,1);
+                    }
 //                    sendWindTurbineTaskStatus(taskCode,taskName,1);
                     if(status == 3){
                         // 查询航线任务状态
@@ -437,12 +440,15 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                 new Thread(() -> {
                                     try {
                                         // 调用分析接口（可能会很慢）
-                                        Result result = fjReportController.pictureSave(jsonObject);
-                                        log.info("图片分析已启动: jobId={}, result={}", jobId, result);
-
+                                        Result analyzed = fjReportController.isAnalyzed(jobId);
+                                        Integer data = (Integer) analyzed.getData();
+//                                      只有未分析时进行分析
+                                        if(data==0){
+                                            Result result = fjReportController.pictureSave(jsonObject);
+                                            log.info("图片分析已启动: jobId={}, result={}", jobId, result);
+                                        }
                                         // 2. 开始轮询检查分析状态
                                         startAnalysisMonitoring(jobId, taskCode,taskName);
-
                                     } catch (Exception e) {
                                         log.error("启动图片分析失败: jobId={}", jobId, e);
                                         // 分析失败也要从监控中移除
@@ -455,7 +461,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //                              普通任务先不分析直接保存
                                 Result<Map> result = pictureSaveHandler.pictureSave(jobId);
                                 if(result.getCode() == 0){
-                                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                    if(isCenterTask.equals("1")){
+                                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                    }
                                 }
                                 monitoringTasks.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
@@ -483,14 +491,16 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 // 1. 检查分析状态
                 Result analyzed = fjReportController.isAnalyzed(jobId);
                 Integer data = (Integer) analyzed.getData();
-
+                String isCenterTask = redisUtils.get("isCenterTask").toString();
                 if (data==1) {
                     log.info("分析完成: taskCode={}, jobId={}", taskCode, jobId);
                     WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                             .eq(WaylineJobEntity::getJobId, jobId)
                     );
                     log.info("分析完成上传照片--------");
-                    sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                    if(isCenterTask.equals("1")){
+                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                    }
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);

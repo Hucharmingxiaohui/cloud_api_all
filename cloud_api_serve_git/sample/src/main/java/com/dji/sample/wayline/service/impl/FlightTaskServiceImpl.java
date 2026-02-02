@@ -15,6 +15,7 @@ import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
+import com.dji.sample.df.wind.mqtt.LongyuanMqttHandler;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.media.model.MediaFileCountDTO;
@@ -449,7 +450,8 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         }
 
         redisUtils.set("jobId",jobId);
-
+        redisUtils.set("isCenterTask","0");
+        LongyuanMqttHandler.startMonitoringTask(jobId, job.getJobName());
         waylineJobService.updateJob(WaylineJobDTO.builder()
                 .jobId(jobId)
                 .executeTime(LocalDateTime.now())
