@@ -144,14 +144,14 @@ public class FjReportController {
 //          return Result.notfan("不是风机任务");
         }
 //      查询job的保存标志位，未保存完就setIsAnalyzed(4)，就不执行下面逻辑直接return,前端显示正在保存，显示正在保存则一直调这个接口直到返回成功
-        Integer isSaved = waylineJobEntity.getIsSaved();
-        if(isSaved!=null) {
-            if (isSaved != 2) {
-                waylineJobEntity.setIsAnalyzed(4);
-                waylineJobMapper.updateById(waylineJobEntity);
-                return Result.saving("还在保存截图文件");
-            }
-        }
+//        Integer isSaved = waylineJobEntity.getIsSaved();
+//        if(isSaved!=null) {
+//            if (isSaved != 2) {
+//                waylineJobEntity.setIsAnalyzed(4);
+//                waylineJobMapper.updateById(waylineJobEntity);
+//                return Result.saving("还在保存截图文件");
+//            }
+//        }
         waylineJobEntity.setIsAnalyzed(2);
         waylineJobMapper.updateById(waylineJobEntity);
         log.info(jobId+"正在分析。。。");

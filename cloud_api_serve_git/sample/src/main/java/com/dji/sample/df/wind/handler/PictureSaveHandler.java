@@ -3,13 +3,11 @@ package com.dji.sample.df.wind.handler;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.ftp.FtpsHelper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
-import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
@@ -71,10 +69,9 @@ public class PictureSaveHandler {
 
     public Result<Map> pictureSave(String jobId) {
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
-        // 分离DJI文件和非DJI文件
+        // 分离DJI文件和非DJI文件（应该都是DJI文件）
         List<MediaFileEntity> djiFiles = new ArrayList<>();
         List<MediaFileEntity> nonDjiFiles = new ArrayList<>();
-
         for (MediaFileEntity file : mediaFileEntities) {
             if (file.getFileName().startsWith("DJI")) {
                 djiFiles.add(file);
@@ -83,34 +80,31 @@ public class PictureSaveHandler {
             }
         }
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
-        // 从数据库获取图片命名规则
-//        String fanPointsJson = redisUtils.get("fanPoints").toString();
-
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
                 .eq(FanWaylinePoints::getJobId, jobId));
         JSONArray points =new JSONArray();
         if (fanWaylinePoints != null) {
-//           风机存在本地
+//          1.风机图片存在服务器
             points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
             Map map = new HashMap();
             try {
                 int index = 0;
                 for (MediaFileEntity mediaFileEntity : djiFiles) {
                     URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
-//               // 使用Redis中的命名规则
+//                  按顺序以fanWaylinePoints存的点位名称给照片命名
                     String fileName;
                     if (index < points.size()) {
                         String pointName = points.getString(index);
                         fileName = pointName;
                     } else {
-                        // 如果图片数量超过Redis规则，使用原始文件名
+//                      如果多拍照了，则多出来的按原命名
                         fileName = mediaFileEntity.getFileName() != null ?
                                 mediaFileEntity.getFileName() :
                                 "file_" + mediaFileEntity.getFileId() + ".dat";
                     }
                     String filePictrueUrl = fileConfig.getFilePictrueUrl();
-                    String localFileName = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
-                    map.put(fileName, localFileName);
+                    String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                    map.put(fileName, localFilePath);
                     index++;
                 }
             } catch (Exception e) {
@@ -118,18 +112,17 @@ public class PictureSaveHandler {
             }
             return Result.success(map);
         }else {
+//          2.普通图片存在服务器
             Map map = new HashMap();
             try {
                 int index = 0;
                 for (MediaFileEntity mediaFileEntity : djiFiles) {
                     URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
-//               // 使用Redis中的命名规则
                     String fileName;
                     if (index < points.size()) {
                         String pointName = points.getString(index);
                         fileName = pointName;
                     } else {
-                        // 如果图片数量超过Redis规则，使用原始文件名
                         fileName = mediaFileEntity.getFileName() != null ?
                                 mediaFileEntity.getFileName() :
                                 "file_" + mediaFileEntity.getFileId() + ".dat";
@@ -157,9 +150,9 @@ public class PictureSaveHandler {
                     String regId=uniPoint.getPointCode()+picType;
 
                     String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
-                    String localFileName = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
+                    String localFilePath = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
                     log.info("保存对应点位-----");
-                    map.put(fileName, localFileName);
+                    map.put(fileName, localFilePath);
                     index++;
                 }
             } catch (Exception e) {

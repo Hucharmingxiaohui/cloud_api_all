@@ -487,15 +487,15 @@ public class SDKWaylineService extends AbstractWaylineService {
                                     }
                                     fanWaylinePoints.setVideoFanPoints(jsonArray.toJSONString());
                                     fanWaylinePointsMapper.updateById(fanWaylinePoints);
- //                                 保存job的保存标志位，正面保存完是1，反面保存完是2
-                                    String segment = jsonResponse.getString("segment");
-                                    if(segment.equals("front")){
-                                        waylineJobEntity.setIsSaved(1);
-                                        waylineJobMapper.updateById(waylineJobEntity);
-                                    }else  if(segment.equals("back")){
-                                        waylineJobEntity.setIsSaved(2);
-                                        waylineJobMapper.updateById(waylineJobEntity);
-                                    }
+ //                                 保存job的保存标志位，正面保存完是1，反面保存完是2  注释掉因为不存在分析慢的问题
+//                                    String segment = jsonResponse.getString("segment");
+//                                    if(segment.equals("front")){
+//                                        waylineJobEntity.setIsSaved(1);
+//                                        waylineJobMapper.updateById(waylineJobEntity);
+//                                    }else  if(segment.equals("back")){
+//                                        waylineJobEntity.setIsSaved(2);
+//                                        waylineJobMapper.updateById(waylineJobEntity);
+//                                    }
                                     log.info("截图点位入库---"+fanWaylinePoints);
                                     log.info("处理返回图像---------------------");
                                 }
