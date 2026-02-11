@@ -164,7 +164,7 @@ public class CenterModelSyncBuilder {
             }
             return items;
         }else if(hebeiStationCode.equals(subCode)){
-//          暂时用不到
+//          暂时用不到（用上面的逻辑，两种点位都同步，根据有无进行区分）
             List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
             if (uniPoints != null && uniPoints.size() > 0) {
                 for (UniPoint entity : uniPoints) {

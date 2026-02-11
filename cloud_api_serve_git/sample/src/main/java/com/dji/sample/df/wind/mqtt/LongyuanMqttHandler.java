@@ -376,6 +376,30 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         if (monitoringTasks.isEmpty()) {
             return;
         }
+//      设置开始2小时后还没传完即为异常，就定时删除任务监控
+        long currentTime = System.currentTimeMillis();
+        long timeoutThreshold = 2 * 60 * 60 * 1000; // 2小时
+
+        // 先检查超时的任务
+        List<String> timeoutTasks = new ArrayList<>();
+        for (Map.Entry<String, Map<String, Long>> entry : monitoringTasks.entrySet()) {
+            String taskCode = entry.getKey();
+            Map<String, Long> taskInfo = entry.getValue();
+
+            if (taskInfo != null && !taskInfo.isEmpty()) {
+                Long startTime = taskInfo.values().iterator().next();
+                if (startTime != null && (currentTime - startTime > timeoutThreshold)) {
+                    timeoutTasks.add(taskCode);
+                    log.warn("任务监控超时，强制移除: taskCode={}, 已监控时长={}ms",
+                            taskCode, currentTime - startTime);
+                }
+            }
+        }
+
+        // 移除超时任务
+        for (String taskCode : timeoutTasks) {
+            monitoringTasks.remove(taskCode);
+        }
 
         // 遍历所有正在监控的任务
         for (Map.Entry<String, Map<String,Long>> entry : monitoringTasks.entrySet()) {
@@ -679,7 +703,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         item.setUnit("");
                         item.setValue_unit("");
                         item.setTime(DateUtils.getNowDateTimeStr());
-//              识别类型先设置为空
+//                      识别类型先设置为空
                         item.setRecognition_type("");
                         item.setFile_path(format);
                         item.setFile_type("2");

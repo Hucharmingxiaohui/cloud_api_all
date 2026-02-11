@@ -141,14 +141,17 @@ public class TaskTimerManager {
                             String singleDeviceId = taskDetail.get("deviceId");
                             String taskName = taskDetail.get("taskName");
                             String planType = taskDetail.get("planType");
-                            executeTask(planType,singleDeviceId,taskCode,taskName);
-                            redisUtils.set("isCenterTask","1");
+                            int result = executeTask(planType, singleDeviceId, taskCode, taskName);
+//                          执行成功了才加入监控
+                            if (result == 0) {
+                                redisUtils.set("isCenterTask","1");
 
-                            WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                                    .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
-                            );
-                            // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
-                            LongyuanMqttHandler.startMonitoringTask(waylineJobEntity.getJobId(), taskName);
+                                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                                        .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
+                                );
+                                // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
+                                LongyuanMqttHandler.startMonitoringTask(waylineJobEntity.getJobId(), taskName);
+                            }
 
                             // 从有序集合中移除已执行任务
                             redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
@@ -170,7 +173,7 @@ public class TaskTimerManager {
     /**
      * 执行任务
      */
-    private void executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
+    private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
         try {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
 //          间隔航线多对一可以，一对多不可以
@@ -185,6 +188,7 @@ public class TaskTimerManager {
                 PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                         .eq(PubWaylineJobPlanDfEntity::getPlanType, 0)
                         .eq(PubWaylineJobPlanDfEntity::getFileId, waylineId)
+                        .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
                         .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
                         .last("LIMIT 1"));
                 CustomClaim customClaim = new CustomClaim();
@@ -194,11 +198,15 @@ public class TaskTimerManager {
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
                 if (httpResultResponse.getCode() == 0) {
                     log.info("成功执行上级任务------");
+                }else {
+                    log.info("执行上级任务失败------");
                 }
+                return httpResultResponse.getCode();
             }else if ("1".equals(planType)){
                 PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                         .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
                         .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
+                        .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
                         .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
                         .last("LIMIT 1"));
                 CustomClaim customClaim = new CustomClaim();
@@ -209,10 +217,15 @@ public class TaskTimerManager {
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
                 if (httpResultResponse.getCode() == 0) {
                     log.info("成功执行上级任务------");
+                }else {
+                    log.info("执行上级任务失败------");
                 }
+                return httpResultResponse.getCode();
             }
+            return -1;
         } catch (Exception e) {
             log.error("任务执行异常", e);
+            return -1;
         }
     }
 

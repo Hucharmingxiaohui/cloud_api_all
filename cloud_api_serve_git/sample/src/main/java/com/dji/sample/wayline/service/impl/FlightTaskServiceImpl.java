@@ -271,15 +271,6 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 WaylineJobDTO waylineJob = waylineJobOpt.get();
                 //20241204修改返回job_id
                 job_id=waylineJob.getJobId();
-//               创建点位历史记录
-                String finalJob_id = job_id;
-                CustomExecutorFactory.dbHandlepool.execute(() -> {
-                    try {
-                        createHisPoint(pubWaylineJobPlanDfEntity, finalJob_id);
-                    } catch (Exception e) {
-                        log.error("创建点位历史记录 ", e);
-                    }
-                });
 
                 // If it is a conditional task type, add conditions to the job parameters.
                 addConditions(waylineJob, param, beginTime, endTime);
@@ -294,48 +285,6 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         return HttpResultResponse.success().setMessage(job_id);
     }
 
-    public void createHisPoint(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity,String jobId) throws SQLException {
-        String subCode = pubWaylineJobPlanDfEntity.getSubCode();
-        String planNo = pubWaylineJobPlanDfEntity.getPlanId();
-        String planName = pubWaylineJobPlanDfEntity.getName();
-        String waylinePointPos = pubWaylineJobPlanDfEntity.getWaylinePointPos();
-        String[] split = waylinePointPos.split(",");
-        List<UniPointEntity> planPoints=new ArrayList<>();
-        for (String point : split) {
-            UniPointEntity uniPointEntity = uniPointMapper.selectOne(new LambdaQueryWrapper<UniPointEntity>()
-                    .eq(UniPointEntity::getWaylinePointPos, point));
-            planPoints.add(uniPointEntity);
-        }
-//        List<UniPointVO> planPoints = baseMapper.listPointsToHisTask(planNo);
-        List<HisUniTaskItemPointsEntity> addList = new ArrayList<>();
-        List<HisUniTaskItemFileEntity> addFileList = new ArrayList<>();
-        for (UniPointEntity point : planPoints) {
-            HisUniTaskItemPointsEntity hisPoint = new HisUniTaskItemPointsEntity();
-            hisPoint.setSubCode(subCode);
-            hisPoint.setPlanNo(planNo);
-            hisPoint.setRequestId(UUID.randomUUID().toString().replace("-", ""));
-            hisPoint.setTaskPatrolledId(jobId);
-            hisPoint.setTaskName(planName);
-            hisPoint.setTaskCode(planNo);
-            hisPoint.setPointCode(point.getPointCode());
-            hisPoint.setPointName(point.getPointName());
-            hisPoint.setDataType(point.getPointType());
-            hisPoint.setPresetNo(point.getWaylinePointPos().toString());
-//          todo 此处类型对吗
-            hisPoint.setRecognitionType(Integer.valueOf(point.getRecognitionTypeList()));
-            hisPoint.setIsFinished(0);
-            hisPoint.setValueType(0);
-            addList.add(hisPoint);
-            HisUniTaskItemFileEntity file = new HisUniTaskItemFileEntity();
-            file.setRequestId(hisPoint.getRequestId());
-            file.setFileType(point.getSaveTypeList());
-            addFileList.add(file);
-        }
-        hisUniTaskItemPointsService.saveHisPointListExecuteBatch(addList);
-        log.info("执行任务 巡检结果数据 创建成功：{}", pubWaylineJobPlanDfEntity.getName());
-        hisUniTaskItemPointsService.saveHisFileExecuteBatch(addFileList);
-        log.info("执行任务 图片数据 创建成功：{}", pubWaylineJobPlanDfEntity.getName());
-    }
 
     public HttpResultResponse publishOneFlightTask(WaylineJobDTO waylineJob) throws SQLException {
 

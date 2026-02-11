@@ -371,7 +371,7 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         param.setFanName(pubWaylineJobPlanDfEntity.getFanName());
         param.setBeginTime(pubWaylineJobPlanDfEntity.getBeginTime());
         System.out.println(param);
-        System.out.println("kkkkk");
+
         //更新状态
         pubWaylineJobPlanDfMapper.updateById(pubWaylineJobPlanDfEntity);
         HttpResultResponse httpResultResponse = flightTaskService.publishFlightTask(param, customClaim, pubWaylineJobPlanDfEntity);

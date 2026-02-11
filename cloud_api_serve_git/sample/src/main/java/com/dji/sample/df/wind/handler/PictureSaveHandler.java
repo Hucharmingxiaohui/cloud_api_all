@@ -148,7 +148,7 @@ public class PictureSaveHandler {
                     }
 //                  对接分析服务唯一标识
                     String regId=uniPoint.getPointCode()+picType;
-
+//                  普通照片保存形式为：点位编码+照片类型+"_"+图片原名
                     String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
                     String localFilePath = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
                     log.info("保存对应点位-----");
