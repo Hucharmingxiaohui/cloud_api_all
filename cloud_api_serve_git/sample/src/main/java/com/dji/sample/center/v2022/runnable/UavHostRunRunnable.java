@@ -1,5 +1,6 @@
 package com.dji.sample.center.v2022.runnable;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.SpringUtils;
@@ -7,6 +8,9 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostRunDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.common.util.SpringBeanUtilsTest;
+import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
 import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
@@ -28,6 +32,8 @@ import java.util.Optional;
 public class UavHostRunRunnable extends IntervalBaseRunnable {
 
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
+    private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
+    private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
 
     public UavHostRunRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -51,12 +57,13 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
      */
     private void intervalRunData() {
         PatrolHostCommand commandData = new PatrolHostCommand();
-        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
-                Wrappers.lambdaQuery(UavDeviceEntity.class)
-                .eq(UavDeviceEntity::getMainDeviceType, 1)
-        );
+//        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
+//                Wrappers.lambdaQuery(UavDeviceEntity.class)
+//                .eq(UavDeviceEntity::getMainDeviceType, 1)
+//        );
+        List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
         if (list != null && list.size() > 0) {
-            for (UavDeviceEntity uavDevice : list) {
+            for (DeviceEntity uavDevice : list) {
                 //无人机数据
                 Optional<OsdDockDrone> deviceOpt = SpringBeanUtilsTest.getBean(IDeviceRedisService.class)
                         .getDeviceOsd(uavDevice.getDeviceSn(), OsdDockDrone.class);
@@ -88,11 +95,11 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
                     osdDockDrone.setTotalFlightDistance(0.0);
                 }
                 UavHostRunDataItem item2 = createCommonBean(uavDevice);
-                valueUnit = Double.toString(osdDockDrone.getTotalFlightDistance())+"km";
+                valueUnit = Double.toString(osdDockDrone.getTotalFlightDistance())+"m";
                 item2.setType("2");
                 item2.setValue_unit(valueUnit);
                 item2.setValue(Double.toString(osdDockDrone.getTotalFlightDistance()));
-                item2.setUnit("km");
+                item2.setUnit("m");
                 commandData.addItem(item2);
 
                 // 电池电量
@@ -132,11 +139,11 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
                     osdDockDrone.setHomeDistance((float)0.0);
                 }
                 UavHostRunDataItem item5 = createCommonBean(uavDevice);
-                valueUnit = Float.toString(osdDockDrone.getHomeDistance())+"km";
+                valueUnit = Float.toString(osdDockDrone.getHomeDistance())+"m";
                 item5.setType("5");
                 item5.setValue_unit(valueUnit);
                 item5.setValue( Float.toString(osdDockDrone.getHomeDistance()));
-                item5.setUnit("km");
+                item5.setUnit("m");
                 commandData.addItem(item5);
 
                 // 飞行高度
@@ -154,7 +161,7 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
                 commandData.addItem(item6);
                 //Optional.ofNullable(osdDockDrone.getTotalFlightTime()).orElse((float)0.0);
 
-                // 飞行时长
+                // 飞行时长（不确定是不是单位为小时）
                 if(osdDockDrone.getTotalFlightTime()==null)
                 {
                     //不在线置为默认值
@@ -210,7 +217,7 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
      * @param device
      * @return
      */
-    private UavHostRunDataItem createCommonBean(UavDeviceEntity device) {
+    private UavHostRunDataItem createCommonBean(DeviceEntity device) {
         UavHostRunDataItem item = new UavHostRunDataItem();
         item.setPatroldevice_code(device.getDeviceSn());
         item.setPatroldevice_name(device.getDeviceName());

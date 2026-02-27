@@ -1,17 +1,29 @@
 package com.dji.sample.center.v2022.runnable;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.SpringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostStatusDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
+import com.dji.sample.common.util.SpringBeanUtilsTest;
+import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
 import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
+import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
+import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.model.entity.DeviceEntity;
+import com.dji.sample.manage.service.IDeviceRedisService;
+import com.dji.sample.wayline.service.IWaylineRedisService;
+import com.dji.sdk.cloudapi.device.OsdDockDrone;
+import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 无人机-巡视设备状态数据上送给上级
@@ -23,6 +35,8 @@ import java.util.List;
 public class UavHostStatusRunnable extends IntervalBaseRunnable {
 
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
+    private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
+    private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
 
     public UavHostStatusRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -42,106 +56,78 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
     }
 
     /**
-     * 发送无人机的巡视设备运行数据
+     * 发送无人机的巡视设备状态数据
      */
     private void intervalRunData() {
         PatrolHostCommand commandData = new PatrolHostCommand();
-        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
-                Wrappers.lambdaQuery(UavDeviceEntity.class)
-                .eq(UavDeviceEntity::getMainDeviceType, 1)
+//        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
+//                Wrappers.lambdaQuery(UavDeviceEntity.class)
+//                .eq(UavDeviceEntity::getMainDeviceType, 1)
+//        );
+
+        List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
+        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                new LambdaQueryWrapper<DroneMonitoringEntity>()
+                        .orderByDesc(DroneMonitoringEntity::getId)
+                        .last("limit 1")
         );
+        String batteryLevel = droneMonitoringEntity.getBatteryLevel();
+        String batteryLevel1 ="0";
+        if (batteryLevel != null) {
+            int i = Integer.parseInt(batteryLevel);
+            if (i < 30) {
+                batteryLevel1 ="1";
+            }else {
+                batteryLevel1 ="0";
+            }
+        }
         if (list != null && list.size() > 0) {
-            for (UavDeviceEntity uavDevice : list) {
-                //数据库查询填充数据
-                // 水平速度
+            for (DeviceEntity uavDevice : list) {
+                //无人机数据
+                //判断是否飞行需要获取机巢sn,目前一个，之后多机巢需要改
+                DeviceEntity deviceEntity = iDeviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
+                Optional<EventsReceiver<FlighttaskProgress>> runningWaylineJob = SpringBeanUtilsTest.getBean(IWaylineRedisService.class)
+                        .getRunningWaylineJob(deviceEntity.getDeviceSn());
+                boolean present = runningWaylineJob.isPresent();
+                String runState = "1";
+                if (present) {
+                    runState = "2";
+                }
+                // 电池电量
                 UavHostStatusDataItem item1 = createCommonBean(uavDevice);
                 String valueUnit = "";
                 item1.setType("1");
                 item1.setValue_unit(valueUnit);
-                item1.setValue("");
+                item1.setValue(batteryLevel1);
                 item1.setUnit("");
                 commandData.addItem(item1);
 
-                // 行驶里程
+                // 通信状态
                 UavHostStatusDataItem item2 = createCommonBean(uavDevice);
                 valueUnit = "";
                 item2.setType("2");
                 item2.setValue_unit(valueUnit);
-                item2.setValue("");
+                item2.setValue("0");
                 item2.setUnit("");
                 commandData.addItem(item2);
 
-                // 电池电量
+                // 故障报警(默认无告警)
                 UavHostStatusDataItem item3 = createCommonBean(uavDevice);
                 valueUnit = "";
-                item3.setType("3");
+                item3.setType("5");
                 item3.setValue_unit(valueUnit);
-                item3.setValue("");
+                item3.setValue("0");
                 item3.setUnit("");
                 commandData.addItem(item3);
 
-                // 垂直速度
+                // 运行状态
                 UavHostStatusDataItem item4 = createCommonBean(uavDevice);
                 valueUnit = "";
-                item4.setType("4");
+                item4.setType("6");
                 item4.setValue_unit(valueUnit);
-                item4.setValue("");
+                item4.setValue(runState);
                 item4.setUnit("");
                 commandData.addItem(item4);
-
-                // 飞行距离
-                UavHostStatusDataItem item5 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item5.setType("5");
-                item5.setValue_unit(valueUnit);
-                item5.setValue("");
-                item5.setUnit("");
-                commandData.addItem(item5);
-
-                // 飞行高度
-                UavHostStatusDataItem item6 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item6.setType("6");
-                item6.setValue_unit(valueUnit);
-                item6.setValue("");
-                item6.setUnit("");
-                commandData.addItem(item6);
-
-                // 飞行时长
-                UavHostStatusDataItem item7 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item7.setType("7");
-                item7.setValue_unit(valueUnit);
-                item7.setValue("");
-                item7.setUnit("");
-                commandData.addItem(item7);
-
-                // 云台俯仰角
-                UavHostStatusDataItem item8 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item8.setType("8");
-                item8.setValue_unit(valueUnit);
-                item8.setValue("");
-                item8.setUnit("");
-                commandData.addItem(item8);
-
-                // 云台横滚角
-                UavHostStatusDataItem item9 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item9.setType("9");
-                item9.setValue_unit(valueUnit);
-                item9.setValue("");
-                item9.setUnit("");
-                commandData.addItem(item9);
-
-                // 云台偏航角
-                UavHostStatusDataItem item10 = createCommonBean(uavDevice);
-                valueUnit = "";
-                item10.setType("10");
-                item10.setValue_unit(valueUnit);
-                item10.setValue("");
-                item10.setUnit("");
-                commandData.addItem(item10);
             }
         }
 
@@ -158,7 +144,7 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
      * @param device
      * @return
      */
-    private UavHostStatusDataItem createCommonBean(UavDeviceEntity device) {
+    private UavHostStatusDataItem createCommonBean(DeviceEntity device) {
         UavHostStatusDataItem item = new UavHostStatusDataItem();
         item.setPatroldevice_code(device.getDeviceSn());
         item.setPatroldevice_name(device.getDeviceName());

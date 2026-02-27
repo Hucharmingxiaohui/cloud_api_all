@@ -98,6 +98,7 @@ public class CenterRegisterRunnable extends CenterMessageBaseRunnable {
         }
 
         if (!StringUtil.isEmpty(registerItem.getNest_run_interval())) {
+//          运行数据和状态数据用的一个间隔时间（分无人机和机巢）
             // 无人机机巢运行数据定时上送
             int rate = Integer.parseInt(registerItem.getNest_run_interval());
             protocolData.setIntervalSeconds(rate);

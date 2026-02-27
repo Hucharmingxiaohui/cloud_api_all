@@ -3,6 +3,8 @@ package com.dji.sample.manage.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.DevicePayloadReceiver;
@@ -69,6 +71,9 @@ public class SDKDeviceService extends AbstractDeviceService {
     @Autowired
     @Qualifier("SDKWaylineService")
     private AbstractWaylineService abstractWaylineService;
+
+    @Resource
+    private DroneMonitoringEntityMapper droneMonitoringEntityMapper;
 
     @Override
     public TopicStatusResponse<MqttReply> updateTopoOnline(TopicStatusRequest<UpdateTopo> request, MessageHeaders headers) {
@@ -144,7 +149,7 @@ public class SDKDeviceService extends AbstractDeviceService {
         deviceService.subDeviceOffline(deviceSn);
         return new TopicStatusResponse<MqttReply>().setData(MqttReply.success());
     }
-
+//  从以下两个地方获取
     @Override
     public void osdDock(TopicOsdRequest<OsdDock> request, MessageHeaders headers) {
         String from = request.getFrom();
@@ -169,6 +174,79 @@ public class SDKDeviceService extends AbstractDeviceService {
         fillDockOsd(from, request.getData());
 
         deviceService.pushOsdDataToWeb(device.getWorkspaceId(), BizCodeEnum.DOCK_OSD, from, request.getData());
+        Integer workingVoltage = request.getData().getWorkingVoltage();
+        Float temperature = request.getData().getTemperature();
+        Integer humidity = request.getData().getHumidity();
+        Float environmentTemperature = request.getData().getEnvironmentTemperature();
+        Float windSpeed = request.getData().getWindSpeed();
+        RainfallEnum rainfallEnum = request.getData().getRainfall();
+        String rainfall = "无雨";
+        if(rainfallEnum!=null){
+            int rain = rainfallEnum.getRain();
+            switch (rain){
+                case 0:
+                    rainfall = "无雨"; break;
+                case 1:
+                    rainfall = "小雨"; break;
+                case 2:
+                    rainfall = "中雨"; break;
+                case 3:
+                    rainfall = "大雨"; break;
+            }
+        }
+//      状态为23则为打开状态1
+        CoverStateEnum coverStateEnum = request.getData().getCoverState();
+        int coverState = 0;
+        if(coverStateEnum!=null && (coverStateEnum.getState() ==2 || coverStateEnum.getState() ==3)){
+            coverState = 1;
+        }else if(coverStateEnum!=null){
+            coverState = coverStateEnum.getState();
+        }
+        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                new LambdaQueryWrapper<DroneMonitoringEntity>()
+                        .orderByDesc(DroneMonitoringEntity::getId)
+                        .last("limit 1")
+        );
+        if (droneMonitoringEntity != null) {
+            if(workingVoltage != null){
+                droneMonitoringEntity.setNestVoltage(String.valueOf(workingVoltage));
+            }
+            if(temperature != null){
+                droneMonitoringEntity.setNestTemperature(String.valueOf(temperature));
+            }
+            if(humidity != null){
+                droneMonitoringEntity.setNestHumidity(String.valueOf(humidity));
+            }
+            if(environmentTemperature != null){
+                droneMonitoringEntity.setAmbientTemperature(String.valueOf(environmentTemperature));
+            }
+            if(windSpeed != null){
+                droneMonitoringEntity.setWindSpeed(String.valueOf(windSpeed));
+            }
+            droneMonitoringEntity.setNestDoorStatus(String.valueOf(coverState));
+            droneMonitoringEntity.setRainfall(rainfall);
+            droneMonitoringEntityMapper.updateById(droneMonitoringEntity);
+        }else {
+            DroneMonitoringEntity droneMonitoringEntity1=new DroneMonitoringEntity();
+            if(workingVoltage != null){
+                droneMonitoringEntity1.setNestVoltage(String.valueOf(workingVoltage));
+            }
+            if(temperature != null){
+                droneMonitoringEntity1.setNestTemperature(String.valueOf(temperature));
+            }
+            if(humidity != null){
+                droneMonitoringEntity1.setNestHumidity(String.valueOf(humidity));
+            }
+            if(environmentTemperature != null){
+                droneMonitoringEntity1.setAmbientTemperature(String.valueOf(environmentTemperature));
+            }
+            if(windSpeed != null){
+                droneMonitoringEntity1.setWindSpeed(String.valueOf(windSpeed));
+            }
+            droneMonitoringEntity1.setNestDoorStatus(String.valueOf(coverState));
+            droneMonitoringEntity1.setRainfall(rainfall);
+            droneMonitoringEntityMapper.insert(droneMonitoringEntity1);
+        }
     }
 
     @Override
@@ -192,6 +270,19 @@ public class SDKDeviceService extends AbstractDeviceService {
         deviceRedisService.setDeviceOsd(from, request.getData());
         String dockSN = request.getGateway();
         Integer capacityPercent = request.getData().getBattery().getCapacityPercent();
+        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                new LambdaQueryWrapper<DroneMonitoringEntity>()
+                        .orderByDesc(DroneMonitoringEntity::getId)
+                        .last("limit 1")
+        );
+        if (droneMonitoringEntity != null) {
+            droneMonitoringEntity.setBatteryLevel(String.valueOf(capacityPercent));
+            droneMonitoringEntityMapper.updateById(droneMonitoringEntity);
+        }else {
+            DroneMonitoringEntity droneMonitoringEntity1=new DroneMonitoringEntity();
+            droneMonitoringEntity1.setBatteryLevel(String.valueOf(capacityPercent));
+            droneMonitoringEntityMapper.insert(droneMonitoringEntity1);
+        }
         if(capacityPercent<=30){
             abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockSN));
             log.info("电量已小于30%触发返航");

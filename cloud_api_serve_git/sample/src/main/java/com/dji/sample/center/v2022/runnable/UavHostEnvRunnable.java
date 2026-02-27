@@ -1,5 +1,6 @@
 package com.dji.sample.center.v2022.runnable;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.SpringUtils;
@@ -8,6 +9,10 @@ import com.dji.sample.center.v2022.command.upload.UavHostEnvItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
 import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
+import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
+import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.model.entity.DeviceEntity;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -22,6 +27,8 @@ import java.util.List;
 public class UavHostEnvRunnable extends IntervalBaseRunnable {
 
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
+    private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
+    private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
 
     public UavHostEnvRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -47,57 +54,41 @@ public class UavHostEnvRunnable extends IntervalBaseRunnable {
      */
     private void intervalWeatherData() {
         PatrolHostCommand commandData = new PatrolHostCommand();
-
-        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
-                Wrappers.lambdaQuery(UavDeviceEntity.class)
+//
+//        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
+//                Wrappers.lambdaQuery(UavDeviceEntity.class)
+//        );
+        List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
+        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                new LambdaQueryWrapper<DroneMonitoringEntity>()
+                        .orderByDesc(DroneMonitoringEntity::getId)
+                        .last("limit 1")
         );
         if (list != null && list.size() > 0) {
-            for (UavDeviceEntity entity : list) {
+            for (DeviceEntity entity : list) {
                 UavHostEnvItem itemUav1 = createCommonBeanUav(entity);
                 UavHostEnvItem itemUav2 = createCommonBeanUav(entity);
                 UavHostEnvItem itemUav3 = createCommonBeanUav(entity);
-                UavHostEnvItem itemUav4 = createCommonBeanUav(entity);
-                UavHostEnvItem itemUav5 = createCommonBeanUav(entity);
-                UavHostEnvItem itemUav6 = createCommonBeanUav(entity);
 
-            /* <1>: = 环境温度 <2>: = 环境湿度 <3>: = 风速 <4>: = 雨量
-            <5>: = 风向 <6>: = 气压 */
+            /* <1>: = 环境温度  <3>: = 风速 <4>: = 雨量 */
                 itemUav1.setType("1");
-                itemUav1.setValue_unit("");
-                itemUav1.setValue("");
-                itemUav1.setUnit("");
+                itemUav1.setValue_unit(droneMonitoringEntity.getAmbientTemperature()+"°C");
+                itemUav1.setValue(droneMonitoringEntity.getAmbientTemperature());
+                itemUav1.setUnit("°C");
 
-                itemUav2.setType("2");
-                itemUav2.setValue_unit("");
-                itemUav2.setValue("");
-                itemUav2.setUnit("");
+                itemUav2.setType("3");
+                itemUav2.setValue_unit(droneMonitoringEntity.getWindSpeed()+"m/s");
+                itemUav2.setValue(droneMonitoringEntity.getWindSpeed());
+                itemUav2.setUnit("m/s");
 
-                itemUav3.setType("3");
+                itemUav3.setType("4");
                 itemUav3.setValue_unit("");
-                itemUav3.setValue("");
+                itemUav3.setValue(droneMonitoringEntity.getRainfall());
                 itemUav3.setUnit("");
-
-                itemUav4.setType("4");
-                itemUav4.setValue_unit("");
-                itemUav4.setValue("");
-                itemUav4.setUnit("");
-
-                itemUav5.setType("5");
-                itemUav5.setValue_unit("");
-                itemUav5.setValue("");
-                itemUav5.setUnit("");
-
-                itemUav6.setType("6");
-                itemUav6.setValue_unit("");
-                itemUav6.setValue("");
-                itemUav6.setUnit("");
 
                 commandData.addItem(itemUav1);
                 commandData.addItem(itemUav2);
                 commandData.addItem(itemUav3);
-                commandData.addItem(itemUav4);
-                commandData.addItem(itemUav5);
-                commandData.addItem(itemUav6);
             }
         }
 
@@ -111,7 +102,7 @@ public class UavHostEnvRunnable extends IntervalBaseRunnable {
     /**
      * 无人机公共数据封装
      */
-    private UavHostEnvItem createCommonBeanUav(UavDeviceEntity entity) {
+    private UavHostEnvItem createCommonBeanUav(DeviceEntity entity) {
         UavHostEnvItem item = new UavHostEnvItem();
         item.setPatroldevice_code(entity.getDeviceSn());
         item.setPatroldevice_name(entity.getDeviceName());

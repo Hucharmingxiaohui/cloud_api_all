@@ -28,6 +28,8 @@ public class PatrolResultItem extends BaseItem {
     private String task_patrolled_id;
     private String obj_id;
     private String valid;
+//  在57号文基础上加了个缺陷描述字段
+    private String defect_description;
 
     @XmlAttribute(name = "patroldevice_name")
     public String getPatroldevice_name() {
@@ -141,6 +143,11 @@ public class PatrolResultItem extends BaseItem {
         return this.task_patrolled_id;
     }
 
+    @XmlAttribute(name = "defect_description")
+    public String getDefect_description() {
+        return this.defect_description;
+    }
+
 
     public void setPatroldevice_code(String patroldevice_code) {
         this.patroldevice_code = patroldevice_code;
@@ -209,5 +216,9 @@ public class PatrolResultItem extends BaseItem {
 
     public void setTask_patrolled_id(String task_patrolled_id) {
         this.task_patrolled_id = task_patrolled_id;
+    }
+
+    public void setDefect_description(String defect_description) {
+        this.defect_description = defect_description;
     }
 }

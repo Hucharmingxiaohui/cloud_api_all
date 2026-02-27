@@ -1,5 +1,6 @@
 package com.dji.sample.center.v2022.runnable;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.SpringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
@@ -7,6 +8,10 @@ import com.dji.sample.center.v2022.command.upload.UavNestDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
 import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
+import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
+import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.model.entity.DeviceEntity;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -22,6 +27,8 @@ import java.util.List;
 public class UavNestRunRunnable extends IntervalBaseRunnable {
 
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
+    private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
+    private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
 
     public UavNestRunRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -47,16 +54,21 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
      */
     private void intervalNestRunData() {
         PatrolHostCommand commandData = new PatrolHostCommand();
-        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
-                Wrappers.lambdaQuery(UavDeviceEntity.class)
-                        .eq(UavDeviceEntity::getMainDeviceType, 3)
-        );
-
+//        List<UavDeviceEntity> list = iUavDeviceMapper.selectByCondition(
+//                Wrappers.lambdaQuery(UavDeviceEntity.class)
+//                        .eq(UavDeviceEntity::getMainDeviceType, 3)
+//        );
+        List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
         if (list == null) {
             list = new ArrayList<>();
         }
-
-        for (UavDeviceEntity entity : list) {
+        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                new LambdaQueryWrapper<DroneMonitoringEntity>()
+                        .orderByDesc(DroneMonitoringEntity::getId)
+                        .last("limit 1")
+        );
+//      此处是针对一个机巢,后续加多个需要改
+        for (DeviceEntity entity : list) {
             UavNestDataItem item1 = createCommonBean(entity);
             UavNestDataItem item2 = createCommonBean(entity);
             UavNestDataItem item3 = createCommonBean(entity);
@@ -88,21 +100,21 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
 
             item4.setType("4");
             valueUnit = "";
-            item4.setValue_unit(valueUnit);
-            item4.setValue("");
-            item4.setUnit("");
+            item4.setValue_unit(droneMonitoringEntity.getNestVoltage()+"mV");
+            item4.setValue(droneMonitoringEntity.getNestVoltage());
+            item4.setUnit("mV");
 
             item5.setType("5");
             valueUnit = "";
-            item5.setValue_unit(valueUnit);
-            item5.setValue("");
-            item5.setUnit("");
+            item5.setValue_unit(droneMonitoringEntity.getNestTemperature()+"°C");
+            item5.setValue(droneMonitoringEntity.getNestTemperature());
+            item5.setUnit("°C");
 
             item6.setType("6");
             valueUnit = "";
-            item6.setValue_unit(valueUnit);
-            item6.setValue("");
-            item6.setUnit("");
+            item6.setValue_unit(droneMonitoringEntity.getNestHumidity()+"%RH");
+            item6.setValue(droneMonitoringEntity.getNestHumidity());
+            item6.setUnit("%RH");
 
             commandData.addItem(item1);
             commandData.addItem(item2);
@@ -125,7 +137,7 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
      * @param entity
      * @return
      */
-    private UavNestDataItem createCommonBean(UavDeviceEntity entity) {
+    private UavNestDataItem createCommonBean(DeviceEntity entity) {
         UavNestDataItem item = new UavNestDataItem();
 
         item.setNest_code(entity.getDeviceSn());

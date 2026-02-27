@@ -102,7 +102,8 @@ public class CenterModelSyncBuilder {
                     item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
                     item.setMain_device_id(Optional.ofNullable(entity.getMainDeviceId()).orElse(""));
                     item.setMain_device_name(Optional.ofNullable(entity.getMainDeviceName()).orElse(""));
-                    item.setDevice_type(entity.getDeviceType());
+//                  点位设备类型为31，风机类型
+                    item.setDevice_type("31");
                     //无人机航拍不巡视表计，暂时设置为空
                     item.setMeter_type("");
                     //无人机点位外观类型，暂时设置为空

@@ -628,9 +628,11 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             .eq(DefectEntity::getFanPart, mediaFileDTO.getFanPart()));
                     String imagePath = defectEntity.getImagePath();
                     String filePath = convertImagePath(imagePath);
-                    String destName = new File(filePath).getName();
+//                  直接传分析图，加缺陷字段defectDescription
+                    String defectDescription = defectEntity.getDefectDescription();
+                    String destName = new File(imagePath).getName();
                     String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
-                    FtpUtils.getInstance().uploadToCenterNormal(filePath, destDir, destName1);
+                    FtpUtils.getInstance().uploadToCenterNormal(imagePath, destDir, destName1);
                     //推送点位报文
                     String format = String.format("%s/%s", destDir, destName1);
 
@@ -645,12 +647,13 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     item.setUnit("");
                     item.setValue_unit("");
                     item.setTime(DateUtils.getNowDateTimeStr());
-//              识别类型先设置为空
+//                  识别类型先设置为空
                     item.setRecognition_type("");
                     item.setFile_path(format);
                     item.setFile_type("2");
                     item.setRectangle("");
                     item.setTask_patrolled_id(waylineJobEntity.getJobId());
+                    item.setDefect_description(defectDescription);
                     item.setObj_id("");
                     item.setValid("1");
                     commandData.addItem(item);
