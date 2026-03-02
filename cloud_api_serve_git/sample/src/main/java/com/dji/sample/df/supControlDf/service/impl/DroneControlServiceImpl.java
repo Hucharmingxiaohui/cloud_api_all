@@ -1,5 +1,6 @@
 package com.dji.sample.df.supControlDf.service.impl;
 
+import com.dji.sample.common.util.SpringBeanUtilsTest;
 import com.dji.sample.control.model.dto.JwtAclDTO;
 import com.dji.sample.control.model.dto.LinkWorkMode;
 import com.dji.sample.control.model.enums.DroneAuthorityEnum;
@@ -20,6 +21,8 @@ import com.dji.sdk.cloudapi.debug.DebugMethodEnum;
 import com.dji.sdk.cloudapi.debug.SdrWorkmodeSwitchRequest;
 import com.dji.sdk.cloudapi.device.CameraModeEnum;
 import com.dji.sdk.cloudapi.device.LinkWorkModeEnum;
+import com.dji.sdk.cloudapi.device.OsdDock;
+import com.dji.sdk.cloudapi.device.OsdDockDrone;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.mqtt.drc.DrcDownPublish;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +34,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.dji.sdk.cloudapi.debug.DebugMethodEnum.SDR_WORKMODE_SWITCH;
@@ -79,6 +83,60 @@ public class DroneControlServiceImpl implements DroneControlService {
     @Override
     public String return_home_cancel(String sn) {
         HttpResultResponse result=controlService.controlDockDebug(sn,RemoteDebugMethodEnum.RETURN_HOME_CANCEL,null);
+        if(result.getCode()==0){
+            return "true";
+        }else{
+            return "false";
+        }
+    }
+
+    @Override
+    public String nest_door_open(String sn) throws InterruptedException {
+//      开启调试模式
+        Optional<OsdDock> deviceOpt =deviceRedisService.getDeviceOsd(sn, OsdDock.class);
+        OsdDock osdDock=new OsdDock();
+        if(deviceOpt.isPresent())
+        {
+            osdDock=deviceOpt.get();
+        }
+        int code = osdDock.getModeCode().getCode();
+        if(code == 0){
+            controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("debug_mode_open"), null);
+            Thread.sleep(4000);
+        }
+//      开启舱门
+        HttpResultResponse result = controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("cover_open"), null);
+//      睡眠10秒用以开启舱门
+        Thread.sleep(10000);
+//      关闭调试模式
+        controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("debug_mode_close"), null);
+        if(result.getCode()==0){
+            return "true";
+        }else{
+            return "false";
+        }
+    }
+
+    @Override
+    public String nest_door_close(String sn) throws InterruptedException {
+        //      开启调试模式
+        Optional<OsdDock> deviceOpt =deviceRedisService.getDeviceOsd(sn, OsdDock.class);
+        OsdDock osdDock=new OsdDock();
+        if(deviceOpt.isPresent())
+        {
+            osdDock=deviceOpt.get();
+        }
+        int code = osdDock.getModeCode().getCode();
+        if(code == 0){
+            controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("debug_mode_open"), null);
+            Thread.sleep(4000);
+        }
+//      开启舱门
+        HttpResultResponse result = controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("cover_close"), null);
+//      关闭调试模式
+//      睡眠10秒用关闭舱门
+        Thread.sleep(10000);
+        controlService.controlDockDebug(sn, RemoteDebugMethodEnum.find("debug_mode_close"), null);
         if(result.getCode()==0){
             return "true";
         }else{
@@ -242,6 +300,7 @@ public class DroneControlServiceImpl implements DroneControlService {
      */
     @Override
     public String droneControl(String sn, String Type, String Command, String Item) throws Exception {
+//      需要补充机巢开启关闭功能
         //检查无人机是否在线
         boolean isOnline= deviceRedisService.checkDeviceOnline(sn);
         if(!isOnline){
@@ -319,7 +378,16 @@ public class DroneControlServiceImpl implements DroneControlService {
             param.setCmd(PayloadCommandsEnum.CAMERA_PHOTO_TAKE);
             return this.payloadCommands(sn,param);
         }
-
+        //机巢舱门开启
+        if(Type.equals("20005")&&Command.equals("3")&&Item.equals("1"))
+        {
+            return this.nest_door_open(sn);
+        }
+        //机巢舱门关闭
+        if(Type.equals("20005")&&Command.equals("3")&&Item.equals("2"))
+        {
+            return this.nest_door_close(sn);
+        }
         return "false";
     }
 

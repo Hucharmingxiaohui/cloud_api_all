@@ -10,6 +10,10 @@ public interface DroneControlService {
     String return_home(String sn);
     //取消一键返航
     String return_home_cancel(String sn);
+    //机巢舱门开启
+    String nest_door_open(String sn) throws InterruptedException;
+    //机巢舱门关闭
+    String nest_door_close(String sn) throws InterruptedException;
     //模式切换：进入drc模式
     String deviceDrcEnter(String sn);
     //模式切换：退出drc模式

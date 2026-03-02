@@ -7,6 +7,7 @@ import com.dji.sample.center.v2022.command.base.EdgeNodeCommandSimple;
 import com.dji.sample.center.v2022.data.CenterProtocolData;
 import com.dji.sample.center.v2022.runnable.*;
 import com.dji.sample.center.v2022.tool.PatrolHostXmlTool;
+import com.dji.sample.df.supControlDf.service.DroneControlService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.Socket;
@@ -26,6 +27,7 @@ public class CenterMessageHandler extends CenterTcpMessageHandler {
     //引用
     private SwitchConfig switchConfig = AppContext.getBean(SwitchConfig.class);
     private ExecutorFactory executorFactory = AppContext.getBean(ExecutorFactory.class);
+    private DroneControlService droneControlService = AppContext.getBean(DroneControlService.class);
 
     //构造方法
     public CenterMessageHandler(PatrolHostSocketClient patrolHostSocketClient, CenterHandler centerHandler, Socket socket, String centerIp) {
@@ -84,27 +86,27 @@ public class CenterMessageHandler extends CenterTcpMessageHandler {
 
             //无人机本体控制指令
             case "20001":
-                executorService.submit(new CenterUavControlRunnable(protocolData));
+                executorService.submit(new CenterUavControlRunnable(droneControlService,protocolData));
                 break;
 
             //无人机飞行控制指令
             case "20002":
-                executorService.submit(new CenterUavControlRunnable(protocolData));
+                executorService.submit(new CenterUavControlRunnable(droneControlService,protocolData));
                 break;
 
             //无人机云台控制指令
             case "20003":
-                executorService.submit(new CenterUavControlRunnable(protocolData));
+                executorService.submit(new CenterUavControlRunnable(droneControlService,protocolData));
                 break;
 
             //无人机相机控制指令
             case "20004":
-                executorService.submit(new CenterUavControlRunnable(protocolData));
+                executorService.submit(new CenterUavControlRunnable(droneControlService,protocolData));
                 break;
 
             //无人机机巢控制指令
             case "20005":
-                executorService.submit(new CenterUavControlRunnable(protocolData));
+                executorService.submit(new CenterUavControlRunnable(droneControlService,protocolData));
                 break;
 
             //任务控制指令

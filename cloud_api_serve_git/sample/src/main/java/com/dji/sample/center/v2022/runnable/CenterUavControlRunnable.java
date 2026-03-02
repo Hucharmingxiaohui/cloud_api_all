@@ -8,6 +8,7 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.supControlDf.service.DroneControlService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -20,12 +21,13 @@ import java.util.List;
  */
 @Slf4j
 public class CenterUavControlRunnable extends CenterMessageBaseRunnable {
-    @Resource
-    private DroneControlService droneControlService;
+    private final DroneControlService droneControlService;
+    private final CenterProtocolData protocolData;
 
-
-    public CenterUavControlRunnable(CenterProtocolData protocolData) {
+    public CenterUavControlRunnable(DroneControlService droneControlService, CenterProtocolData protocolData) {
         super(protocolData);
+        this.droneControlService = droneControlService;
+        this.protocolData = protocolData;
     }
 
     @Override
