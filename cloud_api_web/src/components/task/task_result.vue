@@ -82,7 +82,7 @@
           <el-table-column label="图片" align="center">
             <template #default="scope">
               <img
-                :src="getImageUrl(scope.row.original_image_url)"
+                :src="getImageUrl(config.baseURL, scope.row.original_image_url)"
                 alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
                 @click="openPreviewModal(scope.row)"
@@ -96,7 +96,7 @@
           >
             <template #default="scope">
               <img
-                :src="getImageUrl(scope.row.defect_image_url)"
+                :src="getImageUrl(config.baseURL, scope.row.defect_image_url)"
                 alt="预览图"
                 style="width: 100px; height: 100px; object-fit: cover; cursor: pointer;"
                 @click="openPreviewAnaysisModal(scope.row)"
@@ -229,7 +229,7 @@
       </div>
     </el-dialog>
 
-    <!-- 图片放大弹窗 -->
+    <!-- 原始图片放大弹窗 -->
     <el-dialog v-model="previewVisible" title="原始预览" width="1000px">
       <div class="preview-modal-content">
         <!-- 左侧显示放大图片 -->
@@ -238,7 +238,7 @@
         <button class="prev-image" @click="showPreviousImage('origin')">‹</button>
         <div style="width: 500px; height: 500px;">
           <img
-            :src="getImageUrl(selectedImage.original_image_url)"
+            :src="getImageUrl(config.baseURL, selectedImage.original_image_url)"
             alt="放大图"
             class="preview-image"
             ref="previewImage"
@@ -314,6 +314,7 @@
               readonly
             />
           </div>
+          <button @click="tempStatus = true" class="btn" v-if="selectedImage.file_name.includes('_T')">测温规则配置</button>
         </div>
       </div>
 
@@ -357,7 +358,7 @@
               class="thumbnail-item"
             >
               <img
-                :src="getImageUrl(item.original_image_url)"
+                :src="getImageUrl(config.baseURL, item.original_image_url)"
                 alt=""
                 class="thumbnail-image"
                 :class="{ active: selectedImage === item }"
@@ -372,6 +373,7 @@
         </div>
       </div>
     </el-dialog>
+    <!-- 分析图方法弹窗 -->
     <el-dialog
       v-model="previewAnaysisVisible"
       title="分析图片预览"
@@ -384,7 +386,7 @@
         <button class="prev-image" @click="showPreviousImage('defect')">‹</button>
         <div style="width: 500px; height: 500px;">
           <img
-            :src="getImageUrl(selectedImage.defect_image_url)"
+            :src="getImageUrl(config.baseURL, selectedImage.defect_image_url)"
             alt="放大图"
             class="preview-image"
             ref="previewImage"
@@ -507,7 +509,7 @@
               class="thumbnail-item"
             >
               <img
-                :src="getImageUrl(item.defect_image_url)"
+                :src="getImageUrl(config.baseURL, item.defect_image_url)"
                 alt=""
                 class="thumbnail-image"
                 :class="{ active: selectedImage === item }"
@@ -522,30 +524,34 @@
         </div>
       </div>
     </el-dialog>
+
+    <!-- 测温配置窗口 -->
+     <el-dialog v-model="tempStatus" title="红外测温" width="975">
+      <TempDet :selectedImage = selectedImage :workspaceId = workspaceId></TempDet>
+     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted, inject } from 'vue'
-import { TableState } from 'ant-design-vue/lib/table/interface'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
-import { IPage } from '/@/api/http/type'
-import { Task } from '/@/api/wayline'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
 import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
-import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
-import { CloseOutlined } from '@ant-design/icons-vue'
+import TempDet from '/@/components/task/tempDet.vue'
+import { getImageUrl } from '/@/common/url'
 import { renderAsync } from 'docx-preview'
 import { ElMessage } from 'element-plus'
 const viewReportVisible = ref(false)
 const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
-
 const resultType = ref(1)
+
+// 测温
+const tempStatus = ref(false)
 
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '40'],
@@ -618,23 +624,6 @@ onMounted(() => {
   getFiles()
   getDefectTypeMap()
 })
-
-/**
- * 工具函数，路径拼接
- */
-function getImageUrl (path:string) {
-  if (!path) return ''
-
-  const baseURL = config.baseURL || ''
-  const imagePath = path.replace(/^\/+/, '') // 移除开头的斜杠
-
-  // 确保baseURL以斜杠结尾，路径不以斜杠开头
-  if (baseURL.endsWith('/')) {
-    return baseURL + imagePath
-  } else {
-    return baseURL + '/' + imagePath
-  }
-}
 
 /**
  * 获取任务结果显示类型
@@ -882,13 +871,13 @@ function downloadImageLocal (media: any, type: string) {
       ElMessage.error('图片地址无效')
       return
     }
-    imageUrl = getImageUrl(media.defect_image_ur)
+    imageUrl = getImageUrl(config.baseURL, media.defect_image_ur)
   } else {
     if (!media || !media.original_image_url) {
       ElMessage.error('图片地址无效')
       return
     }
-    imageUrl = getImageUrl(media.original_image_url)
+    imageUrl = getImageUrl(config.baseURL, media.original_image_url)
   }
 
   // 从图片地址下载
@@ -988,7 +977,7 @@ async function openPreviewAnaysisModal (row:any) {
 async function getImageAttributes (Url: string) {
   try {
     // 先设置图片地址
-    const imageUrl = getImageUrl(Url)
+    const imageUrl = getImageUrl(config.baseURL, Url)
 
     // 获取图片信息
     const img = new Image()
@@ -1618,44 +1607,6 @@ function scrollRight () {
 //     font-size: 14px;
 //   }
 // }
-
-.TEMPPanel {
-  padding: 10px 0 0 0;
-  position: absolute;
-  left: 0;
-  top: 200px;
-  margin-left: 345px;
-  width: 940px;
-  height: 690px;
-  z-index: 3000;
-  // background: #232323;
-  // background: rgba(59, 116, 255, 0.2);
-  background-color: #205CA1;
-  color: #fff;
-
-  .content1 {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #06346A;
-    padding: 20px;
-
-    .content-left {
-      width: 300px;
-      // background-color:#1d4292;
-      height: 600px;
-      border-right: 1px solid #023956;
-    }
-
-    .content-right {
-      width: 600px;
-      background-color: #1d4292;
-      height: 600px;
-      border: 3px dashed #3667A7;
-    }
-
-  }
-}
 
 // 输入框
 :deep(.el-input) {
