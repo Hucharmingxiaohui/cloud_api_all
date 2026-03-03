@@ -142,6 +142,7 @@ async function getLiveHttp () {
         // onStop()
         isPlay.value = true
         flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+        initFlv()
         // setTimeout(() => {
         //   getLiveHttp()
         // }, 500)
