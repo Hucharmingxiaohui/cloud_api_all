@@ -61,7 +61,7 @@ cameraSelected.value = '165-0-7'
 const isPlay = ref(false)
 const isStartSteam = ref(false)
 onMounted(() => {
-  // getcameraInfo()
+  getcameraInfo()
 })
 
 /* 请求后端相机信息

@@ -87,7 +87,7 @@ const videoRef = ref<HTMLVideoElement | null>(null)
 const isPlay = ref(false)
 const isStartSteam = ref(false)
 onMounted(() => {
-  // getcameraInfo()
+  getcameraInfo()
 })
 
 /* 请求后端相机信息
