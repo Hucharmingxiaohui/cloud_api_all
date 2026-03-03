@@ -73,7 +73,7 @@ const isDockLive = ref(false)
 const nonSwitchable = 'normal'
 const webrtc: any = null
 const flvURL = ref()
-
+cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 onMounted(() => {
@@ -142,10 +142,11 @@ async function getLiveHttp () {
       initFlv()
     }
     if (res.code === 513003) {
-      onStop()
-      setTimeout(() => {
-        getLiveHttp()
-      }, 500)
+      flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+      // onStop()
+      // setTimeout(() => {
+      //   getLiveHttp()
+      // }, 500)
       setTimeout(() => {
         initFlv()
       }, 1000)

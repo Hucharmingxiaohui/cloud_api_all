@@ -744,7 +744,7 @@ async function onDeleteTask (jobId: string) {
 
 // 删除失败、成功、取消状态的任务
 async function onDeleteOtherTask (jobId: string, status: any) {
-   try {
+  try {
     // 执行状态，先进行挂起操作
     if (status === TaskStatus.Carrying) {
       const { code } = await updateTaskStatus(workspaceId, {
@@ -759,9 +759,9 @@ async function onDeleteOtherTask (jobId: string, status: any) {
       ElMessage.success('任务删除成功!')
       getPlans()
     })
-   } catch (error) {
+  } catch (error) {
 
-   }
+  }
 }
 
 // 批量删除失败、成功、取消状态的任务

@@ -4,11 +4,11 @@
 <div class="container">
     <!-- <div class="header">航线管理</div> -->
     <div class="operation">
-      <el-button class="new_btn iconfont icon-uav" type="primary" style="margin-left: 10px; width: 100px;"
+      <el-button class="new_btn iconfont icon-uav" :class="{ 'active-btn': selectedDeviceBtn === 'drone' }" type="primary" style="margin-left: 10px; width: 100px;"
         @click="select(EDeviceTypeName.Aircraft)">
         <span style="margin-left: 5px; font-size: 14px;">无人机</span>
       </el-button>
-      <el-button class="new_btn iconfont icon-wurenjijichang" type="primary" style="margin-left: 10px; width: 100px;"
+      <el-button class="new_btn iconfont icon-wurenjijichang" :class="{ 'active-btn': selectedDeviceBtn === 'dock' }" type="primary" style="margin-left: 10px; width: 100px;"
         @click="select(EDeviceTypeName.Dock)">
         <span style="margin-left: 5px; font-size: 14px;">机场</span>
       </el-button>
@@ -99,7 +99,7 @@
             :sortable="true"
           ></el-table-column>
 
-          <el-table-column label="操作" width="200">
+          <el-table-column label="操作" width="200" align="center">
             <template #default="scope">
               <div class="editable-row-operations">
                 <div v-if="editableData[scope.row.device_sn]">
@@ -229,7 +229,7 @@ import DeviceHmsDrawer from '/@/components/devices/device-hms/DeviceHmsDrawer.vu
 import { message, notification } from 'ant-design-vue'
 
 //= ========================================================================================
-const activeBtn = ref('1') // 1: 无人机  2: 机场
+const selectedDeviceBtn = ref('drone')// 1: 无人机  2: 机场
 // 控制是否显示复选框列
 const showSelectionColumn = ref(true) // 控制复选框列是否显示
 const selectable = (record: any) => {
@@ -424,6 +424,7 @@ function unbind () {
 
 // 选择设备
 function select (item: any) {
+  selectedDeviceBtn.value = selectedDeviceBtn.value === 'drone' ? 'dock' : 'drone'
   getDevices(item)
   current.value = []
   current.value.push(item)
@@ -487,6 +488,11 @@ onMounted(() => {
   // border: 1px solid rgb(0, 57, 154);
 }
 
+.editable-row-operations{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 // th.ant-table-selection-column {
 //   background-color: rgb(133, 8, 56) !important;
 // }
@@ -784,6 +790,12 @@ table tbody .ant-table-row-selected > td {
   }
 }
 
+// 选择框
+// :deep(.el-radio-button--large .el-radio-button__inner){
+//   padding: 8px;
+//   width: 60px;
+// }
+
 // 操作部分
 .operation {
   display: flex;
@@ -840,6 +852,13 @@ table tbody .ant-table-row-selected > td {
       margin: 9px 20px 0 8px;
     }
 
+  }
+  .active-btn{
+        background-image: linear-gradient(180deg,
+        rgba(70, 145, 217, 1) 0,
+         rgba(21, 81, 181, 0.7) 50%,
+        rgba(47,187,223, 0.7) 100%);
+        border: 1px solid #0AF0F2;
   }
 
   .new_btn1 {

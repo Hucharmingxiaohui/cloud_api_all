@@ -115,10 +115,11 @@ async function getLiveHttp () {
       }
       if (res.code === 513003) {
         isPlay.value = true
-        onStop()
-        setTimeout(() => {
-          getLiveHttp()
-        }, 500)
+        flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+        // onStop()
+        // setTimeout(() => {
+        //   getLiveHttp()
+        // }, 500)
       }
     })
   } catch (error) {
@@ -229,7 +230,7 @@ const destory = () => {
 }
 onUnmounted(() => {
   destory()
-  onStop()
+  // onStop()
 })
 
 // 根据设备osd信息更新信息

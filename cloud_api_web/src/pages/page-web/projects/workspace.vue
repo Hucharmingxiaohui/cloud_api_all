@@ -51,7 +51,7 @@
   </a-layout>
 </template>
 <script lang="ts" setup>
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 // import video from './livestream.vue'
 import Sidebar from '/@/components/common/sidebar.vue'
 // import MediaPanel from '/@/components/MediaPanel.vue'
@@ -61,6 +61,9 @@ import { getRoot } from '/@/root'
 import { useMyStore } from '/@/store'
 import { useConnectWebSocket } from '/@/hooks/use-connect-websocket'
 import EventBus from '/@/event-bus'
+
+// @ts-ignore
+import { startStream } from '/@/components/watchDevice/controlLivestream.js'
 // import Organization from '/@/components/Organization.vue'
 // import myTsa from '/@/components/TsaPanel.vue'
 // import myWayline from '/@/components/WaylinePanel.vue'
@@ -68,6 +71,11 @@ import EventBus from '/@/event-bus'
 // import myWayline from './wayline.vue'
 let dockOsdEmptyTimer = null
 let dockOsdEmptyStartTime = 0
+
+// 当前暂存的设备状态
+const dock_sn = ref('')
+const drone_online_status = ref(false)
+
 const root = getRoot()
 const store = useMyStore()
 const messageHandler = async (payload: any) => {
@@ -94,6 +102,17 @@ const messageHandler = async (payload: any) => {
         clearTimeout(dockOsdEmptyTimer)
         dockOsdEmptyStartTime = 0
         store.commit('SET_DOCK_INFO', currentData)
+        // store?.state.deviceState
+
+        // 开始推流
+        if (currentData.sn && currentData.sn !== dock_sn.value) {
+          dock_sn.value = currentData.sn
+          startStream(currentData.sn, 'dock')
+          drone_online_status.value = currentData.host?.sub_device.device_online_status
+          if (currentData.host?.sub_device.device_online_status === true && currentData.host?.sub_device.device_online_status !== drone_online_status.value) {
+            startStream(currentData.host?.sub_device.device_sn, 'drone')
+          }
+        }
       } else {
         // 为空，检查是否已经持续2秒
         const now = Date.now()

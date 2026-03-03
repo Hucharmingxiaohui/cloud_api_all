@@ -80,6 +80,7 @@ const nonSwitchable = 'normal'
 const webrtc: any = null
 const flvURL = ref()
 
+cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 
@@ -138,11 +139,12 @@ async function getLiveHttp () {
         initFlv()
       }
       if (res.code === 513003) {
-        onStop()
+        // onStop()
         isPlay.value = true
-        setTimeout(() => {
-          getLiveHttp()
-        }, 500)
+        flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+        // setTimeout(() => {
+        //   getLiveHttp()
+        // }, 500)
       }
     })
   } catch (error) {

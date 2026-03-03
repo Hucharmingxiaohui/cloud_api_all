@@ -103,10 +103,11 @@ async function getLiveHttp () {
       initFlv()
     }
     if (res.code === 513003) {
-      onStop()
-      setTimeout(() => {
-        getLiveHttp()
-      }, 500)
+      // onStop()
+      // setTimeout(() => {
+      //   getLiveHttp()
+      // }, 500)
+      flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
       setTimeout(() => {
         initFlv()
       }, 1000)
@@ -219,7 +220,7 @@ const destory = () => {
 }
 onUnmounted(() => {
   destory()
-  onStop()
+  // onStop()
 })
 
 const onSwitch = () => {

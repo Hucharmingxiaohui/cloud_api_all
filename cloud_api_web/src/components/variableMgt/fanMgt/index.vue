@@ -596,7 +596,7 @@ const formRules = {
     { required: true, message: '请输入单个叶片长度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  uav_blade_distance_stop:[
+  uav_blade_distance_stop: [
     { required: true, message: '请输入无人机距离（停机）', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
