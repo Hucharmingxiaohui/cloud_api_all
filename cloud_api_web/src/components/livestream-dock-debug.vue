@@ -4,7 +4,7 @@
 
 <script lang="ts" setup>
 import { message } from 'ant-design-vue'
-import { onMounted, reactive, ref, onUnmounted, defineProps, watch, computed } from 'vue'
+import { onMounted, reactive, nextTick, ref, onUnmounted, defineProps, watch, computed } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { getImageUrl } from '/@/common/url'
 import { DeviceInfoType } from '/@/types/device'
@@ -116,11 +116,10 @@ async function getLiveHttp () {
       if (res.code === 513003) {
         isPlay.value = true
         flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
-        initFlv()
-        // onStop()
-        // setTimeout(() => {
-        //   getLiveHttp()
-        // }, 500)
+        nextTick(() => {
+          console.log('初始化备用flv播放器...')
+          initFlv()
+        })
       }
     })
   } catch (error) {
@@ -228,6 +227,11 @@ const onPause = () => flvPlayer.value.pause()
  * 销毁
  */
 const destory = () => {
+  flvPlayer.value.pause()
+  flvPlayer.value.unload()
+  flvPlayer.value.detachMediaElement()
+  flvPlayer.value.destroy()
+  flvPlayer.value = null
 }
 onUnmounted(() => {
   destory()

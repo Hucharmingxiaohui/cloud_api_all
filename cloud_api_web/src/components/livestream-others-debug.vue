@@ -12,7 +12,7 @@
 
 <script lang="ts" setup>
 import { message } from 'ant-design-vue'
-import { onMounted, defineProps, reactive, ref, onUnmounted, watch, computed } from 'vue'
+import { onMounted, defineProps, nextTick, reactive, ref, onUnmounted, watch, computed } from 'vue'
 import { DeviceInfoType } from '/@/types/device'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { getImageUrl } from '/@/common/url'
@@ -142,7 +142,10 @@ async function getLiveHttp () {
         // onStop()
         isPlay.value = true
         flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
-        initFlv()
+        nextTick(() => {
+          console.log('初始化备用flv播放器...')
+          initFlv()
+        })
         // setTimeout(() => {
         //   getLiveHttp()
         // }, 500)
