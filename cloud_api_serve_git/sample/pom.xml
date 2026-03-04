@@ -50,6 +50,11 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.jcraft</groupId>
+            <artifactId>jsch</artifactId>
+            <version>0.1.55</version>
+        </dependency>
+        <dependency>
             <groupId>com.dji</groupId>
             <artifactId>cloud-sdk</artifactId>
             <version>${cloud-sdk.revision}</version>

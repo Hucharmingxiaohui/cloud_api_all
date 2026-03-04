@@ -207,7 +207,7 @@ switch:
 
 #国网规范对接上级配置
 centernormal:
-  serverIp: 172.20.63.150
+  serverIp: 127.0.0.1
   serverPort: 10019
   stationCode: 192.168.1.16
   serverCode: Server01
@@ -326,6 +326,22 @@ importPoint:
   modelfilePath: D:/importPoint/模版.xlsx
   subName: "尹夏储能电站"
   systemCode: "UavPatrolSystem"
+
+# x86 服务器 SSH 配置
+remote:
+  ssh:
+    host: 172.20.63.150
+    port: 22
+    username: root
+    password: dfe@1500   # 建议使用密钥，更安全
+
+  # 远程 dji_irp 的绝对路径（与本地保持一致）
+  dji_irp:
+    path: /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp
+
+  # 远程临时目录（存放图片和 raw 文件）
+  temp:
+    dir: /tmp/thermal_temp
 
 
 
