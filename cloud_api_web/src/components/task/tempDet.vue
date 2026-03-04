@@ -108,6 +108,8 @@
 <script lang="ts" setup>
 import { reactive, ref, defineProps, watch, computed, onMounted, inject } from 'vue'
 import { insertTEMPConfig, insertTEMPConfig1 } from '/@/api/points'
+import { getImageUrl } from '/@/common/url'
+import { CURRENT_CONFIG as config } from '/@/api/http/config'
 // ==========================================================================红外测温=====================================================================================
 const tt = ref('')
 const context = ref<CanvasRenderingContext2D | null>(null)
@@ -151,7 +153,8 @@ function handleTempConfig () {
   showTempConfig.value = true
   context.value?.clearRect(0, 0, canvas.value?.width || 0, canvas.value?.height || 0)
   setTimeout(() => {
-    drawImage(props.selectedImage.original_image_url)
+    const imgUrl = getImageUrl(config.baseURL, props.selectedImage.original_image_url)
+    drawImage(imgUrl)
   }, 1000)
 }
 
