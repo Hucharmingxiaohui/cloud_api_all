@@ -40,6 +40,7 @@ public class GlobalMVCConfigurer implements WebMvcConfigurer {
         excludePaths.add("/api/file/defect");
         excludePaths.add("/fjReport/api/v1/savePic");
         excludePaths.add("/picAnalyseRetNotify");
+        excludePaths.add("/control/api/v1/devices/jobs/in_flight_wayline_deliver");
 //        excludePaths.add("/wayline/api/v1/**");
         // Intercept for all request interfaces.
         registry.addInterceptor(authInterceptor).addPathPatterns("/**").excludePathPatterns(excludePaths);
