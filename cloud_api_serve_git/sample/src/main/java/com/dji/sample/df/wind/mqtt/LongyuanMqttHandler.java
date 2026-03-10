@@ -645,7 +645,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     item.setDevice_id(pointId);
                     item.setValue("");
                     item.setUnit("");
-                    item.setValue_unit("");
+//                  用Value_unit存储缺陷数据
+                    item.setValue_unit(defectDescription);
                     item.setTime(DateUtils.getNowDateTimeStr());
 //                  识别类型先设置为空
                     item.setRecognition_type("");
@@ -653,7 +654,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     item.setFile_type("2");
                     item.setRectangle("");
                     item.setTask_patrolled_id(waylineJobEntity.getJobId());
-                    item.setDefect_description(defectDescription);
+//                    item.setDefect_description(defectDescription);
                     item.setObj_id("");
                     item.setValid("1");
                     commandData.addItem(item);

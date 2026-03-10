@@ -2419,7 +2419,9 @@ public class FjReportServiceImpl implements FjReportService {
             LambdaQueryWrapper<DefectEntity> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(DefectEntity::getJobId, defect.getJobId())
                     .eq(DefectEntity::getFanCode, defect.getFanCode())
-                    .eq(DefectEntity::getFanPart, defect.getFanPart());
+                    .eq(DefectEntity::getFanPart, defect.getFanPart())
+                    .orderByDesc(DefectEntity::getId)   // 按 id 降序排序，最大的在前面
+                    .last("LIMIT 1");    ;
 
             DefectEntity existingDefect = defectEntityMapper.selectOne(wrapper);
 
