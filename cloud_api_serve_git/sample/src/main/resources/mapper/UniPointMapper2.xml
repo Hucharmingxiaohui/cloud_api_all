@@ -26,6 +26,9 @@
             <if test="waylineId!=null and waylineId!=''">
                 and wayline_id = #{waylineId}
             </if>
+            <if test="picType!=null and picType!=''">
+                and pic_type = #{picType}
+            </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
             LIMIT ${startPos}, ${pageSize}
@@ -53,6 +56,9 @@
             </if>
             <if test="waylineId!=null and waylineId!=''">
                 and wayline_id = #{waylineId}
+            </if>
+            <if test="picType!=null and picType!=''">
+                and pic_type = #{picType}
             </if>
         </where>
     </select>

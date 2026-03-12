@@ -10,6 +10,7 @@ import com.df.server.entity.sys.SysDictDataEntity;
 import com.df.server.mapper.sys.SysDictDataMapper;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.df.electricInspectionDf.service.ReportService;
 import com.dji.sample.df.electricInspectionDf.service.impl.ResultServiceImpl;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
@@ -1394,19 +1395,11 @@ public class FjReportServiceImpl implements FjReportService {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String formattedTime = sdf.format(new Date(beginTime));
 
-        // 风机编号写死为"7号风机"（后面可以修改为从数据库获取）
-        String fanCode = waylineJobEntity.getFanName();
-
-        // 风电场名称写死
         String windFarmName = "河北华电220kV尹夏储能站";
 
-
-        // 获取巡检点位信息
-        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
         Map map=new HashMap();
         map.put("waylineId",waylineJobEntity.getFileId());
         Integer pointCount = uniPointMapper2.selectListCount(map);
-//        Integer pointCount = waylineJobDTO.getMediaCount();
 
         // 2. 创建Word文档
         XWPFDocument document = new XWPFDocument();
@@ -1420,10 +1413,9 @@ public class FjReportServiceImpl implements FjReportService {
             }
         }
 
-
         document.createParagraph().createRun().addBreak();
 
-        // 添加风电场名称标题
+        // 添加变电站名称标题
         XWPFParagraph farmTitle = document.createParagraph();
         XWPFRun farmTitleRun = farmTitle.createRun();
         farmTitleRun.setText(windFarmName);
@@ -1467,7 +1459,7 @@ public class FjReportServiceImpl implements FjReportService {
         // 添加空行
         document.createParagraph().createRun().addBreak();
 
-        // 添加基本信息表格（风机编号和巡检地点）
+        // 添加基本信息表格（
         XWPFTable infoTable = document.createTable(2, 2);
         infoTable.setWidth("100%");
 
@@ -1627,7 +1619,6 @@ public class FjReportServiceImpl implements FjReportService {
             row.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
         }
 
-
         // 在表格后添加一些间距
         XWPFParagraph afterTable = document.createParagraph();
         afterTable.setSpacingAfter(400);
@@ -1674,59 +1665,6 @@ public class FjReportServiceImpl implements FjReportService {
          * 7	qrcode	    实物ID	       非空字符串
          **/
 
-//        // 1.3 智能分析值对照表
-//        XWPFParagraph subSection12 = document.createParagraph();
-//        XWPFRun subSection12Run = subSection12.createRun();
-//        subSection12Run.setText("1.3 智能分析结果对照表");
-//        subSection12Run.setBold(true);
-//        subSection12Run.setFontSize(14);
-//        subSection12Run.setFontFamily("宋体");
-//        subSection12.setAlignment(ParagraphAlignment.LEFT);
-//        subSection12.setSpacingAfter(200);
-//
-//        // 创建表格
-//        XWPFTable table = document.createTable(8, 4); // 8行4列（1行表头+7行数据）
-//
-//        // 设置表格列宽
-//        CTTblWidth width = table.getCTTbl().addNewTblPr().addNewTblW();
-//        width.setType(STTblWidth.DXA);
-//        width.setW(BigInteger.valueOf(8500)); // 表格总宽度
-//
-//        // 设置表格样式（可选）
-//        table.setCellMargins(100, 100, 100, 100); // 设置单元格边距
-//
-//        // 填充表头
-//        XWPFTableRow headerRow = table.getRow(0);
-//        headerRow.getCell(0).setText("序号");
-//        headerRow.getCell(1).setText("type属性数值");
-//        headerRow.getCell(2).setText("定义");
-//        headerRow.getCell(3).setText("智能分析值含义");
-//
-//        // 设置表头加粗
-//        for (int i = 0; i < 4; i++) {
-//            XWPFParagraph para = headerRow.getCell(i).getParagraphs().get(0);
-//            XWPFRun run = para.createRun();
-//            run.setBold(true);
-//            run.setFontSize(11);
-//            run.setFontFamily("宋体");
-//        }
-//
-//        // 填充数据行
-//        // 第1行数据
-//        fillTableRow(table, 1, "1", "isolator", "刀闸状态", "1代表分状态，2代表合状态，3代表分位异常状态，4代表合位异常状态");
-//        // 第2行数据
-//        fillTableRow(table, 2, "2", "switch", "开关/压板状态", "一般情况1代表分状态，2代表合状态，0代表预留; 可以另行约定业务含义，如1代表就地状态，2代表远方状态，0代表停用状态");
-//        // 第3行数据
-//        fillTableRow(table, 3, "3", "meter", "仪表读数", "具体仪表值读数（返回多个值以逗号分隔）");
-//        // 第4行数据
-//        fillTableRow(table, 4, "4", "infrared", "红外温度", "最高温度，最低温度（以逗号分隔）");
-//        // 第5行数据
-//        fillTableRow(table, 5, "5", "sound", "声音", "1代表正常声音，2代表异常声音");
-//        // 第6行数据
-//        fillTableRow(table, 6, "6", "light", "指示灯、闪烁灯", "1代表灯灭，2代表灯亮，3代表绿灯（常）亮，4代表红灯（常）亮，5代表绿灯闪烁，6代表红灯闪烁");
-//        // 第7行数据
-//        fillTableRow(table, 7, "7", "qrcode", "实物ID", "非空字符串");
-
         // ========== 第三页结束，插入分页符 ==========
         insertPageBreak(document);
 
@@ -1741,20 +1679,11 @@ public class FjReportServiceImpl implements FjReportService {
         resultSummaryTitle.setAlignment(ParagraphAlignment.CENTER);
         resultSummaryTitle.setSpacingAfter(300);
 
-        // 任务描述
-//        XWPFParagraph taskDescription = document.createParagraph();
-//        XWPFRun taskDescriptionRun = taskDescription.createRun();
-//        taskDescriptionRun.setText("任务描述：本次巡检整个变电站，共计 " + pointCount + "个巡检点位，识别缺陷 " + "-" + " 处。");
-//        taskDescriptionRun.setFontSize(11);
-//        taskDescriptionRun.setFontFamily("宋体");
-//        taskDescription.setAlignment(ParagraphAlignment.LEFT);
-//        taskDescription.setSpacingAfter(300);
-
+//      结果显示的是有recg_points表里有数据的，没有就不显示
         List<RecgPointsEntity> recgPointsEntities = recgPointsEntityMapper.selectList(new LambdaQueryWrapper<RecgPointsEntity>()
                 .eq(RecgPointsEntity::getTaskPatrolledId, jobId));
 
-
-        // 6. 添加缺陷详情（按第二个文档的格式）
+        // 6. 添加缺陷详情
         // 缺陷详情表格表头
         String[] defectHeaderTitles = {"序号", "点位名称", "识别结果", "数据结果", "识别大类", "识别子类", "智能分析值"};
 
@@ -1792,16 +1721,18 @@ public class FjReportServiceImpl implements FjReportService {
             setCellFont(dataRow.getCell(2), "宋体", 10, false);
             dataRow.getCell(2).setText(recgPointsEntity.getPointValUnit());
             dataRow.getCell(2).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
-
-            // 数据结果
-            String string = recgPointsEntity.getValid().toString();
             String dataResult ="无结果";
-            if (string.equals("0")) {
-                dataResult ="失败";
-            }else if (string.equals("1")) {
-                dataResult ="正常";
-            }else if (string.equals("2")) {
-                dataResult ="异常";
+            // 数据结果
+            Integer valid = recgPointsEntity.getValid();
+            if(valid!=null){
+                String string = valid.toString();
+                if (string.equals("0")) {
+                    dataResult ="失败";
+                }else if (string.equals("1")) {
+                    dataResult ="正常";
+                }else if (string.equals("2")) {
+                    dataResult ="异常";
+                }
             }
             setCellFont(dataRow.getCell(3), "宋体", 10, false);
             dataRow.getCell(3).setText(dataResult);
@@ -1851,133 +1782,135 @@ public class FjReportServiceImpl implements FjReportService {
             dataRow.getCell(5).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             String pointVal = recgPointsEntity.getPointVal();
-            if (pointAnalyseCategory == 1) {
-                switch (pointAnalyseType) {
-                    case "isolator":
-                        // 刀闸状态：1代表分状态，2代表合状态，3代表分位异常状态，4代表合位异常状态
-                        pointAnalyseDes = "刀闸状态";
-                        switch (pointVal) {
-                            case "1":
-                                pointAnalyseDes += "：分状态";
-                                break;
-                            case "2":
-                                pointAnalyseDes += "：合状态";
-                                break;
-                            case "3":
-                                pointAnalyseDes += "：分位异常状态";
-                                break;
-                            case "4":
-                                pointAnalyseDes += "：合位异常状态";
-                                break;
-                            default:
-                                pointAnalyseDes += "：未知状态(" + pointVal + ")";
-                                break;
-                        }
-                        break;
+            if(pointVal!=null){
+                if (pointAnalyseCategory == 1) {
+                    switch (pointAnalyseType) {
+                        case "isolator":
+                            // 刀闸状态：1代表分状态，2代表合状态，3代表分位异常状态，4代表合位异常状态
+                            pointAnalyseDes = "刀闸状态";
+                            switch (pointVal) {
+                                case "1":
+                                    pointAnalyseDes += "：分状态";
+                                    break;
+                                case "2":
+                                    pointAnalyseDes += "：合状态";
+                                    break;
+                                case "3":
+                                    pointAnalyseDes += "：分位异常状态";
+                                    break;
+                                case "4":
+                                    pointAnalyseDes += "：合位异常状态";
+                                    break;
+                                default:
+                                    pointAnalyseDes += "：未知状态(" + pointVal + ")";
+                                    break;
+                            }
+                            break;
 
-                    case "switch":
-                        // 开关/压板状态：一般情况1代表分状态，2代表合状态，0代表预留
-                        pointAnalyseDes = "开关/压板状态";
-                        switch (pointVal) {
-                            case "1":
-                                pointAnalyseDes += "：分状态";
-                                break;
-                            case "2":
-                                pointAnalyseDes += "：合状态";
-                                break;
-                            case "0":
-                                pointAnalyseDes += "：预留";
-                                break;
-                            default:
-                                // 或者检查是否有其他约定业务含义
-                                pointAnalyseDes += "：状态(" + pointVal + ")";
-                                break;
-                        }
-                        break;
+                        case "switch":
+                            // 开关/压板状态：一般情况1代表分状态，2代表合状态，0代表预留
+                            pointAnalyseDes = "开关/压板状态";
+                            switch (pointVal) {
+                                case "1":
+                                    pointAnalyseDes += "：分状态";
+                                    break;
+                                case "2":
+                                    pointAnalyseDes += "：合状态";
+                                    break;
+                                case "0":
+                                    pointAnalyseDes += "：预留";
+                                    break;
+                                default:
+                                    // 或者检查是否有其他约定业务含义
+                                    pointAnalyseDes += "：状态(" + pointVal + ")";
+                                    break;
+                            }
+                            break;
 
-                    case "meter":
-                        // 仪表读数：具体仪表值读数（返回多个值以逗号分隔）
-                        pointAnalyseDes = "仪表读数";
-                        if (pointVal != null && !pointVal.trim().isEmpty()) {
-                            pointAnalyseDes += "：" + pointVal;
-                        } else {
-                            pointAnalyseDes += "：无读数";
-                        }
-                        break;
+                        case "meter":
+                            // 仪表读数：具体仪表值读数（返回多个值以逗号分隔）
+                            pointAnalyseDes = "仪表读数";
+                            if (pointVal != null && !pointVal.trim().isEmpty()) {
+                                pointAnalyseDes += "：" + pointVal;
+                            } else {
+                                pointAnalyseDes += "：无读数";
+                            }
+                            break;
 
-                    case "infrared":
-                        // 红外温度：最高温度，最低温度（以逗号分隔）
-                        pointAnalyseDes = "红外温度";
-                        if (pointVal != null && !pointVal.trim().isEmpty()) {
-                            pointAnalyseDes += "：" + pointVal;
-                        } else {
-                            pointAnalyseDes += "：无温度数据";
-                        }
-                        break;
+                        case "infrared":
+                            // 红外温度：最高温度，最低温度（以逗号分隔）
+                            pointAnalyseDes = "红外温度";
+                            if (pointVal != null && !pointVal.trim().isEmpty()) {
+                                pointAnalyseDes += "：" + pointVal;
+                            } else {
+                                pointAnalyseDes += "：无温度数据";
+                            }
+                            break;
 
-                    case "sound":
-                        // 声音：1代表正常声音，2代表异常声音
-                        pointAnalyseDes = "声音";
-                        switch (pointVal) {
-                            case "1":
-                                pointAnalyseDes += "：正常声音";
-                                break;
-                            case "2":
-                                pointAnalyseDes += "：异常声音";
-                                break;
-                            default:
-                                pointAnalyseDes += "：未知状态(" + pointVal + ")";
-                                break;
-                        }
-                        break;
+                        case "sound":
+                            // 声音：1代表正常声音，2代表异常声音
+                            pointAnalyseDes = "声音";
+                            switch (pointVal) {
+                                case "1":
+                                    pointAnalyseDes += "：正常声音";
+                                    break;
+                                case "2":
+                                    pointAnalyseDes += "：异常声音";
+                                    break;
+                                default:
+                                    pointAnalyseDes += "：未知状态(" + pointVal + ")";
+                                    break;
+                            }
+                            break;
 
-                    case "light":
-                        // 指示灯、闪烁灯：1代表灯灭，2代表灯亮，3代表绿灯（常）亮，4代表红灯（常）亮，5代表绿灯闪烁，6代表红灯闪烁
-                        pointAnalyseDes = "指示灯、闪烁灯";
-                        switch (pointVal) {
-                            case "1":
-                                pointAnalyseDes += "：灯灭";
-                                break;
-                            case "2":
-                                pointAnalyseDes += "：灯亮";
-                                break;
-                            case "3":
-                                pointAnalyseDes += "：绿灯（常）亮";
-                                break;
-                            case "4":
-                                pointAnalyseDes += "：红灯（常）亮";
-                                break;
-                            case "5":
-                                pointAnalyseDes += "：绿灯闪烁";
-                                break;
-                            case "6":
-                                pointAnalyseDes += "：红灯闪烁";
-                                break;
-                            default:
-                                pointAnalyseDes += "：未知状态(" + pointVal + ")";
-                                break;
-                        }
-                        break;
+                        case "light":
+                            // 指示灯、闪烁灯：1代表灯灭，2代表灯亮，3代表绿灯（常）亮，4代表红灯（常）亮，5代表绿灯闪烁，6代表红灯闪烁
+                            pointAnalyseDes = "指示灯、闪烁灯";
+                            switch (pointVal) {
+                                case "1":
+                                    pointAnalyseDes += "：灯灭";
+                                    break;
+                                case "2":
+                                    pointAnalyseDes += "：灯亮";
+                                    break;
+                                case "3":
+                                    pointAnalyseDes += "：绿灯（常）亮";
+                                    break;
+                                case "4":
+                                    pointAnalyseDes += "：红灯（常）亮";
+                                    break;
+                                case "5":
+                                    pointAnalyseDes += "：绿灯闪烁";
+                                    break;
+                                case "6":
+                                    pointAnalyseDes += "：红灯闪烁";
+                                    break;
+                                default:
+                                    pointAnalyseDes += "：未知状态(" + pointVal + ")";
+                                    break;
+                            }
+                            break;
 
-                    case "qrcode":
-                        // 实物ID：非空字符串
-                        pointAnalyseDes = "实物ID";
-                        if (pointVal != null && !pointVal.trim().isEmpty()) {
-                            pointAnalyseDes += "：" + pointVal;
-                        } else {
-                            pointAnalyseDes += "：无ID";
-                        }
-                        break;
+                        case "qrcode":
+                            // 实物ID：非空字符串
+                            pointAnalyseDes = "实物ID";
+                            if (pointVal != null && !pointVal.trim().isEmpty()) {
+                                pointAnalyseDes += "：" + pointVal;
+                            } else {
+                                pointAnalyseDes += "：无ID";
+                            }
+                            break;
 
-                    default:
-                        pointAnalyseDes = "未知类型";
-                        break;
-                }
-            }else if(pointAnalyseCategory==2){
-                if(pointVal.equals("1")){
-                    pointAnalyseDes = "有缺陷";
-                }else if(pointVal.equals("0")){
-                    pointAnalyseDes = "无缺陷";
+                        default:
+                            pointAnalyseDes = "未知类型";
+                            break;
+                    }
+                }else if(pointAnalyseCategory==2){
+                    if(pointVal.equals("1")){
+                        pointAnalyseDes = "有缺陷";
+                    }else if(pointVal.equals("0")){
+                        pointAnalyseDes = "无缺陷";
+                    }
                 }
             }
 
@@ -1994,8 +1927,8 @@ public class FjReportServiceImpl implements FjReportService {
                     .eq(RecgFileEntity::getPresetNo, recgPointsEntity.getPresetNo())
                     .eq(RecgFileEntity::getPicType,recgPointsEntity.getPicType()));
 
-//            String imagePath1 = recgFileEntity.getRecgFilePath();
-//            String imagePath = fileConfig.getRecfilePath()+imagePath1;
+//          String imagePath1 = recgFileEntity.getRecgFilePath();
+//          报告放的是原图，红外暂时没有分析图（因为用的大疆sdk直接测温）
             String imagePath = recgFileEntity.getFilePath();
             if (new File(imagePath).exists()) {
                 try {
@@ -2011,20 +1944,14 @@ public class FjReportServiceImpl implements FjReportService {
                     int originalWidth = bufferedImage.getWidth();
                     int originalHeight = bufferedImage.getHeight();
 
-                    // 尝试方法1：使用非常大的EMU值
-                    // 1英寸 = 914400 EMU, 1厘米 = 360000 EMU
-                    // 我们设置一个非常大的尺寸，比如20厘米宽，15厘米高
-
                     System.out.println("插入图片: " + imagePath);
                     System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
 
-                    // 方法1：使用固定的大EMU值
                     int targetWidthEMU = 14 * 360000;  // 20厘米 = 7,200,000 EMU
                     int targetHeightEMU = 11 * 360000; // 15厘米 = 5,400,000 EMU
 
                     System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
 
-                    // 使用addPicture方法，直接传入EMU值
                     imageRun.addPicture(
                             fis,
                             XWPFDocument.PICTURE_TYPE_JPEG,
@@ -2046,9 +1973,6 @@ public class FjReportServiceImpl implements FjReportService {
 
                         FileInputStream fis = new FileInputStream(imagePath);
 
-                        // 方法2：使用非常大的EMU值（接近页面宽度）
-                        // A4纸宽度约21厘米，高度29.7厘米
-                        // 我们设置宽度为15厘米，高度按比例计算
                         double widthCm = 15.0; // 15厘米
                         double heightCm = 11.0; // 11厘米
 
@@ -2077,8 +2001,6 @@ public class FjReportServiceImpl implements FjReportService {
 
                             FileInputStream fis = new FileInputStream(imagePath);
 
-                            // 方法3：使用Word页面宽度（大约15厘米）
-                            // 直接使用固定的大EMU值
                             int veryLargeWidthEMU = 10000000;  // 约27.8厘米
                             int veryLargeHeightEMU = 7500000;  // 约20.8厘米
 
@@ -2112,9 +2034,6 @@ public class FjReportServiceImpl implements FjReportService {
             document.createParagraph();
         }
 
-
-
-
         // 7. 保存Word文档
         String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
@@ -2124,24 +2043,6 @@ public class FjReportServiceImpl implements FjReportService {
             throw new RuntimeException("报告保存失败", e);
         }
 
-
-    }
-
-    // 辅助方法：填充表格行
-    private void fillTableRow(XWPFTable table, int rowIndex, String seq, String type, String definition, String meaning) {
-        XWPFTableRow row = table.getRow(rowIndex);
-        row.getCell(0).setText(seq);
-        row.getCell(1).setText(type);
-        row.getCell(2).setText(definition);
-        row.getCell(3).setText(meaning);
-
-        // 设置单元格字体
-        for (int i = 0; i < 4; i++) {
-            XWPFParagraph para = row.getCell(i).getParagraphs().get(0);
-            XWPFRun run = para.createRun();
-            run.setFontSize(11);
-            run.setFontFamily("宋体");
-        }
     }
 
     // 辅助方法：插入分页符

@@ -4,7 +4,6 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.redis.RedisUtils;
 import com.df.framework.utils.ParamsUtils;
 import com.df.framework.vo.Result;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
@@ -27,7 +26,6 @@ import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
-import com.dji.sample.df.wind.model.entity.ImageUploadResult;
 import com.dji.sample.df.wind.service.FjReportService;
 
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -40,10 +38,8 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +47,6 @@ import org.springframework.web.bind.annotation.*;
 
 
 import javax.servlet.http.HttpServletResponse;
-import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -120,7 +115,7 @@ public class FjReportController {
      * 保存巡检图片并分析
      */
     @PostMapping("/pictureSave")
-    public Result pictureSave(@RequestBody JSONObject jsonObject) throws Exception {
+    public Result pictureSaveAndAnalysis(@RequestBody JSONObject jsonObject) throws Exception {
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         waylineJobEntity.setIsReported(0);
@@ -135,10 +130,9 @@ public class FjReportController {
             waylineJobMapper.updateById(waylineJobEntity);
             Result<Map> result = pictureSaveHandler.pictureSave(jobId);
             if(result.getCode() == 0){
-//                先不不对接分析
-//                Map data = result.getData();
-//                resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
-//                log.info("进行分析------");
+                Map data = result.getData();
+                resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
+                log.info("进行分析------");
                 return Result.success("success");
             }
 //          return Result.notfan("不是风机任务");

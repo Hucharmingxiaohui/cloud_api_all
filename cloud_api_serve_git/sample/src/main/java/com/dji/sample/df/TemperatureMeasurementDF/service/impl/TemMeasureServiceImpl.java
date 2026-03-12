@@ -1,5 +1,7 @@
 package com.dji.sample.df.TemperatureMeasurementDF.service.impl;
 
+import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.TemperatureMeasurementDF.modol.TemParamEntity;
 import com.dji.sample.df.TemperatureMeasurementDF.modol.TemResultEntity;
 import com.dji.sample.df.TemperatureMeasurementDF.service.IFileServiceDF;
@@ -51,6 +53,8 @@ public class TemMeasureServiceImpl implements TemMeasureService {
     private String remoteDjiIrpPath;
     @Value("${remote.temp.dir}")
     private String remoteTempDir;
+    @Autowired
+    UniPointMapper2 uniPointMapper;
 //    1方法：适用于测温sdk部署在本地服务器     2方法：适用于无人机系统部署在arm架构服务器，需另加一台x86服务器用来部署测温sdk用来系统远程调用
 //    @Override
 //    public TemResultEntity getTemByWorkSpaceIdAndFileId(String workspace_id, String file_id, TemParamEntity temParamEntity) {
@@ -361,7 +365,8 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             log.info("图片上传完成");
 
             // 2.4 构造并执行远程命令
-            String libraryPath = "/dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64";
+//          这一步要根据不同服务器sdk位置进行路径调整
+            String libraryPath = "/home/df/dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64";
             String command = String.format("export LD_LIBRARY_PATH=%s; %s -s '%s' -a measure -o '%s'",
                     libraryPath, remoteDjiIrpPath, remoteImagePath, remoteRawPath);
             log.info("执行远程命令: {}", command);
@@ -563,6 +568,25 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
             return temResultEntity;
         }
+    }
+
+    @Override
+    public boolean bindPoint(TemParamEntity temParamEntity) {
+    try {
+        UniPoint uniPoint = uniPointMapper.selectById(temParamEntity.getPoint_id());
+        String coordinates = String.format("[%d,%d,%d,%d]",
+                temParamEntity.getLeft_top_x(),
+                temParamEntity.getLeft_top_y(),
+                temParamEntity.getRight_bottom_x(),
+                temParamEntity.getRight_bottom_y());
+        uniPoint.setInfraredImageCoordinate(coordinates);
+        uniPointMapper.updateById(uniPoint);
+        return true;
+        }catch (Exception e){
+        e.printStackTrace();
+        return false;
+       }
+
     }
 
     /**

@@ -338,4 +338,7 @@ public class UniPoint {
 
     @TableField("wayline_point_pos")
     private String waylinePointPos;
+
+    @TableField("infrared_image_coordinate")
+    private String infraredImageCoordinate;
 }

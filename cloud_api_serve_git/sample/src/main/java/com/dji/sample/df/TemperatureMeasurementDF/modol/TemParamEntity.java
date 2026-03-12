@@ -19,4 +19,6 @@ public class TemParamEntity {
     private Integer right_bottom_x;
     @JsonProperty("right_bottom_y")
     private Integer right_bottom_y;
+    @JsonProperty("point_id")
+    private Integer point_id;
 }

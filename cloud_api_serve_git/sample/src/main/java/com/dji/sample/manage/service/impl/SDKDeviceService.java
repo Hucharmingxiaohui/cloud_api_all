@@ -1,6 +1,8 @@
 package com.dji.sample.manage.service.impl;
 
+import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.df.framework.redis.RedisUtils;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
@@ -8,18 +10,20 @@ import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.DevicePayloadReceiver;
+import com.dji.sample.manage.model.dto.LiveTypeDTO;
 import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.model.enums.DeviceFirmwareStatusEnum;
 import com.dji.sample.manage.model.param.DeviceQueryParam;
-import com.dji.sample.manage.service.IDeviceDictionaryService;
-import com.dji.sample.manage.service.IDevicePayloadService;
-import com.dji.sample.manage.service.IDeviceRedisService;
-import com.dji.sample.manage.service.IDeviceService;
+import com.dji.sample.manage.service.*;
 import com.dji.sdk.cloudapi.device.*;
 import com.dji.sdk.cloudapi.device.api.AbstractDeviceService;
+import com.dji.sdk.cloudapi.livestream.UrlTypeEnum;
+import com.dji.sdk.cloudapi.livestream.VideoQualityEnum;
+import com.dji.sdk.cloudapi.livestream.VideoTypeEnum;
 import com.dji.sdk.cloudapi.tsa.DeviceIconUrl;
 import com.dji.sdk.cloudapi.tsa.IconUrlEnum;
 import com.dji.sdk.cloudapi.wayline.api.AbstractWaylineService;
+import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.config.version.GatewayManager;
 import com.dji.sdk.common.SDKManager;
 import com.dji.sdk.mqtt.MqttReply;
@@ -74,6 +78,12 @@ public class SDKDeviceService extends AbstractDeviceService {
 
     @Resource
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper;
+
+    @Autowired
+    private ILiveStreamService liveStreamService;
+
+    @Resource
+    private RedisUtils redisUtils;
 
     @Override
     public TopicStatusResponse<MqttReply> updateTopoOnline(TopicStatusRequest<UpdateTopo> request, MessageHeaders headers) {
@@ -287,6 +297,58 @@ public class SDKDeviceService extends AbstractDeviceService {
             abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockSN));
             log.info("电量已小于30%触发返航");
         }
+        log.info("进入无人机osd上报---");
+//       ===== 直播开启逻辑改造开始 =====
+        String droneSn = device.getDeviceSn();
+        String lastLiveKey = "live:last_attempt:" + droneSn;
+        long now = System.currentTimeMillis();
+        Object lastLiveKeyValue = redisUtils.get(lastLiveKey);
+        boolean shouldStartLive = true;
+        log.info("shouldStartLive---"+shouldStartLive);
+        if (lastLiveKeyValue != null) {
+            try {
+                String lastLiveTimeStr = lastLiveKeyValue.toString();
+                long lastLiveTime = Long.parseLong(lastLiveTimeStr);
+                if (now - lastLiveTime < 120000) { // 2分钟 = 120000毫秒
+                    shouldStartLive = false;
+                }
+            } catch (NumberFormatException e) {
+                // 解析异常，视为需要开启
+            }
+        }
+
+        if (shouldStartLive) {
+            // 存储当前时间到Redis，表示本次尝试调用
+            redisUtils.set(lastLiveKey, String.valueOf(now));
+
+            log.info("开启无人机直播---");
+            LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
+            liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+            VideoId videoId = new VideoId();
+            videoId.setDroneSn(droneSn);
+            PayloadIndex payloadIndex = new PayloadIndex();
+            payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
+            payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
+            payloadIndex.setPosition(PayloadPositionEnum.FRONT_LEFT);
+            videoId.setPayloadIndex(payloadIndex);
+            videoId.setVideoType(VideoTypeEnum.NORMAL);
+            liveTypeDTO.setVideoId(videoId);
+            liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
+            HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
+
+            if (httpResultResponse.getCode() == 0) {
+                log.info("无人机 {} 直播开启成功", droneSn);
+            } else if (httpResultResponse.getCode() == 513003) {
+                log.info("无人机 {} 直播已开启", droneSn);
+            } else {
+                log.warn("无人机 {} 直播开启失败，code: {}, message: {}",
+                        droneSn, httpResultResponse.getCode(), httpResultResponse.getMessage());
+            }
+        } else {
+            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
+        }
+        // ===== 直播开启逻辑改造结束 =====
+
         deviceService.pushOsdDataToWeb(device.getWorkspaceId(), BizCodeEnum.DEVICE_OSD, from, request.getData());
     }
 

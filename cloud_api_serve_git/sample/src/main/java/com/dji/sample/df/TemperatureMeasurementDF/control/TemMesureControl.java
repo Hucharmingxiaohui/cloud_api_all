@@ -21,5 +21,12 @@ public class TemMesureControl {
         }
 
     }
+//  红外照片绑定点位和标定接口
+    @PostMapping("/bindPoint")
+    public HttpResultResponse bindPoint(@RequestBody TemParamEntity temParamEntity){
+
+        boolean b = temMeasureService.bindPoint(temParamEntity);
+        return HttpResultResponse.success(b);
+    }
 
 }

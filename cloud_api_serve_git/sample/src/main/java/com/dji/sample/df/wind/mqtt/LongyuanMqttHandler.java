@@ -468,7 +468,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                         Integer data = (Integer) analyzed.getData();
 //                                      只有未分析时进行分析
                                         if(data==0){
-                                            Result result = fjReportController.pictureSave(jsonObject);
+                                            Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
                                             log.info("图片分析已启动: jobId={}, result={}", jobId, result);
                                         }
                                         // 2. 开始轮询检查分析状态
@@ -483,7 +483,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==0){
 //                              普通任务先不分析直接保存
-                                Result<Map> result = pictureSaveHandler.pictureSave(jobId);
+//                                Result<Map> result = pictureSaveHandler.pictureSave(jobId);
+                                Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
                                 if(result.getCode() == 0){
                                     if(isCenterTask.equals("1")){
                                         sendPatrolResult(taskCode, taskName, waylineJobEntity);

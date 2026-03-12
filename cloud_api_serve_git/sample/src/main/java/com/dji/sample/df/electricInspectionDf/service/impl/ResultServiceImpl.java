@@ -25,6 +25,9 @@ import com.df.server.service.robotDog.impl.RobotDogPatrolServiceImpl;
 import com.df.server.service.uni.UniPointThresholdService;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.df.TemperatureMeasurementDF.modol.TemParamEntity;
+import com.dji.sample.df.TemperatureMeasurementDF.modol.TemResultEntity;
+import com.dji.sample.df.TemperatureMeasurementDF.service.TemMeasureService;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.ResultService;
@@ -114,8 +117,8 @@ public class ResultServiceImpl implements ResultService {
     RecgFileEntityMapper recgFileEntityMapper;
     @Autowired
     WaylineJobServiceImpl waylineJobServiceimpl;
-
-
+    @Autowired
+    private TemMeasureService temMeasureService;
     //      只针对一个航点对应一个点位（因为点位导入的时候就是点位与一个航点预置位号绑定）
     @Override
     public void handleUavResult(Map<String,String> map,String workspaceId,String jobId) throws Exception {
@@ -131,8 +134,94 @@ public class ResultServiceImpl implements ResultService {
             if(picType.equals("V")){
                 picType1 = 0;
             }else if(picType.equals("T")){
+//              红外照片不对接分析服务，直接调用大疆测温sdk
                 picType1 = 1;
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                        .eq(WaylineJobEntity::getJobId, jobId));
+                UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
+                        .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                        .eq(UniPoint::getWaylinePointPos, pointPos)
+                        .eq(UniPoint::getPicType,picType1));
+                String subCode = uniPoint.getSubCode();
+                String pointCode = uniPoint.getPointCode();
+                String pointName = uniPoint.getPointName();
+
+                String infraredImageCoordinate = uniPoint.getInfraredImageCoordinate();
+                if (infraredImageCoordinate == null || infraredImageCoordinate.isEmpty()) {
+                    // 根据业务需要处理空值，例如抛出异常或跳过
+                    throw new IllegalArgumentException("红外图片坐标为空");
+                }
+                String trimmed = infraredImageCoordinate.trim();
+                if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
+                    throw new IllegalArgumentException("红外图片坐标格式错误，缺少方括号: " + infraredImageCoordinate);
+                }
+                String content = trimmed.substring(1, trimmed.length() - 1); // 去掉 [ 和 ]
+                String[] parts = content.split(",");
+                if (parts.length != 4) {
+                    throw new IllegalArgumentException("红外图片坐标必须包含4个数字: " + infraredImageCoordinate);
+                }
+                TemParamEntity temParamEntity = new TemParamEntity();
+                try {
+                    int leftTopX = Integer.parseInt(parts[0].trim());
+                    int leftTopY = Integer.parseInt(parts[1].trim());
+                    int rightBottomX = Integer.parseInt(parts[2].trim());
+                    int rightBottomY = Integer.parseInt(parts[3].trim());
+
+
+                    temParamEntity.setLeft_top_x(leftTopX);
+                    temParamEntity.setLeft_top_y(leftTopY);
+                    temParamEntity.setRight_bottom_x(rightBottomX);
+                    temParamEntity.setRight_bottom_y(rightBottomY);
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException("红外图片坐标包含非数字内容: " + infraredImageCoordinate, e);
+                }
+                TemResultEntity temResultEntity= temMeasureService.getTemByWorkSpaceIdAndFileId("e3dea0f5-37f2-4d79-ae58-490af3228069", mediaFileDTO.getFileId(), temParamEntity);
+                RecgPointsEntity recgPointsEntity=new RecgPointsEntity();
+                String requestId = UUID.randomUUID().toString();
+                recgPointsEntity.setRequestId(requestId);
+                recgPointsEntity.setSubCode(subCode);
+                recgPointsEntity.setPointCode(pointCode);
+                recgPointsEntity.setPointName(pointName);
+                recgPointsEntity.setTaskPatrolledId(jobId);
+                recgPointsEntity.setPresetNo(pointPos);
+                recgPointsEntity.setPicType(picType1);
+                recgPointsEntity.setValid(1);
+                recgPointsEntity.setPointValUnit("正常");
+                recgPointsEntity.setPointVal("最高温度："+temResultEntity.getMax_tem()+",最低温度："+temResultEntity.getMin_tem()+",平均温度："+temResultEntity.getAverage_tem());
+                recgPointsEntity.setPicType(picType1);
+                UpdateWrapper<RecgPointsEntity> updateWrapper = new UpdateWrapper<>();
+                updateWrapper.eq("task_patrolled_id", recgPointsEntity.getTaskPatrolledId());
+                updateWrapper.eq("preset_no", recgPointsEntity.getPresetNo());
+                updateWrapper.eq("pic_type", recgPointsEntity.getPicType());
+                RecgPointsEntity recgPointsEntity1 = recgPointsEntityMapper.selectOne(updateWrapper);
+                if(recgPointsEntity1==null){
+                    recgPointsEntityMapper.insert(recgPointsEntity);
+                }else {
+                    recgPointsEntityMapper.update(recgPointsEntity, updateWrapper);
+                }
+
+                RecgFileEntity recgFileEntity=new RecgFileEntity();
+                recgFileEntity.setRequestId(requestId);
+                recgFileEntity.setPointCode(pointCode);
+                recgFileEntity.setTaskPatrolledId(jobId);
+                String filePath = map.get(fileName);
+                recgFileEntity.setFilePath(fjFileConfig.getRecfilePath()+filePath);
+                recgFileEntity.setPresetNo(pointPos);
+                recgFileEntity.setPicType(picType1);
+
+                UpdateWrapper<RecgFileEntity> updateWrapper1 = new UpdateWrapper<>();
+                updateWrapper1.eq("task_patrolled_id", recgFileEntity.getTaskPatrolledId());
+                updateWrapper1.eq("preset_no", recgFileEntity.getPresetNo());
+                updateWrapper1.eq("pic_type", recgFileEntity.getPicType());
+                RecgFileEntity recgFileEntity1 = recgFileEntityMapper.selectOne(updateWrapper1);
+                if(recgFileEntity1==null){
+                    recgFileEntityMapper.insert(recgFileEntity);
+                }else {
+                    recgFileEntityMapper.update(recgFileEntity, updateWrapper1);
+                }
+                continue;
             }
+
             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                     .eq(WaylineJobEntity::getJobId, jobId));
             UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
@@ -257,7 +346,6 @@ public class ResultServiceImpl implements ResultService {
     public void analyseFinish(AnalyseParamsRecReq analyseParamsRecReq) {
 
 //      每次返回一个照片,全部分析完是分析完成,在job表加个分析张数，全部完成才分析完成
-//        TODO
 
         log.info("【收到智能分析结果】 ：{}", JSONObject.toJSONString(analyseParamsRecReq));
         String requestId = analyseParamsRecReq.getRequestId();
@@ -267,16 +355,17 @@ public class ResultServiceImpl implements ResultService {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, recgPointsEntity.getTaskPatrolledId()));
         Integer analyzedNum = waylineJobEntity.getAnalyzedNum();
         if(analyzedNum==null){
-            waylineJobEntity.setAnalyzedNum(1);
+            List<UniPoint> uniPoints = uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()
+                    .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
+                    .eq(UniPoint::getPicType, "1"));
+//          初始数量为红外图片的数量，把它去掉不计入分析服务
+            waylineJobEntity.setAnalyzedNum(uniPoints.size());
             waylineJobMapper.updateById(waylineJobEntity);
         }else {
             waylineJobEntity.setAnalyzedNum(analyzedNum + 1);
             waylineJobMapper.updateById(waylineJobEntity);
         }
         Integer analyzedNum1 = waylineJobEntity.getAnalyzedNum();
-//        WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
-//        Integer mediaCount = waylineJobDTO.getMediaCount();
-//        uniPointMapper2
         Map map=new HashMap();
         map.put("waylineId",waylineJobEntity.getFileId());
         Integer mediaCount = uniPointMapper2.selectListCount(map);
@@ -334,26 +423,13 @@ public class ResultServiceImpl implements ResultService {
             pointValUnit = valeResultMap.get("point_val_unit");
             valid = Integer.valueOf(valeResultMap.get("valid"));
             resImageUrl = valeResultMap.get("resImageUrl");
-            //判断告警（暂时不弄）
-//            alarmLevel = uniPointThresholdService.isAlarmByThreshold(uniPoint, pointVal);
-//            if (alarmLevel != null) {
-//                valid = 2;
-//            }
-            //更新图片
-//            hisFile.setRecgFilePath(resImageUrl);
-//            hisUniTaskItemFileMapper.updateById(hisFile);
-//            //异步压缩图片 //2.将原图压缩一份成缩略图存储
-//            hisExePointAnalyseServiceImpl.updateRecgFilePathPress(resImageUrl, hisFile);
 
             recgFileEntity.setRecgFilePath(resImageUrl);
             UpdateWrapper<RecgFileEntity> updateWrapper = new UpdateWrapper<>();
-//            updateWrapper.eq("point_code", recgFileEntity.getPointCode());
             updateWrapper.eq("task_patrolled_id", recgFileEntity.getTaskPatrolledId());
             updateWrapper.eq("preset_no", recgFileEntity.getPresetNo());
             updateWrapper.eq("pic_type", recgFileEntity.getPicType());
             recgFileEntityMapper.update(recgFileEntity, updateWrapper);
-//          缩略图先不弄
-//            hisExePointAnalyseServiceImpl.updateRecgFilePathPress(resImageUrl, hisFile);
 
         }
 
@@ -366,17 +442,10 @@ public class ResultServiceImpl implements ResultService {
         recgPointsEntity.setPointUnit("");
 
         UpdateWrapper<RecgPointsEntity> updateWrapper = new UpdateWrapper<>();
-//        updateWrapper.eq("point_code", recgPointsEntity.getPointCode());
         updateWrapper.eq("task_patrolled_id", recgPointsEntity.getTaskPatrolledId());
         updateWrapper.eq("preset_no", recgPointsEntity.getPresetNo());
         updateWrapper.eq("pic_type", recgPointsEntity.getPicType());
         recgPointsEntityMapper.update(recgPointsEntity, updateWrapper);
-//      先不更新点位数
-//        updatePointNum(taskPatrolledId);
-
-//        if (alarmLevel != null) {
-//            hisUniTaskItemAlarmService.createAlarm(hisPoint, alarmLevel);
-//        }
     }
 
     public void sendAnalyse(AnalyseImageInfo analyseImageInfo) {
@@ -400,18 +469,7 @@ public class ResultServiceImpl implements ResultService {
             log.info("【任务_发送智能分析】 请求url：{}，请求：{}", analyseUrl, JSONObject.toJSONString(params));
             httpUtils.sendPostJson(analyseUrl, JSONObject.toJSONString(params));
         } catch (Exception e) {
-//            HisUniTaskItemPointsEntity failParam = new HisUniTaskItemPointsEntity();
-//            failParam.setRequestId(requestId);
-//            failParam.setIsFinished(1);
-//            failParam.setFinishedTime(new Date());
-//            failParam.setValid(0);
-//            failParam.setPointVal("");
-//            failParam.setPointUnit("");
-//            failParam.setIsAlarm(0);
-//            failParam.setPointValUnit("算法服务通讯异常");
-//            hisUniTaskItemPointsMapper.finishResult(failParam);
-//            //更新任务进度
-//            updatePointNum(taskPatrolledId);
+
             log.error("【发送智能分析请求】异常！ {}", e.getMessage());
         }
     }
