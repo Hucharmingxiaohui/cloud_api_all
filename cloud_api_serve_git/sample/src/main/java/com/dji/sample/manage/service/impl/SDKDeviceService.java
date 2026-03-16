@@ -212,6 +212,13 @@ public class SDKDeviceService extends AbstractDeviceService {
         }else if(coverStateEnum!=null){
             coverState = coverStateEnum.getState();
         }
+        Integer capacityPercent = 0;
+        DroneBatteryMaintenanceInfo droneBatteryMaintenanceInfo = request.getData().getDroneBatteryMaintenanceInfo();
+        if (droneBatteryMaintenanceInfo != null) {
+            List<DroneBatteryMaintenance> batteries = droneBatteryMaintenanceInfo.getBatteries();
+            DroneBatteryMaintenance droneBatteryMaintenance = batteries.get(0);
+            capacityPercent = droneBatteryMaintenance.getCapacityPercent();
+        }
         DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
                 new LambdaQueryWrapper<DroneMonitoringEntity>()
                         .orderByDesc(DroneMonitoringEntity::getId)
@@ -233,6 +240,9 @@ public class SDKDeviceService extends AbstractDeviceService {
             if(windSpeed != null){
                 droneMonitoringEntity.setWindSpeed(String.valueOf(windSpeed));
             }
+            if(capacityPercent!=0){
+                droneMonitoringEntity.setBatteryLevel(String.valueOf(capacityPercent));
+            }
             droneMonitoringEntity.setNestDoorStatus(String.valueOf(coverState));
             droneMonitoringEntity.setRainfall(rainfall);
             droneMonitoringEntityMapper.updateById(droneMonitoringEntity);
@@ -252,6 +262,9 @@ public class SDKDeviceService extends AbstractDeviceService {
             }
             if(windSpeed != null){
                 droneMonitoringEntity1.setWindSpeed(String.valueOf(windSpeed));
+            }
+            if(capacityPercent!=0){
+                droneMonitoringEntity1.setBatteryLevel(String.valueOf(capacityPercent));
             }
             droneMonitoringEntity1.setNestDoorStatus(String.valueOf(coverState));
             droneMonitoringEntity1.setRainfall(rainfall);

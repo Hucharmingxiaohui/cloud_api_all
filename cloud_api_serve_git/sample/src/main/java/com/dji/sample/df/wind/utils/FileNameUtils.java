@@ -18,7 +18,7 @@ public class FileNameUtils {
         String nameWithoutExt = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName;
         String extension = dotIndex > 0 ? fileName.substring(dotIndex) : "";
 
-        // 转换中文部分
+        // 转换文件名主体
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < nameWithoutExt.length(); i++) {
             char ch = nameWithoutExt.charAt(i);
@@ -27,18 +27,22 @@ public class FileNameUtils {
                 // 获取拼音首字母
                 String[] pinyinArray = PinyinHelper.toHanyuPinyinStringArray(ch);
                 if (pinyinArray != null && pinyinArray.length > 0) {
-                    // 取第一个拼音的第一个字母（大写）
+                    // 取第一个拼音的首字母（大写）
                     result.append(Character.toUpperCase(pinyinArray[0].charAt(0)));
                 } else {
                     // 无法转换的中文字符，保留原字符
                     result.append(ch);
                 }
+            } else if (ch == ' ') {
+                // 空格替换为下划线
+                result.append('_');
             } else {
-                // 非中文字符，保留原样
+                // 其他非中文字符保留原样
                 result.append(ch);
             }
         }
 
+        // 拼接扩展名后返回
         return result.append(extension).toString();
     }
 

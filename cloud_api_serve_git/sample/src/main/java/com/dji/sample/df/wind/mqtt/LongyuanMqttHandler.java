@@ -531,7 +531,10 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = fjReportController.createHisTaskReport(jsonObject);
                     log.info("已生成完报告-------");
-
+                    if(isCenterTask.equals("1")){
+                        log.info("上传报告-------");
+                        sendPatrolResult2(taskCode, taskName, waylineJobEntity);
+                    }
                     // 3. 清理监控
                     analyzingTasks.remove(taskCode);
                     analysisStartTime.remove(taskCode);
@@ -727,6 +730,49 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }
     }
 
+    public void sendPatrolResult2(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
+        try {
+            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+            Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+            if(planType==1){
+                    PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                    String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                    String reportPath ="/home/uav_server/report/"+waylineJobEntity.getName()+".docx";
+                    String destName = new File(reportPath).getName();
+                    String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
+                    FtpUtils.getInstance().uploadToCenterNormal(reportPath, destDir, destName1);
+                    //推送点位报文
+                    String format = String.format("%s/%s", destDir, destName1);
+
+                    PatrolResultItem item = new PatrolResultItem();
+                    item.setPatroldevice_name("大疆M4td");
+                    item.setPatroldevice_code("1581F8HGX253800A030D");
+                    item.setTask_name(taskName);
+                    item.setTask_code(taskCode);
+                    item.setDevice_name("");
+                    item.setDevice_id("");
+                    item.setValue("");
+                    item.setUnit("");
+                    item.setValue_unit("");
+                    item.setTime(DateUtils.getNowDateTimeStr());
+                    item.setRecognition_type("");
+                    item.setFile_path(format);
+//                  用4表示上传巡视报告
+                    item.setFile_type("4");
+                    item.setRectangle("");
+                    item.setTask_patrolled_id(waylineJobEntity.getJobId());
+                    item.setObj_id("");
+                    item.setValid("1");
+                    commandData.addItem(item);
+                    patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
+                    log.info("上报巡视报告--------: ");
+            }
+        } catch (Exception e) {
+            log.error("上报巡视结果失败: taskCode={}", taskCode, e);
+        }
+    }
+
     public Integer extractWaypointNumber(String fileName) {
         if (fileName == null || fileName.isEmpty()) {
             return null;
@@ -841,8 +887,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         item.setStart_time(formatter.format(waylineJobDTO.getExecuteTime()));
         item.setPlan_start_time(formatter.format(waylineJobDTO.getBeginTime()));
         item.setTask_progress(progress + "%");
-        item.setTask_estimated_time("");
-        item.setDescription("");
+        item.setTask_estimated_time(calculateEstimatedTime(progress));
+        item.setDescription("正在进行风机巡视，已完成"+progress+"%的巡视任务");
         patrolStatusItems.add(item);
 
         PatrolHostCommand commandData = new PatrolHostCommand();
