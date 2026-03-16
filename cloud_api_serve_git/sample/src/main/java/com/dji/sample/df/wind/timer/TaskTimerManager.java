@@ -150,7 +150,7 @@ public class TaskTimerManager {
                                         .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
                                 );
                                 // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
-                                LongyuanMqttHandler.startMonitoringTask(waylineJobEntity.getJobId(), taskName);
+                                LongyuanMqttHandler.startMonitoringTask(taskCode, taskName);
                             }
 
                             // 从有序集合中移除已执行任务
@@ -214,6 +214,7 @@ public class TaskTimerManager {
                 customClaim.setUsername("adminPC");
                 String fanName = pubWaylineJobPlanDfEntity.getFanName();
                 pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
+                redisUtils.set("taskCode",taskCode);
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
                 if (httpResultResponse.getCode() == 0) {
                     log.info("成功执行上级任务------");
