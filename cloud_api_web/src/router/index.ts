@@ -89,7 +89,17 @@ const routes: Array<RouteRecordRaw> = [
               label: '兴趣点管理',
               cache: true
             }
-          }
+          },
+          {
+            path: '/variableMgt/solarPanel',
+            name: 'solarPanel',
+            component: () => import('/@/components/variableMgt/solarPanel/index.vue'),
+            meta: {
+              showInMenu: true,
+              label: '光伏板管理',
+              cache: true
+            }
+          },
         ]
       },
       // {

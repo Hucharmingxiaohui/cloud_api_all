@@ -93,3 +93,43 @@ export const deleteInserestPointApi = async function (id): Promise<IWorkspaceRes
   const result = await request.get(url)
   return result.data
 }
+
+/**
+ * 光伏板管理
+ */
+const HTTP_PREFIX_SOLAR = '/api/solarPanel'
+
+// 获取所有的光伏板参数
+export const getAllSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/selectList?solarPanelName=${data.solar_panel_name}&id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 新增光伏板参数配置
+export const addSolarPanelConfigApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/save`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 更新光伏板参数配置
+export const updateSolarPanelConfigApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/update`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 删除光伏板参数配置
+export const deleteSolarPanelApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/delete?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 根据ID查询光伏板参数
+export const getSolarPanelByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/getById?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
