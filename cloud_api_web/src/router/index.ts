@@ -1,10 +1,5 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import { ERouterName } from '/@/types/index'
-import WaylinePanel from '/@/pages/page-web/projects/wayline.vue'
-import DockPanel from '/@/pages/page-web/projects/dock.vue'
-import LiveAgora from '/@/components/livestream-agora.vue'
-import LiveOthers from '/@/components/livestream-others.vue'
-import LiveResults from '/@/components/livestream-results.vue'
 import { ref } from 'vue'
 
 // 扩展路由元信息类型（移除index/parentIndex，保留核心配置）
@@ -91,14 +86,36 @@ const routes: Array<RouteRecordRaw> = [
             }
           },
           {
-            path: '/variableMgt/solarPanel',
-            name: 'solarPanel',
-            component: () => import('/@/components/variableMgt/solarPanel/index.vue'),
+            path: '/variableMgt/solarMgt',
+            name: 'solarMgt',
             meta: {
               showInMenu: true,
-              label: '光伏板管理',
-              cache: true
-            }
+              label: '光伏管理',
+              position: 'left',
+              cache: false
+            },
+            children: [
+              {
+                path: '/variableMgt/solarMgt/solarPanelMgt',
+                name: 'solarPanelMgt',
+                component: () => import('/@/components/variableMgt/solarMgt/solarPanelMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '光伏板区域管理',
+                  cache: true
+                }
+              },
+              {
+                path: '/variableMgt/solarMgt/solarDeviceMgt',
+                name: 'solarDeviceMgt',
+                component: () => import('/@/components/variableMgt/solarMgt/solarDeviceMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '光伏板设备管理',
+                  cache: true
+                }
+              },
+            ]
           },
         ]
       },
@@ -139,7 +156,11 @@ const routes: Array<RouteRecordRaw> = [
           {
             path: ERouterName.LIVING,
             name: ERouterName.LIVING,
-            components: { LiveAgora, LiveOthers, LiveResults },
+            components: {
+              default: () => import('/@/components/livestream-agora.vue'),
+              LiveOthers: () => import('/@/components/livestream-others.vue'),
+              LiveResults: () => import('/@/components/livestream-results.vue')
+            },
             meta: { showInMenu: false, cache: false }
           }
         ]
@@ -410,7 +431,10 @@ const routes: Array<RouteRecordRaw> = [
           {
             path: ERouterName.SELECT_PLAN,
             name: ERouterName.SELECT_PLAN,
-            components: { WaylinePanel, DockPanel },
+            components: {
+              WaylinePanel: () => import('/@/pages/page-web/projects/wayline.vue'),
+              DockPanel: () => import('/@/pages/page-web/projects/dock.vue')
+            },
             meta: { showInMenu: false, cache: true }
           }
         ]
@@ -474,9 +498,7 @@ router.beforeEach((to, from, next) => {
 })
 
 router.afterEach(() => {
-  setTimeout(() => {
-    isLoading.value = false
-  }, 200)
+  isLoading.value = false
 })
 
 export { routes, isLoading }

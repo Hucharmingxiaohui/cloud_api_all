@@ -7,32 +7,50 @@
           <el-col :span="7" class="text_1"  style="display: flex; justify-content: center;">
             <!-- 左侧菜单 -->
              <div style="width: 100%;">
-                          <el-menu
+             <el-menu
               :default-active="activeIndex"
               class="el-menu-demo"
               mode="horizontal"
               @select="handleSelect"
             >
-              <template v-for="item in menuOptions" :key="item.name">
-                <el-menu-item :index="item.name" v-if="!item.children || item.children.length === 0">
+              <template v-for="(item, index) in menuOptions" :key="item.name">
+                <!-- 一级菜单（无子菜单） -->
+                <el-menu-item :index="String(index + 1)" v-if="!item.children || item.children.length === 0">
                   <router-link :to="item.path">
                     {{ item.label }}
                   </router-link>
                 </el-menu-item>
+                <!-- 二级菜单（有子菜单） -->
                 <el-sub-menu
                   v-else
-                  :index="item.name"
+                  :index="String(index + 1)"
                   popper-class="child-menu-title"
                 >
                   <template #title>
                     {{ item.label }}
                   </template>
-                  <template v-for="child in item.children" :key="child.name">
-                    <el-menu-item :index="child.name">
+                  <template v-for="(child, childIndex) in item.children" :key="child.name">
+                    <!-- 二级菜单项（无三级子菜单） -->
+                    <el-menu-item :index="`${index + 1}-${childIndex + 1}`" v-if="!child.children || child.children.length === 0" >
                       <router-link :to="child.path">
                         {{ child.label }}
                       </router-link>
                     </el-menu-item>
+                    <!-- 三级菜单（有子菜单） -->
+                    <el-sub-menu v-else :index="`${index + 1}-${childIndex + 1}`" popper-class="child-menu-title">
+                      <template #title>
+                        {{ child.label }}
+                      </template>
+                      <el-menu-item
+                        v-for="(grandChild, grandChildIndex) in child.children"
+                        :key="grandChild.name"
+                        :index="`${index + 1}-${childIndex + 1}-${grandChildIndex + 1}`"
+                      >
+                        <router-link :to="grandChild.path">
+                          {{ grandChild.label }}
+                        </router-link>
+                      </el-menu-item>
+                    </el-sub-menu>
                   </template>
                 </el-sub-menu>
               </template>
@@ -53,37 +71,37 @@
               :default-active="activeIndex"
               @select="handleSelect"
             >
-              <template v-for="item in menuRightOptions" :key="item.name">
-                <el-menu-item :index="item.name" v-if="!item.children || item.children.length===0">
+              <template v-for="(item, index) in menuRightOptions" :key="item.name">
+                <el-menu-item :index="String(index + 1)" v-if="!item.children || item.children.length===0">
                   <router-link :to="item.path">
                     {{ item.label }}
                   </router-link>
                 </el-menu-item>
                 <el-sub-menu
                   v-else
-                  :index="item.name"
+                  :index="String(index + 1)"
                   popper-class="child-menu-title"
                 >
                   <template #title>
                     {{ item.label }}
                   </template>
-                  <template v-for="child in item.children" :key="child.name">
-                    <el-menu-item :index="child.name" v-if="!child.children || child.children.length===0">
+                  <template v-for="(child, childIndex) in item.children" :key="child.name">
+                    <el-menu-item :index="`${index + 1}-${childIndex + 1}`" v-if="!child.children || child.children.length===0">
                       <router-link :to="child.path">
                         {{ child.label }}
                       </router-link>
                     </el-menu-item>
-                    <el-sub-menu v-else :index="child.name">
+                    <el-sub-menu v-else :index="`${index + 1}-${childIndex + 1}`">
                       <template #title>
                         {{ child.label }}
                       </template>
 
                       <el-menu-item
-                        v-for="grandChild in child.children"
+                        v-for="(grandChild, grandChildIndex) in child.children"
                         :key="grandChild.name"
-                        :index="grandChild.name"
+                        :index="`${index + 1}-${childIndex + 1}-${grandChildIndex + 1}`"
                       >
-                        <router-link :to="child.path">
+                        <router-link :to="grandChild.path">
                           {{ grandChild.label }}
                         </router-link>
                       </el-menu-item>
@@ -174,11 +192,7 @@ const handleResize = () => {
   viewportWidth.value = window.innerWidth
 }
 onMounted(() => {
-  // window.addEventListener('resize', handleResize)
-  // handleResize() // Initialize viewportWidth
   activeIndex.value = localStorage.getItem(STORAGE_KEY) || '2'
-
-  // const path = findPathByIndex(allMenuItems, activeIndex.value)
   router.push(selected.value)
 })
 onBeforeUnmount(() => {
@@ -208,18 +222,34 @@ function getShowInMenuRoutes (routes) {
           children: [] // 初始化children数组
         }
 
-        // 递归处理子路由，构建子菜单
+        // 递归处理子路由，构建子菜单（支持三级菜单）
         if (route.children && route.children.length > 0) {
           route.children.forEach(child => {
             if (child.meta?.showInMenu === true) {
               const childFullPath = child.path
-              routeCopy.children.push({
+              const childCopy = {
                 ...child.meta,
                 path: childFullPath,
                 name: child.name,
                 label: child.meta.label || '',
-                children: child.children || []
-              })
+                children: []
+              }
+
+              // 处理三级菜单
+              if (child.children && child.children.length > 0) {
+                child.children.forEach(grandChild => {
+                  if (grandChild.meta?.showInMenu === true) {
+                    childCopy.children.push({
+                      ...grandChild.meta,
+                      path: grandChild.path,
+                      name: grandChild.name,
+                      label: grandChild.meta.label || ''
+                    })
+                  }
+                })
+              }
+
+              routeCopy.children.push(childCopy)
             }
           })
         }
@@ -244,9 +274,9 @@ menuTree.value = menuData
 
 // 2. 拆分左右菜单（按position字段）
 const menuOptions = computed(() => {
+  console.log('menuOptions=', menuTree.value.filter(menu => menu.position === 'left'))
   return menuTree.value.filter(menu => menu.position === 'left')
 })
-console.log('左侧菜单', menuOptions)
 const menuRightOptions = computed(() => {
   return menuTree.value.filter(menu => menu.position === 'right')
 })
@@ -258,34 +288,64 @@ const menuRightOptions = computed(() => {
 function handleSelect (index) {
   activeIndex.value = index
   localStorage.setItem(STORAGE_KEY, index)
-  // const path = findPathByIndex(allMenuItems, index)
-  // if (path) {
-  //   router.push(path)
-  // }
 }
 
-// 查找路径对应的索引
-function findIndexByPath (items, targetPath) {
-  for (const item of items) {
+// 根据路径查找菜单索引（返回 Element Plus 格式的索引，如 '1', '1-1', '1-1-1'）
+function findMenuIndexByPath (items, targetPath) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const currentIndex = String(i + 1)
+
+    // 检查当前项是否匹配
     if (item.path === targetPath) {
-      return item.index
+      return currentIndex
     }
-    if (item.children) {
-      const found = findIndexByPath(item.children, targetPath)
-      if (found) return found
+
+    // 递归检查子项
+    if (item.children && item.children.length > 0) {
+      for (let j = 0; j < item.children.length; j++) {
+        const child = item.children[j]
+        const childIndex = `${currentIndex}-${j + 1}`
+
+        // 检查二级菜单是否匹配
+        if (child.path === targetPath) {
+          return childIndex
+        }
+
+        // 检查三级菜单
+        if (child.children && child.children.length > 0) {
+          for (let k = 0; k < child.children.length; k++) {
+            const grandChild = child.children[k]
+            const grandChildIndex = `${childIndex}-${k + 1}`
+
+            if (grandChild.path === targetPath) {
+              return grandChildIndex
+            }
+          }
+        }
+      }
     }
   }
   return null
 }
 
-// // 监听路由变化，自动更新激活菜单
-// watch(() => route.path, (newPath) => {
-//   const matchedIndex = findIndexByPath(allMenuItems, newPath)
-//   if (matchedIndex) {
-//     activeIndex.value = matchedIndex
-//     localStorage.setItem(STORAGE_KEY, matchedIndex)
-//   }
-// }, { immediate: true })
+// 监听路由变化，自动更新激活菜单
+watch(() => route.path, (newPath) => {
+  // 在左侧菜单中查找
+  const leftIndex = findMenuIndexByPath(menuOptions.value, newPath)
+  if (leftIndex) {
+    activeIndex.value = leftIndex
+    localStorage.setItem(STORAGE_KEY, leftIndex)
+    return
+  }
+
+  // 在右侧菜单中查找
+  const rightIndex = findMenuIndexByPath(menuRightOptions.value, newPath)
+  if (rightIndex) {
+    activeIndex.value = rightIndex
+    localStorage.setItem(STORAGE_KEY, rightIndex)
+  }
+}, { immediate: true })
 
 const logout = () => {
   localStorage.clear()
@@ -360,13 +420,10 @@ function goHome () {
 }
 
 // 二级标题下拉列表 .el-sub-menu__title
-:deep(.el-menu--horizontal .el-menu .el-menu-item, .el-menu--horizontal .el-menu) {
-  background: linear-gradient(135deg, #1e3a8a 0%, #0c4a6e 100%) !important;
-  border: 1px solid rgba(99, 156, 242, 0.3) !important;
-  border-radius: 8px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
-  padding: 5px 0 !important;
-}
+// :deep(.el-menu--horizontal .el-menu .el-menu-item, .el-menu--horizontal .el-menu) {
+//   padding: 15px !important;
+//   font-size: 16px;
+// }
 
 .selected-item {
   color: rgba(175, 193, 222, 1); /* 选中时文字颜色 */
@@ -522,6 +579,52 @@ function goHome () {
       &:not(.is-disabled):hover {
         a{
           color: rgb(41, 197, 222) !important;
+        }
+      }
+    }
+
+    // 三级菜单样式
+    .el-sub-menu {
+      .el-sub-menu__title {
+        color: #e0e2e6 !important;
+        font-weight: 500;
+        font-size: 16px;
+        background-color: transparent !important;
+        &:hover {
+          color: rgb(41, 197, 222) !important;
+          background-color: rgba(24, 45, 208, 0.21) !important;
+        }
+      }
+      // 三级菜单父级（二级菜单）激活状态
+      &.is-active {
+        .el-sub-menu__title {
+          color: rgb(8, 120, 248) !important;
+          background-color: #182dd036 !important;
+        }
+      }
+
+      // 三级子菜单展开后的容器
+      .el-menu {
+        background-color: rgb(2, 51, 112) !important;
+        border:none !important;
+        height: auto;
+        .el-menu-item {
+          a {
+            color: #c5d0e0 !important;
+            font-size: 16px;
+          }
+          &:hover {
+            background-color: rgba(24, 45, 208, 0.3) !important;
+            a {
+              color: rgb(41, 197, 222) !important;
+            }
+          }
+          &.is-active {
+            background-color: #182dd05c !important;
+            a {
+              color: rgb(8, 120, 248) !important;
+            }
+          }
         }
       }
     }

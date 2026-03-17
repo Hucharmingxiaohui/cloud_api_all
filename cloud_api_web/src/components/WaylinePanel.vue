@@ -57,7 +57,7 @@
             <el-button
               class="new_btn iconfont icon-daoruhangxian"
               type="primary"
-              style="margin-left: 10px; width: 100px; margin-top: 5px;"
+              style="margin-left: 10px; width: 100px; margin-top: 2px;"
             >
               <span style="margin-left: 5px; font-size: 14px;">导入航线</span>
             </el-button>

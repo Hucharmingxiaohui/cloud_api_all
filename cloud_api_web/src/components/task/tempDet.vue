@@ -44,16 +44,6 @@
                     </el-input>
                   </el-form-item>
                 </el-col>
-                <!-- 最高温度坐标 -->
-                <!-- <el-col :span="24">
-                    <el-form-item label="最高温度坐标" :label-style="{ color: 'white' }" v-if="tempType == 2">
-                      <el-input v-model="tt" placeholder="最高温度坐标"></el-input>
-                    </el-form-item>
-                    <el-form-item label="温度坐标" :label-style="{ color: 'white' }" v-else>
-                      <el-input v-model="tt" placeholder="温度坐标"></el-input>
-                    </el-form-item>
-                  </el-col> -->
-                <!-- 最低温度 -->
                 <el-col :span="24">
                   <el-form-item
                     label="最低温度°C"
@@ -80,12 +70,6 @@
                     ></el-input>
                   </el-form-item>
                 </el-col>
-                <!-- 最低温度坐标 -->
-                <!-- <el-col :span="24">
-                    <el-form-item label="最低温度坐标" :label-style="{ color: 'white' }"  v-if="tempType ==2">
-                      <el-input v-model="tt" placeholder="最低温度坐标"></el-input>
-                    </el-form-item>
-                  </el-col> -->
               </el-row>
             </el-form>
           </div>
