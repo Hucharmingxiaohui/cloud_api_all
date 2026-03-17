@@ -35,8 +35,5 @@
                 and id = #{id}
             </if>
         </where>
-        <if test="pageSize != null and pageSize != '' ">
-            LIMIT ${startPos}, ${pageSize}
-        </if>
     </select>
 </mapper>

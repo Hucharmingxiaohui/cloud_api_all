@@ -401,7 +401,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         redisUtils.set("jobId",jobId);
         redisUtils.set("isCenterTask","0");
 //      这个地方要看下加startMonitoringTask的作用，和需要传什么id
-        LongyuanMqttHandler.startMonitoringTask(redisUtils.get("taskCode").toString(), job.getJobName());
+        LongyuanMqttHandler.startMonitoringTask(jobId, job.getJobName());
         waylineJobService.updateJob(WaylineJobDTO.builder()
                 .jobId(jobId)
                 .executeTime(LocalDateTime.now())

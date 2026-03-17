@@ -322,7 +322,7 @@ public class SDKDeviceService extends AbstractDeviceService {
             try {
                 String lastLiveTimeStr = lastLiveKeyValue.toString();
                 long lastLiveTime = Long.parseLong(lastLiveTimeStr);
-                if (now - lastLiveTime < 120000) { // 2分钟 = 120000毫秒
+                if (now - lastLiveTime < 3000) { // 2分钟 = 120000毫秒
                     shouldStartLive = false;
                 }
             } catch (NumberFormatException e) {
@@ -358,7 +358,7 @@ public class SDKDeviceService extends AbstractDeviceService {
                         droneSn, httpResultResponse.getCode(), httpResultResponse.getMessage());
             }
         } else {
-            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
+            log.debug("距离上次调用直播接口不足3秒，跳过无人机 {} 直播开启", droneSn);
         }
         // ===== 直播开启逻辑改造结束 =====
 

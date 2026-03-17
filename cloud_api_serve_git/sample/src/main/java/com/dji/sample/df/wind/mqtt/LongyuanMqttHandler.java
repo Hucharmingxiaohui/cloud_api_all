@@ -439,12 +439,12 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 String isCenterTask = redisUtils.get("isCenterTask").toString();
                 // 如果状态为2（执行中），上报状态
                 if (status == 2) {
-                    if (isCenterTask.equals("1")) {
+                    if (isCenterTask.equals("1") && !jobId.equals(taskCode)) {
                         sendWindTurbineTaskStatus(taskCode,taskName,0);
                     }
                 } else if (status == 3 || status == 1|| status == 5|| status == 4) {
                     // 如果任务已完成（假设状态3为完成，还有别的），停止监控
-                    if (isCenterTask.equals("1")) {
+                    if (isCenterTask.equals("1")&& !jobId.equals(taskCode)) {
                         sendWindTurbineTaskStatus(taskCode,taskName,1);
                     }
 //                    sendWindTurbineTaskStatus(taskCode,taskName,1);
@@ -486,7 +486,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //                                Result<Map> result = pictureSaveHandler.pictureSave(jobId);
                                 Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
                                 if(result.getCode() == 0){
-                                    if(isCenterTask.equals("1")){
+                                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
                                         sendPatrolResult(taskCode, taskName, waylineJobEntity);
                                     }
                                 }
@@ -523,7 +523,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             .eq(WaylineJobEntity::getJobId, jobId)
                     );
                     log.info("分析完成上传照片--------");
-                    if(isCenterTask.equals("1")){
+                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
                         sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
@@ -531,7 +531,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = fjReportController.createHisTaskReport(jsonObject);
                     log.info("已生成完报告-------");
-                    if(isCenterTask.equals("1")){
+                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
                         log.info("上传报告-------");
                         sendPatrolResult2(taskCode, taskName, waylineJobEntity);
                     }
@@ -574,7 +574,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 for (MediaFileDTO mediaFileDTO : list) {
                     URL url = fileService.getObjectUrl("e3dea0f5-37f2-4d79-ae58-490af3228069",mediaFileDTO.getFileId());
                     String urlString = url.toString();
-                    log.info("图片映射路径为"+urlString);
                     Map<String, Object> resultMessage = new HashMap<>();
 
                     resultMessage.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
@@ -624,7 +623,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 //                mqttSender.sendToPatrolData(resultMessage);
 
                     PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                    String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                    String destDir = "/" + taskCode;
 //                String localFile = point.getMediaFileDTOS().get(0).getFilePath();
                     DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
                             .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
@@ -690,7 +689,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         }
 
                         PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                        String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                        String destDir = "/" + taskCode;
                         String regId=uniPoint.getPointCode()+picType;
                         String replace = fileName.replace(".jpeg", "");
                         String filePath="/ftpdir/admin_files/recfile_images/"+waylineJobEntity.getJobId()+"/"+regId+"_"+replace+".jpg";
@@ -737,7 +736,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
             if(planType==1){
                     PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
-                    String destDir = centerFtpsNormalConfig.getFileSavePath() + "/" + stationCode + "/" + waylineJobEntity.getJobId() + "/";
+                    String destDir = "/" + taskCode;
                     String reportPath ="/home/uav_server/report/"+waylineJobEntity.getName()+".docx";
                     String destName = new File(reportPath).getName();
                     String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
