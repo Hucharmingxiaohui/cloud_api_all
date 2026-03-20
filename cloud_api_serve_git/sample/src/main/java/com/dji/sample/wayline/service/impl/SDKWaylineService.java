@@ -423,6 +423,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 response1.append(responseLine.trim());
                             }
                             JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
+//                          此块变成开放接口分析服务那边进行调用
                             log.info("收到不停机状态返回参数----" + jsonResponse);
 
                             if (jsonResponse.getString("desc").equals("1")) {

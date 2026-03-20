@@ -37,6 +37,8 @@ import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.timer.TaskTimerManager;
 import com.dji.sample.df.wind.utils.FileNameUtils;
+import com.dji.sample.manage.dao.IDeviceMapper;
+import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.media.controller.FileController;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -119,6 +121,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     UniPointMapper2 uniPointMapper2;
     @Autowired
     FanWaylinePointsMapper fanWaylinePointsMapper;
+    @Resource
+    private IDeviceMapper deviceMapper;
 
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
@@ -567,6 +571,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                     .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+            DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
+            String deviceSn = deviceEntity.getDeviceSn();
             if(planType==1){
                 HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), "e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 500L, new HashMap<>());
                 PaginationData<MediaFileDTO> data1 = (PaginationData< MediaFileDTO >)mediaFileByJobId.getData();
@@ -600,7 +606,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                             stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
                     Map<String, Object> data = new HashMap<>();
                     data.put("patrolDeviceName","大疆M4td");
-                    data.put("patrolDeviceCode", "1581F8HGX253800A030D");
+                    data.put("patrolDeviceCode", deviceSn);
                     data.put("taskName", taskName);
                     data.put("taskCode", taskCode);
 //              点位名称是拼接，点位id是文件id
@@ -641,7 +647,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                     PatrolResultItem item = new PatrolResultItem();
                     item.setPatroldevice_name("大疆M4td");
-                    item.setPatroldevice_code("1581F8HGX253800A030D");
+                    item.setPatroldevice_code(deviceSn);
                     item.setTask_name(taskName);
                     item.setTask_code(taskCode);
                     item.setDevice_name(pointName);
@@ -701,7 +707,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                         PatrolResultItem item = new PatrolResultItem();
                         item.setPatroldevice_name("大疆M4td");
-                        item.setPatroldevice_code("1581F8HGX253800A030D");
+                        item.setPatroldevice_code(deviceSn);
                         item.setTask_name(taskName);
                         item.setTask_code(taskCode);
                         item.setDevice_name(uniPoint.getPointName());
@@ -734,6 +740,8 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                     .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+            DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
+            String deviceSn = deviceEntity.getDeviceSn();
             if(planType==1){
                     PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
                     String destDir = "/" + taskCode;
@@ -746,7 +754,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
                     PatrolResultItem item = new PatrolResultItem();
                     item.setPatroldevice_name("大疆M4td");
-                    item.setPatroldevice_code("1581F8HGX253800A030D");
+                    item.setPatroldevice_code(deviceSn);
                     item.setTask_name(taskName);
                     item.setTask_code(taskCode);
                     item.setDevice_name("");

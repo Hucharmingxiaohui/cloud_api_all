@@ -213,6 +213,7 @@ public class TaskTimerManager {
                 customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
                 customClaim.setUsername("adminPC");
                 String fanName = pubWaylineJobPlanDfEntity.getFanName();
+                fanName = fanName.replace("#", "");
                 pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
                 redisUtils.set("taskCode",taskCode);
                 HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
