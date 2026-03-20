@@ -344,6 +344,32 @@ export function updateDeviceCmdInfoByExecuteInfo (cmdList: DeviceCmdItem[], devi
           exchangeDeviceCmd(cmdItem)
           cmdItem.loading = false
         }
+      } else if (cmdItem.cmdKey === DeviceCmd.SupplementLightOpen) { // 打开补光灯
+         if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.InProgress) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightOpenInProgressText
+          cmdItem.loading = true
+        } else if (isExecuteFailed(deviceCmdExecuteInfo.output.status)) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightOpenFailedText
+          cmdItem.loading = false
+        } else if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.OK) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightOpenNormalText
+          cmdItem.operateText = DeviceCmdStatusText.DeviceSupplementLightOpenBtnText
+          exchangeDeviceCmd(cmdItem)
+          cmdItem.loading = false
+        }
+      } else if (cmdItem.cmdKey === DeviceCmd.SupplementLightClose) {
+        if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.InProgress) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightCloseText
+          cmdItem.loading = true
+        } else if (isExecuteFailed(deviceCmdExecuteInfo.output.status)) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightCloseFailedText
+          cmdItem.loading = false
+        } else if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.OK) {
+          cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightCloseNormalText
+          cmdItem.operateText = DeviceCmdStatusText.DeviceSupplementLightCloseBtnText
+          exchangeDeviceCmd(cmdItem)
+          cmdItem.loading = false
+        }
       } else if (cmdItem.cmdKey === DeviceCmd.PutterOpen) { // 推杆闭合展开
         if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.InProgress) {
           cmdItem.status = DeviceCmdStatusText.DevicePutterOpenInProgressText
