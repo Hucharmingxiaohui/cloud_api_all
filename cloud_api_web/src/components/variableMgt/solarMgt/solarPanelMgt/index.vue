@@ -60,62 +60,62 @@
           </el-table-column>
           <el-table-column label="光伏板名称" align="center" width="150">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.solarPanelName }}</div>
+              <div class="ellipsis">{{ scope.row.solar_panel_name }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角1经度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner1Lng }}</div>
+              <div class="ellipsis">{{ scope.row.corner1_lng }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角1纬度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner1Lat }}</div>
+              <div class="ellipsis">{{ scope.row.corner1_lat }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角2经度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner2Lng }}</div>
+              <div class="ellipsis">{{ scope.row.corner2_lng }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角2纬度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner2Lat }}</div>
+              <div class="ellipsis">{{ scope.row.corner2_lat }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角3经度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner3Lng }}</div>
+              <div class="ellipsis">{{ scope.row.corner3_lng }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角3纬度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner3Lat }}</div>
+              <div class="ellipsis">{{ scope.row.corner3_lat }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角4经度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner4Lng }}</div>
+              <div class="ellipsis">{{ scope.row.corner4_lng }}</div>
             </template>
           </el-table-column>
           <el-table-column label="角4纬度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner4Lat }}</div>
+              <div class="ellipsis">{{ scope.row.corner4_lat }}</div>
             </template>
           </el-table-column>
           <el-table-column label="航线高度(米)" align="center" width="110">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.flightAltitude }}</div>
+              <div class="ellipsis">{{ scope.row.flight_altitude }}</div>
             </template>
           </el-table-column>
           <el-table-column label="光伏板倾角(度)" align="center" width="120">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.tiltAngle }}</div>
+              <div class="ellipsis">{{ scope.row.tilt_angle }}</div>
             </template>
           </el-table-column>
           <el-table-column label="横向航线数" align="center" width="100">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.horizontalRoutes }}</div>
+              <div class="ellipsis">{{ scope.row.horizontal_routes }}</div>
             </template>
           </el-table-column>
 
@@ -464,7 +464,21 @@ async function handleInsert () {
       ElMessage.warning('请检查表单是否填写!')
       return
     }
-    const res = await addSolarPanelConfigApi(insertForm)
+    const submitData = {
+      solar_panel_name: insertForm.solarPanelName,
+      corner1_lng: Number(insertForm.corner1Lng),
+      corner1_lat: Number(insertForm.corner1Lat),
+      corner2_lng: Number(insertForm.corner2Lng),
+      corner2_lat: Number(insertForm.corner2Lat),
+      corner3_lng: Number(insertForm.corner3Lng),
+      corner3_lat: Number(insertForm.corner3Lat),
+      corner4_lng: Number(insertForm.corner4Lng),
+      corner4_lat: Number(insertForm.corner4Lat),
+      flight_altitude: Number(insertForm.flightAltitude),
+      tilt_angle: Number(insertForm.tiltAngle),
+      horizontal_routes: Number(insertForm.horizontalRoutes)
+    }
+    const res = await addSolarPanelConfigApi(submitData)
     if (res.code !== 0) {
       return
     }
@@ -497,7 +511,21 @@ function openInsertDialog () {
 
 function openEditDialog (row:any) {
   editDialog.value = true
-  Object.assign(editForm, row)
+  Object.assign(editForm, {
+    id: row.id,
+    solarPanelName: row.solar_panel_name,
+    corner1Lng: row.corner1_lng,
+    corner1Lat: row.corner1_lat,
+    corner2Lng: row.corner2_lng,
+    corner2Lat: row.corner2_lat,
+    corner3Lng: row.corner3_lng,
+    corner3Lat: row.corner3_lat,
+    corner4Lng: row.corner4_lng,
+    corner4Lat: row.corner4_lat,
+    flightAltitude: row.flight_altitude,
+    tiltAngle: row.tilt_angle,
+    horizontalRoutes: row.horizontal_routes
+  })
 }
 
 async function handleEdit () {
@@ -507,7 +535,22 @@ async function handleEdit () {
       ElMessage.warning('请检查表单是否填写!')
       return
     }
-    const res = await updateSolarPanelConfigApi(editForm)
+    const submitData = {
+      id: editForm.id,
+      solar_panel_name: editForm.solarPanelName,
+      corner1_lng: Number(editForm.corner1Lng),
+      corner1_lat: Number(editForm.corner1Lat),
+      corner2_lng: Number(editForm.corner2Lng),
+      corner2_lat: Number(editForm.corner2Lat),
+      corner3_lng: Number(editForm.corner3Lng),
+      corner3_lat: Number(editForm.corner3Lat),
+      corner4_lng: Number(editForm.corner4Lng),
+      corner4_lat: Number(editForm.corner4Lat),
+      flight_altitude: Number(editForm.flightAltitude),
+      tilt_angle: Number(editForm.tiltAngle),
+      horizontal_routes: Number(editForm.horizontalRoutes)
+    }
+    const res = await updateSolarPanelConfigApi(submitData)
     if (res.code !== 0) {
       return
     }

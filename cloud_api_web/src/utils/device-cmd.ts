@@ -345,7 +345,7 @@ export function updateDeviceCmdInfoByExecuteInfo (cmdList: DeviceCmdItem[], devi
           cmdItem.loading = false
         }
       } else if (cmdItem.cmdKey === DeviceCmd.SupplementLightOpen) { // 打开补光灯
-         if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.InProgress) {
+        if (deviceCmdExecuteInfo.output.status === DeviceCmdExecuteStatus.InProgress) {
           cmdItem.status = DeviceCmdStatusText.DeviceSupplementLightOpenInProgressText
           cmdItem.loading = true
         } else if (isExecuteFailed(deviceCmdExecuteInfo.output.status)) {

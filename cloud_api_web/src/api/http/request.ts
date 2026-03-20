@@ -22,8 +22,10 @@ const instance = axios.create({
 instance.interceptors.request.use(
   config => {
     config.headers[ELocalStorageKey.Token] = getAuthToken()
-    // config.headers[REQUEST_ID] = uuidv4()
-    config.baseURL = CURRENT_CONFIG.baseURL
+
+    config.headers['ngrok-skip-browser-warning'] = 'true'
+    config.baseURL = import.meta.env.VITE_BACK
+    // config.baseURL = CURRENT_CONFIG.baseURL
     return config
   },
   error => {

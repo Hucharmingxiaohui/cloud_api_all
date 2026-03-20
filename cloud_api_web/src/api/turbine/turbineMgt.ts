@@ -133,3 +133,43 @@ export const getSolarPanelByIdApi = async function (id): Promise<IWorkspaceRespo
   const result = await request.get(url)
   return result.data
 }
+
+/**
+ * 光伏板设备管理接口 (巡视设备)
+ */
+const HTTP_PREFIX_INSPECTION = '/api/inspectionDevice'
+
+// 获取所有的巡视设备参数
+export const getAllInspectionDeviceApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_INSPECTION}/selectList?deviceName=${data.device_name}&id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 新增巡视设备参数配置
+export const addInspectionDeviceConfigApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_INSPECTION}/save`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 更新巡视设备参数配置
+export const updateInspectionDeviceConfigApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_INSPECTION}/update`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 删除巡视设备参数配置
+export const deleteInspectionDeviceApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_INSPECTION}/delete?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 根据ID查询巡视设备参数
+export const getInspectionDeviceByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_INSPECTION}/getById?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}

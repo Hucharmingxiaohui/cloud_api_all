@@ -2,17 +2,17 @@
   <div class="container">
     <div class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right">
-        <el-form-item label="光伏板名称:" prop="solar_panel_name">
+        <el-form-item label="设备名称:" prop="device_name">
           <el-input
-            v-model="queryForm.solar_panel_name"
-            placeholder="请输入光伏板名称"
+            v-model="queryForm.device_name"
+            placeholder="请输入设备名称"
             class="custom-input"
           ></el-input>
         </el-form-item>
-        <el-form-item label="光伏板ID:" prop="id">
+        <el-form-item label="设备ID:" prop="id">
           <el-input
             v-model="queryForm.id"
-            placeholder="请输入光伏板ID"
+            placeholder="请输入设备ID"
             class="custom-input"
           ></el-input>
         </el-form-item>
@@ -21,7 +21,7 @@
             class="new_btn"
             type="primary"
             :icon="Search"
-            @click="getSolarPanelConfig()"
+            @click="getInspectionDeviceConfig()"
           >
             查询
           </el-button>
@@ -53,72 +53,46 @@
             label="序号"
             width="60"
           />
-          <el-table-column label="光伏板ID" align="center" width="100">
+          <el-table-column label="设备ID" align="center" width="100">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.id }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="光伏板名称" align="center" width="150">
+          <el-table-column label="设备名称" align="center" width="150">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.solarPanelName }}</div>
+              <div class="ellipsis">{{ scope.row.device_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角1经度" align="center">
+          <el-table-column label="目标点经度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner1Lng }}</div>
+              <div class="ellipsis">{{ scope.row.target_longitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角1纬度" align="center">
+          <el-table-column label="目标点纬度" align="center">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner1Lat }}</div>
+              <div class="ellipsis">{{ scope.row.target_latitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角2经度" align="center">
+          <el-table-column label="目标点高度(米)" align="center" width="130">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner2Lng }}</div>
+              <div class="ellipsis">{{ scope.row.target_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角2纬度" align="center">
+          <el-table-column label="无人机高度(米)" align="center" width="130">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner2Lat }}</div>
+              <div class="ellipsis">{{ scope.row.drone_altitude }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角3经度" align="center">
+          <el-table-column label="距离设备距离(米)" align="center" width="140">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner3Lng }}</div>
+              <div class="ellipsis">{{ scope.row.drone_distance }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角3纬度" align="center">
+          <el-table-column label="偏航角(度)" align="center" width="110">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner3Lat }}</div>
+              <div class="ellipsis">{{ scope.row.drone_yaw }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="角4经度" align="center">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner4Lng }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="角4纬度" align="center">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.corner4Lat }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="航线高度(米)" align="center" width="110">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.flightAltitude }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="光伏板倾角(度)" align="center" width="120">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.tiltAngle }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="横向航线数" align="center" width="100">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.horizontalRoutes }}</div>
-            </template>
-          </el-table-column>
-
           <el-table-column label="操作" width="150" fixed="right">
             <template #default="scope">
               <el-button link type="primary" @click="openEditDialog(scope.row)"
@@ -146,8 +120,8 @@
     </div>
     <el-dialog
       v-model="insertDialog"
-      title="新增光伏板"
-      width="1000"
+      title="新增巡视设备"
+      width="800"
       style="background-color: #0A2D63; color: white"
     >
       <el-form
@@ -158,77 +132,47 @@
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="光伏板名称" required prop="solarPanelName">
+            <el-form-item label="设备名称" required prop="deviceName">
               <el-input
-                v-model="insertForm.solarPanelName"
+                v-model="insertForm.deviceName"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1经度" prop="corner1Lng" required>
+            <el-form-item label="目标点经度" prop="targetLongitude" required>
               <el-input
-                v-model="insertForm.corner1Lng"
+                v-model="insertForm.targetLongitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1纬度" prop="corner1Lat" required>
+            <el-form-item label="目标点纬度" prop="targetLatitude" required>
               <el-input
-                v-model="insertForm.corner1Lat"
+                v-model="insertForm.targetLatitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2经度" prop="corner2Lng" required>
+            <el-form-item label="目标点高度(米)" prop="targetAltitude" required>
               <el-input
-                v-model="insertForm.corner2Lng"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="角2纬度" prop="corner2Lat" required>
-              <el-input
-                v-model="insertForm.corner2Lat"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="航线高度(米)" prop="flightAltitude" required>
-              <el-input
-                v-model="insertForm.flightAltitude"
+                v-model="insertForm.targetAltitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角3经度" prop="corner3Lng" required>
+            <el-form-item label="无人机高度(米)" prop="droneAltitude" required>
               <el-input
-                v-model="insertForm.corner3Lng"
+                v-model="insertForm.droneAltitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角3纬度" prop="corner3Lat" required>
+            <el-form-item label="距离设备距离(米)" prop="droneDistance" required>
               <el-input
-                v-model="insertForm.corner3Lat"
+                v-model="insertForm.droneDistance"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4经度" prop="corner4Lng" required>
+            <el-form-item label="偏航角(度)" prop="droneYaw" required>
               <el-input
-                v-model="insertForm.corner4Lng"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="角4纬度" prop="corner4Lat" required>
-              <el-input
-                v-model="insertForm.corner4Lat"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="光伏板倾角(度)" prop="tiltAngle" required>
-              <el-input
-                v-model="insertForm.tiltAngle"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="横向航线数" prop="horizontalRoutes" required>
-              <el-input
-                v-model="insertForm.horizontalRoutes"
+                v-model="insertForm.droneYaw"
                 maxlength="50"
               ></el-input>
             </el-form-item>
@@ -248,8 +192,8 @@
     </el-dialog>
     <el-dialog
       v-model="editDialog"
-      title="编辑光伏板"
-      width="1000"
+      title="编辑巡视设备"
+      width="800"
       style="background-color: #0A2D63; color: white"
     >
       <el-form
@@ -260,77 +204,47 @@
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="光伏板名称" required prop="solarPanelName">
+            <el-form-item label="设备名称" required prop="deviceName">
               <el-input
-                v-model="editForm.solarPanelName"
+                v-model="editForm.deviceName"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1经度" prop="corner1Lng" required>
+            <el-form-item label="目标点经度" prop="targetLongitude" required>
               <el-input
-                v-model="editForm.corner1Lng"
+                v-model="editForm.targetLongitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1纬度" prop="corner1Lat" required>
+            <el-form-item label="目标点纬度" prop="targetLatitude" required>
               <el-input
-                v-model="editForm.corner1Lat"
+                v-model="editForm.targetLatitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2经度" prop="corner2Lng" required>
+            <el-form-item label="目标点高度(米)" prop="targetAltitude" required>
               <el-input
-                v-model="editForm.corner2Lng"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="角2纬度" prop="corner2Lat" required>
-              <el-input
-                v-model="editForm.corner2Lat"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="航线高度(米)" prop="flightAltitude" required>
-              <el-input
-                v-model="editForm.flightAltitude"
+                v-model="editForm.targetAltitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角3经度" prop="corner3Lng" required>
+            <el-form-item label="无人机高度(米)" prop="droneAltitude" required>
               <el-input
-                v-model="editForm.corner3Lng"
+                v-model="editForm.droneAltitude"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角3纬度" prop="corner3Lat" required>
+            <el-form-item label="距离设备距离(米)" prop="droneDistance" required>
               <el-input
-                v-model="editForm.corner3Lat"
+                v-model="editForm.droneDistance"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4经度" prop="corner4Lng" required>
+            <el-form-item label="偏航角(度)" prop="droneYaw" required>
               <el-input
-                v-model="editForm.corner4Lng"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="角4纬度" prop="corner4Lat" required>
-              <el-input
-                v-model="editForm.corner4Lat"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="光伏板倾角(度)" prop="tiltAngle" required>
-              <el-input
-                v-model="editForm.tiltAngle"
-                maxlength="50"
-              ></el-input>
-            </el-form-item>
-            <el-form-item label="横向航线数" prop="horizontalRoutes" required>
-              <el-input
-                v-model="editForm.horizontalRoutes"
+                v-model="editForm.droneYaw"
                 maxlength="50"
               ></el-input>
             </el-form-item>
@@ -353,10 +267,10 @@
 import { reactive, ref, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElMessage } from 'element-plus'
-import { addSolarPanelConfigApi, getAllSolarPanelApi, updateSolarPanelConfigApi, deleteSolarPanelApi } from '/@/api/turbine/turbineMgt'
+import { addInspectionDeviceConfigApi, getAllInspectionDeviceApi, updateInspectionDeviceConfigApi, deleteInspectionDeviceApi } from '/@/api/turbine/turbineMgt'
 
 const queryForm = reactive({
-  solar_panel_name: '',
+  device_name: '',
   id: ''
 })
 const formRef = ref(null)
@@ -370,33 +284,23 @@ const paginationProp = reactive({
 })
 
 const insertForm = reactive({
-  solarPanelName: '',
-  corner1Lng: '',
-  corner1Lat: '',
-  corner2Lng: '',
-  corner2Lat: '',
-  corner3Lng: '',
-  corner3Lat: '',
-  corner4Lng: '',
-  corner4Lat: '',
-  flightAltitude: '',
-  tiltAngle: '',
-  horizontalRoutes: ''
+  deviceName: '',
+  targetLongitude: '',
+  targetLatitude: '',
+  targetAltitude: '',
+  droneAltitude: '',
+  droneDistance: '',
+  droneYaw: ''
 })
 const editForm = reactive({
   id: '',
-  solarPanelName: '',
-  corner1Lng: '',
-  corner1Lat: '',
-  corner2Lng: '',
-  corner2Lat: '',
-  corner3Lng: '',
-  corner3Lat: '',
-  corner4Lng: '',
-  corner4Lat: '',
-  flightAltitude: '',
-  tiltAngle: '',
-  horizontalRoutes: ''
+  deviceName: '',
+  targetLongitude: '',
+  targetLatitude: '',
+  targetAltitude: '',
+  droneAltitude: '',
+  droneDistance: '',
+  droneYaw: ''
 })
 const tableData = ref([])
 
@@ -404,57 +308,37 @@ const insertDialog = ref(false)
 const editDialog = ref(false)
 
 const formRules = {
-  solarPanelName: [
-    { required: true, message: '请输入光伏板名称', trigger: 'blur' }
+  deviceName: [
+    { required: true, message: '请输入设备名称', trigger: 'blur' }
   ],
-  corner1Lng: [
-    { required: true, message: '请输入角1经度', trigger: 'blur' },
+  targetLongitude: [
+    { required: true, message: '请输入目标点经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner1Lat: [
-    { required: true, message: '请输入角1纬度', trigger: 'blur' },
+  targetLatitude: [
+    { required: true, message: '请输入目标点纬度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner2Lng: [
-    { required: true, message: '请输入角2经度', trigger: 'blur' },
+  targetAltitude: [
+    { required: true, message: '请输入目标点高度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner2Lat: [
-    { required: true, message: '请输入角2纬度', trigger: 'blur' },
+  droneAltitude: [
+    { required: true, message: '请输入无人机高度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner3Lng: [
-    { required: true, message: '请输入角3经度', trigger: 'blur' },
+  droneDistance: [
+    { required: true, message: '请输入距离设备距离', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner3Lat: [
-    { required: true, message: '请输入角3纬度', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  corner4Lng: [
-    { required: true, message: '请输入角4经度', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  corner4Lat: [
-    { required: true, message: '请输入角4纬度', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  flightAltitude: [
-    { required: true, message: '请输入航线高度', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  tiltAngle: [
-    { required: true, message: '请输入光伏板倾角', trigger: 'blur' },
-    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
-  ],
-  horizontalRoutes: [
-    { required: true, message: '请输入横向航线数', trigger: 'blur' },
+  droneYaw: [
+    { required: true, message: '请输入偏航角', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ]
 }
 
 onMounted(() => {
-  getSolarPanelConfig()
+  getInspectionDeviceConfig()
 })
 
 async function handleInsert () {
@@ -464,7 +348,16 @@ async function handleInsert () {
       ElMessage.warning('请检查表单是否填写!')
       return
     }
-    const res = await addSolarPanelConfigApi(insertForm)
+    const submitData = {
+      device_name: insertForm.deviceName,
+      target_longitude: Number(insertForm.targetLongitude),
+      target_latitude: Number(insertForm.targetLatitude),
+      target_altitude: Number(insertForm.targetAltitude),
+      drone_altitude: Number(insertForm.droneAltitude),
+      drone_distance: Number(insertForm.droneDistance),
+      drone_yaw: Number(insertForm.droneYaw)
+    }
+    const res = await addInspectionDeviceConfigApi(submitData)
     if (res.code !== 0) {
       return
     }
@@ -479,25 +372,29 @@ async function handleInsert () {
 function openInsertDialog () {
   formRef.value?.resetFields()
   Object.assign(insertForm, {
-    solarPanelName: '',
-    corner1Lng: '',
-    corner1Lat: '',
-    corner2Lng: '',
-    corner2Lat: '',
-    corner3Lng: '',
-    corner3Lat: '',
-    corner4Lng: '',
-    corner4Lat: '',
-    flightAltitude: '',
-    tiltAngle: '',
-    horizontalRoutes: ''
+    deviceName: '',
+    targetLongitude: '',
+    targetLatitude: '',
+    targetAltitude: '',
+    droneAltitude: '',
+    droneDistance: '',
+    droneYaw: ''
   })
   insertDialog.value = true
 }
 
 function openEditDialog (row:any) {
   editDialog.value = true
-  Object.assign(editForm, row)
+  Object.assign(editForm, {
+    id: row.id,
+    deviceName: row.device_name,
+    targetLongitude: row.target_longitude,
+    targetLatitude: row.target_latitude,
+    targetAltitude: row.target_altitude,
+    droneAltitude: row.drone_altitude,
+    droneDistance: row.drone_distance,
+    droneYaw: row.drone_yaw
+  })
 }
 
 async function handleEdit () {
@@ -507,7 +404,17 @@ async function handleEdit () {
       ElMessage.warning('请检查表单是否填写!')
       return
     }
-    const res = await updateSolarPanelConfigApi(editForm)
+    const submitData = {
+      id: editForm.id,
+      device_name: editForm.deviceName,
+      target_longitude: Number(editForm.targetLongitude),
+      target_latitude: Number(editForm.targetLatitude),
+      target_altitude: Number(editForm.targetAltitude),
+      drone_altitude: Number(editForm.droneAltitude),
+      drone_distance: Number(editForm.droneDistance),
+      drone_yaw: Number(editForm.droneYaw)
+    }
+    const res = await updateInspectionDeviceConfigApi(submitData)
     if (res.code !== 0) {
       return
     }
@@ -521,13 +428,13 @@ async function handleEdit () {
 
 async function handleDelete (row:any) {
   try {
-    ElMessageBox.confirm('确定要删除该光伏板吗?', '提示', {
+    ElMessageBox.confirm('确定要删除该巡视设备吗?', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
       .then(async () => {
-        const res = await deleteSolarPanelApi(row.id)
+        const res = await deleteInspectionDeviceApi(row.id)
         if (res.code !== 0) {
           return
         }
@@ -539,9 +446,9 @@ async function handleDelete (row:any) {
   }
 }
 
-function getSolarPanelConfig () {
+function getInspectionDeviceConfig () {
   try {
-    getAllSolarPanelApi({ ...paginationProp, ...queryForm }).then(res => {
+    getAllInspectionDeviceApi({ ...paginationProp, ...queryForm }).then(res => {
       if (res.code !== 0) {
         return
       }
@@ -554,19 +461,19 @@ function getSolarPanelConfig () {
 }
 
 function handleRest () {
-  queryForm.solar_panel_name = ''
+  queryForm.device_name = ''
   queryForm.id = ''
-  getSolarPanelConfig()
+  getInspectionDeviceConfig()
 }
 
 function handleSizeChange (val: number) {
   paginationProp.pageSize = val
-  getSolarPanelConfig()
+  getInspectionDeviceConfig()
 }
 
 function handleCurrentChange (val: number) {
   paginationProp.pageNo = val
-  getSolarPanelConfig()
+  getInspectionDeviceConfig()
 }
 </script>
 
