@@ -135,7 +135,9 @@ import { getPointList, deletePointListapi, importPointList, exportPointTemplate 
 // 表单
 const queryForm = reactive({
   pointName: '',
-  id: ''
+  id: '',
+  picType: '',
+  waylineId: ''
 })
 
 const paginationProp = reactive({

@@ -80,6 +80,7 @@
           <el-table-column label="序号" type="index" width="80" />
           <!-- 预览图 -->
           <el-table-column label="图片" align="center">
+            <!-- :src="getImageUrl(config.baseURL, scope.row.original_image_url)" -->
             <template #default="scope">
               <img
                 :src="getImageUrl(config.baseURL, scope.row.original_image_url)"
@@ -238,7 +239,7 @@
         <button class="prev-image" @click="showPreviousImage('origin')">‹</button>
         <div style="width: 500px; height: 500px;">
           <img
-            :src="getImageUrl(config.baseURL, selectedImage.original_image_url)"
+            :src="getImageUrl(config.baseURL, selectedImage.original_image_url) "
             alt="放大图"
             class="preview-image"
             ref="previewImage"
@@ -314,7 +315,8 @@
               readonly
             />
           </div>
-          <button @click="tempStatus = true" class="btn" v-if="selectedImage.file_name.includes('_T')">测温规则配置</button>
+          <button @click="tempStatus = true" class="btn" v-if="selectedImage.file_name.includes('_T')">红外测温</button>
+          <button @click="tempCalibrationStatus = true" class="btn"  style="margin-top:10px" v-if="selectedImage.file_name.includes('_T')">红外图片标定</button>
         </div>
       </div>
 
@@ -525,10 +527,15 @@
       </div>
     </el-dialog>
 
-    <!-- 测温配置窗口 -->
+    <!-- 测温窗口 -->
      <el-dialog v-model="tempStatus" title="红外测温" width="975">
       <TempDet :selectedImage = selectedImage :workspaceId = workspaceId></TempDet>
      </el-dialog>
+
+    <el-dialog v-model="tempCalibrationStatus" title="红外测温标定" width="975">
+      <TempCalibration :selectedImage = selectedImage  :waylineId="jobInfo.file_id" :workspaceId = workspaceId></TempCalibration>
+     </el-dialog>
+
   </div>
 </template>
 
@@ -541,6 +548,7 @@ import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadO
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import TempDet from '/@/components/task/tempDet.vue'
+import TempCalibration from '/@/components/task/tempCalibration.vue'
 import { getImageUrl } from '/@/common/url'
 import { renderAsync } from 'docx-preview'
 import { ElMessage } from 'element-plus'
@@ -552,6 +560,7 @@ const resultType = ref(1)
 
 // 测温
 const tempStatus = ref(false)
+const tempCalibrationStatus = ref(false)
 
 const paginationProp = reactive({
   pageSizeOptions: ['10', '20', '40'],
@@ -836,9 +845,6 @@ async function handleCorrection () {
  * */
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 async function getFiles () {
-  // mediaData.data = res.list
-  // paginationProp.total = res.pagination.total
-  // getUrls()
   getFlyTaskResultApi({
     job_id: jobInfo.job_id,
     workspace_id: workspaceId,
@@ -849,6 +855,12 @@ async function getFiles () {
     mediaData.data = res.data.list
     paginationProp.total = res.data.pagination.total
   })
+  // mediaData.data = [
+  //   {
+  //     file_name: 'test_T.png',
+  //     original_image_url: 'https://img1.baidu.com/it/u=2229506947,112557494&fm=253&fmt=auto?w=500&h=500'
+  //   }
+  // ]
 }
 
 // 重置

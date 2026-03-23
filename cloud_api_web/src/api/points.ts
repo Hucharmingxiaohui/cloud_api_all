@@ -13,7 +13,7 @@ const HTTP_PREFIX2 = '/tem/api/v1'
 
 // 查询点位列表
 export const getPointList = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = `/api/point/selectList?page=${data.pageNo}&pageSize=${data.pageSize}&id=${data.id}&pointName=${data.pointName}`
+  const url = `/api/point/selectList?page=${data.pageNo}&pageSize=${data.pageSize}&id=${data.id}&pointName=${data.pointName}&picType=${data.picType}&waylineId=${data.waylineId}`
   const result = await request.get(url)
   return result.data
 }
@@ -53,6 +53,12 @@ export const deletePointListapi = async function (data): Promise<IWorkspaceRespo
   return result.data
 }
 
+// 点位标注区域绑定
+export const bindPointsApi = async function (data:any): Promise<IWorkspaceResponse<any>> {
+  const url = '/tem/api/v1/workspace/bindPoint'
+  const result = await request.post(url, data)
+  return result.data
+}
 /**
  * 暂时不用
  */
