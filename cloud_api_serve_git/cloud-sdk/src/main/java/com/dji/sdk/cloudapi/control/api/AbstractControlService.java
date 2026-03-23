@@ -251,7 +251,8 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_CAMERA_PHOTO_TAKE_PROGRESS, outputChannel = ChannelName.OUTBOUND_EVENTS)
     public TopicEventsResponse<MqttReply> cameraPhotoTakeProgress(TopicEventsRequest<EventsDataRequest<CameraPhotoTakeProgress>> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("cameraPhotoTakeProgress not implemented");
+//        throw new UnsupportedOperationException("cameraPhotoTakeProgress not implemented");
+        return new TopicEventsResponse<MqttReply>();
     }
 
     /**
@@ -525,7 +526,8 @@ public abstract class AbstractControlService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_POI_STATUS_NOTIFY, outputChannel = ChannelName.OUTBOUND_EVENTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_2, include = GatewayTypeEnum.DOCK)
     public TopicEventsResponse<MqttReply> poiStatusNotify(TopicEventsRequest<PoiStatusNotify> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("poiStatusNotify not implemented");
+//        throw new UnsupportedOperationException("poiStatusNotify not implemented");
+        return new TopicEventsResponse<MqttReply>();
     }
 
     /**
@@ -589,7 +591,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_DRONE_CONTROL)
     public void droneControlUp(TopicDrcRequest<DrcUpData<DroneControlResponse>> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("droneControlUp not implemented");
+//        throw new UnsupportedOperationException("droneControlUp not implemented");
     }
 
     /**
@@ -611,7 +613,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_DRONE_EMERGENCY_STOP)
     public void droneEmergencyStopUp(TopicDrcRequest<DrcUpData> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("droneEmergencyStopUp not implemented");
+//        throw new UnsupportedOperationException("droneEmergencyStopUp not implemented");
     }
 
 
@@ -636,7 +638,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_HEART_BEAT)
     public void heartBeatUp(TopicDrcRequest<HeartBeatRequest> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("heartBeatUp not implemented");
+//        throw new UnsupportedOperationException("heartBeatUp not implemented");
     }
 
     /**
@@ -647,7 +649,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_HSI_INFO_PUSH)
     public void hsiInfoPush(TopicDrcRequest<HsiInfoPush> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("hsiInfoPush not implemented");
+//        throw new UnsupportedOperationException("hsiInfoPush not implemented");
     }
 
     /**
@@ -658,7 +660,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_DELAY_INFO_PUSH)
     public void delayInfoPush(TopicDrcRequest<DelayInfoPush> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("delayInfoPush not implemented");
+//        throw new UnsupportedOperationException("delayInfoPush not implemented");
     }
 
     /**
@@ -669,7 +671,7 @@ public abstract class AbstractControlService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_DRC_UP_OSD_INFO_PUSH)
     public void osdInfoPush(TopicDrcRequest<OsdInfoPush> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("osdInfoPush not implemented");
+//        throw new UnsupportedOperationException("osdInfoPush not implemented");
     }
 
 

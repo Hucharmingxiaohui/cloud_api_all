@@ -796,8 +796,6 @@ public class SDKWaylineService extends AbstractWaylineService {
 
     @Override
     public TopicEventsResponse<MqttReply> returnHomeInfo(TopicEventsRequest<ReturnHomeInfo> request, MessageHeaders headers)  {
-        // 空实现，只记录日志，不抛出异常
-        log.debug("重写返航信息方法----");
 
         // 返回空的成功响应
         return new TopicEventsResponse<MqttReply>()

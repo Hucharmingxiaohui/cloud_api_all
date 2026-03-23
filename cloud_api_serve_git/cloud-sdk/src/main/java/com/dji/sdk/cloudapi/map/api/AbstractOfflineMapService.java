@@ -67,7 +67,8 @@ public abstract class AbstractOfflineMapService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_OFFLINE_MAP_SYNC_PROGRESS, outputChannel = ChannelName.OUTBOUND_EVENTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_1, include = GatewayTypeEnum.DOCK2)
     public TopicRequestsResponse<MqttReply> offlineMapSyncProgress(TopicRequestsRequest<OfflineMapSyncProgress> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("offlineMapSyncProgress not implemented");
+//        throw new UnsupportedOperationException("offlineMapSyncProgress not implemented");
+        return new TopicRequestsResponse<MqttReply>();
     }
 
     /**
@@ -82,6 +83,7 @@ public abstract class AbstractOfflineMapService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_OFFLINE_MAP_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_1, include = GatewayTypeEnum.DOCK2)
     public TopicRequestsResponse<MqttReply<OfflineMapGetResponse>> offlineMapGet(TopicRequestsRequest<OfflineMapGetRequest> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("offlineMapGet not implemented");
+//        throw new UnsupportedOperationException("offlineMapGet not implemented");
+        return new TopicRequestsResponse<MqttReply<OfflineMapGetResponse>>();
     }
 }

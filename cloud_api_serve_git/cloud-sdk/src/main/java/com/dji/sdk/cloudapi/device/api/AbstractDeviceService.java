@@ -137,7 +137,7 @@ public class AbstractDeviceService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_LIVE_STATUS)
     public void dockLiveStatusUpdate(TopicStateRequest<DockLiveStatus> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockLiveStatusUpdate not implemented");
+//        throw new UnsupportedOperationException("dockLiveStatusUpdate not implemented");
     }
 
     /**
@@ -147,7 +147,7 @@ public class AbstractDeviceService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_RC_LIVE_STATUS)
     public void rcLiveStatusUpdate(TopicStateRequest<RcLiveStatus> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("rcLiveStatusUpdate not implemented");
+//        throw new UnsupportedOperationException("rcLiveStatusUpdate not implemented");
     }
 
     /**
@@ -167,7 +167,7 @@ public class AbstractDeviceService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_WPMZ_VERSION)
     public void dockWpmzVersionUpdate(TopicStateRequest<DockDroneWpmzVersion> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockWpmzVersionUpdate not implemented");
+//        throw new UnsupportedOperationException("dockWpmzVersionUpdate not implemented");
     }
 
     /**
@@ -177,7 +177,7 @@ public class AbstractDeviceService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_THERMAL_SUPPORTED_PALETTE_STYLE)
     public void dockThermalSupportedPaletteStyle(TopicStateRequest<DockDroneThermalSupportedPaletteStyle> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockThermalSupportedPaletteStyle not implemented");
+//        throw new UnsupportedOperationException("dockThermalSupportedPaletteStyle not implemented");
     }
 
     /**
@@ -189,7 +189,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_RTH_MODE, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneRthMode(TopicStateRequest<DockDroneRthMode> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockRthMode not implemented");
+//        throw new UnsupportedOperationException("dockRthMode not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -200,7 +201,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_CURRENT_RTH_MODE, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneCurrentRthMode(TopicStateRequest<DockDroneCurrentRthMode> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockCurrentRthMode not implemented");
+//        throw new UnsupportedOperationException("dockCurrentRthMode not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -211,7 +213,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_COMMANDER_MODE_LOST_ACTION, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneCommanderModeLostAction(TopicStateRequest<DockDroneCommanderModeLostAction> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockDroneCommanderModeLostAction not implemented");
+//        throw new UnsupportedOperationException("dockDroneCommanderModeLostAction not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -222,7 +225,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_CURRENT_COMMANDER_FLIGHT_MODE, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneCurrentCommanderFlightMode(TopicStateRequest<DockDroneCurrentCommanderFlightMode> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockDroneCurrentCommanderFlightMode not implemented");
+//        throw new UnsupportedOperationException("dockDroneCurrentCommanderFlightMode not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -234,7 +238,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_COMMANDER_FLIGHT_HEIGHT, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneCommanderFlightHeight(TopicStateRequest<DockDroneCommanderFlightHeight> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockDroneCommanderFlightHeight not implemented");
+//        throw new UnsupportedOperationException("dockDroneCommanderFlightHeight not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -245,7 +250,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_DRONE_MODE_CODE_REASON, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockDroneModeCodeReason(TopicStateRequest<DockDroneModeCodeReason> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockDroneModeCodeReason not implemented");
+//        throw new UnsupportedOperationException("dockDroneModeCodeReason not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -256,7 +262,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_1, include = GatewayTypeEnum.DOCK2)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_AND_DRONE_DONGLE_INFOS, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dongleInfos(TopicStateRequest<DongleInfos> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dongleInfos not implemented");
+//        throw new UnsupportedOperationException("dongleInfos not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
     /**
@@ -267,7 +274,8 @@ public class AbstractDeviceService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_2, include = GatewayTypeEnum.DOCK)
     @ServiceActivator(inputChannel = ChannelName.INBOUND_STATE_DOCK_SILENT_MODE, outputChannel = ChannelName.OUTBOUND_STATE)
     public TopicStateResponse<MqttReply> dockSilentMode(TopicStateRequest<DockSilentMode> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("dockSilentMode not implemented");
+//        throw new UnsupportedOperationException("dockSilentMode not implemented");
+        return new TopicStateResponse<MqttReply>();
     }
 
 }

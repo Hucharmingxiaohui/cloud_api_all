@@ -306,6 +306,7 @@ wayline:
 longyuan:
   sender: "UpperPlatform"
   stationCode: "Sub_WeiLan"
+  stationName: "广西蔚蓝风电场"
 uavPlatform:
   sender: "UavPatrolSystem"
   stationCode: "Sub_WeiLan"

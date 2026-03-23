@@ -40,7 +40,8 @@ public abstract class AbstractInterconnectionService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_CUSTOM_DATA_TRANSMISSION_FROM_ESDK, outputChannel = ChannelName.OUTBOUND_EVENTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     public TopicEventsResponse<MqttReply> customDataTransmissionFromEsdk(TopicEventsRequest<CustomDataTransmissionFromEsdk> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("customDataTransmissionFromEsdk not implemented");
+//        throw new UnsupportedOperationException("customDataTransmissionFromEsdk not implemented");
+          return new TopicEventsResponse<MqttReply>();
     }
 
     /**
@@ -65,7 +66,8 @@ public abstract class AbstractInterconnectionService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_CUSTOM_DATA_TRANSMISSION_FROM_PSDK, outputChannel = ChannelName.OUTBOUND_EVENTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     public TopicEventsResponse<MqttReply> customDataTransmissionFromPsdk(TopicEventsRequest<CustomDataTransmissionFromEsdk> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("customDataTransmissionFromPsdk not implemented");
+//        throw new UnsupportedOperationException("customDataTransmissionFromPsdk not implemented");
+        return new TopicEventsResponse<MqttReply>();
     }
 
     /**
