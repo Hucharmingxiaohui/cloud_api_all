@@ -143,6 +143,17 @@ const routes: Array<RouteRecordRaw> = [
         }
       },
       {
+        path: '/remoteDebug',
+        name: 'remoteDebug',
+        component: () => import('/@/components/task/waylineVideo.vue'),
+        meta: {
+          showInMenu: false,
+          label: '控制台',
+          position: 'left',
+          cache: true
+        }
+      },
+      {
         path: '/' + ERouterName.LIVESTREAM,
         name: ERouterName.LIVESTREAM,
         component: () => import('/@/pages/page-web/projects/livestream.vue'),
@@ -280,12 +291,6 @@ const routes: Array<RouteRecordRaw> = [
         name: ERouterName.MEDIA,
         component: () => import('/@/components/MediaPanel.vue'),
         meta: { showInMenu: false, cache: true }
-      },
-      {
-        path: '/remoteDebug',
-        name: 'remoteDebug',
-        component: () => import('/@/components/task/waylineVideo.vue'),
-        meta: { showInMenu: false, cache: false }
       },
       {
         path: '/member',

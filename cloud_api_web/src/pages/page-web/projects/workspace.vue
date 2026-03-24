@@ -1,51 +1,10 @@
 <template>
-  <!-- <div class="project-app-wrapper">
-    <div class="left">
-      <Sidebar />
-      <div class="main-content uranus-scrollbar dark" >
-        <router-view />
-      </div>
-    </div>
-    <div class="right">
-      <div class="map-wrapper">
-        <GMap />
-      </div>
-      <div class="media-wrapper" v-if="root.$route.name === ERouterName.MEDIA">
-        <MediaPanel />
-      </div>
-      <div class="task-wrapper" v-if="root.$route.name === ERouterName.TASK">
-        <TaskPanel />
-      </div>
-
-      <div class="Organization-wrapper" v-if="$route.name === ERouterName.Organization">
-        <Organization />
-      </div>
-    </div>
-  </div> -->
   <a-layout class="width-100 flex-display" style="height: 100vh;">
     <a-layout-header class="header left" style="padding: 0">
       <Sidebar />
     </a-layout-header>
     <a-layout-content class="content-bg" >
       <router-view />
-      <!-- <div class="map-wrapper" v-if="root.$route.name === ERouterName.LAYER">
-        <router-view />
-      </div>
-      <div class="Organization-wrapper" v-else-if="root.$route.name === ERouterName.Organization">
-        <Organization />
-      </div>
-      <div class="media-wrapper" v-else-if="root.$route.name === ERouterName.MEDIA">
-        <MediaPanel />
-      </div>
-      <div class="task-wrapper" v-else-if="root.$route.name === ERouterName.TASK">
-        <TaskPanel />
-      </div>
-      <div class="task-wrapper" v-else-if="root.$route.name === ERouterName.NEW_WAYLINE">
-        <myWayline />
-      </div>
-      <div class="task-wrapper" v-else>
-        <router-view />
-      </div> -->
     </a-layout-content>
 
   </a-layout>
@@ -64,11 +23,6 @@ import EventBus from '/@/event-bus'
 
 // @ts-ignore
 import { startStream } from '/@/components/watchDevice/controlLivestream.js'
-// import Organization from '/@/components/Organization.vue'
-// import myTsa from '/@/components/TsaPanel.vue'
-// import myWayline from '/@/components/WaylinePanel.vue'
-// import GMap from '/@/components/GMap.vue'
-// import myWayline from './wayline.vue'
 let dockOsdEmptyTimer = null
 let dockOsdEmptyStartTime = 0
 
