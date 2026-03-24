@@ -6,6 +6,13 @@
   "description": "",
   "glyphs": [
     {
+      "icon_id": "42227700",
+      "name": "遥控器",
+      "font_class": "yaokongqi",
+      "unicode": "e6ec",
+      "unicode_decimal": 59116
+    },
+    {
       "icon_id": "25015250",
       "name": "无人机",
       "font_class": "uav",

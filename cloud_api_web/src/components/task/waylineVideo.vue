@@ -261,21 +261,13 @@ async function getNowTask () {
 
 const current_sub = ref('') // 当前变电站
 onMounted(() => {
-//   const data = JSON.parse(localStorage.getItem('osdInfo'))
-//   store.commit('SET_OSD_VISIBLE_INFO', data)
-  //   const data1 = JSON.parse(localStorage.getItem('currentTask'))
-  //   if (data1) {
-  //     const waylineId = store.state.waylineInfo
-  //     waylineId.id = data1.file_id
-  //     store.commit('SET_SELECT_WAYLINE_INFO', waylineId)
-  //     // taskInfo.execute_time = data1.execute_time
-  //     // taskInfo.job_name = data1.job_name
-  //     // taskInfo.file_id = data1.file_id
-  //     // taskInfo.file_name = data1.file_name
-  //   }
+  // 从 localStorage 恢复 osdVisible，使 deviceInfo 能够持续接收更新
+  const savedOsdInfo = localStorage.getItem('osdInfo')
+  if (savedOsdInfo) {
+    const osdData = JSON.parse(savedOsdInfo)
+    store.commit('SET_OSD_VISIBLE_INFO', osdData)
+  }
 
-  //   current_sub.value = history.state.name
-  //   getNowTask()
   getPlans()
 })
 // 左侧视频流切换标签

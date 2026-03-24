@@ -1,8 +1,8 @@
 @font-face {
   font-family: "iconfont"; /* Project id 4423138 */
-  src: url('iconfont.woff2?t=1733987053150') format('woff2'),
-       url('iconfont.woff?t=1733987053150') format('woff'),
-       url('iconfont.ttf?t=1733987053150') format('truetype');
+  src: url('iconfont.woff2?t=1774320154786') format('woff2'),
+       url('iconfont.woff?t=1774320154786') format('woff'),
+       url('iconfont.ttf?t=1774320154786') format('truetype');
 }
 
 .iconfont {
@@ -11,6 +11,10 @@
   font-style: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-yaokongqi:before {
+  content: "\e6ec";
 }
 
 .icon-uav:before {

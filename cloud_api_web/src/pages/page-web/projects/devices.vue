@@ -12,6 +12,10 @@
         @click="select(EDeviceTypeName.Dock)">
         <span style="margin-left: 5px; font-size: 14px;">机场</span>
       </el-button>
+      <el-button class="new_btn iconfont icon-yaokongqi" :class="{ 'active-btn': selectedDeviceBtn === 'gateway' }" type="primary" style="margin-left: 10px; width: 100px;"
+        @click="select(EDeviceTypeName.Gateway)">
+        <span style="margin-left: 5px; font-size: 14px;">遥控器</span>
+      </el-button>
     </div>
 
   </div>
@@ -136,60 +140,6 @@
             </template>
           </el-table-column>
         </el-table>
-        <!-- <el-table :data="data.device" stripe  :loading="loading"  row-key="device_sn" :tree-props="treeProps" :row-selection="rowSelection">
-          <el-table-column type="selection" width="55"  />
-          <el-table-column label="模型" prop="nickname">
-            <template #default="scope">
-              <div>
-                <el-input v-if="editableData[scope.row.device_sn]" v-model="editableData[scope.row.device_sn].nickname"
-                  style="margin: -5px 0" />
-                <template v-else>
-                  <el-tooltip :content="scope.row.nickname">
-                    <span>{{ scope.row.nickname }}</span>
-                  </el-tooltip>
-                </template>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="SN" prop="device_sn">
-            <template #default="scope">
-              <div>
-                <template >
-                  <el-tooltip :content="scope.row.device_sn">
-                    <span>{{ scope.row.device_sn }}</span>
-                  </el-tooltip>
-                </template>
-              </div>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="编号">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.id }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="330px">
-            <template #default="scope">
-              <div class="action-buttons">
-                <el-button size="small" link type="primary" class="download"
-                  @click="downloadWayline(scope.row.id, scope.row.name)">下载</el-button>
-                <el-button size="small" link type="primary" class="preview"
-                  @click="openDrag(scope.row.id, scope.row.template_types[0])">预览</el-button>
-                <el-button size="small" link type="primary" class="waylipot"
-                  @click="openWaylinePoints(scope.row)">航点</el-button>
-                <el-button size="small" link type="primary" class="wayliedit"
-                  @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])">编辑</el-button>
-                <el-popconfirm width="220" confirm-button-text="确定" cancel-button-text="不，谢谢" icon-color="#626AEF"
-                  title="航线文件一旦删除就无法恢复,是否继续？" @confirm="deleteWayline(scope.row.id)">
-                  <template #reference>
-                    <el-button size="small" link type="primary" class="delete">删除</el-button>
-                  </template>
-                </el-popconfirm>
-              </div>
-            </template>
-          </el-table-column>
-        </el-table> -->
       </div>
       <div class="pagination-container">
       <el-pagination v-model:current-page="paginationProp.current" v-model:page-size="paginationProp.pageSize"
@@ -424,7 +374,14 @@ function unbind () {
 
 // 选择设备
 function select (item: any) {
-  selectedDeviceBtn.value = selectedDeviceBtn.value === 'drone' ? 'dock' : 'drone'
+  console.log('item=', item)
+  if (item === EDeviceTypeName.Aircraft) {
+    selectedDeviceBtn.value = 'drone'
+  } else if (item === EDeviceTypeName.Dock) {
+    selectedDeviceBtn.value = 'dock'
+  } else {
+    selectedDeviceBtn.value = 'gateway'
+  }
   getDevices(item)
   current.value = []
   current.value.push(item)
