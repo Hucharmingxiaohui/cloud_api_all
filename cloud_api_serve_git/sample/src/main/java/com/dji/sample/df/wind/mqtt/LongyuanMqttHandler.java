@@ -45,6 +45,7 @@ import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
+import com.dji.sdk.cloudapi.wayline.WaylineErrorCodeEnum;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
 import com.dji.sdk.mqtt.longyuan.MqttMessageHandler;
@@ -451,6 +452,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     if (isCenterTask.equals("1")&& !jobId.equals(taskCode)) {
                         sendWindTurbineTaskStatus(taskCode,taskName,1);
                     }
+
 //                    sendWindTurbineTaskStatus(taskCode,taskName,1);
                     if(status == 3){
                         // 查询航线任务状态
@@ -870,6 +872,20 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }else if(isFinished == 0){
             progress = waylineJobDTO.getProgress();
         }
+        String description ="正在进行风机巡视，已完成"+progress+"%的巡视任务";
+        if(mappedState.equals("1")){
+            description="完成风机任务巡检";
+        } else if(mappedState.equals("3")){
+            description="风机巡检任务已暂停";
+        }else if(mappedState.equals("4")){
+            description="风机巡检任务已取消";
+        }else if(mappedState.equals("5")){
+            description="风机巡检任务待执行";
+        }else if(mappedState.equals("6")){
+            Integer code = waylineJobDTO.getCode();
+            String message = WaylineErrorCodeEnum.find(code).getMessage();
+            description="风机巡检任务失败，原因为："+message;
+        }
         data.put("taskPatrolledId", waylineJobEntity.getJobId());
         data.put("taskName", taskName);
         data.put("taskCode", taskCode);
@@ -878,8 +894,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         data.put("startTime",waylineJobDTO.getExecuteTime());
         data.put("taskProgress", progress + "%");
         data.put("taskEstimatedTime", calculateEstimatedTime(progress));
-        data.put("description", "正在进行风机巡视，已完成"+progress+"%的巡视任务");
-
+        data.put("description", description);
         statusMessage.put("data", data);
 //      需要改成tcp上报状态
 //        mqttSender.sendToPatrolData(statusMessage);
@@ -895,7 +910,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         item.setPlan_start_time(formatter.format(waylineJobDTO.getBeginTime()));
         item.setTask_progress(progress + "%");
         item.setTask_estimated_time(calculateEstimatedTime(progress));
-        item.setDescription("正在进行风机巡视，已完成"+progress+"%的巡视任务");
+        item.setDescription(description);
         patrolStatusItems.add(item);
 
         PatrolHostCommand commandData = new PatrolHostCommand();

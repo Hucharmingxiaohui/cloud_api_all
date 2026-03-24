@@ -34,6 +34,7 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblWidth;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblWidth;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -102,6 +103,9 @@ public class FjReportServiceImpl implements FjReportService {
 
     @Autowired
     SysDictDataMapper sysDictDataMapper;
+
+    @Value("${longyuan.stationName}")
+    private String longyuanStationName;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final HttpClient httpClient = HttpClient.newHttpClient();
@@ -775,7 +779,7 @@ public class FjReportServiceImpl implements FjReportService {
         String fanCode = waylineJobEntity.getFanName();
 
         // 风电场名称写死
-        String windFarmName = "云南高美风电场";
+        String windFarmName = longyuanStationName;
 
         // 获取缺陷列表
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()

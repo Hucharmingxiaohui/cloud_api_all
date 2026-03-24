@@ -29,6 +29,9 @@
             <if test="picType!=null and picType!=''">
                 and pic_type = #{picType}
             </if>
+            <if test="id!=null and id!=''">
+                and id = #{id}
+            </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
             LIMIT ${startPos}, ${pageSize}
@@ -59,6 +62,9 @@
             </if>
             <if test="picType!=null and picType!=''">
                 and pic_type = #{picType}
+            </if>
+            <if test="id!=null and id!=''">
+                and id = #{id}
             </if>
         </where>
     </select>

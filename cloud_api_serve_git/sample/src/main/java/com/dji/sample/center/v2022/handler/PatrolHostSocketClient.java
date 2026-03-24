@@ -164,42 +164,122 @@ public class PatrolHostSocketClient implements Runnable {
      *
      * @Synchronized 保证同一时间只能有同一线程调用它，防止多线程下SN计数bug。
      */
+//    private synchronized boolean sendPacket(String xmlData) {
+//        //自增一个发送序号，赋值给serialNumber
+//        CenterSNTool centerSNTool = CenterSNTool.getInstance();
+//        long sendSN = centerSNTool.increaseSN();
+//        try {
+//            byte[] data = xmlData.getBytes("utf-8");
+//            CenterPacket packet = new CenterPacket();
+//            packet.serialNumber = sendSN;
+//            packet.responseSerialNumber = 0;    //主动发起，故无响应序列号
+//            packet.setSessionType((byte) 0);
+//            packet.setData(data);
+//            packet.setDataLength(data.length);
+//            OutputStream outputStream = this.socket.getOutputStream();
+//            outputStream.write(packet.getBytes());
+//            outputStream.flush();
+//            if ("true".equals(switchConfig.getCenterNormalTcpMsgEnable())) {
+//                log.info("【无人机系统发送命令】上级IP：{}，报文序号【{}】【{}】\n{}", this.centerIp, packet.serialNumber, packet.responseSerialNumber, xmlData);
+//            }
+////            SEND_UNM_MAP.put(sendSN, "");
+//            if (SEND_UNM_MAP.size() > 0) {
+//                SEND_UNM_MAP.clear();
+//            }
+//            return true;
+//        } catch (SocketException socketException) {
+//            log.error("【无人机系统发送命令】发送命令失败, socket连接异常：{} {} ", socketException.getMessage(), socketException);
+//            SEND_UNM_MAP.put(sendSN, "");
+//            // 如果给上级发送指令，超过20次，主站没回消息，重新建立连接
+//            if (SEND_UNM_MAP.size() > 20) {
+//                log.error("【无人机系统发送命令】发送命令失败, socket连接异常，超过20次，开始重连：{} {} ", socketException.getMessage(), socketException);
+//                connect();
+//            }
+//            return false;
+//        } catch (Exception e) {
+//            log.error("【无人机系统发送命令】发送命令失败：{} {} ", e.getMessage(), e);
+//            return false;
+//        }
+//    }
+
+    /**
+     * 发送报文（带立即重连与一次重试）
+     */
     private synchronized boolean sendPacket(String xmlData) {
-        //自增一个发送序号，赋值给serialNumber
         CenterSNTool centerSNTool = CenterSNTool.getInstance();
         long sendSN = centerSNTool.increaseSN();
-        try {
-            byte[] data = xmlData.getBytes("utf-8");
-            CenterPacket packet = new CenterPacket();
-            packet.serialNumber = sendSN;
-            packet.responseSerialNumber = 0;    //主动发起，故无响应序列号
-            packet.setSessionType((byte) 0);
-            packet.setData(data);
-            packet.setDataLength(data.length);
-            OutputStream outputStream = this.socket.getOutputStream();
-            outputStream.write(packet.getBytes());
-            outputStream.flush();
-            if ("true".equals(switchConfig.getCenterNormalTcpMsgEnable())) {
-                log.info("【无人机系统发送命令】上级IP：{}，报文序号【{}】【{}】\n{}", this.centerIp, packet.serialNumber, packet.responseSerialNumber, xmlData);
-            }
-//            SEND_UNM_MAP.put(sendSN, "");
-            if (SEND_UNM_MAP.size() > 0) {
+        int maxRetries = 1; // 最多重试一次
+        for (int attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                ensureSocketValid(); // 确保连接有效
+                byte[] data = xmlData.getBytes(StandardCharsets.UTF_8);
+                CenterPacket packet = new CenterPacket();
+                packet.serialNumber = sendSN;
+                packet.responseSerialNumber = 0;
+                packet.setSessionType((byte) 0);
+                packet.setData(data);
+                packet.setDataLength(data.length);
+                OutputStream outputStream = this.socket.getOutputStream();
+                outputStream.write(packet.getBytes());
+                outputStream.flush();
+
+                // 记录成功日志
+                if ("true".equals(switchConfig.getCenterNormalTcpMsgEnable())) {
+                    log.info("【无人机系统发送命令】上级IP：{}，报文序号【{}】【{}】\n{}",
+                            this.centerIp, packet.serialNumber, packet.responseSerialNumber, xmlData);
+                }
+                // 清空失败记录（如果有）
                 SEND_UNM_MAP.clear();
+                return true;
+
+            } catch (SocketException e) {
+                log.error("【无人机系统发送命令】发送命令失败，连接异常：{}", e.getMessage(), e);
+                closeSocket(); // 关闭旧连接
+                if (attempt < maxRetries) {
+                    log.info("尝试重连并重发...");
+                    try {
+                        connect(); // 重新建立连接
+                    } catch (Exception ex) {
+                        log.error("重连失败", ex);
+                        // 重连失败则不再重试
+                        return false;
+                    }
+                    // 继续下一次循环重试发送
+                } else {
+                    // 已达最大重试次数，记录失败
+                    SEND_UNM_MAP.put(sendSN, "");
+                    log.error("发送失败，重试次数已达上限");
+                    return false;
+                }
+            } catch (Exception e) {
+                log.error("【无人机系统发送命令】发送命令失败：{}", e.getMessage(), e);
+                return false;
             }
-            return true;
-        } catch (SocketException socketException) {
-            log.error("【无人机系统发送命令】发送命令失败, socket连接异常：{} {} ", socketException.getMessage(), socketException);
-            SEND_UNM_MAP.put(sendSN, "");
-            // 如果给上级发送指令，超过20次，主站没回消息，重新建立连接
-            if (SEND_UNM_MAP.size() > 20) {
-                log.error("【无人机系统发送命令】发送命令失败, socket连接异常，超过20次，开始重连：{} {} ", socketException.getMessage(), socketException);
-                connect();
-            }
-            return false;
-        } catch (Exception e) {
-            log.error("【无人机系统发送命令】发送命令失败：{} {} ", e.getMessage(), e);
-            return false;
         }
+        return false;
+    }
+
+    /**
+     * 确保连接有效
+     */
+    private void ensureSocketValid() throws IOException {
+        if (socket == null || socket.isClosed() || !socket.isConnected()) {
+            connect();
+        }
+    }
+
+    /**
+     * 关闭当前 Socket
+     */
+    private void closeSocket() {
+        try {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            log.warn("关闭Socket异常", e);
+        }
+        socket = null;
     }
 
 
