@@ -43,7 +43,7 @@
             </el-button>
 
             <!-- 新建计划 -->
-            <el-button class="new_btn" type="primary" style="margin-left: 10px" :icon="Plus" @click="toCreatePlan('0')">新建计划</el-button>
+            <el-button class="new_btn" type="primary" style="margin-left: 10px" :icon="Plus" @click="toCreatePlan('3')">新建计划</el-button>
 
         </el-form-item>
       </el-form>

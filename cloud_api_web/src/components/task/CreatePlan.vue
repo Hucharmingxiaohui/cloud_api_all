@@ -68,7 +68,7 @@
               label="执行航线"
               required
               prop="file_id"
-              v-if="type==='0'"
+              v-if="type==='0' || type==='3'"
             >
               <div
                 style="margin-left: 120px"
