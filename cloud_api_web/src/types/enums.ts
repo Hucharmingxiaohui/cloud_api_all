@@ -17,7 +17,7 @@ export enum ERouterName {
     DEVICES = 'devices',
     LOGS= 'logs',
     TASK = 'task',
-    FLY_WAYLINE_PLAN = 'fly-wanyline-plan',
+    FLY_WAYLINE_PLAN = 'fly-wayline-plan',
     FLY_FAN_PLAN = 'fly-fan-plan',
     TASK_RESULT = 'task-result',
     CREATE_PLAN = 'create-plan',

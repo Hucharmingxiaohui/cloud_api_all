@@ -198,17 +198,28 @@ const routes: Array<RouteRecordRaw> = [
           cache: false
         },
         children: [
-          // 子菜单 - 普通计划
+          // 子菜单 - 普通点位计划
           {
             path: '/taskManage/' + ERouterName.FLY_WAYLINE_PLAN,
             name: ERouterName.FLY_WAYLINE_PLAN,
             component: () => import('/@/components/task/flyWaylinePlan.vue'),
             meta: {
               showInMenu: true,
-              label: '航线计划',
+              label: '点位航线计划',
               cache: true
             }
           },
+          {
+            path: '/taskManage/common-fly-wayline-plan',
+            name: ERouterName.FLY_WAYLINE_PLAN,
+            component: () => import('/@/components/task/commonFlyWaylinePlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '普通航线计划',
+              cache: true
+            }
+          },
+
           // 子菜单 - 风机计划
           // {
           //   path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
