@@ -115,7 +115,32 @@
           </el-table-column>
           <el-table-column label="横向航线数" align="center" width="100">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.horizontal_routes }}</div>
+              <div class="ellipsis">{{ scope.row.horizontal_lines }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="光伏区域海拔" align="center" width="110">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.area_height }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="光伏架设高度" align="center" width="110">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.panel_height }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="光伏板朝向" align="center" width="100">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.panel_heading }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="区域边距" align="center" width="100">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.margin }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="航线内点数" align="center" width="100">
+            <template #default="scope">
+              <div class="ellipsis">{{ scope.row.points_per_line }}</div>
             </template>
           </el-table-column>
 
@@ -148,90 +173,121 @@
       v-model="insertDialog"
       title="新增光伏板"
       width="1000"
-      style="background-color: #0A2D63; color: white"
+      style="background-color: #0A2D63; color: white;padding-right: 25px;"
     >
       <el-form
         :model="insertForm"
-        label-width="160px"
+        label-width="120px"
         :rules="formRules"
         ref="formRef"
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="光伏板名称" required prop="solarPanelName">
+            <el-form-item label="光伏板名称" required prop="solar_panel_name">
               <el-input
-                v-model="insertForm.solarPanelName"
+                v-model="insertForm.solar_panel_name"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1经度" prop="corner1Lng" required>
+            <el-form-item label="角1经度" prop="corner1_lng" required>
               <el-input
-                v-model="insertForm.corner1Lng"
+                v-model="insertForm.corner1_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1纬度" prop="corner1Lat" required>
+            <el-form-item label="角1纬度" prop="corner1_lat" required>
               <el-input
-                v-model="insertForm.corner1Lat"
+                v-model="insertForm.corner1_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2经度" prop="corner2Lng" required>
+            <el-form-item label="角2经度" prop="corner2_lng" required>
               <el-input
-                v-model="insertForm.corner2Lng"
+                v-model="insertForm.corner2_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2纬度" prop="corner2Lat" required>
+            <el-form-item label="角2纬度" prop="corner2_lat" required>
               <el-input
-                v-model="insertForm.corner2Lat"
+                v-model="insertForm.corner2_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="航线高度(米)" prop="flightAltitude" required>
+            <el-form-item label="航线高度(米)" prop="flight_altitude" required>
               <el-input
-                v-model="insertForm.flightAltitude"
+                v-model="insertForm.flight_altitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="光伏板倾角(度)" prop="tilt_angle" required>
+              <el-input
+                v-model="insertForm.tilt_angle"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="区域边距" prop="margin" required>
+              <el-input
+                v-model="insertForm.margin"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="航线内点数" prop="points_per_line" required>
+              <el-input
+                v-model="insertForm.points_per_line"
                 maxlength="50"
               ></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角3经度" prop="corner3Lng" required>
+            <el-form-item label="角3经度" prop="corner3_lng" required>
               <el-input
-                v-model="insertForm.corner3Lng"
+                v-model="insertForm.corner3_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角3纬度" prop="corner3Lat" required>
+            <el-form-item label="角3纬度" prop="corner3_lat" required>
               <el-input
-                v-model="insertForm.corner3Lat"
+                v-model="insertForm.corner3_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4经度" prop="corner4Lng" required>
+            <el-form-item label="角4经度" prop="corner4_lng" required>
               <el-input
-                v-model="insertForm.corner4Lng"
+                v-model="insertForm.corner4_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4纬度" prop="corner4Lat" required>
+            <el-form-item label="角4纬度" prop="corner4_lat" required>
               <el-input
-                v-model="insertForm.corner4Lat"
+                v-model="insertForm.corner4_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="光伏板倾角(度)" prop="tiltAngle" required>
+            <el-form-item label="横向航线数" prop="horizontal_lines" required>
               <el-input
-                v-model="insertForm.tiltAngle"
+                v-model="insertForm.horizontal_lines"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="横向航线数" prop="horizontalRoutes" required>
+            <el-form-item label="光伏区域海拔" prop="area_height" required>
               <el-input
-                v-model="insertForm.horizontalRoutes"
+                v-model="insertForm.area_height"
                 maxlength="50"
               ></el-input>
             </el-form-item>
+            <el-form-item label="光伏架设高度" prop="panel_height" required>
+              <el-input
+                v-model="insertForm.panel_height"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="光伏板朝向" prop="panel_heading" required>
+              <el-input
+                v-model="insertForm.panel_heading"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+
           </el-col>
         </el-row>
       </el-form>
@@ -254,86 +310,117 @@
     >
       <el-form
         :model="editForm"
-        label-width="160px"
+        label-width="120px"
         :rules="formRules"
         ref="editFormRef"
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="光伏板名称" required prop="solarPanelName">
+            <el-form-item label="光伏板名称" required prop="solar_panel_name">
               <el-input
-                v-model="editForm.solarPanelName"
+                v-model="editForm.solar_panel_name"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1经度" prop="corner1Lng" required>
+            <el-form-item label="角1经度" prop="corner1_lng" required>
               <el-input
-                v-model="editForm.corner1Lng"
+                v-model="editForm.corner1_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角1纬度" prop="corner1Lat" required>
+            <el-form-item label="角1纬度" prop="corner1_lat" required>
               <el-input
-                v-model="editForm.corner1Lat"
+                v-model="editForm.corner1_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2经度" prop="corner2Lng" required>
+            <el-form-item label="角2经度" prop="corner2_lng" required>
               <el-input
-                v-model="editForm.corner2Lng"
+                v-model="editForm.corner2_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角2纬度" prop="corner2Lat" required>
+            <el-form-item label="角2纬度" prop="corner2_lat" required>
               <el-input
-                v-model="editForm.corner2Lat"
+                v-model="editForm.corner2_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="航线高度(米)" prop="flightAltitude" required>
+            <el-form-item label="航线高度(米)" prop="flight_altitude" required>
               <el-input
-                v-model="editForm.flightAltitude"
+                v-model="editForm.flight_altitude"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="光伏板倾角(度)" prop="tilt_angle" required>
+              <el-input
+                v-model="editForm.tilt_angle"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="区域边距" prop="margin" required>
+              <el-input
+                v-model="editForm.margin"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="航线内点数" prop="points_per_line" required>
+              <el-input
+                v-model="editForm.points_per_line"
                 maxlength="50"
               ></el-input>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="角3经度" prop="corner3Lng" required>
+            <el-form-item label="角3经度" prop="corner3_lng" required>
               <el-input
-                v-model="editForm.corner3Lng"
+                v-model="editForm.corner3_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角3纬度" prop="corner3Lat" required>
+            <el-form-item label="角3纬度" prop="corner3_lat" required>
               <el-input
-                v-model="editForm.corner3Lat"
+                v-model="editForm.corner3_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4经度" prop="corner4Lng" required>
+            <el-form-item label="角4经度" prop="corner4_lng" required>
               <el-input
-                v-model="editForm.corner4Lng"
+                v-model="editForm.corner4_lng"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="角4纬度" prop="corner4Lat" required>
+            <el-form-item label="角4纬度" prop="corner4_lat" required>
               <el-input
-                v-model="editForm.corner4Lat"
+                v-model="editForm.corner4_lat"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="光伏板倾角(度)" prop="tiltAngle" required>
+            <el-form-item label="横向航线数" prop="horizontal_lines" required>
               <el-input
-                v-model="editForm.tiltAngle"
+                v-model="editForm.horizontal_lines"
                 maxlength="50"
               ></el-input>
             </el-form-item>
-            <el-form-item label="横向航线数" prop="horizontalRoutes" required>
+            <el-form-item label="光伏区域海拔" prop="area_height" required>
               <el-input
-                v-model="editForm.horizontalRoutes"
+                v-model="editForm.area_height"
                 maxlength="50"
               ></el-input>
             </el-form-item>
+            <el-form-item label="光伏架设高度" prop="panel_height" required>
+              <el-input
+                v-model="editForm.panel_height"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+            <el-form-item label="光伏板朝向" prop="panel_heading" required>
+              <el-input
+                v-model="editForm.panel_heading"
+                maxlength="50"
+              ></el-input>
+            </el-form-item>
+
           </el-col>
         </el-row>
       </el-form>
@@ -370,33 +457,43 @@ const paginationProp = reactive({
 })
 
 const insertForm = reactive({
-  solarPanelName: '',
-  corner1Lng: '',
-  corner1Lat: '',
-  corner2Lng: '',
-  corner2Lat: '',
-  corner3Lng: '',
-  corner3Lat: '',
-  corner4Lng: '',
-  corner4Lat: '',
-  flightAltitude: '',
-  tiltAngle: '',
-  horizontalRoutes: ''
+  solar_panel_name: '',
+  corner1_lng: '',
+  corner1_lat: '',
+  corner2_lng: '',
+  corner2_lat: '',
+  corner3_lng: '',
+  corner3_lat: '',
+  corner4_lng: '',
+  corner4_lat: '',
+  flight_altitude: '',
+  tilt_angle: '',
+  horizontal_lines: '',
+  area_height: '',
+  panel_height: '',
+  panel_heading: '',
+  margin: '',
+  points_per_line: ''
 })
 const editForm = reactive({
   id: '',
-  solarPanelName: '',
-  corner1Lng: '',
-  corner1Lat: '',
-  corner2Lng: '',
-  corner2Lat: '',
-  corner3Lng: '',
-  corner3Lat: '',
-  corner4Lng: '',
-  corner4Lat: '',
-  flightAltitude: '',
-  tiltAngle: '',
-  horizontalRoutes: ''
+  solar_panel_name: '',
+  corner1_lng: '',
+  corner1_lat: '',
+  corner2_lng: '',
+  corner2_lat: '',
+  corner3_lng: '',
+  corner3_lat: '',
+  corner4_lng: '',
+  corner4_lat: '',
+  flight_altitude: '',
+  tilt_angle: '',
+  horizontal_lines: '',
+  area_height: '',
+  panel_height: '',
+  panel_heading: '',
+  margin: '',
+  points_per_line: ''
 })
 const tableData = ref([])
 
@@ -404,51 +501,71 @@ const insertDialog = ref(false)
 const editDialog = ref(false)
 
 const formRules = {
-  solarPanelName: [
+  solar_panel_name: [
     { required: true, message: '请输入光伏板名称', trigger: 'blur' }
   ],
-  corner1Lng: [
+  corner1_lng: [
     { required: true, message: '请输入角1经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner1Lat: [
+  corner1_lat: [
     { required: true, message: '请输入角1纬度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner2Lng: [
+  corner2_lng: [
     { required: true, message: '请输入角2经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner2Lat: [
+  corner2_lat: [
     { required: true, message: '请输入角2纬度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner3Lng: [
+  corner3_lng: [
     { required: true, message: '请输入角3经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner3Lat: [
+  corner3_lat: [
     { required: true, message: '请输入角3纬度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner4Lng: [
+  corner4_lng: [
     { required: true, message: '请输入角4经度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  corner4Lat: [
+  corner4_lat: [
     { required: true, message: '请输入角4纬度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  flightAltitude: [
+  flight_altitude: [
     { required: true, message: '请输入航线高度', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  tiltAngle: [
+  tilt_angle: [
     { required: true, message: '请输入光伏板倾角', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ],
-  horizontalRoutes: [
+  horizontal_lines: [
     { required: true, message: '请输入横向航线数', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  area_height: [
+    { required: true, message: '请输入光伏区域海拔', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  panel_height: [
+    { required: true, message: '请输入光伏架设高度', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  panel_heading: [
+    { required: true, message: '请输入光伏板朝向', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  margin: [
+    { required: true, message: '请输入区域边距', trigger: 'blur' },
+    { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
+  ],
+  points_per_line: [
+    { required: true, message: '请输入航线内点数', trigger: 'blur' },
     { type: 'number', message: '必须为数字值', trigger: 'blur', transform: value => Number(value) }
   ]
 }
@@ -465,18 +582,23 @@ async function handleInsert () {
       return
     }
     const submitData = {
-      solar_panel_name: insertForm.solarPanelName,
-      corner1_lng: Number(insertForm.corner1Lng),
-      corner1_lat: Number(insertForm.corner1Lat),
-      corner2_lng: Number(insertForm.corner2Lng),
-      corner2_lat: Number(insertForm.corner2Lat),
-      corner3_lng: Number(insertForm.corner3Lng),
-      corner3_lat: Number(insertForm.corner3Lat),
-      corner4_lng: Number(insertForm.corner4Lng),
-      corner4_lat: Number(insertForm.corner4Lat),
-      flight_altitude: Number(insertForm.flightAltitude),
-      tilt_angle: Number(insertForm.tiltAngle),
-      horizontal_routes: Number(insertForm.horizontalRoutes)
+      solar_panel_name: insertForm.solar_panel_name,
+      corner1_lng: Number(insertForm.corner1_lng),
+      corner1_lat: Number(insertForm.corner1_lat),
+      corner2_lng: Number(insertForm.corner2_lng),
+      corner2_lat: Number(insertForm.corner2_lat),
+      corner3_lng: Number(insertForm.corner3_lng),
+      corner3_lat: Number(insertForm.corner3_lat),
+      corner4_lng: Number(insertForm.corner4_lng),
+      corner4_lat: Number(insertForm.corner4_lat),
+      flight_altitude: Number(insertForm.flight_altitude),
+      tilt_angle: Number(insertForm.tilt_angle),
+      horizontal_lines: Number(insertForm.horizontal_lines),
+      area_height: Number(insertForm.area_height),
+      panel_height: Number(insertForm.panel_height),
+      panel_heading: Number(insertForm.panel_heading),
+      margin: Number(insertForm.margin),
+      points_per_line: Number(insertForm.points_per_line)
     }
     const res = await addSolarPanelConfigApi(submitData)
     if (res.code !== 0) {
@@ -493,18 +615,23 @@ async function handleInsert () {
 function openInsertDialog () {
   formRef.value?.resetFields()
   Object.assign(insertForm, {
-    solarPanelName: '',
-    corner1Lng: '',
-    corner1Lat: '',
-    corner2Lng: '',
-    corner2Lat: '',
-    corner3Lng: '',
-    corner3Lat: '',
-    corner4Lng: '',
-    corner4Lat: '',
-    flightAltitude: '',
-    tiltAngle: '',
-    horizontalRoutes: ''
+    solar_panel_name: '',
+    corner1_lng: '',
+    corner1_lat: '',
+    corner2_lng: '',
+    corner2_lat: '',
+    corner3_lng: '',
+    corner3_lat: '',
+    corner4_lng: '',
+    corner4_lat: '',
+    flight_altitude: '',
+    tilt_angle: '',
+    horizontal_lines: '',
+    area_height: '',
+    panel_height: '',
+    panel_heading: '',
+    margin: '',
+    points_per_line: ''
   })
   insertDialog.value = true
 }
@@ -513,18 +640,23 @@ function openEditDialog (row:any) {
   editDialog.value = true
   Object.assign(editForm, {
     id: row.id,
-    solarPanelName: row.solar_panel_name,
-    corner1Lng: row.corner1_lng,
-    corner1Lat: row.corner1_lat,
-    corner2Lng: row.corner2_lng,
-    corner2Lat: row.corner2_lat,
-    corner3Lng: row.corner3_lng,
-    corner3Lat: row.corner3_lat,
-    corner4Lng: row.corner4_lng,
-    corner4Lat: row.corner4_lat,
-    flightAltitude: row.flight_altitude,
-    tiltAngle: row.tilt_angle,
-    horizontalRoutes: row.horizontal_routes
+    solar_panel_name: row.solar_panel_name,
+    corner1_lng: row.corner1_lng,
+    corner1_lat: row.corner1_lat,
+    corner2_lng: row.corner2_lng,
+    corner2_lat: row.corner2_lat,
+    corner3_lng: row.corner3_lng,
+    corner3_lat: row.corner3_lat,
+    corner4_lng: row.corner4_lng,
+    corner4_lat: row.corner4_lat,
+    flight_altitude: row.flight_altitude,
+    tilt_angle: row.tilt_angle,
+    horizontal_lines: row.horizontal_lines,
+    area_height: row.area_height,
+    panel_height: row.panel_height,
+    panel_heading: row.panel_heading,
+    margin: row.margin,
+    points_per_line: row.points_per_line
   })
 }
 
@@ -537,18 +669,23 @@ async function handleEdit () {
     }
     const submitData = {
       id: editForm.id,
-      solar_panel_name: editForm.solarPanelName,
-      corner1_lng: Number(editForm.corner1Lng),
-      corner1_lat: Number(editForm.corner1Lat),
-      corner2_lng: Number(editForm.corner2Lng),
-      corner2_lat: Number(editForm.corner2Lat),
-      corner3_lng: Number(editForm.corner3Lng),
-      corner3_lat: Number(editForm.corner3Lat),
-      corner4_lng: Number(editForm.corner4Lng),
-      corner4_lat: Number(editForm.corner4Lat),
-      flight_altitude: Number(editForm.flightAltitude),
-      tilt_angle: Number(editForm.tiltAngle),
-      horizontal_routes: Number(editForm.horizontalRoutes)
+      solar_panel_name: editForm.solar_panel_name,
+      corner1_lng: Number(editForm.corner1_lng),
+      corner1_lat: Number(editForm.corner1_lat),
+      corner2_lng: Number(editForm.corner2_lng),
+      corner2_lat: Number(editForm.corner2_lat),
+      corner3_lng: Number(editForm.corner3_lng),
+      corner3_lat: Number(editForm.corner3_lat),
+      corner4_lng: Number(editForm.corner4_lng),
+      corner4_lat: Number(editForm.corner4_lat),
+      flight_altitude: Number(editForm.flight_altitude),
+      tilt_angle: Number(editForm.tilt_angle),
+      horizontal_lines: Number(editForm.horizontal_lines),
+      area_height: Number(editForm.area_height),
+      panel_height: Number(editForm.panel_height),
+      panel_heading: Number(editForm.panel_heading),
+      margin: Number(editForm.margin),
+      points_per_line: Number(editForm.points_per_line)
     }
     const res = await updateSolarPanelConfigApi(submitData)
     if (res.code !== 0) {
