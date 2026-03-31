@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * 太阳能光伏板巡检区域参数实体类
@@ -92,13 +91,44 @@ public class SolarPanel implements Serializable {
     /**
      * 光伏板倾角（度）
      */
-    @TableField("tilt_angle")
-    private Double tiltAngle;
+    @TableField("angle_tilt")
+    private Double angleTilt;
 
     /**
      * 横向航线数
      */
-    @TableField("horizontal_routes")
-    private Integer horizontalRoutes;
+    @TableField("horizontal_lines")
+    private Integer horizontalLines;
 
+    // ========== 新增字段 ==========
+
+    /**
+     * 光伏区域海拔
+     */
+    @TableField("area_height")
+    private Double areaHeight;
+
+    /**
+     * 光伏架设高度
+     */
+    @TableField("panel_height")
+    private Double panelHeight;
+
+    /**
+     * 光伏板朝向
+     */
+    @TableField("panel_heading")
+    private Double panelHeading;
+
+    /**
+     * 区域边距
+     */
+    @TableField("margin")
+    private Double margin;
+
+    /**
+     * 航线内点数
+     */
+    @TableField("points_per_line")
+    private Integer pointsPerLine;
 }

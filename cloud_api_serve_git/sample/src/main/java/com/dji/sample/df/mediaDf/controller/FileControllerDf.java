@@ -187,7 +187,7 @@ public class FileControllerDf {
                     filteredFiles.get(j).setDefectId(defect.getId());
                 }
             }
-        }else {
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==0){
             for (int j = 0; j < filteredFiles.size(); j++) {
                 String fileName = filteredFiles.get(j).getFileName();
                 Integer pointPos = extractWaypointNumber(fileName);
@@ -216,6 +216,18 @@ public class FileControllerDf {
                             URLEncoder.encode(imagePath1, "UTF-8");
                     filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
                 }
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
+            for (int j = 0; j < filteredFiles.size(); j++) {
+                String fileName = filteredFiles.get(j).getFileName();
+//                  对接分析服务唯一标识
+                String replace = fileName.replace(".jpeg", "");
+                String regId="1";
+//                  普通照片保存形式为：点位编码+照片类型+"_"+图片原名
+                String imagePath1="/ftpdir/admin_files/recfile_images/"+job_id+"/"+regId+"_"+replace+".jpg";
+                String imageUrl1 = "/api/file/defect?path=" +
+                        URLEncoder.encode(imagePath1, "UTF-8");
+                filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
+            }
         }
 
 //      如果为普通任务加上智能分析图url

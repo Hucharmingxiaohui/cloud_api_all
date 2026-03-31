@@ -498,6 +498,16 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                 }
                                 monitoringTasks.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }else if(planType==3){
+                                log.info("执行普通计划保存图片---");
+                                Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
+                                if(result.getCode() == 0){
+                                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
+                                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                    }
+                                }
+                                monitoringTasks.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }
                         }
                     }else {

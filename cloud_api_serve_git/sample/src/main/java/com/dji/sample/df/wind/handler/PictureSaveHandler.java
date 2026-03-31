@@ -7,6 +7,8 @@ import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
@@ -67,7 +69,10 @@ public class PictureSaveHandler {
     @Autowired
     UniPointMapper2 uniPointMapper2;
 
-    public Result<Map> pictureSave(String jobId) {
+    @Autowired
+    PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+
+    public Result<Map> pictureSave(String jobId) throws IOException {
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
         // 分离DJI文件和非DJI文件（应该都是DJI文件）
         List<MediaFileEntity> djiFiles = new ArrayList<>();
@@ -79,11 +84,14 @@ public class PictureSaveHandler {
                 nonDjiFiles.add(file);
             }
         }
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
         FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
                 .eq(FanWaylinePoints::getJobId, jobId));
         JSONArray points =new JSONArray();
-        if (fanWaylinePoints != null) {
+        if (fanWaylinePoints != null && pubWaylineJobPlanDfEntity.getPlanType()==1) {
 //          1.风机图片存在服务器
             points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
             Map map = new HashMap();
@@ -111,7 +119,7 @@ public class PictureSaveHandler {
                 e.printStackTrace();
             }
             return Result.success(map);
-        }else {
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==0){
 //          2.普通图片存在服务器
             Map map = new HashMap();
             try {
@@ -136,8 +144,6 @@ public class PictureSaveHandler {
                         picType1 = 1;
                     }
                     log.info(fileName+"的类型为"+picType);
-                    WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                            .eq(WaylineJobEntity::getJobId, jobId));
                     UniPoint uniPoint = uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
                             .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
                             .eq(UniPoint::getWaylinePointPos, pointPos)
@@ -148,7 +154,7 @@ public class PictureSaveHandler {
                     }
 //                  对接分析服务唯一标识
                     String regId=uniPoint.getPointCode()+picType;
-//                  普通照片保存形式为：点位编码+照片类型+"_"+图片原名
+//                  航点航线计划照片保存形式为：点位编码+照片类型+"_"+图片原名
                     String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
                     String localFilePath = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
                     log.info("保存对应点位-----");
@@ -159,6 +165,31 @@ public class PictureSaveHandler {
                 e.printStackTrace();
             }
             return Result.success(map);
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
+            Map map = new HashMap();
+            int index = 0;
+            for (MediaFileEntity mediaFileEntity : djiFiles) {
+                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+                String fileName;
+                if (index < points.size()) {
+                    String pointName = points.getString(index);
+                    fileName = pointName;
+                } else {
+                    fileName = mediaFileEntity.getFileName() != null ?
+                            mediaFileEntity.getFileName() :
+                            "file_" + mediaFileEntity.getFileId() + ".dat";
+                }
+                String regId="1";
+//              普通照片regId保存形式为：1
+                String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
+                String localFilePath = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
+                log.info("保存对应点位-----");
+                map.put(fileName, localFilePath);
+                index++;
+            }
+            return Result.success(map);
+        }else {
+            return Result.success(new HashMap<>());
         }
 
     }

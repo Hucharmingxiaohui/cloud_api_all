@@ -104,7 +104,7 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     private String poiId;//兴趣点id
 
     @TableField("plan_type")
-    private Integer planType;// 计划类型：0普通任务1风机任务2兴趣点环绕任务
+    private Integer planType;// 计划类型：0航点航线计划1风机计划2兴趣点环绕计划3普通航线计划
 
     @TableField("poi_orbit_num")
     private Integer poiOrbitNum;//兴趣点环绕数

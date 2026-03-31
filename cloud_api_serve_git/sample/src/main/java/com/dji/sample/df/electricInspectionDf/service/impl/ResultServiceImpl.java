@@ -359,6 +359,7 @@ public class ResultServiceImpl implements ResultService {
                     .eq(UniPoint::getWaylineId, waylineJobEntity.getFileId())
                     .eq(UniPoint::getPicType, "1"));
 //          初始数量为红外图片的数量，把它去掉不计入分析服务
+//          这个地方需看是否需要改
             waylineJobEntity.setAnalyzedNum(uniPoints.size());
             waylineJobMapper.updateById(waylineJobEntity);
         }else {

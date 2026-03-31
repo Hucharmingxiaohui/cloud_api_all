@@ -137,6 +137,11 @@ public class FjReportController {
             }
 //          return Result.notfan("不是风机任务");
         }
+//      普通计划直接保存
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==3){
+           pictureSaveHandler.pictureSave(jobId);
+           return Result.success("success");
+        }
 //      查询job的保存标志位，未保存完就setIsAnalyzed(4)，就不执行下面逻辑直接return,前端显示正在保存，显示正在保存则一直调这个接口直到返回成功
 //        Integer isSaved = waylineJobEntity.getIsSaved();
 //        if(isSaved!=null) {

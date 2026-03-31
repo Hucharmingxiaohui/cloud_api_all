@@ -72,46 +72,13 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         Map map=new HashMap();
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         if(planType==1){
-////          普通风机巡检计划
-//            Map<String, Object> allResult =new HashMap<>();
-//            List<PubWaylineJobPlanDfEntity> successPlans = new ArrayList<>();
-//            boolean allSuccess = true;
-//            List<String> fanIdList = pubWaylineJobPlanDfEntity.getFanIdList();
-//            for (String fanId : fanIdList) {
-//                PubWaylineJobPlanDfEntity copyPlanEntity = copyPlanEntity(pubWaylineJobPlanDfEntity);
-//                copyPlanEntity.setFanId(fanId);
-//                Map<String, Object> singleResult = routePlanService.buildFanWayline(copyPlanEntity);
-//                // 检查结果
-//                Boolean resultFlag = (Boolean) singleResult.get("result");
-//                if (resultFlag != null && resultFlag) {
-//                    // 成功：保存计划
-//                    PubWaylineJobPlanDfEntity successPlan = (PubWaylineJobPlanDfEntity) singleResult.get("plan");
-//                    if (successPlan != null) {
-//                        successPlans.add(successPlan);
-//                    }
-//                } else {
-//                    // 失败：标记为失败
-//                    allSuccess = false;
-//                    // 可以选择记录失败的风机ID
-//                    allResult.put("failedFanId", fanId.trim());
-//                    break; // 或者不break，继续处理其他风机
-//                }
-//            }
-//            // 设置最终结果
-//            allResult.put("result", allSuccess);
-//            if (allSuccess && !successPlans.isEmpty()) {
-//                allResult.put("plans", successPlans); // 返回所有成功计划
-//            } else {
-//                allResult.put("successCount", successPlans.size());
-//                allResult.put("totalCount", fanIdList.size());
-//            }
-//            return allResult;
-
+//          风机计划
             return routePlanService.buildFanWayline(pubWaylineJobPlanDfEntity);
         }else if(planType==2){
 //          风机兴趣点环绕计划
             return routePlanService.buildInterestPointWayline(pubWaylineJobPlanDfEntity);
         }else {
+//          航点航线计划planType==0和普通航线计划planType==2
             //创建计划接口
             pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
             // 获取当前系统时间戳（以毫秒为单位）
