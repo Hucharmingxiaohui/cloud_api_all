@@ -471,7 +471,9 @@ function closePlan () {
   if (type.value === '1') {
     router.push({ path: '/taskManage/fly-fan-plan' })
   } else if (type.value === '0') {
-    router.push({ path: '/taskManage/fly-wanyline-plan' })
+    router.push({ path: '/taskManage/fly-wayline-plan' })
+  } else if (type.value === '3') {
+    router.push({ path: '/taskManage/common-fly-wayline-plan' })
   } else {
     router.push({ path: '/taskManage/interestPointPlan' })
   }
