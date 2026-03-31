@@ -211,7 +211,7 @@ const routes: Array<RouteRecordRaw> = [
           },
           {
             path: '/taskManage/common-fly-wayline-plan',
-            name: ERouterName.FLY_WAYLINE_PLAN,
+            name: 'commonFlyPlan',
             component: () => import('/@/components/task/commonFlyWaylinePlan.vue'),
             meta: {
               showInMenu: true,
