@@ -19,11 +19,8 @@ import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
-import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -116,7 +113,7 @@ public class CenterModelSyncBuilder {
                     data.add(item);
                 }
 //              两部分点位，上面是风机点位，下面是航线点位
-                List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
+                List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
                 if (uniPoints != null && uniPoints.size() > 0) {
                     for (UniPoint entity : uniPoints) {
                         PatrolUavPointModelItem item = new PatrolUavPointModelItem();
@@ -166,7 +163,7 @@ public class CenterModelSyncBuilder {
             return items;
         }else if(hebeiStationCode.equals(subCode)){
 //          暂时用不到（用上面的逻辑，两种点位都同步，根据有无进行区分）
-            List<UniPoint> uniPoints = uniPointMapper.selectList(new HashMap());
+            List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
             if (uniPoints != null && uniPoints.size() > 0) {
                 for (UniPoint entity : uniPoints) {
                     PatrolUavPointModelItem item = new PatrolUavPointModelItem();

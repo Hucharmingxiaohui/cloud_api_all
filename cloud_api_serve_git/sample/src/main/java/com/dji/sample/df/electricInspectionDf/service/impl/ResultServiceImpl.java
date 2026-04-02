@@ -360,7 +360,7 @@ public class ResultServiceImpl implements ResultService {
                     .eq(UniPoint::getPicType, "1"));
 //          初始数量为红外图片的数量，把它去掉不计入分析服务
 //          这个地方需看是否需要改
-            waylineJobEntity.setAnalyzedNum(uniPoints.size());
+            waylineJobEntity.setAnalyzedNum(uniPoints.size()+1);
             waylineJobMapper.updateById(waylineJobEntity);
         }else {
             waylineJobEntity.setAnalyzedNum(analyzedNum + 1);
@@ -370,7 +370,7 @@ public class ResultServiceImpl implements ResultService {
         Map map=new HashMap();
         map.put("waylineId",waylineJobEntity.getFileId());
         Integer mediaCount = uniPointMapper2.selectListCount(map);
-        if(mediaCount == analyzedNum1){
+        if(mediaCount.equals(analyzedNum1)){
             waylineJobEntity.setIsAnalyzed(1);
             waylineJobMapper.updateById(waylineJobEntity);
             log.info("智能分析结束----------");

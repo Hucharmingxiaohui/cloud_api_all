@@ -1,23 +1,16 @@
 package com.dji.sample.df.wind.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.df.framework.config.FileConfig;
 import com.df.framework.exception.FastException;
-import com.df.framework.redis.RedisUtils;
 import com.df.framework.utils.CustomStringUtils;
 import com.df.framework.utils.RecognitionTypeUtils;
-import com.df.server.dto.uniPoint.UniPointImportExcel;
 import com.df.server.entity.uni.*;
-import com.df.server.mapper.uni.UniPointMapper;
-import com.df.server.service.sys.SysDictDataService;
 import com.df.server.service.uni.*;
 import com.df.server.utils.PointDataTypeUtils;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.commonDf.util.PageUtil;
 import com.dji.sample.df.wind.model.entity.UniPointImportExcel2;
-import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.wind.service.ImportPointService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -457,7 +450,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
     @Override
     public Map<String, Object> selectList(Map map) {
         PageUtil.setPageArgs(map);
-        List<UniPoint> uniPoints = uniPointMapper2.selectList(map);
+        List<UniPoint> uniPoints = uniPointMapper2.selectListByMap(map);
         int count = uniPointMapper2.selectListCount(map);
         Map result = new HashMap();
         Map pagination = new HashMap();

@@ -3,6 +3,7 @@ package com.dji.sample.wayline.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.thread.CustomExecutorFactory;
+import com.df.framework.utils.HttpUtils;
 import com.df.server.entity.his.HisUniTaskItemFileEntity;
 import com.df.server.entity.his.HisUniTaskItemPointsEntity;
 import com.df.server.entity.uni.UniPointEntity;
@@ -43,11 +44,13 @@ import com.dji.sdk.mqtt.events.TopicEventsRequest;
 import com.dji.sdk.mqtt.events.TopicEventsResponse;
 import com.dji.sdk.mqtt.services.ServicesReplyData;
 import com.dji.sdk.mqtt.services.TopicServicesResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -106,6 +109,13 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     @Resource
     private RedisUtils redisUtils;
+
+    @Autowired
+    private HttpUtils httpUtils;
+    @Value("${ue.switch}")
+    private String ueSwitch;
+    @Value("${ue.stateUrl}")
+    private String ueStateUrl;
 
 
     @Scheduled(initialDelay = 10, fixedRate = 5, timeUnit = TimeUnit.SECONDS)
@@ -271,6 +281,21 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 WaylineJobDTO waylineJob = waylineJobOpt.get();
                 //20241204修改返回job_id
                 job_id=waylineJob.getJobId();
+//              三维需要，跟三维发任务开始状态
+                if ("true".equals(ueSwitch)){
+                    Map<String, String> map = new HashMap<>();
+                    map.put("taskId", job_id);
+                    map.put("status", "start");
+                    ObjectMapper mapper = new ObjectMapper();
+                    String json = null;
+                    try {
+                        json = mapper.writeValueAsString(map);
+                    } catch (JsonProcessingException e) {
+                        throw new RuntimeException(e);
+                    }
+                    String s = httpUtils.sendPostJson(ueStateUrl, json);
+                    System.out.println("收到UE返回参数:"+s);
+                }
 
                 // If it is a conditional task type, add conditions to the job parameters.
                 addConditions(waylineJob, param, beginTime, endTime);

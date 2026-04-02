@@ -5,7 +5,7 @@
 
 <mapper namespace="com.dji.sample.center.dao.UniPointMapper2">
 
-    <select id="selectList" resultType="com.dji.sample.center.entity.UniPoint">
+    <select id="selectListByMap" resultType="com.dji.sample.center.entity.UniPoint">
         SELECT * FROM df_uni_point
         <where>
             <if test="pointName!=null and pointName!=''">
