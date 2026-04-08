@@ -219,6 +219,16 @@ const routes: Array<RouteRecordRaw> = [
               cache: true
             }
           },
+          {
+            path: '/taskManage/solarPlan',
+            name: 'solarPlan',
+            component: () => import('/@/components/task/solarPlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '光伏板计划',
+              cache: true
+            }
+          },
 
           // 子菜单 - 风机计划
           // {

@@ -50,6 +50,21 @@
               </el-select>
             </el-form-item>
             <el-form-item
+              label="光伏板区域"
+              required
+              prop="solar_panel_id"
+              v-if="type==='4'"
+            >
+              <el-select v-model="planBody.solar_panel_id">
+                <el-option
+                  v-for="item in solarTable"
+                  :label="item.solar_panel_name"
+                  :value="item.id"
+                  :key="item.id"
+                ></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item
               label="环绕点类型"
               required
               label-position="top"
@@ -258,7 +273,7 @@ import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
 import SelectWayLine from '/@/pages/page-web/projects/wayline.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getAllWindTurbineApi, getAllInserestPointApi } from '/@/api/turbine/turbineMgt'
+import { getAllWindTurbineApi, getAllInserestPointApi,getAllSolarPanelApi } from '/@/api/turbine/turbineMgt'
 const router = useRouter()
 const route = useRoute()
 const type = ref(localStorage.getItem('createPlan_query')) // 获取计划类型
@@ -276,6 +291,7 @@ const dock = computed<Device>(() => {
 })
 const fanTable = ref([]) // 风机列表
 const interestPointTable = ref([]) // 兴趣点列表
+const solarTable = ref([]) // 光伏板区域列表
 const oibitType = ref('1') // 环绕点类型
 const routeName = ref('')
 const planBody = reactive({
@@ -290,6 +306,7 @@ const planBody = reactive({
   status: 1,
   fan_id: '',
   poi_id: '',
+  solar_panel_id: '',
   poi_orbit_num: 1,
   username: 'pilot',
   plan_type: type.value,
@@ -346,6 +363,7 @@ const rules = {
   ],
   poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'change' }],
   fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
+  solar_panel_id: [{ required: true, message: '请选择光伏板区域', trigger: 'blur' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
     { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'blur' }
@@ -386,6 +404,8 @@ onMounted(() => {
     getSubInfo()
   } else if (type.value === '2') {
     getInterestPoint()
+  } else if (type.value === '4') {
+    getSolarPanel()
   }
 })
 
@@ -458,6 +478,28 @@ function getInterestPoint () {
 }
 
 /**
+ * @description: 查询光伏板ID列表
+ * @param {string}
+ * */
+function getSolarPanel () {
+  try {
+    getAllSolarPanelApi({
+      pageSize: 10000,
+      pageNo: 1,
+      solar_panel_name: '',
+      id: ''
+    }).then(res => {
+      if (res.code !== 0) {
+        return
+      }
+      solarTable.value = res.data.list
+    })
+  } catch (error) {
+  }
+}
+
+
+/**
  * 更新环绕点类型
  */
 
@@ -474,7 +516,10 @@ function closePlan () {
     router.push({ path: '/taskManage/fly-wayline-plan' })
   } else if (type.value === '3') {
     router.push({ path: '/taskManage/common-fly-wayline-plan' })
-  } else {
+  } else if (type.value === '4') {
+    router.push({ path: '/taskManage/solarPlan' })
+  }
+  else {
     router.push({ path: '/taskManage/interestPointPlan' })
   }
 }
