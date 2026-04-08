@@ -139,6 +139,8 @@ public class FjReportController {
         }
 //      普通计划直接保存
         if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==3){
+           waylineJobEntity.setIsAnalyzed(2);
+           waylineJobMapper.updateById(waylineJobEntity);
            pictureSaveHandler.pictureSave(jobId);
            return Result.success("success");
         }

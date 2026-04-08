@@ -14,8 +14,10 @@ public interface RoutePlanService {
      void workingWayline(String name,String value);
 //   停机巡检
      void stopWayline(String name, Double yaw,String value);
-//   风机飞向顶端航线，任务名开头fj来判别
+//   风机飞向顶端航线
      Map<String,Object> buildFanWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
-//   风机兴趣点环绕航线，任务名开头fjip来判别
+//   风机兴趣点环绕航线
      Map<String,Object> buildInterestPointWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
+//   光伏板航线
+     Map<String,Object> buildSolarPanelWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity);
 }

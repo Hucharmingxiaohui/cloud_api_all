@@ -77,8 +77,11 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         }else if(planType==2){
 //          风机兴趣点环绕计划
             return routePlanService.buildInterestPointWayline(pubWaylineJobPlanDfEntity);
+        }else if(planType==4) {
+//          光伏计划（目前只是光伏区域）
+            return routePlanService.buildSolarPanelWayline(pubWaylineJobPlanDfEntity);
         }else {
-//          航点航线计划planType==0和普通航线计划planType==2
+//          航点航线计划planType==0和普通航线计划planType==3
             //创建计划接口
             pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
             // 获取当前系统时间戳（以毫秒为单位）
@@ -104,28 +107,6 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
                 return map;
             }
         }
-    }
-
-    // 复制计划实体的辅助方法
-    private PubWaylineJobPlanDfEntity copyPlanEntity(PubWaylineJobPlanDfEntity source) {
-        // 使用BeanUtils或手动复制
-        PubWaylineJobPlanDfEntity copy = new PubWaylineJobPlanDfEntity();
-        copy.setPlanSource(source.getPlanSource());
-        copy.setName(source.getName());
-        copy.setDockSn(source.getDockSn());
-        copy.setWorkspaceId(source.getWorkspaceId());
-        copy.setTaskType(source.getTaskType());
-        copy.setWaylineType(source.getWaylineType());
-        copy.setBeginTime(source.getBeginTime());
-        copy.setEndTime(source.getEndTime());
-        copy.setUsername(source.getUsername());
-        copy.setRthAltitude(source.getRthAltitude());
-        copy.setOutOfControl(source.getOutOfControl());
-        copy.setEnableStatus(source.getEnableStatus());
-        copy.setPlanPriority(source.getPlanPriority());
-        copy.setPlanType(source.getPlanType());
-        // 注意：fanId会在循环中单独设置
-        return copy;
     }
 
     @Override

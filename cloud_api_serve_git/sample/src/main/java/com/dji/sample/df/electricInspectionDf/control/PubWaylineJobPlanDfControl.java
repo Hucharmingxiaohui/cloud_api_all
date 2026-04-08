@@ -50,19 +50,7 @@ public class PubWaylineJobPlanDfControl {
         Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
         boolean result = (boolean) waylineJObPlan.get("result");
         if(result){
-//            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
-////          定时任务则立即执行,要根据实际情况加上间隔(暂定1个小时）
-//            // 获取第一个对象的beginTime作为基准时间
-//            long baseTime = planDfEntityList.get(0).getBeginTime();
-//            for (int i = 0; i < planDfEntityList.size(); i++) {
-//                PubWaylineJobPlanDfEntity planDfEntity = planDfEntityList.get(i);
-//                // 为每个对象设置新的beginTime：基准时间 + i * 1小时
-//                long newBeginTime = baseTime + i * 3600000L; // 1小时 = 3600000毫秒
-//                planDfEntity.setBeginTime(newBeginTime);
-//                if (planDfEntity.getTaskType() == 1) {
-//                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
-//                }
-//            }
+
             PubWaylineJobPlanDfEntity planDfEntity = (PubWaylineJobPlanDfEntity) waylineJObPlan.get("plan");
 //          定时任务则立即执行
             if(planDfEntity.getTaskType()==1) {
@@ -73,30 +61,7 @@ public class PubWaylineJobPlanDfControl {
            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
         }
     }
-//    多机巢计划，和上述逻辑一样，只不过传多计划，一个机场对应一个计划
-//    @PostMapping("/createWaylinePlan")
-//    HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
-//        CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
-//        String workspaceId = customClaim.getWorkspaceId();
-//        String creator = customClaim.getUsername();
-////      为了后续风机航线创建任务
-//        redisUtils.set("workspaceId", workspaceId);
-//        redisUtils.set("creator", creator);
-//        Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
-//        boolean result = (boolean) waylineJObPlan.get("result");
-//        if(result){
-//            List<PubWaylineJobPlanDfEntity> planDfEntityList = (List<PubWaylineJobPlanDfEntity>) waylineJObPlan.get("plans");
-////          定时任务则立即执行,要根据实际情况加上间隔
-//            for (PubWaylineJobPlanDfEntity planDfEntity : planDfEntityList) {
-//                if(planDfEntity.getTaskType()==1){
-//                    pubWaylineJobPlanDfService.expressPlan(customClaim,planDfEntity);
-//                }
-//            }
-//            return HttpResultResponse.success().setMessage("创建飞行计划成功");
-//        }else{
-//            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
-//        }
-//    }
+
 
     @GetMapping("/plan_type/{plan_type}/getPlanByPlantype")
     public HttpResultResponse<PaginationData<PubWaylineJobPlanDfEntity>> getPlanByPlantype(@RequestParam(defaultValue = "1") Long page,
@@ -203,28 +168,6 @@ public class PubWaylineJobPlanDfControl {
         }
         return HttpResultResponse.success().setData(map);
     }
-
-    // 初级版本（启用）
-//    @PostMapping("/createWaylinePlan2")
-//    HttpResultResponse createWaylinePlan2(@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity)
-//    {
-//        Map<Integer, String> waylineByPoint = pubWaylineJobPlanDfService.
-//                getWaylineByPoint(pubWaylineJobPlanDfEntity.getDeviceLevel(), pubWaylineJobPlanDfEntity.getDeviceList());
-//        Map<String, String> waylineIdByPos = pubWaylineJobPlanDfService.getWaylineIdByPos(waylineByPoint);
-//        boolean flag = true;
-//        for (Map.Entry<String, String> entry : waylineIdByPos.entrySet()) {
-//            pubWaylineJobPlanDfEntity.setFileId(entry.getKey());
-//            pubWaylineJobPlanDfEntity.setWaylinePointPos(entry.getValue());
-//            boolean waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);
-//            flag = flag && waylineJObPlan;
-//        }
-//        if(flag){
-//            return HttpResultResponse.success().setMessage("创建飞行计划成功");
-//        }else{
-//            return HttpResultResponse.error("创建飞行计划失败，计划id有可能重复");
-//        }
-//    }
-
 
     public static void main(String[] args) {
 

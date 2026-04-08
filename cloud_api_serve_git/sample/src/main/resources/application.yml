@@ -300,6 +300,7 @@ wayline:
     working-wayline: "http://172.20.63.157:5001/working"
     stop-wayline: "http://172.20.63.157:5001/stop"
     interest-point-wayline: "http://172.20.63.157:5001/poi"
+    solar-panel-wayline: "http://172.20.63.157:5001/solar"
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20022/api"
 #  系统编码

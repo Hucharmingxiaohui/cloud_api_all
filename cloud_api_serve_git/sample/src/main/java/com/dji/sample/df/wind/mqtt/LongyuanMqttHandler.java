@@ -125,6 +125,13 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     @Resource
     private IDeviceMapper deviceMapper;
 
+    private final Map<String, UploadStallInfo> uploadStallMap = new ConcurrentHashMap<>();
+
+    private static class UploadStallInfo {
+        int lastUploadedCount;
+        long lastChangeTime;
+    }
+
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
 
@@ -404,6 +411,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         // 移除超时任务
         for (String taskCode : timeoutTasks) {
             monitoringTasks.remove(taskCode);
+            uploadStallMap.remove(taskCode);
         }
 
         // 遍历所有正在监控的任务
@@ -436,6 +444,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 if (waylineJobEntity == null) {
                     log.warn("未找到航线任务，移除监控: taskCode={}, jobId={}", taskCode, jobId);
                     monitoringTasks.remove(taskCode);
+                    uploadStallMap.remove(taskCode);
                     continue;
                 }
 
@@ -453,17 +462,20 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                         sendWindTurbineTaskStatus(taskCode,taskName,1);
                     }
 
-//                    sendWindTurbineTaskStatus(taskCode,taskName,1);
+//                   sendWindTurbineTaskStatus(taskCode,taskName,1);
                     if(status == 3){
-                        // 查询航线任务状态
                         log.info("上传数为"+waylineJobDTO.getUploadedCount()+"总数为"+waylineJobDTO.getMediaCount());
-                        if(waylineJobDTO.getUploadedCount()==waylineJobDTO.getMediaCount()){
+                        int uploaded = waylineJobDTO.getUploadedCount();
+                        int total = waylineJobDTO.getMediaCount();
+//                      需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果（风机任务也直接回传结果只不过继续执行分析逻辑）
+                        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+                        Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+                        // 查询航线任务状态
+                        if(uploaded == total){
                             JSONObject jsonObject = new JSONObject();
                             jsonObject.put("jobId", jobId);
-//                          需要区分是风机任务和普通任务，风机任务走这个逻辑，普通任务直接上传结果（风机任务也直接回传结果只不过继续执行分析逻辑）
-                            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
-                            Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+
                             if(planType==1){
                                 log.info("进入分析逻辑---------");
                                 // 1. 异步启动图片保存分析
@@ -483,9 +495,11 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                         log.error("启动图片分析失败: jobId={}", jobId, e);
                                         // 分析失败也要从监控中移除
                                         monitoringTasks.remove(taskCode);
+                                        uploadStallMap.remove(taskCode);
                                     }
                                 }).start();
                                 monitoringTasks.remove(taskCode);
+                                uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==0){
 //                              普通任务先不分析直接保存
@@ -497,6 +511,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                     }
                                 }
                                 monitoringTasks.remove(taskCode);
+                                uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==3){
                                 log.info("执行普通计划保存图片---");
@@ -507,12 +522,62 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                     }
                                 }
                                 monitoringTasks.remove(taskCode);
+                                uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }
+//                      只针对航点航线任务，如果拍照上传数停滞，则执行下面的逻辑
+                        }else if (planType == 0 && uploaded >= total - 2 && uploaded < total) {
+                            // 获取该任务的停滞信息
+                            UploadStallInfo stallInfo = uploadStallMap.get(taskCode);
+                            long now = System.currentTimeMillis();
+                            if (stallInfo == null) {
+                                // 第一次进入停滞检测，记录当前上传数和时间
+                                stallInfo = new UploadStallInfo();
+                                stallInfo.lastUploadedCount = uploaded;
+                                stallInfo.lastChangeTime = now;
+                                uploadStallMap.put(taskCode, stallInfo);
+                                log.info("开始监控上传停滞: taskCode={}, 当前上传={}/{}", taskCode, uploaded, total);
+                            } else {
+                                // 检查上传数是否有变化
+                                if (stallInfo.lastUploadedCount != uploaded) {
+                                    // 上传数有增加，更新时间
+                                    stallInfo.lastUploadedCount = uploaded;
+                                    stallInfo.lastChangeTime = now;
+                                    log.info("上传数更新: taskCode={}, 当前上传={}/{}", taskCode, uploaded, total);
+                                } else {
+                                    // 上传数未变化，检查是否超过30秒
+                                    long stagnantDuration = now - stallInfo.lastChangeTime;
+                                    if (stagnantDuration >= 30_000) {  // 30秒阈值
+                                        log.warn("上传数已停滞超过30秒: taskCode={}, 上传={}/{}, 强制进入后续处理",
+                                                taskCode, uploaded, total);
+                                        // 执行与完全相同时相同的后续逻辑
+                                        JSONObject jsonObject = new JSONObject();
+                                        jsonObject.put("jobId", jobId);
+                                        Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
+                                        if(result.getCode() == 0){
+                                            if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
+                                                sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                            }
+                                        }
+                                        monitoringTasks.remove(taskCode);
+                                        uploadStallMap.remove(taskCode);
+                                        log.info("停滞任务已处理并移除监控: taskCode={}", taskCode);
+                                    } else {
+                                        log.debug("上传数停滞中，已持续{}ms: taskCode={}, 上传={}/{}",
+                                                stagnantDuration, taskCode, uploaded, total);
+                                    }
+                                }
+                            }
+                        }else {
+                            // 原有逻辑：上传数未达到阈值，不做处理，但需要重置停滞记录（防止残留）
+                            if (planType == 0) {
+                                uploadStallMap.remove(taskCode);
                             }
                         }
                     }else {
                         monitoringTasks.remove(taskCode);
                         log.info("任务失败/取消/终止，停止监控: taskCode={}", taskCode);
+                        uploadStallMap.remove(taskCode);
                     }
                 }
 
