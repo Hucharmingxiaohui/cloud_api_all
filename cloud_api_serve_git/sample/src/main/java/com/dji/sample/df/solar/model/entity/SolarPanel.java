@@ -91,8 +91,8 @@ public class SolarPanel implements Serializable {
     /**
      * 光伏板倾角（度）
      */
-    @TableField("angle_tilt")
-    private Double angleTilt;
+    @TableField("tilt_angle")
+    private Double tiltAngle;
 
     /**
      * 横向航线数

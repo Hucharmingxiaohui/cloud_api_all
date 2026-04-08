@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletResponse;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 
@@ -16,8 +17,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @RequestMapping("/")
 public class ResultController {
 
-    private static ConcurrentLinkedQueue<AnalyseParamsRecReq> AnalyseResultQueue = new ConcurrentLinkedQueue<>();
-
+//    private static ConcurrentLinkedQueue<AnalyseParamsRecReq> AnalyseResultQueue = new ConcurrentLinkedQueue<>();
+    private static final Queue<AnalyseParamsRecReq> AnalyseResultQueue = new ConcurrentLinkedQueue<>();
     @Autowired
     private ResultService resultService;
     //  参考智能分析，返回图片结果转为base64，发送智能请求，进行联调
@@ -41,8 +42,9 @@ public class ResultController {
      */
     @PostMapping("/picAnalyseRetNotify")
     public Result picAnalyseRetNotify(@RequestBody AnalyseParamsRecReq params) {
-        System.out.println("结果=========="+params.toString());
-        AnalyseResultQueue.add(params);
+        System.out.println("收到请求，队列大小：" + AnalyseResultQueue.size());
+        boolean added = AnalyseResultQueue.add(params);
+        System.out.println("添加结果：" + added);
         return Result.success();
     }
 

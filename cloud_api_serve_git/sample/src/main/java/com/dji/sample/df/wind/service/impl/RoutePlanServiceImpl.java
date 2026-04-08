@@ -4,12 +4,15 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
+import com.df.framework.utils.HttpUtils;
 import com.dji.sample.control.model.param.InFlightWaylineDeliverParam;
 import com.dji.sample.control.service.IControlService2;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
+import com.dji.sample.df.solar.dao.SolarPanelMapper;
+import com.dji.sample.df.solar.model.entity.SolarPanel;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.PointOfInterestMapper;
@@ -93,6 +96,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Autowired
     private IWaylineJobMapper waylineJobMapper;
+
+    @Autowired
+    private HttpUtils httpUtils;
+
+    @Autowired
+    private SolarPanelMapper solarPanelMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -997,6 +1006,103 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             throw new RuntimeException(e);
         }
         return map;
+    }
+
+    @Override
+    public Map<String,Object> buildSolarPanelWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+//      光伏航线
+        Map map = new HashMap();
+        String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
+        SolarPanel solarPanel = solarPanelMapper.selectById(solarPanelId);
+        String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
+        // 构建 solar_params
+        Double corner1Lng = solarPanel.getCorner1Lng();
+        Double corner1Lat = solarPanel.getCorner1Lat();
+        Double corner2Lng = solarPanel.getCorner2Lng();
+        Double corner2Lat = solarPanel.getCorner2Lat();
+        Double corner3Lng = solarPanel.getCorner3Lng();
+        Double corner3Lat = solarPanel.getCorner3Lat();
+        Double corner4Lng = solarPanel.getCorner4Lng();
+        Double corner4Lat = solarPanel.getCorner4Lat();
+        Double areaHeight = solarPanel.getAreaHeight();
+        // 构建 corners 数组
+        JSONArray corners = new JSONArray();
+        double[][] points = {
+                {corner1Lng, corner1Lat, areaHeight},
+                {corner2Lng, corner2Lat, areaHeight},
+                {corner3Lng, corner3Lat, areaHeight},
+                {corner4Lng, corner4Lat, areaHeight}
+        };
+        for (double[] point : points) {
+            JSONObject corner = new JSONObject();
+            corner.put("lon", point[0]);
+            corner.put("lat", point[1]);
+            corner.put("height", point[2]);
+            corners.add(corner);
+        }
+        JSONObject solarParams = new JSONObject();
+        solarParams.put("panelHeight", solarPanel.getPanelHeight());
+        solarParams.put("flightAltitude", solarPanel.getFlightAltitude());
+        solarParams.put("panelHeading",solarPanel.getPanelHeading());
+        solarParams.put("panelTilt",solarPanel.getTiltAngle());
+        solarParams.put("margin", solarPanel.getMargin());
+        JSONObject routeParams = new JSONObject();
+        routeParams.put("horizontalLines", solarPanel.getHorizontalLines());
+        routeParams.put("pointsPerLine", solarPanel.getPointsPerLine());
+        JSONObject root = new JSONObject();
+        root.put("corners", corners);
+        root.put("solar_params", solarParams);
+        root.put("route_params", routeParams);
+        String jsonString = root.toString();
+        String response = httpUtils.sendPostJson(url, jsonString);
+        JSONObject jsonResponse = JSONObject.parseObject(response);
+        String routeName = jsonResponse.getString("routeName");
+        String projectPath = System.getProperty("user.dir");
+        String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
+        MultipartFile file = null;
+        try {
+            file = convert(filePath);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
+        String creator = "adminPC";
+        importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
+        String fileName = file.getOriginalFilename();
+        if (fileName != null && fileName.endsWith(".kmz")) {
+            fileName = fileName.substring(0, fileName.length() - 4);
+        }
+        WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
+        if (Objects.isNull(entity)) {
+            log.error("导入外部航线失败");
+        }
+        pubWaylineJobPlanDfEntity.setName(routeName);
+        pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
+//      航线类型：航点
+        pubWaylineJobPlanDfEntity.setWaylineType(0);
+//      创建计划存数据库
+        pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+        // 获取当前系统时间戳（以毫秒为单位）
+        long currentTimeMillis = System.currentTimeMillis();
+        //如果是立即执行任务，添加begin_time
+        if(pubWaylineJobPlanDfEntity.getTaskType()==0){
+            pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
+        }
+        pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
+        pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
+        pubWaylineJobPlanDfEntity.setWaylineType(0);
+        //校验paln_id是否重复
+        PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
+                eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
+        if(entity1!=null){//plan_id重复
+            map.put("result",false);
+            return map;
+        }else{//plan_id不重复
+            pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
+            map.put("result",true);
+            map.put("plan",pubWaylineJobPlanDfEntity);
+            return map;
+        }
     }
 
 }

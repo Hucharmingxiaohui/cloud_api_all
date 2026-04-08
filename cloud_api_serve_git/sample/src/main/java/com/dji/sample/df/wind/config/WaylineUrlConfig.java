@@ -20,5 +20,6 @@ public class WaylineUrlConfig {
         private String workingWayline;
         private String stopWayline;
         private String interestPointWayline;
+        private String solarPanelWayline;
     }
 }
