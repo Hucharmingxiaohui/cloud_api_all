@@ -119,17 +119,17 @@ const routes: Array<RouteRecordRaw> = [
           },
         ]
       },
-      // {
-      //   path: '/' + ERouterName.Points_Management,
-      //   name: ERouterName.Points_Management,
-      //   component: () => import('/@/components/points/points_manage.vue'),
-      //   meta: {
-      //     showInMenu: true,
-      //     label: '点位管理',
-      //     position: 'left',
-      //     cache: true
-      //   }
-      // },
+      {
+        path: '/' + ERouterName.Points_Management,
+        name: ERouterName.Points_Management,
+        component: () => import('/@/components/points/points_manage.vue'),
+        meta: {
+          showInMenu: true,
+          label: '点位管理',
+          position: 'left',
+          cache: true
+        }
+      },
 
       {
         path: '/' + ERouterName.DEVICES,
@@ -231,26 +231,26 @@ const routes: Array<RouteRecordRaw> = [
           },
 
           // 子菜单 - 风机计划
-          // {
-          //   path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
-          //   name: ERouterName.FLY_FAN_PLAN,
-          //   component: () => import('/@/components/task/flyFanPlan.vue'),
-          //   meta: {
-          //     showInMenu: true,
-          //     label: '风机计划',
-          //     cache: true
-          //   }
-          // },
-          // {
-          //   path: '/taskManage/interestPointPlan',
-          //   name: 'interestPointPlan',
-          //   component: () => import('/@/components/task/interestPointPlan.vue'),
-          //   meta: {
-          //     showInMenu: true,
-          //     label: '兴趣点环绕计划',
-          //     cache: true
-          //   }
-          // },
+          {
+            path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
+            name: ERouterName.FLY_FAN_PLAN,
+            component: () => import('/@/components/task/flyFanPlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '风机计划',
+              cache: true
+            }
+          },
+          {
+            path: '/taskManage/interestPointPlan',
+            name: 'interestPointPlan',
+            component: () => import('/@/components/task/interestPointPlan.vue'),
+            meta: {
+              showInMenu: true,
+              label: '兴趣点环绕计划',
+              cache: true
+            }
+          },
 
           // 子菜单 - 飞行任务
           {

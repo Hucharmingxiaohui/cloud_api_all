@@ -273,7 +273,7 @@ import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
 import SelectWayLine from '/@/pages/page-web/projects/wayline.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getAllWindTurbineApi, getAllInserestPointApi,getAllSolarPanelApi } from '/@/api/turbine/turbineMgt'
+import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi } from '/@/api/turbine/turbineMgt'
 const router = useRouter()
 const route = useRoute()
 const type = ref(localStorage.getItem('createPlan_query')) // 获取计划类型
@@ -498,7 +498,6 @@ function getSolarPanel () {
   }
 }
 
-
 /**
  * 更新环绕点类型
  */
@@ -518,8 +517,7 @@ function closePlan () {
     router.push({ path: '/taskManage/common-fly-wayline-plan' })
   } else if (type.value === '4') {
     router.push({ path: '/taskManage/solarPlan' })
-  }
-  else {
+  } else {
     router.push({ path: '/taskManage/interestPointPlan' })
   }
 }

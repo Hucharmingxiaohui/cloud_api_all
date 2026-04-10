@@ -68,8 +68,8 @@ onMounted(() => {
 *
 */
 const timestamp = new Date().getTime().toString()
-const liveURL = config.rtmpURL + timestamp
-livetypeSelected.value = 1
+const liveURL = config.rtcURL
+livetypeSelected.value = 4
 claritySelected.value = 2
 async function getcameraInfo () {
   if (isStartSteam.value) return
@@ -107,11 +107,11 @@ async function getLiveHttp () {
     }).then(res => {
       if (res.code === 0) {
         isStartSteam.value = true
-        // flvURL.value = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-        const videoUrl = res.data.url.replace('webrtc://', 'http://').replace(':2035', ':9080') + '.flv'
-        const liveIndex = videoUrl.indexOf('/live/')
-        flvURL.value = getImageUrl(config.flvURL, videoUrl.substring(liveIndex + 6))
-        initFlv()
+        const whepUrl = res.data.url
+        const urlObj = new URL(whepUrl)
+        const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
+        const flvFileName = streamName + '.flv'
+        flvURL.value = getImageUrl(config.flvURL, flvFileName)
       }
       if (res.code === 513003) {
         isPlay.value = true

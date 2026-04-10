@@ -7,14 +7,14 @@ const droneSelected = ref()
 const cameraSelected = ref('165-0-7')
 const nonSwitchable = 'normal'
 const videoId = ref('')
-const livetypeSelected = 1
+const livetypeSelected = 4
 const claritySelected = 2
 
 // 无人机
 const droneCameraSelected = ref('99-0-0')
 
 const timestamp = new Date().getTime().toString()
-const liveURL = config.rtmpURL + timestamp
+const liveURL = config.rtcURL
 
 export const startStream = (device_sn, device_type) => {
   getcameraInfo(device_sn, device_type)
