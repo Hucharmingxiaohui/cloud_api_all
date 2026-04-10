@@ -65,49 +65,33 @@ public class FjReportController {
 
     @Autowired
     ReportService reportService;
-
     @Autowired
     private FjReportService fjReportService;
-
     @Autowired
     private FjFileConfig fileConfig;
-
     @Autowired
     private PictureSaveHandler pictureSaveHandler;
-
     @Autowired
     IFileMapperDf iFileMapperDf;
-
     @Autowired
     IWaylineJobMapper waylineJobMapper;
-
     @Autowired
     FanWaylinePointsMapper  fanWaylinePointsMapper;
-
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
-
     @Autowired
     private IDeviceMapper deviceMapper;
 //  OssServiceContext还是IOssService需要区分
     @Autowired
     private OssServiceContext ossService;
-
     @Autowired
     IFileMapper fileMapper;
-
     @Autowired
     private IWorkspaceMapper workspaceMapper;
-
     @Autowired
     private ResultService resultService;
-
     @Autowired
     private IFileServiceDf fileService;
-
-    @Autowired
-    FjFileConfig fjFileConfig;
-
     @Autowired
     UniPointMapper2 uniPointMapper2;
 
@@ -151,15 +135,6 @@ public class FjReportController {
             pictureSaveHandler.pictureSave(jobId);
             return Result.success("success");
         }
-//      查询job的保存标志位，未保存完就setIsAnalyzed(4)，就不执行下面逻辑直接return,前端显示正在保存，显示正在保存则一直调这个接口直到返回成功
-//        Integer isSaved = waylineJobEntity.getIsSaved();
-//        if(isSaved!=null) {
-//            if (isSaved != 2) {
-//                waylineJobEntity.setIsAnalyzed(4);
-//                waylineJobMapper.updateById(waylineJobEntity);
-//                return Result.saving("还在保存截图文件");
-//            }
-//        }
         waylineJobEntity.setIsAnalyzed(2);
         waylineJobMapper.updateById(waylineJobEntity);
         log.info(jobId+"正在分析。。。");
@@ -202,13 +177,6 @@ public class FjReportController {
         }
         return Result.success("success");
     }
-
-//    @GetMapping("/sendRec")
-//    public Result sendRec(@RequestParam String jobId) throws Exception {
-//        Map<String,String> data = (Map<String,String>)redisTemplate.opsForHash().get("reg", jobId);
-//        resultService.handleUavResult(data,"e3dea0f5-37f2-4d79-ae58-490af3228069",jobId);
-//        return Result.success("success");
-//    }
 
     @GetMapping("/isAnalyzed")
     public Result isAnalyzed(@RequestParam String jobId) {

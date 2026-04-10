@@ -241,50 +241,6 @@ public class PictureSaveHandler {
             throw e;
         }
     }
-//
-//    public static String downloadAndConvertToJpeg2(String url, String localFileName, String filePictrueUrl,String jobId,String nativePath) throws IOException {
-//        String tempDir = filePictrueUrl + "/" +jobId;
-//        Path tempPath = Paths.get(tempDir);
-//        if (!Files.exists(tempPath)) {
-//            Files.createDirectories(tempPath);
-//        }
-//
-//        // 修复：检查文件名是否有后缀，如果没有则直接添加.jpg
-//        String fileNameWithoutExt;
-//        if (localFileName.contains(".")) {
-//            fileNameWithoutExt = localFileName.substring(0, localFileName.lastIndexOf('.'));
-//        } else {
-//            fileNameWithoutExt = localFileName;
-//        }
-//        localFileName = fileNameWithoutExt + ".jpg";
-//
-//        String localFilePath = tempDir + "/" + localFileName;
-//
-//        try {
-//            // 从URL读取图片
-//            URL imageUrl = new URL(url);
-//            BufferedImage image = ImageIO.read(imageUrl);
-//
-//            if (image == null) {
-//                throw new IOException("无法从URL读取图片: " + url);
-//            }
-//
-//            // 创建JPG文件并保存
-//            File outputFile = new File(localFilePath);
-//            boolean success = ImageIO.write(image, "jpg", outputFile);
-//
-//            if (!success) {
-//                throw new IOException("无法将图片保存为JPEG格式");
-//            }
-//
-//            System.out.println("JPEG图片保存成功: " + localFilePath);
-//            return nativePath + jobId+ "/" + localFileName;
-//
-//        } catch (IOException e) {
-//            System.err.println("图片转换失败: " + e.getMessage());
-//            throw e;
-//        }
-//    }
 
     public static String downloadAndConvertToJpeg2(String regId,String url, String localFileName,
                                                    String filePictrueUrl, String jobId, String nativePath) throws IOException {

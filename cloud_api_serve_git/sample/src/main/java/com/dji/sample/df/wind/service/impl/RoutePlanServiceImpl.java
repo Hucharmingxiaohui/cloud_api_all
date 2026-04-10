@@ -24,7 +24,6 @@ import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.df.wind.service.WindTurbineService;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
-import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineFileEntity;

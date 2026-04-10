@@ -1,4 +1,4 @@
-package com.dji.sample.df.wind.timer;
+package com.dji.sample.df.wind.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -9,7 +9,6 @@ import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
-import com.dji.sample.df.wind.mqtt.LongyuanMqttHandler;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
@@ -26,7 +25,7 @@ import java.util.Set;
 
 @Component
 @Slf4j
-public class TaskTimerManager {
+public class CenterTaskHandler {
 
     @Autowired
     private RedisUtils redisUtils;
@@ -150,7 +149,7 @@ public class TaskTimerManager {
                                         .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
                                 );
                                 // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
-                                LongyuanMqttHandler.startMonitoringTask(taskCode, taskName);
+                                JobControlHandler.startMonitoringTask(taskCode, taskName);
                             }
 
                             // 从有序集合中移除已执行任务
@@ -167,8 +166,6 @@ public class TaskTimerManager {
             log.error("定时扫描任务失败", e);
         }
     }
-
-
 
     /**
      * 执行任务
@@ -228,45 +225,6 @@ public class TaskTimerManager {
         } catch (Exception e) {
             log.error("任务执行异常", e);
             return -1;
-        }
-    }
-
-    /**
-     * 删除任务
-     */
-    public void deleteTask(String taskCode) {
-        try {
-            // 先从Hash中获取执行时间戳
-            Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
-            if (detailMap != null) {
-                Object timestampObj = detailMap.get("executeTimestamp");
-                if (timestampObj != null) {
-                    // 从有序集合中删除
-                    String taskInfo = taskCode + ":" + timestampObj.toString();
-                    redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
-                }
-            }
-
-            // 删除Hash详情
-            redisUtils.delete(TASK_DETAIL_HASH + ":" + taskCode);
-
-            log.info("删除定时任务: {}", taskCode);
-
-        } catch (Exception e) {
-            log.error("删除定时任务失败", e);
-        }
-    }
-
-    /**
-     * 获取所有等待的任务数量
-     */
-    public int getWaitingTaskCount() {
-        try {
-            Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
-            return allTasks != null ? allTasks.size() : 0;
-        } catch (Exception e) {
-            log.error("获取任务数量失败", e);
-            return 0;
         }
     }
 

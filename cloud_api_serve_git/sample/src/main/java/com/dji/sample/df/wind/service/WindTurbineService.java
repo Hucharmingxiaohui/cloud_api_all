@@ -1,10 +1,8 @@
 package com.dji.sample.df.wind.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 
-import java.util.List;
 import java.util.Map;
 
 public interface WindTurbineService  extends IService<WindTurbine> {

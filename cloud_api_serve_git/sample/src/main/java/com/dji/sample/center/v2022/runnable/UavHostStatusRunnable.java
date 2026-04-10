@@ -1,7 +1,6 @@
 package com.dji.sample.center.v2022.runnable;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.SpringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
@@ -10,14 +9,11 @@ import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.common.util.SpringBeanUtilsTest;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
-import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
 import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
-import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.wayline.service.IWaylineRedisService;
-import com.dji.sdk.cloudapi.device.OsdDockDrone;
 import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
 import lombok.extern.slf4j.Slf4j;
 

@@ -3,52 +3,34 @@ package com.dji.sample.df.wind.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.redis.RedisUtils;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.df.server.entity.sys.SysDictDataEntity;
 import com.df.server.mapper.sys.SysDictDataMapper;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
-import com.dji.sample.center.utils.StringUtils;
-import com.dji.sample.df.electricInspectionDf.service.ReportService;
-import com.dji.sample.df.electricInspectionDf.service.impl.ResultServiceImpl;
-import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
-import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.*;
-import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.*;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
-import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblWidth;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblWidth;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigInteger;
 import java.util.function.Function;
 
 import javax.annotation.Resource;
-import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
@@ -61,8 +43,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static com.dji.sample.df.wind.utils.FileUtil.convert;
 
 @Slf4j
 @Service

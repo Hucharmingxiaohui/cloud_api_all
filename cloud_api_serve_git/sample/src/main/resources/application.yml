@@ -314,14 +314,6 @@ uavPlatform:
 hebei:
   stationCode: "HDCN"
 
-lyftps:
-  ftpIp: 172.20.63.157
-  ftpPort: 10012
-  userName: dfftp
-  password: dfe2k_1500
-  #false显式，true隐式
-  implicit: true
-
 importPoint:
 #  D:/importPoint/  /home/importPoint/
   filePath: D:/importPoint/

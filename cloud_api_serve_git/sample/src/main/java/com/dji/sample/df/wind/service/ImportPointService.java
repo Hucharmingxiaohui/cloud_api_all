@@ -1,6 +1,5 @@
 package com.dji.sample.df.wind.service;
 
-import com.df.server.dto.uniPoint.UniPointImportExcel;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.wind.model.entity.UniPointImportExcel2;
 

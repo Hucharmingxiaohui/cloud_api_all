@@ -1,12 +1,7 @@
 package com.dji.sample.wayline.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
-import com.df.framework.thread.CustomExecutorFactory;
 import com.df.framework.utils.HttpUtils;
-import com.df.server.entity.his.HisUniTaskItemFileEntity;
-import com.df.server.entity.his.HisUniTaskItemPointsEntity;
-import com.df.server.entity.uni.UniPointEntity;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.df.server.service.his.impl.HisUniTaskItemPointsServiceImpl;
 import com.dji.sample.common.error.CommonErrorEnum;
@@ -16,7 +11,7 @@ import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
-import com.dji.sample.df.wind.mqtt.LongyuanMqttHandler;
+import com.dji.sample.df.wind.handler.JobControlHandler;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.media.model.MediaFileCountDTO;
@@ -426,7 +421,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         redisUtils.set("jobId",jobId);
         redisUtils.set("isCenterTask","0");
 //      这个地方要看下加startMonitoringTask的作用，和需要传什么id
-        LongyuanMqttHandler.startMonitoringTask(jobId, job.getJobName());
+        JobControlHandler.startMonitoringTask(jobId, job.getJobName());
         waylineJobService.updateJob(WaylineJobDTO.builder()
                 .jobId(jobId)
                 .executeTime(LocalDateTime.now())

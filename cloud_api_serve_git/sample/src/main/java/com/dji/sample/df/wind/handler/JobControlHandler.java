@@ -1,12 +1,9 @@
-package com.dji.sample.df.wind.mqtt;
+package com.dji.sample.df.wind.handler;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
-import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
@@ -16,30 +13,20 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.PatrolResultItem;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
-import com.dji.sample.component.oss.model.OssConfiguration;
-import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
-import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.mediaDf.controller.FileControllerDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
-import com.dji.sample.df.wind.config.FjFileConfig;
-import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.controller.FjReportController;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
-import com.dji.sample.df.wind.dao.WindTurbineMapper;
-import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
-import com.dji.sample.df.wind.model.entity.WindTurbine;
-import com.dji.sample.df.wind.timer.TaskTimerManager;
 import com.dji.sample.df.wind.utils.FileNameUtils;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
-import com.dji.sample.media.controller.FileController;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
@@ -48,8 +35,6 @@ import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.dji.sdk.cloudapi.wayline.WaylineErrorCodeEnum;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
-import com.dji.sdk.mqtt.longyuan.MqttMessageHandler;
-import com.dji.sdk.mqtt.longyuan.MqttStandardMessage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,11 +42,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.InputStream;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -74,16 +56,10 @@ import java.util.regex.Pattern;
 
 @Slf4j
 @Component
-public class LongyuanMqttHandler implements MqttMessageHandler {
+public class JobControlHandler {
 
     @Autowired
-    private MqttMessageSender mqttSender;
-    @Autowired
-    WindTurbineMapper windTurbineMapper;
-    @Autowired
     private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
-    @Autowired
-    PubWaylineJobPlanDfService pubWaylineJobPlanDfService;
     @Autowired
     private IWaylineJobMapper waylineJobMapper;
     @Autowired
@@ -91,21 +67,11 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     @Resource
     private RedisUtils redisUtils;
     @Autowired
-    TaskTimerManager taskTimerManager;
-    @Autowired
     private FjReportController fjReportController;
-    @Autowired
-    private FjFileConfig fileConfig;
-    @Autowired
-    LyFtpsProperties  lyFtpsProperties;
-    @Autowired
-    FileController fileController;
     @Autowired
     FileControllerDf fileControllerDf;
     @Autowired
     private IFileService fileService;
-    @Autowired
-    private OssServiceContext ossService;
     @Resource
     FanStationPointsMapper fanStationPointsMapper;
     @Autowired
@@ -113,11 +79,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     @Autowired
     private CenterNormalConfig centerConfig;
     @Autowired
-    CenterFtpsNormalConfig centerFtpsNormalConfig;
-    @Autowired
     DefectEntityMapper defectEntityMapper;
-    @Autowired
-    private PictureSaveHandler pictureSaveHandler;
     @Autowired
     UniPointMapper2 uniPointMapper2;
     @Autowired
@@ -135,20 +97,9 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
     // 存储正在监控的任务
     private static final Map<String,Map<String,Long>> monitoringTasks = new ConcurrentHashMap<>();
 
-    // ========== 分析状态监控逻辑 ==========
-
     // 存储分析中的任务
     private final Map<String, String> analyzingTasks = new ConcurrentHashMap<>(); // taskCode -> jobId
     private final Map<String, Long> analysisStartTime = new ConcurrentHashMap<>(); // taskCode -> 开始时间
-
-    /**
-     * 添加到分析监控
-     */
-    private void addToAnalysisMonitoring(String taskCode, String jobId) {
-        analyzingTasks.put(taskCode, jobId);
-        analysisStartTime.put(taskCode, System.currentTimeMillis());
-        log.info("开始监控分析状态: taskCode={}, jobId={}", taskCode, jobId);
-    }
 
     @Value("${uavPlatform.sender}")
     private String sender;
@@ -164,220 +115,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         map.put(taskName,  System.currentTimeMillis());
         monitoringTasks.put(taskCode,map);
         log.info("开始监控任务状态: taskCode={}, taskName={}", taskCode, taskName);
-    }
-    /**
-     * 停止监控任务状态
-     */
-    public void stopMonitoringTask(String taskCode) {
-        monitoringTasks.remove(taskCode);
-        log.info("停止监控任务状态: taskCode={}", taskCode);
-    }
-
-    @Override
-    public boolean supports(String topic) {
-        return "/patrol/data/LyGroupToSub/guangxi_weilan".equals(topic);
-    }
-
-    @Override
-    public void handleMessage(String topic, String payload) {
-        log.info("收到消息: topic={}", topic);
-    }
-
-    @Override
-    public void handleStandardMessage(String topic, MqttStandardMessage message) {
-        log.info("处理消息: messageId={}, category={}, action={}",
-                message.getMessageId(), message.getCategory(), message.getAction());
-
-        String handlerKey = message.getCategory() + ":" + message.getAction();
-
-        switch (handlerKey) {
-            case "model:sync":       // 点位模型同步
-                handleModelSync(message);
-                break;
-            case "task:dispatch":    // 任务下发
-                handleTaskDispatch(message);
-                break;
-            default:
-                log.warn("未处理的消息类型: category={}, action={}",
-                        message.getCategory(), message.getAction());
-        }
-    }
-
-    // ========== 核心业务处理方法 ==========
-
-    /**
-     * 1. 处理点位模型同步（上对下）
-     */
-    private void handleModelSync(MqttStandardMessage message) {
-        Map<String, Object> data = message.getData();
-        String syncType = (String) data.get("syncType");
-        String description = (String) data.get("description");
-
-        log.info("处理点位模型同步请求: syncType={}, description={}",
-                syncType, description);
-
-        try {
-            // 1. 根据 syncType 查询对应的模型数据
-            List<Map<String, Object>> modelData = queryModelDataByType(syncType);
-
-            // 2. 将 modelData 转换为 JSON 字符串，格式化为可读格式
-                        String jsonContent = JSON.toJSONString(
-                                modelData,
-                                SerializerFeature.PrettyFormat,
-                                SerializerFeature.WriteMapNullValue,
-                                SerializerFeature.WriteDateUseDateFormat
-                        );
-
-            // 3. 生成 JSON 文件名（使用时间戳或UUID确保唯一性）
-                        String timestamp = String.valueOf(System.currentTimeMillis());
-                        String jsonFileName = "model_data_" + timestamp + ".json";
-            // 4. 构建 ObjectKey（存储路径）
-            String objectKey = OssConfiguration.objectDirPrefix + "/model/" + jsonFileName;
-
-            // 5. 将 JSON 字符串转换为 InputStream 并上传到 OSS
-            try (InputStream jsonInputStream = new ByteArrayInputStream(jsonContent.getBytes(StandardCharsets.UTF_8))) {
-                ossService.putObject(OssConfiguration.bucket, objectKey, jsonInputStream);
-
-            } catch (Exception e) {
-                // 处理异常
-                throw new RuntimeException("上传JSON文件失败", e);
-            }
-
-            URL objectUrl = ossService.getObjectUrl(OssConfiguration.bucket, objectKey);
-            String urlString = objectUrl.toString();
-
-            // 2. 构建响应报文
-            Map<String, Object> response = new HashMap<>();
-
-            response.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
-            response.put("timestamp", getCurrentTime());
-            response.put("sender", sender);
-            response.put("stationCode",stationCode);
-            response.put("category", "model");
-            response.put("action", "upload");
-
-            // 3. 构建 data 部分
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("modeType", syncType); // 使用上级传来的 syncType
-            responseData.put("description", description);
-            responseData.put("fileUrl",urlString);
-            responseData.put("modelData", "");
-
-            response.put("data", responseData);
-
-            // 4. 发送响应
-            mqttSender.sendToPatrolData(response);
-            log.info("发送模型数据响应: syncType={}, 数据条数={}",
-                    syncType, modelData.size());
-
-        } catch (Exception e) {
-            log.error("点位模型同步处理失败", e);
-            sendErrorResponse(message, "model", "upload", "MODEL_SYNC_ERROR", e.getMessage());
-        }
-    }
-
-    private List<Map<String, Object>> queryModelDataByType(String syncType) {
-        // 实际应从数据库查询
-        List<Map<String, Object>> modelData = new ArrayList<>();
-
-        if ("2".equals(syncType)) {
-            // 巡视点位模型
-            modelData.addAll(queryPatrolPointModels());
-        }
-
-        return modelData;
-    }
-
-    private List<Map<String, Object>> queryPatrolPointModels() {
-        List<Map<String, Object>> models = new ArrayList<>();
-        List<WindTurbine> windTurbines = windTurbineMapper.selectList(new HashMap());
-
-        for (WindTurbine windTurbine : windTurbines) {
-            List<FanStationPoints> fanStationPoints = fanStationPointsMapper.selectList(new LambdaQueryWrapper<FanStationPoints>()
-                    .eq(FanStationPoints::getMainDeviceId, windTurbine.getId()));
-            // 示例数据1
-            if (!fanStationPoints.isEmpty()) {
-                for (FanStationPoints fanStationPoint : fanStationPoints) {
-                    Map<String, Object> point1 = new HashMap<>();
-
-                    point1.put("stationName", fanStationPoint.getStationName());
-                    point1.put("stationCode", stationCode);
-                    point1.put("areaId", fanStationPoint.getAreaId());
-                    point1.put("areaName", fanStationPoint.getAreaName());
-                    point1.put("bayId", fanStationPoint.getBayId());
-                    point1.put("bayName", fanStationPoint.getBayName());
-                    point1.put("mainDeviceId", fanStationPoint.getMainDeviceId());
-                    point1.put("mainDeviceName", fanStationPoint.getMainDeviceName());
-                    point1.put("componentId", fanStationPoint.getComponentId());
-                    point1.put("componentName", fanStationPoint.getComponentName());
-                    point1.put("pointId", fanStationPoint.getPointId());
-                    point1.put("pointName", fanStationPoint.getPointName());
-                    point1.put("deviceType", fanStationPoint.getDeviceType());
-                    point1.put("meterType", fanStationPoint.getMeterType());
-                    point1.put("appearanceType", fanStationPoint.getAppearanceType());
-                    point1.put("saveType", fanStationPoint.getSaveType());
-                    point1.put("recognitionType", fanStationPoint.getRecognitionType());
-                    point1.put("phase", fanStationPoint.getPhase());
-                    point1.put("deviceInfo", fanStationPoint.getDeviceInfo());
-                    point1.put("dataType", fanStationPoint.getDataType());
-                    point1.put("lowerValue", fanStationPoint.getLowerValue());
-                    point1.put("upperValue", fanStationPoint.getUpperValue());
-                    point1.put("videoPos", fanStationPoint.getVideoPos());
-                    point1.put("pointType", fanStationPoint.getPointType());
-                    point1.put("labelAttrib", fanStationPoint.getLabelAttrib());
-                    models.add(point1);
-                }
-            }
-
-        }
-        return models;
-    }
-
-    /**
-     * 2. 处理任务下发（上对下）
-     */
-    private void handleTaskDispatch(MqttStandardMessage message) {
-        Map<String, Object> data = message.getData();
-        String taskCode = (String) data.get("taskCode");
-        String taskName = (String) data.get("taskName");
-        Integer deviceLevel = (Integer) data.get("deviceLevel");
-        String deviceList = (String) data.get("deviceList");
-        String fixedStartTime = (String) data.get("fixedStartTime");
-
-        log.info("处理任务下发: taskCode={}, taskName={}",
-                taskCode, taskName );
-
-        try {
-            // 1. 检查设备层级和列表
-            if (deviceLevel == 2) {
-                // 2. 检查设备列表是否只有一个ID
-                String[] deviceIds = deviceList.split(",");
-                if (deviceIds.length == 1) {
-                    String singleDeviceId = deviceIds[0].trim();
-
-                    // 3. 查询所有风机
-                    List<WindTurbine> windTurbines = windTurbineMapper.selectList(new HashMap<>());
-
-                    // 4. 检查是否能匹配上风机ID
-                    WindTurbine matchedTurbine = windTurbines.stream()
-                            .filter(wt -> singleDeviceId.equals(wt.getId()) ||
-                                    singleDeviceId.equals(wt.getId()))
-                            .findFirst()
-                            .orElse(null);
-                    if (matchedTurbine!=null) {
-
-                        // 存入定时任务
-                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
-                                singleDeviceId, taskName);
-
-                    }
-                }
-            }
-
-        } catch (Exception e) {
-            log.error("任务处理失败", e);
-            sendErrorResponse(message, "task", "dispatch_ack", "TASK_PROCESS_ERROR", e.getMessage());
-        }
     }
 
     /**
@@ -625,7 +362,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                     log.info("已生成完报告-------");
                     if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
                         log.info("上传报告-------");
-                        sendPatrolResult2(taskCode, taskName, waylineJobEntity);
+                        sendPatrolReportResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 3. 清理监控
                     analyzingTasks.remove(taskCode);
@@ -823,7 +560,7 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }
     }
 
-    public void sendPatrolResult2(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
+    public void sendPatrolReportResult(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
         try {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                     .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
@@ -909,7 +646,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
         }
         return null;
     }
-
 
 
     public static String convertImagePath(String imagePath) {
@@ -1043,46 +779,6 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
 
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
-
-    // ========== 工具方法 ==========
-
-    /**
-     * 创建标准响应格式
-     */
-    private Map<String, Object> createResponse(MqttStandardMessage original,
-                                               String category, String action) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("messageId", UUID.randomUUID().toString());
-        response.put("timestamp", getCurrentTime());
-        response.put("sender", "PatrolSystem01"); // 你的系统标识
-        response.put("stationCode", original.getStationCode());
-        response.put("category", category);
-        response.put("action", action);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("originalMessageId", original.getMessageId());
-        data.put("responseTime", getCurrentTime());
-        response.put("data", data);
-
-        return response;
-    }
-
-    /**
-     * 发送错误响应
-     */
-    private void sendErrorResponse(MqttStandardMessage original, String category,
-                                   String action, String errorCode, String errorMsg) {
-        Map<String, Object> response = createResponse(original, category, action);
-        Map<String, Object> data = (Map<String, Object>) response.get("data");
-        data.put("result", "failed");
-        data.put("errorCode", errorCode);
-        data.put("errorMsg", errorMsg);
-
-        mqttSender.sendToPatrolData(response);
-        log.error("发送错误响应: category={}, action={}, errorCode={}",
-                category, action, errorCode);
-    }
-
     /**
      * 获取当前时间
      */
@@ -1091,9 +787,4 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
-
-    @Override
-    public String getHandlerName() {
-        return "longyuan-core-handler";
-    }
 }
