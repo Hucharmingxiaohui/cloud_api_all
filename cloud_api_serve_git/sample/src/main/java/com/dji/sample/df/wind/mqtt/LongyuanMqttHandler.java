@@ -524,6 +524,17 @@ public class LongyuanMqttHandler implements MqttMessageHandler {
                                 monitoringTasks.remove(taskCode);
                                 uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
+                            }else if(planType==4){
+                                log.info("执行光伏计划保存图片---");
+                                Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
+                                if(result.getCode() == 0){
+                                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
+                                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                    }
+                                }
+                                monitoringTasks.remove(taskCode);
+                                uploadStallMap.remove(taskCode);
+                                log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }
 //                      只针对航点航线任务，如果拍照上传数停滞，则执行下面的逻辑
                         }else if (planType == 0 && uploaded >= total - 2 && uploaded < total) {

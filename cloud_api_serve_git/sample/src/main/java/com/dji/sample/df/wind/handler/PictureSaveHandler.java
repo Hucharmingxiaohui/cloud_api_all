@@ -47,28 +47,20 @@ public class PictureSaveHandler {
 
     @Resource
     IFileMapperDf iFileMapperDf;
-
     @Resource
     private IFileService fileService;
-
     @Autowired
     private FjFileConfig fileConfig;
-
     @Resource
     private RedisUtils redisUtils;
-
     @Resource
     IWorkspaceMapper workspaceMapper;
-
     @Resource
     FanWaylinePointsMapper fanWaylinePointsMapper;
-
     @Autowired
     private IWaylineJobMapper waylineJobMapper;
-
     @Autowired
     UniPointMapper2 uniPointMapper2;
-
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
@@ -92,7 +84,7 @@ public class PictureSaveHandler {
                 .eq(FanWaylinePoints::getJobId, jobId));
         JSONArray points =new JSONArray();
         if (fanWaylinePoints != null && pubWaylineJobPlanDfEntity.getPlanType()==1) {
-//          1.风机图片存在服务器
+//          1.风机图片保存
             points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
             Map map = new HashMap();
             try {
@@ -120,7 +112,7 @@ public class PictureSaveHandler {
             }
             return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==0){
-//          2.普通图片存在服务器
+//          2.航点航线图片保存
             Map map = new HashMap();
             try {
                 int index = 0;
@@ -165,7 +157,19 @@ public class PictureSaveHandler {
                 e.printStackTrace();
             }
             return Result.success(map);
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==4){
+//          光伏区域保存
+            Map map = new HashMap();
+            for (MediaFileEntity mediaFileEntity : djiFiles) {
+                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+                String fileName = mediaFileEntity.getFileName();
+                String filePictrueUrl = fileConfig.getFilePictrueUrl();
+                String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                map.put(fileName, localFilePath);
+            }
+            return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
+//          普通航线图片保存
             Map map = new HashMap();
             int index = 0;
             for (MediaFileEntity mediaFileEntity : djiFiles) {

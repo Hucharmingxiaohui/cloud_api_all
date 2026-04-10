@@ -1076,7 +1076,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         if (Objects.isNull(entity)) {
             log.error("导入外部航线失败");
         }
-        pubWaylineJobPlanDfEntity.setName(routeName);
         pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
 //      航线类型：航点
         pubWaylineJobPlanDfEntity.setWaylineType(0);

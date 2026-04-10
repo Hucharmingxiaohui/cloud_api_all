@@ -339,7 +339,7 @@ public class SDKDeviceService extends AbstractDeviceService {
 
             log.info("开启无人机直播---");
             LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-            liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+            liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
             VideoId videoId = new VideoId();
             videoId.setDroneSn(droneSn);
             PayloadIndex payloadIndex = new PayloadIndex();
