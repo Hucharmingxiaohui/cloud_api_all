@@ -92,9 +92,6 @@ public class FjReportServiceImpl implements FjReportService {
 
     @Override
     public String createNewReport(String jobId) {
-//        fjReportMapper.delete(new LambdaQueryWrapper<FjReportEntity>().eq(FjReportEntity::getTaskPatrolledId,jobId));
-
-
         FjReportEntity reportEntity = new FjReportEntity();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
                 eq(WaylineJobEntity::getJobId, jobId));
@@ -106,16 +103,7 @@ public class FjReportServiceImpl implements FjReportService {
         return reportEntity.getId();
     }
 
-    /**
-     * 查看任务报告
-     *
-     * @param params
-     * @return
-     */
-    @Override
-    public TaskReportDTO lookReport(HisUniTaskParamsDTO params) {
-        return null;
-    }
+
 
     /**
      * 生成巡视报告
@@ -743,7 +731,7 @@ public class FjReportServiceImpl implements FjReportService {
 //    }
 
     @Override
-    public void genPatrolTaskWordNew(String reportId, String jobId) {
+    public void genFjPatrolTaskWordNew(String reportId, String jobId) {
         // 1. 从数据库获取巡检任务、风机、缺陷等信息
         FjReportEntity fjReportEntity = fjReportMapper.selectById(reportId);
         String taskName = fjReportEntity.getName();
@@ -2049,7 +2037,7 @@ public class FjReportServiceImpl implements FjReportService {
 
 
     @Override
-    public List<String> generateFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
+    public List<String> generateFjFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
         List<String> fileNames = new ArrayList<>();
         int index = 0;
 
@@ -2079,7 +2067,7 @@ public class FjReportServiceImpl implements FjReportService {
     }
 
     @Override
-    public AnalysisResponse sendAnalysisRequest(AnalysisRequest request) {
+    public AnalysisResponse sendFjAnalysisRequest(AnalysisRequest request) {
         try {
             String requestBody = objectMapper.writeValueAsString(request);
 
@@ -2318,48 +2306,10 @@ public class FjReportServiceImpl implements FjReportService {
                 // 如果不存在，插入新记录
                 defectEntityMapper.insert(defect);
             }
-//            defect.getJobId();
-//            defect.getFanCode();
-//            defect.getDefectType();
-//            defectEntityMapper.insert(defect);
             System.out.println((i + 1) + ". " + defect);
         }
 
         System.out.println("缺陷数据新增完成");
-    }
-    @Override
-    public void downloadDocxFile(String filePath, HttpServletResponse response) {
-        File file = new File(filePath);
-
-        if (!file.exists()) {
-            throw new RuntimeException("文件不存在: " + filePath);
-        }
-
-        if (!filePath.toLowerCase().endsWith(".docx")) {
-            throw new RuntimeException("文件格式错误，只支持DOCX格式");
-        }
-
-        try (FileInputStream fis = new FileInputStream(file);
-             OutputStream os = response.getOutputStream()) {
-
-            // 设置响应头
-            response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Content-Disposition",
-                    "attachment;filename=" + new String(file.getName().getBytes("UTF-8"), "ISO-8859-1"));
-            response.setHeader("Content-Length", String.valueOf(file.length()));
-
-            // 将文件写入响应流
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-            os.flush();
-
-        } catch (IOException e) {
-            throw new RuntimeException("文件下载失败");
-        }
     }
 
 }

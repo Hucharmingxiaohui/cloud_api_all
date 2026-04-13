@@ -390,7 +390,7 @@ public class FileServiceImplDf implements IFileServiceDf {
                                 eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
                     }
 
-                    List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
+                    List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
 
                     if (fileNames.size() == mediaFileDTOList.size()) {
                         for (int i = 0; i < mediaFileDTOList.size(); i++) {

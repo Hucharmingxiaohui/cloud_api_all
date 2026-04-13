@@ -3,7 +3,6 @@ package com.dji.sample.df.wind.handler;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
@@ -22,7 +21,6 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -44,15 +42,12 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class PictureSaveHandler {
-
     @Resource
     IFileMapperDf iFileMapperDf;
     @Resource
     private IFileService fileService;
     @Autowired
     private FjFileConfig fileConfig;
-    @Resource
-    private RedisUtils redisUtils;
     @Resource
     IWorkspaceMapper workspaceMapper;
     @Resource
