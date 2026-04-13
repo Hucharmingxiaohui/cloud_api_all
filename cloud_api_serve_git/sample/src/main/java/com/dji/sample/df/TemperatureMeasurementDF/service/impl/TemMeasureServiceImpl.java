@@ -51,6 +51,8 @@ public class TemMeasureServiceImpl implements TemMeasureService {
     private String remotePassword;
     @Value("${remote.dji_irp.path}")
     private String remoteDjiIrpPath;
+    @Value("${remote.dji_irp.libraryPath}")
+    private String remotelibraryPath;
     @Value("${remote.temp.dir}")
     private String remoteTempDir;
     @Autowired
@@ -366,7 +368,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
             // 2.4 构造并执行远程命令
 //          这一步要根据不同服务器sdk位置进行路径调整
-            String libraryPath = "/home/df/dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64";
+            String libraryPath = remotelibraryPath;
             String command = String.format("export LD_LIBRARY_PATH=%s; %s -s '%s' -a measure -o '%s'",
                     libraryPath, remoteDjiIrpPath, remoteImagePath, remoteRawPath);
             log.info("执行远程命令: {}", command);

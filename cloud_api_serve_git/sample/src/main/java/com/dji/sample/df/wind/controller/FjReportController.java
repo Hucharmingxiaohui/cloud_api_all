@@ -160,11 +160,11 @@ public class FjReportController {
                 jsonArray.addAll(videoPoints);
                 jsonArray.addAll(djiPoints);
             }
-             List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
+             List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
              log.info("文件名为-------------"+fileNames);
              log.info("request为-------------"+request);
              request.setFile_name(fileNames);
-             AnalysisResponse response = fjReportService.sendAnalysisRequest(request);
+             AnalysisResponse response = fjReportService.sendFjAnalysisRequest(request);
              if (response != null) {
                  System.out.println("分析结果: " + response);
              }
@@ -332,7 +332,7 @@ public class FjReportController {
         }else if(planType==1){
              reportId = fjReportService.createNewReport(jobId);
 
-            fjReportService.genPatrolTaskWordNew(reportId,jobId);
+            fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
         }
 
 //      已进行巡检

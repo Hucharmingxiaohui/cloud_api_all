@@ -332,6 +332,8 @@ remote:
   # 远程 dji_irp 的绝对路径（与本地保持一致）
   dji_irp:
     path: /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp
+#   测温库路径
+    libraryPath : /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64
 
   # 远程临时目录（存放图片和 raw 文件）
   temp:
