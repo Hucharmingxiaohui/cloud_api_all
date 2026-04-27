@@ -115,6 +115,16 @@ const routes: Array<RouteRecordRaw> = [
                   cache: true
                 }
               },
+              // {
+              //   path: '/variableMgt/solarMgt/solarPanelLabel',
+              //   name: 'solarPanelLabel',
+              //   component: () => import('/@/components/variableMgt/solarMgt/solarPanelLabel/index.vue'),
+              //   meta: {
+              //     showInMenu: true,
+              //     label: '光伏板区域标注',
+              //     cache: true
+              //   }
+              // },
             ]
           },
         ]

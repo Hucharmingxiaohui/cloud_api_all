@@ -756,7 +756,6 @@ function init () {
   const Layers = JSON.parse(JSON.stringify(store.state.Points))// 深拷贝，避免直接引用
 
   if (waylineData) {
-    console.log('我被执行2')
     const parsedData = JSON.parse(waylineData)
     // 确保 parsedData 的结构与 Layers[0] 相同
     if (parsedData && typeof parsedData === 'object') {
@@ -765,7 +764,6 @@ function init () {
       setTimeout(() => {
         useGMapCoverHook = useGMapCover()
         initMapCover(Layers[0])
-        console.log('添加浏览器内存')
         const coordinates = Layers[0].elements.map(point => {
           const { coordinates } = point.resource.content.geometry
           return wgs84togcj02(coordinates[0], coordinates[1]) // 只提取经纬度
@@ -792,15 +790,6 @@ function init () {
       localStorage.setItem('wayline', JSON.stringify(Layers[0]))
     }, 500)
   }
-  // 从航线编辑界面过来
-  // setTimeout(() => {
-  //   // console.log('sd', Layers)
-  //   // const Layers = store.state.Points
-  //   // mapLayers.value = Layers
-  //   // myMap.value.drawWayline() // 绘制航线
-  //   // localStorage.setItem('wayline', JSON.stringify(Layers[0]))
-  // }, 500)
-  // console.log('sdef', liveState)
 }
 // 页面刷新，航线重新绘制事件---------------------------------------------------------------------------------------------------------------------------------
 function initMapCover (item) {
