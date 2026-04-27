@@ -11,15 +11,14 @@ import lombok.NoArgsConstructor;
 import java.io.Serializable;
 
 /**
- * 光伏板组件实体类
- * 包含经纬度四点及像素行列坐标
+ * 太阳能光伏板巡检区域参数实体类
  */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName("manage_solar_panel")
-public class SolarPanel implements Serializable {
+@TableName("manage_solar_panel_area")
+public class SolarPanelArea implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -30,7 +29,7 @@ public class SolarPanel implements Serializable {
     private Long id;
 
     /**
-     * 光伏组件名称
+     * 光伏板区域名称
      */
     @TableField("solar_panel_name")
     private String solarPanelName;
@@ -84,50 +83,52 @@ public class SolarPanel implements Serializable {
     private Double corner4Lat;
 
     /**
-     * 角1像素列号
+     * 航线高度（米）
      */
-    @TableField("corner1_col")
-    private Integer corner1Col;
+    @TableField("flight_altitude")
+    private Double flightAltitude;
 
     /**
-     * 角1像素行号
+     * 光伏板倾角（度）
      */
-    @TableField("corner1_row")
-    private Integer corner1Row;
+    @TableField("tilt_angle")
+    private Double tiltAngle;
 
     /**
-     * 角2像素列号
+     * 横向航线数
      */
-    @TableField("corner2_col")
-    private Integer corner2Col;
+    @TableField("horizontal_lines")
+    private Integer horizontalLines;
+
+    // ========== 新增字段 ==========
 
     /**
-     * 角2像素行号
+     * 光伏区域海拔
      */
-    @TableField("corner2_row")
-    private Integer corner2Row;
+    @TableField("area_height")
+    private Double areaHeight;
 
     /**
-     * 角3像素列号
+     * 光伏架设高度
      */
-    @TableField("corner3_col")
-    private Integer corner3Col;
+    @TableField("panel_height")
+    private Double panelHeight;
 
     /**
-     * 角3像素行号
+     * 光伏板朝向
      */
-    @TableField("corner3_row")
-    private Integer corner3Row;
+    @TableField("panel_heading")
+    private Double panelHeading;
 
     /**
-     * 角4像素列号
+     * 区域边距
      */
-    @TableField("corner4_col")
-    private Integer corner4Col;
+    @TableField("margin")
+    private Double margin;
 
     /**
-     * 角4像素行号
+     * 航线内点数
      */
-    @TableField("corner4_row")
-    private Integer corner4Row;
+    @TableField("points_per_line")
+    private Integer pointsPerLine;
 }

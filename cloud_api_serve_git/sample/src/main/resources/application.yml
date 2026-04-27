@@ -344,4 +344,7 @@ ue:
   switch: true
   stateUrl: http://172.20.63.106:19922/api/taskStatus
 
-
+# 正射图存储路径配置
+orthophoto:
+  #  /dji/orthophoto
+  upload-dir: D:/orthophoto/

@@ -11,8 +11,8 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
-import com.dji.sample.df.solar.dao.SolarPanelMapper;
-import com.dji.sample.df.solar.model.entity.SolarPanel;
+import com.dji.sample.df.solar.dao.SolarPanelAreaMapper;
+import com.dji.sample.df.solar.model.entity.SolarPanelArea;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.wind.dao.PointOfInterestMapper;
@@ -100,7 +100,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     private HttpUtils httpUtils;
 
     @Autowired
-    private SolarPanelMapper solarPanelMapper;
+    private SolarPanelAreaMapper solarPanelAreaMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -1012,18 +1012,18 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 //      光伏航线
         Map map = new HashMap();
         String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
-        SolarPanel solarPanel = solarPanelMapper.selectById(solarPanelId);
+        SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(solarPanelId);
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
         // 构建 solar_params
-        Double corner1Lng = solarPanel.getCorner1Lng();
-        Double corner1Lat = solarPanel.getCorner1Lat();
-        Double corner2Lng = solarPanel.getCorner2Lng();
-        Double corner2Lat = solarPanel.getCorner2Lat();
-        Double corner3Lng = solarPanel.getCorner3Lng();
-        Double corner3Lat = solarPanel.getCorner3Lat();
-        Double corner4Lng = solarPanel.getCorner4Lng();
-        Double corner4Lat = solarPanel.getCorner4Lat();
-        Double areaHeight = solarPanel.getAreaHeight();
+        Double corner1Lng = solarPanelArea.getCorner1Lng();
+        Double corner1Lat = solarPanelArea.getCorner1Lat();
+        Double corner2Lng = solarPanelArea.getCorner2Lng();
+        Double corner2Lat = solarPanelArea.getCorner2Lat();
+        Double corner3Lng = solarPanelArea.getCorner3Lng();
+        Double corner3Lat = solarPanelArea.getCorner3Lat();
+        Double corner4Lng = solarPanelArea.getCorner4Lng();
+        Double corner4Lat = solarPanelArea.getCorner4Lat();
+        Double areaHeight = solarPanelArea.getAreaHeight();
         // 构建 corners 数组
         JSONArray corners = new JSONArray();
         double[][] points = {
@@ -1040,14 +1040,14 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             corners.add(corner);
         }
         JSONObject solarParams = new JSONObject();
-        solarParams.put("panelHeight", solarPanel.getPanelHeight());
-        solarParams.put("flightAltitude", solarPanel.getFlightAltitude());
-        solarParams.put("panelHeading",solarPanel.getPanelHeading());
-        solarParams.put("panelTilt",solarPanel.getTiltAngle());
-        solarParams.put("margin", solarPanel.getMargin());
+        solarParams.put("panelHeight", solarPanelArea.getPanelHeight());
+        solarParams.put("flightAltitude", solarPanelArea.getFlightAltitude());
+        solarParams.put("panelHeading", solarPanelArea.getPanelHeading());
+        solarParams.put("panelTilt", solarPanelArea.getTiltAngle());
+        solarParams.put("margin", solarPanelArea.getMargin());
         JSONObject routeParams = new JSONObject();
-        routeParams.put("horizontalLines", solarPanel.getHorizontalLines());
-        routeParams.put("pointsPerLine", solarPanel.getPointsPerLine());
+        routeParams.put("horizontalLines", solarPanelArea.getHorizontalLines());
+        routeParams.put("pointsPerLine", solarPanelArea.getPointsPerLine());
         JSONObject root = new JSONObject();
         root.put("corners", corners);
         root.put("solar_params", solarParams);
