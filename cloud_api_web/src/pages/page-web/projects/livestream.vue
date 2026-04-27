@@ -13,9 +13,9 @@
         </div> -->
       </div>
       <div class="box-right">
-        <!-- <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div> -->
+         <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
         <div style="width: 100%; height: 100%; border: 2px solid white;">
-          <ThreeDModel v-if="isFlatMap && isMounted" />
+          <UEPix v-if="isFlatMap && isMounted" />
           <TwoDModel v-if="!isFlatMap && isMounted" />
         </div>
       </div>
@@ -43,6 +43,7 @@ import tsaPanel from '/@/components/tsaPanel.vue'
 import deviceState from '/@/components/devices/drone_control/device_state.vue'
 // import control from '/@/components/control/loadHandle.vue'
 import { EDeviceTypeName } from '/@/types'
+import UEPix from '/@/components/uePix/UEPix.vue'
 const showLive1 = ref<boolean>(false)
 const scorllHeight = ref() // 容器自适应滚动高度
 

@@ -6,6 +6,7 @@ const CURRENT_CONFIG = {
   rtmpURL: 'rtmp://172.20.63.157:2035/live/', // 视频请求推流地址
   rtcURL: 'http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream=', // 视频请求推流地址
   flvURL: 'http://172.20.63.157:9080/live/',  // 视频流地址
+  UEPixURL: 'ws://172.20.63.106:901',
 
   // 风机坐标 用于地图初始显示风机marker,不需要时置空(高德地图坐标)
   // 由于遥控器获取的是WGS84坐标，而不是gcj02坐标。此处暂时放置WGS84坐标，代码中进行WGS84=>gcj02转换
