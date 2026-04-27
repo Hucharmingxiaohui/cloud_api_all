@@ -3,9 +3,9 @@
     <div class="container-tab1" v-if="activeTab==='index'">
       <div class="operation">
         <el-form :inline="true" :model="queryForm" label-position="right">
-          <el-form-item label="光伏板区域:" prop="solar_panel_name">
+          <el-form-item label="光伏板区域:" prop="solar_panel_area_name">
             <el-input
-              v-model="queryForm.solar_panel_name"
+              v-model="queryForm.solar_panel_area_name"
               placeholder="请输入光伏板区域"
               class="custom-input"
             ></el-input>
@@ -61,7 +61,7 @@
             </el-table-column>
             <el-table-column label="光伏板区域名称" align="center" width="150">
               <template #default="scope">
-                <div class="ellipsis">{{ scope.row.solar_panel_name }}</div>
+                <div class="ellipsis">{{ scope.row.solar_panel_area_name }}</div>
               </template>
             </el-table-column>
             <el-table-column label="角1经度" align="center">
@@ -184,9 +184,9 @@
         >
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="光伏板名称" required prop="solar_panel_name">
+              <el-form-item label="光伏板名称" required prop="solar_panel_area_name">
                 <el-input
-                  v-model="insertForm.solar_panel_name"
+                  v-model="insertForm.solar_panel_area_name"
                   maxlength="50"
                 ></el-input>
               </el-form-item>
@@ -317,9 +317,9 @@
         >
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="光伏板名称" required prop="solar_panel_name">
+              <el-form-item label="光伏板名称" required prop="solar_panel_area_name">
                 <el-input
-                  v-model="editForm.solar_panel_name"
+                  v-model="editForm.solar_panel_area_name"
                   maxlength="50"
                 ></el-input>
               </el-form-item>
@@ -449,7 +449,7 @@ import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElMessag
 import { addSolarPanelConfigApi, getAllSolarPanelApi, updateSolarPanelConfigApi, deleteSolarPanelApi } from '/@/api/turbine/turbineMgt'
 import SolarDraw from './solarDraw.vue'
 const queryForm = reactive({
-  solar_panel_name: '',
+  solar_panel_area_name: '',
   id: ''
 })
 const formRef = ref(null)
@@ -463,7 +463,7 @@ const paginationProp = reactive({
 })
 
 const insertForm = reactive({
-  solar_panel_name: '',
+  solar_panel_area_name: '',
   corner1_lng: '',
   corner1_lat: '',
   corner2_lng: '',
@@ -483,7 +483,7 @@ const insertForm = reactive({
 })
 const editForm = reactive({
   id: '',
-  solar_panel_name: '',
+  solar_panel_area_name: '',
   corner1_lng: '',
   corner1_lat: '',
   corner2_lng: '',
@@ -507,7 +507,7 @@ const insertDialog = ref(false)
 const editDialog = ref(false)
 
 const formRules = {
-  solar_panel_name: [
+  solar_panel_area_name: [
     { required: true, message: '请输入光伏板名称', trigger: 'blur' }
   ],
   corner1_lng: [
@@ -591,7 +591,7 @@ async function handleInsert () {
       return
     }
     const submitData = {
-      solar_panel_name: insertForm.solar_panel_name,
+      solar_panel_area_name: insertForm.solar_panel_area_name,
       corner1_lng: Number(insertForm.corner1_lng),
       corner1_lat: Number(insertForm.corner1_lat),
       corner2_lng: Number(insertForm.corner2_lng),
@@ -625,7 +625,7 @@ function openInsertDialog () {
   activeTab.value = 'insert'
   // formRef.value?.resetFields()
   // Object.assign(insertForm, {
-  //   solar_panel_name: '',
+  //   solar_panel_area_name: '',
   //   corner1_lng: '',
   //   corner1_lat: '',
   //   corner2_lng: '',
@@ -647,14 +647,14 @@ function openInsertDialog () {
 }
 
 function backPage () {
-  activeTab.value = 'index'
+  backPage.value = 'insert'
 }
 
 function openEditDialog (row:any) {
   editDialog.value = true
   Object.assign(editForm, {
     id: row.id,
-    solar_panel_name: row.solar_panel_name,
+    solar_panel_area_name: row.solar_panel_area_name,
     corner1_lng: row.corner1_lng,
     corner1_lat: row.corner1_lat,
     corner2_lng: row.corner2_lng,
@@ -683,7 +683,7 @@ async function handleEdit () {
     }
     const submitData = {
       id: editForm.id,
-      solar_panel_name: editForm.solar_panel_name,
+      solar_panel_area_name: editForm.solar_panel_area_name,
       corner1_lng: Number(editForm.corner1_lng),
       corner1_lat: Number(editForm.corner1_lat),
       corner2_lng: Number(editForm.corner2_lng),
@@ -748,7 +748,7 @@ function getSolarPanelConfig () {
 }
 
 function handleRest () {
-  queryForm.solar_panel_name = ''
+  queryForm.solar_panel_area_name = ''
   queryForm.id = ''
   getSolarPanelConfig()
 }

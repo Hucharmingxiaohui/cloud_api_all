@@ -40,14 +40,13 @@
               删除
             </el-button>
             <!-- 新建计划 -->
-            <el-button class="new_btn" type="primary" style="margin-left: 10px" :icon="Plus" @click="toCreatePlan('4')">新建计划</el-button>
+            <el-button class="new_btn" type="primary" style="margin-left: 10px" :icon="Plus" @click="toCreatePlan()">新建计划</el-button>
         </el-form-item>
       </el-form>
     </div>
     <div class="content">
       <div class="table-container">
         <el-table :data="tableData" stripe  @selection-change="handleSelectionChange">
-
           <!-- 序号列 -->
           <el-table-column type="selection" width="55" />
           <el-table-column label="序号" type="index" align='center' width="60">
@@ -241,11 +240,10 @@ function batchDeletePlan () {
   }
 }
 
-// 新建任务 type  0普通航线计划  1 风机计划
-function toCreatePlan (type:string) {
-  localStorage.setItem('createPlan_query', type)
+// 新建计划
+function toCreatePlan () {
   router.push({
-    path: '/task/createPlan',
+    path: '/taskManage/createSolarPlan',
   })
 }
 // ============================================================分页数据==========================================================

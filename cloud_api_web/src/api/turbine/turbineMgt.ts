@@ -97,7 +97,7 @@ export const deleteInserestPointApi = async function (id): Promise<IWorkspaceRes
 /**
  * 光伏板管理
  */
-const HTTP_PREFIX_SOLAR = '/api/solarPanel'
+const HTTP_PREFIX_SOLAR = '/api/solarPanelArea'
 
 // 获取所有的光伏板区域参数
 export const getAllSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
@@ -131,6 +131,43 @@ export const deleteSolarPanelApi = async function (id): Promise<IWorkspaceRespon
 export const getSolarPanelByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_SOLAR}/getById?id=${id}`
   const result = await request.get(url)
+  return result.data
+}
+
+/**
+ * 光伏区域绘制接口
+ */
+
+// 1. 获取正射图列表
+export const getOrthophotoListApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `/api/Orthophoto/selectList?pageSize=${data.pageSize}&page=${data.pageNo}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 2. 根据地址获取URL文件
+export const getOrthophotoByUrlApi = async function (path): Promise<IWorkspaceResponse<any>> {
+  const encodedPath = encodeURIComponent(path)
+  const url = `/api/file/defect?path=${encodedPath}`
+  const result = await request.get(url, { responseType: 'blob', })
+  return result.data
+}
+
+// 3. 新增光伏区绘制
+export const insertSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/detectAreaGenSolar`
+  const result = await request.post(url, data)
+  return result.data
+}
+
+// 4. 导入正射图
+export const importSolarPanelImgApi = async function (file): Promise<IWorkspaceResponse<any>> {
+  const url = '/api/Orthophoto/import'
+  const result = await request.post(url, file, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    }
+  })
   return result.data
 }
 
@@ -171,42 +208,5 @@ export const deleteInspectionDeviceApi = async function (id): Promise<IWorkspace
 export const getInspectionDeviceByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_INSPECTION}/getById?id=${id}`
   const result = await request.get(url)
-  return result.data
-}
-
-/**
- * 光伏区域绘制接口
- */
-
-// 1. 获取正射图列表
-export const getOrthophotoListApi = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = `/api/Orthophoto/selectList?pageSize=${data.pageSize}&page=${data.pageNo}`
-  const result = await request.get(url)
-  return result.data
-}
-
-// 2. 根据地址获取URL文件
-export const getOrthophotoByUrlApi = async function (path): Promise<IWorkspaceResponse<any>> {
-  const encodedPath = encodeURIComponent(path)
-  const url = `/api/file/defect?path=${encodedPath}`
-  const result = await request.get(url, { responseType: 'blob', })
-  return result.data
-}
-
-// 3. 新增光伏区绘制
-export const insertSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = '/api/solarPanel/detectAreaGenSolar'
-  const result = await request.post(url, data)
-  return result.data
-}
-
-// 4. 导入正射图
-export const importSolarPanelImgApi = async function (file): Promise<IWorkspaceResponse<any>> {
-  const url = '/api/Orthophoto/import'
-  const result = await request.post(url, file, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    }
-  })
   return result.data
 }

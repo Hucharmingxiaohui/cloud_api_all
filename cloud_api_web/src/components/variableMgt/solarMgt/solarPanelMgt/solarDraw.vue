@@ -105,11 +105,8 @@
                   <el-tag v-if="activeAreaId === area.id" size="small" type="info">当前选中</el-tag>
                 </div>
                 <div class="area-coords">
-                  <div class="coord-item">
-                    <span>左上: ({{ area.coordinates.x1.toFixed(2) }}, {{ area.coordinates.y1.toFixed(2) }})</span>
-                  </div>
-                  <div class="coord-item">
-                    <span>右下: ({{ area.coordinates.x2.toFixed(2) }}, {{ area.coordinates.y2.toFixed(2) }})</span>
+                  <div class="coord-item" v-for="(pt, idx) in area.points" :key="idx">
+                    <span>顶点{{ idx + 1 }}: ({{ pt.x.toFixed(2) }}, {{ pt.y.toFixed(2) }})</span>
                   </div>
                 </div>
               </div>
@@ -136,7 +133,7 @@
             <div v-if="detectionAreas.length === 0" class="empty-tip">
               <el-empty description="暂无检测区域" :image-size="100">
                 <template #description>
-                  <p style="color: #999; margin-top: 10px;">点击"开始绘制"按钮，然后在图片上绘制矩形区域</p>
+                  <p style="color: #999; margin-top: 10px;">点击"开始绘制"按钮，然后在图片上依次点击放置4个顶点</p>
                 </template>
               </el-empty>
             </div>
@@ -176,16 +173,16 @@
             />
 
             <!-- 绘制引导文字 -->
-            <div v-if="isDrawing && !isDrawingRect" class="drawing-hint">
+            <div v-if="isDrawing && drawingPoints.length < 4" class="drawing-hint">
               <div class="hint-content">
                 <el-icon class="hint-icon"><Position /></el-icon>
-                <span>点击并拖动鼠标绘制矩形区域</span>
+                <span>点击放置顶点 {{ drawingPoints.length + 1 }}/4</span>
               </div>
             </div>
 
             <!-- 当前绘制预览 -->
-            <div v-if="isDrawingRect" class="drawing-preview">
-              宽: {{ Math.abs(currentRect.width) }}px, 高: {{ Math.abs(currentRect.height) }}px
+            <div v-if="isDrawingPolygon" class="drawing-preview">
+              已放置: {{ drawingPoints.length }}/4 顶点
             </div>
           </div>
 
@@ -350,40 +347,23 @@ const imgSize = reactive({
 const scaleX = 1
 const scaleY = 1
 
+// 顶点坐标
+interface Point {
+  x: number
+  y: number
+}
+
 // 绘制状态
 const isDrawing = ref(false)
-const isDrawingRect = ref(false)
-const drawingRect = reactive({
-  startX: 0,
-  startY: 0,
-  endX: 0,
-  endY: 0
-})
+const isDrawingPolygon = ref(false)
+const drawingPoints = reactive<Point[]>([])
+const currentMousePos = reactive({ x: 0, y: 0 })
 
-// 当前绘制预览
-const currentRect = reactive({
-  x: 0,
-  y: 0,
-  width: 0,
-  height: 0
-})
-
-// 检测区域数据
+// 检测区域数据（四边形，4个顶点）
 interface DetectionArea {
   id: number
   name: string
-  coordinates: {
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-  }
-  displayRect?: {
-    x: number
-    y: number
-    width: number
-    height: number
-  }
+  points: Point[] // 4个顶点
 }
 
 const detectionAreas = ref<DetectionArea[]>([])
@@ -548,100 +528,88 @@ function redrawAllAreas () {
     drawArea(area, area.id === activeAreaId.value, area.id === hoveredAreaId.value)
   })
 
-  // 如果有正在绘制的矩形，绘制它
-  if (isDrawingRect.value) {
-    drawCurrentRect()
+  // 如果有正在绘制的四边形，绘制它
+  if (isDrawingPolygon.value) {
+    drawCurrentPolygon()
   }
 }
 
-// 绘制单个区域
+// 绘制单个区域（四边形）
 function drawArea (area: DetectionArea, isActive = false, isHovered = false) {
-  if (!ctx.value || !area.displayRect) return
+  if (!ctx.value || area.points.length !== 4) return
 
-  const rect = area.displayRect
-
-  // 画布坐标即图片坐标（图片已铺满画布）
-  const x = rect.x
-  const y = rect.y
-  const width = rect.width
-  const height = rect.height
+  const points = area.points
 
   // 设置样式
   ctx.value.strokeStyle = getAreaColor(area.id)
   ctx.value.lineWidth = isActive ? 3 : 2
   ctx.value.setLineDash(isActive ? [] : [5, 5])
 
-  // 绘制矩形
+  // 绘制四边形
   ctx.value.beginPath()
-  ctx.value.rect(x, y, width, height)
+  ctx.value.moveTo(points[0].x, points[0].y)
+  for (let i = 1; i < points.length; i++) {
+    ctx.value.lineTo(points[i].x, points[i].y)
+  }
+  ctx.value.closePath()
   ctx.value.stroke()
 
   // 如果被选中或悬停，绘制填充
   if (isActive || isHovered) {
-    ctx.value.fillStyle = getAreaColor(area.id) + '20' // 添加透明度
-    ctx.value.fillRect(x, y, width, height)
+    ctx.value.fillStyle = getAreaColor(area.id) + '20'
+    ctx.value.fill()
   }
 
   // 绘制区域名称
   ctx.value.fillStyle = getAreaColor(area.id)
   ctx.value.font = '14px Arial'
   ctx.value.textBaseline = 'top'
-  ctx.value.fillText(area.name, x + 5, y + 5)
+  ctx.value.fillText(area.name, points[0].x + 5, points[0].y + 5)
 
   // 绘制角点
-  drawCorners(x, y, width, height, getAreaColor(area.id))
+  points.forEach(p => drawPoint(p.x, p.y, getAreaColor(area.id)))
 }
 
-// 绘制角点
-function drawCorners (x: number, y: number, width: number, height: number, color: string) {
+// 绘制顶点标记
+function drawPoint (x: number, y: number, color: string) {
   if (!ctx.value) return
-
-  const cornerSize = 6
-  const halfCorner = cornerSize / 2
-
+  const size = 6
+  const half = size / 2
   ctx.value.fillStyle = color
   ctx.value.setLineDash([])
-
-  // 四个角
-  const corners = [
-    [x, y], // 左上
-    [x + width, y], // 右上
-    [x + width, y + height], // 右下
-    [x, y + height] // 左下
-  ]
-
-  corners.forEach(corner => {
-    ctx.value!.fillRect(corner[0] - halfCorner, corner[1] - halfCorner, cornerSize, cornerSize)
-  })
+  ctx.value.fillRect(x - half, y - half, size, size)
 }
 
-// 绘制当前正在绘制的矩形
-function drawCurrentRect () {
-  if (!ctx.value || !isDrawingRect.value) return
+// 绘制当前正在绘制的四边形
+function drawCurrentPolygon () {
+  if (!ctx.value || drawingPoints.length === 0) return
 
-  const x = Math.min(drawingRect.startX, drawingRect.endX)
-  const y = Math.min(drawingRect.startY, drawingRect.endY)
-  const width = Math.abs(drawingRect.endX - drawingRect.startX)
-  const height = Math.abs(drawingRect.endY - drawingRect.startY)
-
+  // 绘制已放置的实线边
   ctx.value.strokeStyle = '#FF6B6B'
   ctx.value.lineWidth = 2
-  ctx.value.setLineDash([5, 5])
-  ctx.value.fillStyle = '#FF6B6B20'
-
+  ctx.value.setLineDash([])
   ctx.value.beginPath()
-  ctx.value.rect(x, y, width, height)
+  ctx.value.moveTo(drawingPoints[0].x, drawingPoints[0].y)
+  for (let i = 1; i < drawingPoints.length; i++) {
+    ctx.value.lineTo(drawingPoints[i].x, drawingPoints[i].y)
+  }
   ctx.value.stroke()
-  ctx.value.fill()
 
-  // 更新预览
-  currentRect.x = x
-  currentRect.y = y
-  currentRect.width = width
-  currentRect.height = height
+  // 绘制已放置的顶点
+  drawingPoints.forEach(p => drawPoint(p.x, p.y, '#FF6B6B'))
+
+  // 绘制预览线（最后一点到鼠标位置）
+  if (drawingPoints.length < 4) {
+    const last = drawingPoints[drawingPoints.length - 1]
+    ctx.value.setLineDash([5, 5])
+    ctx.value.beginPath()
+    ctx.value.moveTo(last.x, last.y)
+    ctx.value.lineTo(currentMousePos.x, currentMousePos.y)
+    ctx.value.stroke()
+  }
 }
 
-// 鼠标事件处理
+// 鼠标事件处理（四边形逐点绘制）
 function handleMouseDown (event: MouseEvent) {
   if (!isDrawing.value || !canvasRef.value) return
 
@@ -649,13 +617,35 @@ function handleMouseDown (event: MouseEvent) {
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
 
-  isDrawingRect.value = true
-  drawingRect.startX = x
-  drawingRect.startY = y
-  drawingRect.endX = x
-  drawingRect.endY = y
+  if (drawingPoints.length === 0) {
+    isDrawingPolygon.value = true
+  }
 
-  // 清除之前的绘制预览
+  // 添加新顶点
+  drawingPoints.push({ x, y })
+
+  if (drawingPoints.length === 4) {
+    // 完成四边形绘制
+    const newArea: DetectionArea = {
+      id: areaIdCounter++,
+      name: `检测区${detectionAreas.value.length + 1}`,
+      points: [...drawingPoints]
+    }
+
+    detectionAreas.value.push(newArea)
+    activeAreaId.value = newArea.id
+
+    // 重置绘制状态
+    drawingPoints.length = 0
+    isDrawingPolygon.value = false
+    isDrawing.value = false
+
+    redrawAllAreas()
+    ElMessage.success(`已添加检测区域: ${newArea.name}`)
+    return
+  }
+
+  // 继续绘制，更新预览
   clearCanvas()
   redrawAllAreas()
 }
@@ -667,90 +657,35 @@ function handleMouseMove (event: MouseEvent) {
   const x = event.clientX - rect.left
   const y = event.clientY - rect.top
 
-  // 更新鼠标坐标显示（画布坐标即图片坐标）
+  // 更新鼠标坐标显示
   mousePosition.x = Math.round(x)
   mousePosition.y = Math.round(y)
 
-  if (isDrawingRect.value) {
-    drawingRect.endX = x
-    drawingRect.endY = y
+  if (isDrawingPolygon.value && drawingPoints.length > 0 && drawingPoints.length < 4) {
+    currentMousePos.x = x
+    currentMousePos.y = y
 
     // 清除并重绘
     clearCanvas()
     redrawAllAreas()
-    drawCurrentRect()
   }
 }
 
 function handleMouseUp (event: MouseEvent) {
-  if (!isDrawingRect.value || !canvasRef.value) return
-
-  const rect = canvasRef.value.getBoundingClientRect()
-  const x = event.clientX - rect.left
-  const y = event.clientY - rect.top
-
-  drawingRect.endX = x
-  drawingRect.endY = y
-
-  // 计算矩形尺寸
-  const width = Math.abs(drawingRect.endX - drawingRect.startX)
-  const height = Math.abs(drawingRect.endY - drawingRect.startY)
-
-  // 最小尺寸检查
-  if (width < 10 || height < 10) {
-    ElMessage.warning('绘制区域太小，请重新绘制')
-    isDrawingRect.value = false
-    redrawAllAreas()
-    return
-  }
-
-  // 创建新的检测区域
-  const newArea: DetectionArea = {
-    id: areaIdCounter++,
-    name: `检测区${detectionAreas.value.length + 1}`,
-    coordinates: {
-      x1: Math.min(drawingRect.startX, drawingRect.endX),
-      y1: Math.min(drawingRect.startY, drawingRect.endY),
-      x2: Math.max(drawingRect.startX, drawingRect.endX),
-      y2: Math.max(drawingRect.startY, drawingRect.endY)
-    },
-    displayRect: {
-      x: Math.min(drawingRect.startX, drawingRect.endX),
-      y: Math.min(drawingRect.startY, drawingRect.endY),
-      width: Math.abs(drawingRect.endX - drawingRect.startX),
-      height: Math.abs(drawingRect.endY - drawingRect.startY)
-    }
-  }
-
-  detectionAreas.value.push(newArea)
-  activeAreaId.value = newArea.id
-
-  isDrawingRect.value = false
-
-  // 自动结束绘制模式
-  isDrawing.value = false
-
-  // 重绘
-  redrawAllAreas()
-
-  ElMessage.success(`已添加检测区域: ${newArea.name}`)
+  // 四边形绘制在 mousedown 中处理，此处不做额外操作
 }
 
 function handleMouseLeave () {
   mousePosition.x = -1
   mousePosition.y = -1
-
-  if (isDrawingRect.value) {
-    isDrawingRect.value = false
-    redrawAllAreas()
-  }
 }
 
 // 键盘事件处理
 function handleKeyDown (event: KeyboardEvent) {
   if (event.key === 'Escape') {
-    if (isDrawingRect.value) {
-      isDrawingRect.value = false
+    if (isDrawingPolygon.value) {
+      drawingPoints.length = 0
+      isDrawingPolygon.value = false
       redrawAllAreas()
     } else if (isDrawing.value) {
       isDrawing.value = false
@@ -762,8 +697,11 @@ function handleKeyDown (event: KeyboardEvent) {
 function toggleDrawingMode () {
   isDrawing.value = !isDrawing.value
   if (isDrawing.value) {
-    ElMessage.info('绘制模式已开启，在图片上点击并拖动绘制矩形区域')
+    ElMessage.info('绘制模式已开启，在图片上依次点击放置4个顶点')
   } else {
+    // 取消当前未完成的绘制
+    drawingPoints.length = 0
+    isDrawingPolygon.value = false
     ElMessage.info('绘制模式已关闭')
   }
 }
@@ -900,20 +838,18 @@ async function saveDetectionAreas () {
   saving.value = true
 
   try {
-    // 计算图片拉伸比例
+    // 计算图片拉伸比例，映射成图片中的坐标
     const scaleX = imgSize.naturalWidth / CANVAS_WIDTH
     const scaleY = imgSize.naturalHeight / CANVAS_HEIGHT
 
     const saveData = {
-      solar_area_name: currentImageInfo.value.name || '',
+      solar_panel_area_name: currentImageInfo.value.name || '',
       detect_areas: detectionAreas.value.map(area => ({
         area_name: area.name,
-        corners_pixels: [
-          { row: Math.round(area.coordinates.y1 * scaleY), col: Math.round(area.coordinates.x1 * scaleX) },
-          { row: Math.round(area.coordinates.y1 * scaleY), col: Math.round(area.coordinates.x2 * scaleX) },
-          { row: Math.round(area.coordinates.y2 * scaleY), col: Math.round(area.coordinates.x2 * scaleX) },
-          { row: Math.round(area.coordinates.y2 * scaleY), col: Math.round(area.coordinates.x1 * scaleX) }
-        ]
+        corners_pixels: area.points.map(p => ({
+          row: Math.round(p.y * scaleY),
+          col: Math.round(p.x * scaleX)
+        }))
       })),
       flight_altitude: Number(paramForm.flight_altitude),
       tilt_angle: Number(paramForm.tilt_angle),
@@ -942,6 +878,7 @@ async function saveDetectionAreas () {
       paramForm.panel_heading = null
       paramForm.margin = null
       paramForm.points_per_line = null
+      emit('back')
     } else {
       ElMessage.error(res.message || '保存失败')
     }
@@ -1056,7 +993,7 @@ function formatDate (timestamp: number | string): string {
 
 // 坐标格式化显示
 const formatCoords = computed(() => (area: DetectionArea) => {
-  return `(${area.coordinates.x1.toFixed(0)}, ${area.coordinates.y1.toFixed(0)}) - (${area.coordinates.x2.toFixed(0)}, ${area.coordinates.y2.toFixed(0)})`
+  return area.points.map((p, i) => `V${i + 1}:(${p.x.toFixed(0)},${p.y.toFixed(0)})`).join(' ')
 })
 
 </script>

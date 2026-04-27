@@ -230,12 +230,22 @@ const routes: Array<RouteRecordRaw> = [
             }
           },
           {
-            path: '/taskManage/solarPlan',
-            name: 'solarPlan',
-            component: () => import('/@/components/task/solarPlan.vue'),
+            path: '/taskManage/solarPlanMgt',
+            name: 'solarPlanMgt',
+            component: () => import('../components/task/solarflyPlan/solarPlanMgt.vue'),
             meta: {
               showInMenu: true,
               label: '光伏板计划',
+              cache: true
+            }
+          },
+          {
+            path: '/taskManage/createSolarPlan',
+            name: 'createSolarPlan',
+            component: () => import('/@/components/task/solarflyPlan/createSolarPlan.vue'),
+            meta: {
+              showInMenu: false,
+              label: '创建光伏板计划',
               cache: true
             }
           },

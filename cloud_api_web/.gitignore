@@ -10,6 +10,7 @@ dist.war
 *-dist.zip
 *-dist.tar
 *-dist.war
+.dfcode
 coverage
 *.local
 **/.vitepress/cache
