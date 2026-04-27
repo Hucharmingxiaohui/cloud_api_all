@@ -188,7 +188,7 @@ livestream:
 
     # Webrtc: Only supports using whip standard
     whip:
-      url: http://172.20.63.157:8080/index/api/v1/whip?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
+      url: http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
 
 #配置动态航线文件夹参数
 singlePointUrl: D:\KmzKml\
@@ -303,6 +303,7 @@ wayline:
     solar-panel-wayline: "http://172.20.63.157:5001/solar"
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20022/api"
+  detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
 #  系统编码
 longyuan:
   sender: "UpperPlatform"
@@ -313,14 +314,6 @@ uavPlatform:
   stationCode: "Sub_WeiLan"
 hebei:
   stationCode: "HDCN"
-
-lyftps:
-  ftpIp: 172.20.63.157
-  ftpPort: 10012
-  userName: dfftp
-  password: dfe2k_1500
-  #false显式，true隐式
-  implicit: true
 
 importPoint:
 #  D:/importPoint/  /home/importPoint/
@@ -340,6 +333,8 @@ remote:
   # 远程 dji_irp 的绝对路径（与本地保持一致）
   dji_irp:
     path: /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp
+#   测温库路径
+    libraryPath : /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64
 
   # 远程临时目录（存放图片和 raw 文件）
   temp:

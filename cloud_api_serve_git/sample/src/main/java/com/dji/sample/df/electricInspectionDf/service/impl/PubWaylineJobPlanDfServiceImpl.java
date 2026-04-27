@@ -34,13 +34,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import javax.xml.transform.ErrorListener;
 import java.io.File;
 import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static com.dji.sdk.cloudapi.wayline.WaylineTypeEnum.WAYPOINT;
 
 @Service
 @Slf4j

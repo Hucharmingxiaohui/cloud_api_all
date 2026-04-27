@@ -216,10 +216,20 @@ public class FileControllerDf {
                             URLEncoder.encode(imagePath1, "UTF-8");
                     filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
                 }
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==4){
+//          光伏图片
+            for (int j = 0; j < filteredFiles.size(); j++) {
+                String fileName = filteredFiles.get(j).getFileName();
+                String replace = fileName.replace(".jpeg", "");
+                String imagePath1="/home/uav_server/defect_images/"+job_id+"/"+replace+".jpg";
+                String imageUrl1 = "/api/file/defect?path=" +
+                        URLEncoder.encode(imagePath1, "UTF-8");
+                filteredFiles.get(j).setOriginalImageUrl(imageUrl1);
+            }
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
             for (int j = 0; j < filteredFiles.size(); j++) {
                 String fileName = filteredFiles.get(j).getFileName();
-//                  对接分析服务唯一标识
+//              对接分析服务唯一标识
                 String replace = fileName.replace(".jpeg", "");
                 String regId="1";
 //                  普通照片保存形式为：点位编码+照片类型+"_"+图片原名

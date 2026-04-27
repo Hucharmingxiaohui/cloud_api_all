@@ -64,69 +64,9 @@ public class InboundMessageRouter extends AbstractMessageRouter {
 //        log.debug("received topic: {} \t payload =>{}", topic, new String(payload));
         String data = new String(payload);
         CloudApiTopicEnum topicEnum = CloudApiTopicEnum.find(topic);
-        // 直接判断是否是 patrol/data 主题
-        // 1. 先尝试调用业务处理器（如果存在）
-        if("/patrol/data/LyGroupToSub/guangxi_weilan".equals(topic)){
-            try {
-                // 使用反射或Spring上下文调用业务处理
-                callBusinessHandler(topic, data);
-            } catch (Exception e) {
-                log.error("业务处理失败", e);
-            }
-
-            // 2. 原有逻辑继续
-            if ("/patrol/data/LyGroupToSub/guangxi_weilan".equals(topic)) {
-                return Collections.emptyList();
-            }
-        }
 
         MessageChannel bean = (MessageChannel) SpringBeanUtils.getBean(topicEnum.getBeanName());
 
         return Collections.singleton(bean);
-    }
-
-  // sdk模块的消息接收类
-    private void callBusinessHandler(String topic, String data) {
-        try {
-            ApplicationContext context = SpringContextHolder.getApplicationContext();
-            if (context == null) {
-                log.debug("Spring上下文未初始化");
-                return;
-            }
-
-            // 1. 尝试解析为标准消息
-            MqttStandardMessage standardMessage = MqttMessageParser.parseSafe(data);
-
-            // 2. 获取所有处理器
-            Map<String, MqttMessageHandler> handlers =
-                    context.getBeansOfType(MqttMessageHandler.class);
-
-            if (handlers.isEmpty()) {
-                log.debug("未注册任何MQTT处理器");
-                return;
-            }
-
-            // 3. 调用处理器
-            for (MqttMessageHandler handler : handlers.values()) {
-                if (!handler.supports(topic)) {
-                    continue;
-                }
-
-                try {
-                    // 如果有标准消息，优先使用标准消息处理方法
-                    if (standardMessage != null) {
-                        handler.handleStandardMessage(topic, standardMessage);
-                    } else {
-                        // 否则使用原始处理方法
-                        handler.handleMessage(topic, data);
-                    }
-                } catch (Exception e) {
-                    log.error("处理器 [{}] 执行失败", handler.getHandlerName(), e);
-                }
-            }
-
-        } catch (Exception e) {
-            log.debug("调用业务处理器失败: {}", e.getMessage());
-        }
     }
 }

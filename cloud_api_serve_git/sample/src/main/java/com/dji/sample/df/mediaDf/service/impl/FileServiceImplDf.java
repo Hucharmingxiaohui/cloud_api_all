@@ -5,7 +5,6 @@ import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.df.framework.vo.Result;
 import com.df.server.entity.uni.UniPointEntity;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.dji.sample.component.oss.model.OssConfiguration;
@@ -31,7 +30,6 @@ import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.manage.model.dto.DeviceDictionaryDTO;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
-import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.IWaylineFileService;
 import com.dji.sdk.cloudapi.device.DeviceEnum;
@@ -392,7 +390,7 @@ public class FileServiceImplDf implements IFileServiceDf {
                                 eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
                     }
 
-                    List<String> fileNames = fjReportService.generateFileNames(mediaFileEntities, jsonArray);
+                    List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
 
                     if (fileNames.size() == mediaFileDTOList.size()) {
                         for (int i = 0; i < mediaFileDTOList.size(); i++) {

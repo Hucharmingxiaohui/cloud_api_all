@@ -19,7 +19,7 @@ import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
-import com.dji.sample.df.wind.config.LyFtpsProperties;
+//import com.dji.sample.df.wind.config.LyFtpsProperties;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.controller.FjReportController;
 import com.dji.sample.df.wind.dao.DefectEntityMapper;
@@ -30,7 +30,7 @@ import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.service.FjReportService;
 
-import com.dji.sample.df.wind.timer.DeleteWaylineFileTimer;
+import com.dji.sample.wayline.timer.DeleteWaylineFileTimer;
 import com.dji.sample.df.wind.utils.FileNameUtils;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
@@ -73,8 +73,8 @@ public class Test {
     @Autowired
     MqttGatewayPublish mqttGatewayPublish;
 
-    @Autowired
-    LyFtpsProperties lyFtpsProperties;
+//    @Autowired
+//    LyFtpsProperties lyFtpsProperties;
     @Autowired
     IWaylineJobMapper waylineJobMapper;
 

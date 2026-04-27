@@ -1,7 +1,6 @@
 package com.dji.sample.df.wind.service;
 
 import com.dji.sample.df.wind.model.entity.PointOfInterest;
-import com.dji.sample.df.wind.model.entity.WindTurbine;
 
 import java.util.Map;
 

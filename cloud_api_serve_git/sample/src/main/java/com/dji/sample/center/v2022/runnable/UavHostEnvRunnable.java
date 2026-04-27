@@ -1,14 +1,12 @@
 package com.dji.sample.center.v2022.runnable;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.SpringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostEnvItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
-import com.dji.sample.df.manageDf.model.entity.UavDeviceEntity;
 import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;

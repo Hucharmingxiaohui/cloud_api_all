@@ -1,15 +1,11 @@
 package com.dji.sample.df.wind.controller;
 
 import com.df.framework.vo.Result;
-import com.dji.sample.df.wind.handler.PictureSaveHandler;
-import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
-import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.df.wind.service.WindTurbineService;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.util.List;
 import java.util.Map;
 
 @RestController

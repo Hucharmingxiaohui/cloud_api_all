@@ -3,52 +3,34 @@ package com.dji.sample.df.wind.service.impl;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.redis.RedisUtils;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
 import com.df.server.dto.HisUniTask.TaskReportDTO;
 import com.df.server.entity.sys.SysDictDataEntity;
 import com.df.server.mapper.sys.SysDictDataMapper;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
-import com.dji.sample.center.utils.StringUtils;
-import com.dji.sample.df.electricInspectionDf.service.ReportService;
-import com.dji.sample.df.electricInspectionDf.service.impl.ResultServiceImpl;
-import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
-import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.*;
-import com.dji.sample.df.wind.handler.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.*;
 import com.dji.sample.df.wind.service.FjReportService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
-import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblWidth;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblWidth;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigInteger;
 import java.util.function.Function;
 
 import javax.annotation.Resource;
-import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageOutputStream;
 import javax.servlet.http.HttpServletResponse;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URI;
@@ -61,8 +43,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import static com.dji.sample.df.wind.utils.FileUtil.convert;
 
 @Slf4j
 @Service
@@ -112,9 +92,6 @@ public class FjReportServiceImpl implements FjReportService {
 
     @Override
     public String createNewReport(String jobId) {
-//        fjReportMapper.delete(new LambdaQueryWrapper<FjReportEntity>().eq(FjReportEntity::getTaskPatrolledId,jobId));
-
-
         FjReportEntity reportEntity = new FjReportEntity();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
                 eq(WaylineJobEntity::getJobId, jobId));
@@ -126,16 +103,7 @@ public class FjReportServiceImpl implements FjReportService {
         return reportEntity.getId();
     }
 
-    /**
-     * 查看任务报告
-     *
-     * @param params
-     * @return
-     */
-    @Override
-    public TaskReportDTO lookReport(HisUniTaskParamsDTO params) {
-        return null;
-    }
+
 
     /**
      * 生成巡视报告
@@ -763,7 +731,7 @@ public class FjReportServiceImpl implements FjReportService {
 //    }
 
     @Override
-    public void genPatrolTaskWordNew(String reportId, String jobId) {
+    public void genFjPatrolTaskWordNew(String reportId, String jobId) {
         // 1. 从数据库获取巡检任务、风机、缺陷等信息
         FjReportEntity fjReportEntity = fjReportMapper.selectById(reportId);
         String taskName = fjReportEntity.getName();
@@ -2069,7 +2037,7 @@ public class FjReportServiceImpl implements FjReportService {
 
 
     @Override
-    public List<String> generateFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
+    public List<String> generateFjFileNames(List<MediaFileEntity> mediaFileEntities, JSONArray points) {
         List<String> fileNames = new ArrayList<>();
         int index = 0;
 
@@ -2099,7 +2067,7 @@ public class FjReportServiceImpl implements FjReportService {
     }
 
     @Override
-    public AnalysisResponse sendAnalysisRequest(AnalysisRequest request) {
+    public AnalysisResponse sendFjAnalysisRequest(AnalysisRequest request) {
         try {
             String requestBody = objectMapper.writeValueAsString(request);
 
@@ -2338,48 +2306,10 @@ public class FjReportServiceImpl implements FjReportService {
                 // 如果不存在，插入新记录
                 defectEntityMapper.insert(defect);
             }
-//            defect.getJobId();
-//            defect.getFanCode();
-//            defect.getDefectType();
-//            defectEntityMapper.insert(defect);
             System.out.println((i + 1) + ". " + defect);
         }
 
         System.out.println("缺陷数据新增完成");
-    }
-    @Override
-    public void downloadDocxFile(String filePath, HttpServletResponse response) {
-        File file = new File(filePath);
-
-        if (!file.exists()) {
-            throw new RuntimeException("文件不存在: " + filePath);
-        }
-
-        if (!filePath.toLowerCase().endsWith(".docx")) {
-            throw new RuntimeException("文件格式错误，只支持DOCX格式");
-        }
-
-        try (FileInputStream fis = new FileInputStream(file);
-             OutputStream os = response.getOutputStream()) {
-
-            // 设置响应头
-            response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Content-Disposition",
-                    "attachment;filename=" + new String(file.getName().getBytes("UTF-8"), "ISO-8859-1"));
-            response.setHeader("Content-Length", String.valueOf(file.length()));
-
-            // 将文件写入响应流
-            byte[] buffer = new byte[4096];
-            int bytesRead;
-            while ((bytesRead = fis.read(buffer)) != -1) {
-                os.write(buffer, 0, bytesRead);
-            }
-            os.flush();
-
-        } catch (IOException e) {
-            throw new RuntimeException("文件下载失败");
-        }
     }
 
 }

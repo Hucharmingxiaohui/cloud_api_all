@@ -3,7 +3,6 @@ package com.dji.sample.df.wind.handler;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.df.framework.redis.RedisUtils;
 import com.df.framework.vo.Result;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
@@ -22,7 +21,6 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-
 import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -44,31 +42,20 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class PictureSaveHandler {
-
     @Resource
     IFileMapperDf iFileMapperDf;
-
     @Resource
     private IFileService fileService;
-
     @Autowired
     private FjFileConfig fileConfig;
-
-    @Resource
-    private RedisUtils redisUtils;
-
     @Resource
     IWorkspaceMapper workspaceMapper;
-
     @Resource
     FanWaylinePointsMapper fanWaylinePointsMapper;
-
     @Autowired
     private IWaylineJobMapper waylineJobMapper;
-
     @Autowired
     UniPointMapper2 uniPointMapper2;
-
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
@@ -92,7 +79,7 @@ public class PictureSaveHandler {
                 .eq(FanWaylinePoints::getJobId, jobId));
         JSONArray points =new JSONArray();
         if (fanWaylinePoints != null && pubWaylineJobPlanDfEntity.getPlanType()==1) {
-//          1.风机图片存在服务器
+//          1.风机图片保存
             points = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
             Map map = new HashMap();
             try {
@@ -120,7 +107,7 @@ public class PictureSaveHandler {
             }
             return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==0){
-//          2.普通图片存在服务器
+//          2.航点航线图片保存
             Map map = new HashMap();
             try {
                 int index = 0;
@@ -165,7 +152,19 @@ public class PictureSaveHandler {
                 e.printStackTrace();
             }
             return Result.success(map);
+        }else if(pubWaylineJobPlanDfEntity.getPlanType()==4){
+//          光伏区域保存
+            Map map = new HashMap();
+            for (MediaFileEntity mediaFileEntity : djiFiles) {
+                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+                String fileName = mediaFileEntity.getFileName();
+                String filePictrueUrl = fileConfig.getFilePictrueUrl();
+                String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                map.put(fileName, localFilePath);
+            }
+            return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
+//          普通航线图片保存
             Map map = new HashMap();
             int index = 0;
             for (MediaFileEntity mediaFileEntity : djiFiles) {
@@ -237,50 +236,6 @@ public class PictureSaveHandler {
             throw e;
         }
     }
-//
-//    public static String downloadAndConvertToJpeg2(String url, String localFileName, String filePictrueUrl,String jobId,String nativePath) throws IOException {
-//        String tempDir = filePictrueUrl + "/" +jobId;
-//        Path tempPath = Paths.get(tempDir);
-//        if (!Files.exists(tempPath)) {
-//            Files.createDirectories(tempPath);
-//        }
-//
-//        // 修复：检查文件名是否有后缀，如果没有则直接添加.jpg
-//        String fileNameWithoutExt;
-//        if (localFileName.contains(".")) {
-//            fileNameWithoutExt = localFileName.substring(0, localFileName.lastIndexOf('.'));
-//        } else {
-//            fileNameWithoutExt = localFileName;
-//        }
-//        localFileName = fileNameWithoutExt + ".jpg";
-//
-//        String localFilePath = tempDir + "/" + localFileName;
-//
-//        try {
-//            // 从URL读取图片
-//            URL imageUrl = new URL(url);
-//            BufferedImage image = ImageIO.read(imageUrl);
-//
-//            if (image == null) {
-//                throw new IOException("无法从URL读取图片: " + url);
-//            }
-//
-//            // 创建JPG文件并保存
-//            File outputFile = new File(localFilePath);
-//            boolean success = ImageIO.write(image, "jpg", outputFile);
-//
-//            if (!success) {
-//                throw new IOException("无法将图片保存为JPEG格式");
-//            }
-//
-//            System.out.println("JPEG图片保存成功: " + localFilePath);
-//            return nativePath + jobId+ "/" + localFileName;
-//
-//        } catch (IOException e) {
-//            System.err.println("图片转换失败: " + e.getMessage());
-//            throw e;
-//        }
-//    }
 
     public static String downloadAndConvertToJpeg2(String regId,String url, String localFileName,
                                                    String filePictrueUrl, String jobId, String nativePath) throws IOException {

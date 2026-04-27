@@ -1,22 +1,17 @@
-package com.dji.sample.df.wind.timer;
+package com.dji.sample.wayline.timer;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.wayline.dao.IWaylineFileMapper;
-import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineFileEntity;
-import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import javax.annotation.Resource;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 
 @Component
@@ -63,7 +58,7 @@ public class DeleteWaylineFileTimer {
                 fileName = fileName.substring(0, i);
                 WaylineFileEntity waylineFileEntity = waylineFileMapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().
                         eq(WaylineFileEntity::getName, fileName));
-                if (waylineFileEntity != null && !fileName.contains("top")&& !fileName.contains("poi")) {
+                if (waylineFileEntity != null && !fileName.contains("top")&& !fileName.contains("poi")&& !fileName.contains("solar")) {
 //                  删除数据库
                     waylineFileMapper.deleteById(waylineFileEntity.getId());
 //                  删除minio

@@ -1,12 +1,7 @@
 package com.dji.sample.center.v2022.runnable;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.dji.sample.center.app.AppContext;
 import com.dji.sample.center.dao.UniPointMapper2;
-import com.dji.sample.center.entity.UniPoint;
-import com.dji.sample.center.utils.DateUtils;
-import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommandItem;
 import com.dji.sample.center.v2022.command.control.CenterTaskCommandItem;
@@ -15,14 +10,12 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylinePointDfMapper;
 import com.dji.sample.df.manageDf.dao.IUniTaskPlanMapper;
-import com.dji.sample.df.manageDf.model.entity.UniTaskPlanEntity;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
-import com.dji.sample.df.wind.timer.TaskTimerManager;
+import com.dji.sample.df.wind.handler.CenterTaskHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
@@ -35,7 +28,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     private IUniTaskPlanMapper iUniTaskPlanMapper = AppContext.getBean(IUniTaskPlanMapper.class);
     private PubWaylinePointDfMapper pubWaylinePointDfMapper = AppContext.getBean(PubWaylinePointDfMapper.class);
     private WindTurbineMapper windTurbineMapper = AppContext.getBean(WindTurbineMapper.class);
-    private TaskTimerManager taskTimerManager = AppContext.getBean(TaskTimerManager.class);
+    private CenterTaskHandler centerTaskHandler = AppContext.getBean(CenterTaskHandler.class);
     private UniPointMapper2 uniPointMapper2 = AppContext.getBean(UniPointMapper2.class);
 
     public CenterTaskRunnable(CenterProtocolData protocolData) {
@@ -99,7 +92,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     if (matchedTurbine!=null) {
 
                         // 存入定时任务
-                        taskTimerManager.addScheduledTask(1,taskCode, fixedStartTime,
+                        centerTaskHandler.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
 
                     }
@@ -110,7 +103,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
                     // 存入定时任务
-                    taskTimerManager.addScheduledTask(0,taskCode, fixedStartTime,
+                    centerTaskHandler.addScheduledTask(0,taskCode, fixedStartTime,
                             bayId, taskName);
                 }
             }
