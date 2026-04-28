@@ -647,7 +647,7 @@ function openInsertDialog () {
 }
 
 function backPage () {
-  backPage.value = 'insert'
+  activeTab.value = 'index'
 }
 
 function openEditDialog (row:any) {

@@ -843,7 +843,8 @@ async function saveDetectionAreas () {
     const scaleY = imgSize.naturalHeight / CANVAS_HEIGHT
 
     const saveData = {
-      solar_panel_area_name: currentImageInfo.value.name || '',
+      orthophoto_id: currentImageInfo.value.id,
+      solar_area_name: currentImageInfo.value.name || '',
       detect_areas: detectionAreas.value.map(area => ({
         area_name: area.name,
         corners_pixels: area.points.map(p => ({

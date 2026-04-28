@@ -24,10 +24,10 @@
               required
               prop="solar_panel_id"
             >
-              <el-select v-model="planBody.solar_panel_id">
+              <el-select v-model="planBody.solar_panel_id" @change="handleSolarPanelChange">
                 <el-option
                   v-for="item in solarTable"
-                  :label="item.solar_panel_name"
+                  :label="item.solar_panel_area_name"
                   :value="item.id"
                   :key="item.id"
                 ></el-option>
@@ -158,7 +158,7 @@
       </div>
     </div>
     <div class="box-right">
-      <waylinePanel />
+      <loadSolarPanel :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" />
     </div>
   </div>
 
@@ -187,10 +187,10 @@ import { getRoot } from '/@/root'
 import { TaskType, OutOfControlActionOptions, OutOfControlAction, TaskTypeOptions } from '/@/types/task'
 import moment, { Moment } from 'moment'
 import { ElTable, ElTableColumn, ElFormItem, ElForm, ElInput, ElButton, ElSelect, ElOption, ElPagination, ElContainer, ElHeader, ElMain, ElFooter, ElDialog, ElMessage, ElMessageBox, ElText, ElLink, ElTag, ElTooltip } from 'element-plus'
-import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
+import loadSolarPanel from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi } from '/@/api/turbine/turbineMgt'
+import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi, getSolarPanelImgByIdApi, getOrthophotoListApi, getSolarPanelByIdApi } from '/@/api/turbine/turbineMgt'
 const router = useRouter()
 const route = useRoute()
 const store = useMyStore()
@@ -205,11 +205,9 @@ const wayline = computed<WaylineFile>(() => {
 const dock = computed<Device>(() => {
   return store.state.dockInfo
 })
-const fanTable = ref([]) // 风机列表
-const interestPointTable = ref([]) // 兴趣点列表
 const solarTable = ref([]) // 光伏板区域列表
-const oibitType = ref('1') // 环绕点类型
-const routeName = ref('')
+const selectedImagePath = ref('') // 选中光伏板区域对应的正射图path
+const selectedDetectAreas = ref<any>(null) // 选中光伏板区域的检测区域
 const planBody = reactive({
   plan_source: '系统创建',
   name: '',
@@ -315,7 +313,7 @@ const rules = {
   ]
 }
 
-onMounted(() => {
+onMounted(async () => {
   getSolarPanel()
 })
 
@@ -346,48 +344,6 @@ async function onSubmit () {
 }
 
 /**
- * @description: 查询风机ID列表
- * @param {string} waylineInfo 航线信息
- * */
-function getSubInfo () {
-  try {
-    getAllWindTurbineApi({
-      turbine_name: '',
-      id: '',
-      pageSize: 10000,
-      pageNo: 1
-    }).then(res => {
-      if (res.code !== 0) {
-        return
-      }
-      fanTable.value = res.data.list
-    })
-  } catch (error) {
-  }
-}
-
-/**
- * @description: 查询兴趣点ID列表
- * @param {string}
- * */
-function getInterestPoint () {
-  try {
-    getAllInserestPointApi({
-      pageSize: 10000,
-      pageNo: 1,
-      point_name: '',
-      id: ''
-    }).then(res => {
-      if (res.code !== 0) {
-        return
-      }
-      interestPointTable.value = res.data.list
-    })
-  } catch (error) {
-  }
-}
-
-/**
  * @description: 查询光伏板ID列表
  * @param {string}
  * */
@@ -405,6 +361,43 @@ function getSolarPanel () {
       solarTable.value = res.data.list
     })
   } catch (error) {
+  }
+}
+
+// 加载正射图列表
+async function getOrthophotoPath (id:any) {
+  try {
+    const res = await getSolarPanelImgByIdApi(id)
+    if (res.code === 0) {
+      return res.data.path
+    }
+    return ''
+  } catch (error) {
+    console.error('加载正射图列表失败:', error)
+  }
+}
+
+// 光伏板区域选择变化
+async function handleSolarPanelChange (id: string | number) {
+  selectedImagePath.value = ''
+  selectedDetectAreas.value = null
+
+  if (!id) return
+  console.log(solarTable.value)
+  const orthophotoItem = solarTable.value.find((item) => item.id === id
+  )
+  try {
+    // selectedDetectAreas.value = orthophotoItem
+    // selectedImagePath.value = 'D:\\orthophoto\\测试.jpg'
+    if (orthophotoItem.orthophoto_id) {
+      const path = getOrthophotoPath(orthophotoItem.orthophoto_id)
+      selectedDetectAreas.value = orthophotoItem
+      selectedImagePath.value = path
+    } else {
+      ElMessage.warning('为查询到关联正射图!')
+    }
+  } catch (error) {
+    console.error('获取光伏板区域详情失败:', error)
   }
 }
 
