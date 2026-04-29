@@ -10,4 +10,5 @@ public interface OrthophotoEntityService extends IService<OrthophotoEntity> {
     OrthophotoEntity importOrthophoto(MultipartFile file, String name);
     Map<String, Object> selectList(Map<String, Object> params);
     void deleteOrthophoto(Long id);
+    OrthophotoEntity selectById(Long id);
 }

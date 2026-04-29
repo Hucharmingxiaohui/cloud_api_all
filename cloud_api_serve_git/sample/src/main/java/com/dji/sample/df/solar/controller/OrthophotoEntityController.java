@@ -47,4 +47,13 @@ public class OrthophotoEntityController {
         return Result.success();
     }
 
+    /**
+     * 根据id查正射图
+     */
+    @GetMapping("/selectById")
+    public Result<Void> selectById(@RequestParam Long id) {
+        OrthophotoEntity orthophotoEntity = orthophotoEntityService.selectById(id);
+        return Result.success(orthophotoEntity);
+    }
+
 }

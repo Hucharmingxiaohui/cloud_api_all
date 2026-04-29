@@ -13,14 +13,14 @@ const CURRENT_CONFIG = {
   markerList: [],
 
   // 机场坐标,用于初始定位地图中心(高德地图坐标)
-  droneLocation: [100.107507953, 26.656845222],
+  droneLocation: [121.36586134080659,37.519892471294547],
 
   // 系统名称
   sysName: '东方电子无人机管控平台',
   // 地图初始级别
-  initMapLevel: 15,
+  initMapLevel: 18,
   // 地图是否允许放缩
-  isAllowScaling: false,
+  isAllowScaling: true,
 
   // 此处不用动
   amapKey: '617568068ecaef890bd0949fb2431c54',

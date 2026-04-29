@@ -390,7 +390,7 @@ async function handleSolarPanelChange (id: string | number) {
     // selectedDetectAreas.value = orthophotoItem
     // selectedImagePath.value = 'D:\\orthophoto\\测试.jpg'
     if (orthophotoItem.orthophoto_id) {
-      const path = getOrthophotoPath(orthophotoItem.orthophoto_id)
+      const path = await getOrthophotoPath(orthophotoItem.orthophoto_id)
       selectedDetectAreas.value = orthophotoItem
       selectedImagePath.value = path
     } else {

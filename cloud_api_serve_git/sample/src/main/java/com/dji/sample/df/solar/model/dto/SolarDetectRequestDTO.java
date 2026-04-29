@@ -15,6 +15,12 @@ import java.util.List;
 public class SolarDetectRequestDTO {
 
     /**
+     * 正射图id
+     */
+    @NotEmpty(message = "正射图id不能为空")
+    private Integer orthophoto_id;
+
+    /**
      * 光伏区域名称
      */
     @NotEmpty(message = "光伏区域名称不能为空")

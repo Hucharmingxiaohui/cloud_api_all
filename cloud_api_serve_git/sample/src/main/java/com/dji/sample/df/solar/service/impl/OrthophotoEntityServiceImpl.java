@@ -122,6 +122,12 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
     }
 
     @Override
+    public OrthophotoEntity selectById(Long id) {
+        OrthophotoEntity orthophotoEntity = orthophotoMapper.selectById(id);
+        return orthophotoEntity;
+    }
+
+    @Override
     public Map<String, Object> selectList(Map<String, Object> params) {
         // 使用原风格的分页工具类 PageUtil（需存在）
         PageUtil.setPageArgs(params);

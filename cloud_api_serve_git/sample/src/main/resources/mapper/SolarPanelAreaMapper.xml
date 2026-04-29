@@ -8,8 +8,8 @@
     <select id="selectList" resultType="com.dji.sample.df.solar.model.entity.SolarPanelArea">
         SELECT * FROM manage_solar_panel_area
         <where>
-            <if test="solarPanelName!=null and solarPanelName!=''">
-                and solar_panel_name LIKE concat('%', #{solarPanelName},'%')
+            <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
+                and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
         </where>
         <where>
@@ -26,8 +26,8 @@
     <select id="selectListCount" resultType="int">
         SELECT count(*) FROM manage_solar_panel_area
         <where>
-            <if test="solarPanelName!=null and solarPanelName!=''">
-                and solar_panel_name LIKE concat('%', #{solarPanelName},'%')
+            <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
+                and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
         </where>
         <where>

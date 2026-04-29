@@ -174,7 +174,7 @@ export const importSolarPanelImgApi = async function (file): Promise<IWorkspaceR
 // 5. 根据id查询正射图
 
 export const getSolarPanelImgByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
-  const url = 'api/Orthophoto/selectByld?id=' + id
+  const url = 'api/Orthophoto/selectById?id=' + id
   const result = await request.get(url)
   return result.data
 }

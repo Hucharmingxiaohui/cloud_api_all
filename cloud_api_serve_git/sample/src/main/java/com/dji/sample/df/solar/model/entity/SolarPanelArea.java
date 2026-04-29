@@ -8,6 +8,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import javax.validation.constraints.NotEmpty;
 import java.io.Serializable;
 
 /**
@@ -31,8 +33,8 @@ public class SolarPanelArea implements Serializable {
     /**
      * 光伏板区域名称
      */
-    @TableField("solar_panel_name")
-    private String solarPanelName;
+    @TableField("solar_panel_area_name")
+    private String solarPanelAreaName;
 
     /**
      * 角1经度
@@ -131,4 +133,58 @@ public class SolarPanelArea implements Serializable {
      */
     @TableField("points_per_line")
     private Integer pointsPerLine;
+
+    /**
+     * 角1像素列号
+     */
+    @TableField("corner1_col")
+    private Integer corner1Col;
+
+    /**
+     * 角1像素行号
+     */
+    @TableField("corner1_row")
+    private Integer corner1Row;
+
+    /**
+     * 角2像素列号
+     */
+    @TableField("corner2_col")
+    private Integer corner2Col;
+
+    /**
+     * 角2像素行号
+     */
+    @TableField("corner2_row")
+    private Integer corner2Row;
+
+    /**
+     * 角3像素列号
+     */
+    @TableField("corner3_col")
+    private Integer corner3Col;
+
+    /**
+     * 角3像素行号
+     */
+    @TableField("corner3_row")
+    private Integer corner3Row;
+
+    /**
+     * 角4像素列号
+     */
+    @TableField("corner4_col")
+    private Integer corner4Col;
+
+    /**
+     * 角4像素行号
+     */
+    @TableField("corner4_row")
+    private Integer corner4Row;
+
+    /**
+     * 正射图id
+     */
+    @TableField("orthophoto_id")
+    private Integer orthophotoId;
 }
