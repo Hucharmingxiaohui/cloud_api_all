@@ -648,6 +648,7 @@ function openInsertDialog () {
 
 function backPage () {
   activeTab.value = 'index'
+  getSolarPanelConfig()
 }
 
 function openEditDialog (row:any) {
