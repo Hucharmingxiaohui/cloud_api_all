@@ -1,4 +1,4 @@
-package com.dji.sample.df.wind.handler;
+package com.dji.sample.df.uavHandlerDf;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -153,14 +153,30 @@ public class PictureSaveHandler {
             }
             return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==4){
-//          光伏区域保存
+            // 光伏图片保存
             Map map = new HashMap();
-            for (MediaFileEntity mediaFileEntity : djiFiles) {
-                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
-                String fileName = mediaFileEntity.getFileName();
-                String filePictrueUrl = fileConfig.getFilePictrueUrl();
-                String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
-                map.put(fileName, localFilePath);
+            try {
+                int index = 0;
+                for (MediaFileEntity mediaFileEntity : djiFiles) {
+                    URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
+//                  按顺序以fanWaylinePoints存的点位名称给照片命名
+                    String fileName;
+                    if (index < points.size()) {
+                        String pointName = points.getString(index);
+                        fileName = pointName;
+                    } else {
+//                      如果多拍照了，则多出来的按原命名
+                        fileName = mediaFileEntity.getFileName() != null ?
+                                mediaFileEntity.getFileName() :
+                                "file_" + mediaFileEntity.getFileId() + ".dat";
+                    }
+                    String filePictrueUrl = fileConfig.getFilePictrueUrl();
+                    String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                    map.put(fileName, localFilePath);
+                    index++;
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
             return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){

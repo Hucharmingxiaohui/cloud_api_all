@@ -304,6 +304,7 @@ wayline:
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20022/api"
   detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
+  start-segmentation-url: "http://172.20.63.157:5005/startSegmentation"
 #  系统编码
 longyuan:
   sender: "UpperPlatform"

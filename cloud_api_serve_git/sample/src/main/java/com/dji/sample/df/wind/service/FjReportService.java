@@ -9,6 +9,8 @@ import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import java.util.List;
 
 public interface FjReportService {
+//  生成光伏报告
+    void genGfPatrolTaskWordNew(String reportId, String jobId);
 //  生成风机报告
     void genFjPatrolTaskWordNew(String reportId, String jobId);
 //  生成航点航线任务报告

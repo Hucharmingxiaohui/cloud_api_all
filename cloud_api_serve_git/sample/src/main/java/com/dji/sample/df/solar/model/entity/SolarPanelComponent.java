@@ -8,32 +8,33 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.io.Serializable;
 
 /**
- * 光伏板板实体类
- * 包含经纬度四点及像素行列坐标
+ * 光伏板组件实体类
+ * 包含四个角的经纬度坐标及对应的像素行列坐标
  */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName("manage_solar_panel")
-public class SolarPanel implements Serializable {
+@TableName("manage_solar_panel_component")
+public class SolarPanelComponent implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
-     * 主键ID，自增
+     * 主键ID
      */
     @TableId(type = IdType.INPUT)
     private String id;
 
     /**
-     * 光伏板名称
+     * 光伏组件名称
      */
-    @TableField("solar_panel_name")
-    private String solarPanelName;
+    @TableField("solar_panel_component_name")
+    private String solarPanelComponentName;
 
     /**
      * 角1经度
@@ -132,8 +133,14 @@ public class SolarPanel implements Serializable {
     private Integer corner4Row;
 
     /**
-     * 正射图id
+     * 正射图ID
      */
     @TableField("orthophoto_id")
     private String orthophotoId;
+
+    /**
+     * 光伏板ID
+     */
+    @TableField("solar_panel_id")
+    private String solarPanelId;
 }

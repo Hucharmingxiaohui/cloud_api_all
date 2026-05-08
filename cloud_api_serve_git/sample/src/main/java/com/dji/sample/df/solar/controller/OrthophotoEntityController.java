@@ -1,5 +1,6 @@
 package com.dji.sample.df.solar.controller;
 
+import com.alibaba.fastjson.JSONArray;
 import com.df.framework.vo.Result;
 import com.dji.sample.df.solar.model.entity.OrthophotoEntity;
 import com.dji.sample.df.solar.service.OrthophotoEntityService;
@@ -42,7 +43,7 @@ public class OrthophotoEntityController {
      * 删除正射图
      */
     @GetMapping("/deleteOrthophoto")
-    public Result<Void> deleteOrthophoto(@RequestParam Long id) {
+    public Result<Void> deleteOrthophoto(@RequestParam String id) {
         orthophotoEntityService.deleteOrthophoto(id);
         return Result.success();
     }
@@ -51,9 +52,18 @@ public class OrthophotoEntityController {
      * 根据id查正射图
      */
     @GetMapping("/selectById")
-    public Result<Void> selectById(@RequestParam Long id) {
+    public Result<Void> selectById(@RequestParam String id) {
         OrthophotoEntity orthophotoEntity = orthophotoEntityService.selectById(id);
         return Result.success(orthophotoEntity);
+    }
+
+    /**
+     * 根据正射图id查光伏组件树
+     */
+    @GetMapping("/selectComponentsById")
+    public Result<Void> selectComponentsById(@RequestParam String id) {
+        JSONArray objects = orthophotoEntityService.selectComponentsById(id);
+        return Result.success(objects);
     }
 
 }

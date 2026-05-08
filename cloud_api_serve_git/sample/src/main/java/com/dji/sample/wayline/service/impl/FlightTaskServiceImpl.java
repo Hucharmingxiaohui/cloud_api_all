@@ -11,7 +11,7 @@ import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
-import com.dji.sample.df.wind.handler.JobControlHandler;
+import com.dji.sample.df.uavHandlerDf.JobControlHandler;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.media.model.MediaFileCountDTO;

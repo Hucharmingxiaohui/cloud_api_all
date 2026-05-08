@@ -1,5 +1,6 @@
 package com.dji.sample.df.solar.model.entity;
 
+import com.alibaba.fastjson.JSONArray;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -23,8 +24,8 @@ public class OrthophotoEntity {
     /**
      * 主键ID，自增
      */
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.INPUT)
+    private String id;
 
     /**
      * 正射图名称
@@ -38,4 +39,21 @@ public class OrthophotoEntity {
     @TableField("path")
     private String path;
 
+    /**
+     * 光伏板数量
+     */
+    @TableField(exist = false)
+    private Integer solarPanelTotal;
+
+    /**
+     * 光伏组件数量
+     */
+    @TableField(exist = false)
+    private Integer componentTotal;
+
+    /**
+     * 光伏组件列表
+     */
+    @TableField(exist = false)
+    private JSONArray componentList;
 }

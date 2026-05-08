@@ -10,7 +10,7 @@ import java.util.Map;
 @Mapper
 public interface OrthophotoEntityMapper extends BaseMapper<OrthophotoEntity> {
 
-    List<OrthophotoEntity> selectList(Map map);
+    List<OrthophotoEntity> selectListByMap(Map map);
 
     int selectListCount(Map map);
 }

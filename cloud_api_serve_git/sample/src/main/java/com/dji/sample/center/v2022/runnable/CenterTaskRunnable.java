@@ -12,7 +12,7 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylinePointDfMapper;
 import com.dji.sample.df.manageDf.dao.IUniTaskPlanMapper;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
-import com.dji.sample.df.wind.handler.CenterTaskHandler;
+import com.dji.sample.df.uavHandlerDf.CenterTaskHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 

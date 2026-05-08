@@ -1,9 +1,19 @@
 package com.dji.sample.df.solar.service.impl;
 
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dji.sample.df.commonDf.util.PageUtil;
 import com.dji.sample.df.solar.dao.OrthophotoEntityMapper;
+import com.dji.sample.df.solar.dao.SolarPanelAreaMapper;
+import com.dji.sample.df.solar.dao.SolarPanelComponentMapper;
+import com.dji.sample.df.solar.dao.SolarPanelMapper;
 import com.dji.sample.df.solar.model.entity.OrthophotoEntity;
+import com.dji.sample.df.solar.model.entity.SolarPanel;
+import com.dji.sample.df.solar.model.entity.SolarPanelArea;
+import com.dji.sample.df.solar.model.entity.SolarPanelComponent;
 import com.dji.sample.df.solar.service.OrthophotoEntityService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Slf4j
@@ -28,6 +39,13 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
 
     @Resource
     OrthophotoEntityMapper orthophotoMapper;
+
+    @Resource
+    private SolarPanelMapper solarPanelMapper;
+    @Resource
+    private SolarPanelComponentMapper solarPanelComponentMapper;
+    @Resource
+    private SolarPanelAreaMapper solarPanelAreaMapper;
 
     /**
      * 导入正射图
@@ -66,8 +84,10 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
             throw new RuntimeException("文件保存失败：" + e.getMessage());
         }
         // 5. 保存记录到数据库
+        String id = UUID.randomUUID().toString();
         String accessPath = generateAccessPath(newFileName);
         OrthophotoEntity entity = OrthophotoEntity.builder()
+                .id(id)
                 .name(name)                 // 注意实体类属性名首字母大写
                 .path(accessPath)
                 .build();
@@ -91,10 +111,11 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
 
     /**
      * 删除正射图（同时删除文件和数据库记录）
+     * 数据库记录级联删除，包括正射图下的巡视区域、光伏板、光伏组件
      * @param id 正射图ID
      */
     @Transactional(rollbackFor = Exception.class)
-    public void deleteOrthophoto(Long id) {
+    public void deleteOrthophoto(String id) {
         // 1. 查询数据库记录
         OrthophotoEntity entity = orthophotoMapper.selectById(id);
         if (entity == null) {
@@ -114,6 +135,9 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
             }
         }
         // 3. 删除数据库记录
+        solarPanelComponentMapper.delete(new LambdaQueryWrapper<SolarPanelComponent>().eq(SolarPanelComponent::getOrthophotoId,id));
+        solarPanelMapper.delete(new LambdaQueryWrapper<SolarPanel>().eq(SolarPanel::getOrthophotoId,id));
+        solarPanelAreaMapper.delete(new LambdaQueryWrapper<SolarPanelArea>().eq(SolarPanelArea::getOrthophotoId,id));
         int rows = orthophotoMapper.deleteById(id);
         if (rows == 0) {
             throw new RuntimeException("删除数据库记录失败，ID: " + id);
@@ -122,7 +146,7 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
     }
 
     @Override
-    public OrthophotoEntity selectById(Long id) {
+    public OrthophotoEntity selectById(String id) {
         OrthophotoEntity orthophotoEntity = orthophotoMapper.selectById(id);
         return orthophotoEntity;
     }
@@ -131,9 +155,18 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
     public Map<String, Object> selectList(Map<String, Object> params) {
         // 使用原风格的分页工具类 PageUtil（需存在）
         PageUtil.setPageArgs(params);
-        List<OrthophotoEntity> list = orthophotoMapper.selectList(params);
+        List<OrthophotoEntity> list = orthophotoMapper.selectListByMap(params);
         int count = orthophotoMapper.selectListCount(params);
-
+        for(OrthophotoEntity orthophotoEntity : list) {
+            JSONArray objects = selectComponentsById(orthophotoEntity.getId());
+            Map<String, Object> map = new HashMap<>();
+            map.put("orthophotoId", orthophotoEntity.getId());
+            int solarPanelTotal = solarPanelMapper.selectListCount(map);
+            orthophotoEntity.setSolarPanelTotal(solarPanelTotal);
+            int componentTotal = solarPanelComponentMapper.selectCountByOrthophotoId(orthophotoEntity.getId());
+            orthophotoEntity.setComponentTotal(componentTotal);
+            orthophotoEntity.setComponentList(objects);
+        }
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> pagination = new HashMap<>();
         pagination.put("page", Integer.parseInt(params.get("page").toString()));
@@ -144,5 +177,34 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
         return result;
     }
 
+    @Override
+    public JSONArray selectComponentsById(String id) {
+        JSONArray jsonArray = new JSONArray();
+        List<SolarPanel> solarPanels = solarPanelMapper.selectList(
+                new LambdaQueryWrapper<SolarPanel>().eq(SolarPanel::getOrthophotoId, id)
+        );
+
+        for (SolarPanel solarPanel : solarPanels) {
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("solarPanelId", solarPanel.getId());
+            jsonObject.put("solarPanelName", solarPanel.getSolarPanelName());
+
+            List<SolarPanelComponent> solarPanelComponents = solarPanelComponentMapper.selectList(
+                    new LambdaQueryWrapper<SolarPanelComponent>()
+                            .eq(SolarPanelComponent::getSolarPanelId, solarPanel.getId())
+            );
+            JSONArray childrenArray = new JSONArray();
+            for (SolarPanelComponent component : solarPanelComponents) {
+                // 关键：每次循环创建一个新的 JSONObject
+                JSONObject child = new JSONObject();
+                child.put("componentId", component.getId());
+                child.put("componentName", component.getSolarPanelComponentName());
+                childrenArray.add(child);
+            }
+            jsonObject.put("children", childrenArray);
+            jsonArray.add(jsonObject);
+        }
+        return  jsonArray;
+    }
 
 }

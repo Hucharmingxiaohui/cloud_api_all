@@ -12,6 +12,8 @@ public class WaylineUrlConfig {
     private BuildKmzUrl buildKmzUrl;
     private String waylineStateUrl;
     private String analysisUrl;
+    private String detectAreaGenUrl;
+    private String startSegmentationUrl;
 
     @Data
     public static class BuildKmzUrl {

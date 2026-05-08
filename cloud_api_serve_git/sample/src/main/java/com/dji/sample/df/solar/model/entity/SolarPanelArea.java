@@ -27,8 +27,8 @@ public class SolarPanelArea implements Serializable {
     /**
      * 主键ID，自增
      */
-    @TableId(type = IdType.AUTO)
-    private Long id;
+    @TableId(type = IdType.INPUT)
+    private String id;
 
     /**
      * 光伏板区域名称
@@ -186,5 +186,5 @@ public class SolarPanelArea implements Serializable {
      * 正射图id
      */
     @TableField("orthophoto_id")
-    private Integer orthophotoId;
+    private String orthophotoId;
 }

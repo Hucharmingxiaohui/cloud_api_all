@@ -1,4 +1,4 @@
-package com.dji.sample.df.wind.handler;
+package com.dji.sample.df.uavHandlerDf;
 
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -263,12 +263,26 @@ public class JobControlHandler {
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==4){
                                 log.info("执行光伏计划保存图片---");
-                                Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
-                                if(result.getCode() == 0){
-                                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
-                                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                // 1. 异步启动图片保存分析
+                                new Thread(() -> {
+                                    try {
+                                        // 调用分析接口（可能会很慢）
+                                        Result analyzed = fjReportController.isAnalyzed(jobId);
+                                        Integer data = (Integer) analyzed.getData();
+//                                      只有未分析时进行分析
+                                        if(data==0){
+                                            Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
+                                            log.info("图片分析已启动: jobId={}, result={}", jobId, result);
+                                        }
+                                        // 2. 开始轮询检查分析状态
+                                        startAnalysisMonitoring(jobId, taskCode,taskName);
+                                    } catch (Exception e) {
+                                        log.error("启动图片分析失败: jobId={}", jobId, e);
+                                        // 分析失败也要从监控中移除
+                                        monitoringTasks.remove(taskCode);
+                                        uploadStallMap.remove(taskCode);
                                     }
-                                }
+                                }).start();
                                 monitoringTasks.remove(taskCode);
                                 uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);

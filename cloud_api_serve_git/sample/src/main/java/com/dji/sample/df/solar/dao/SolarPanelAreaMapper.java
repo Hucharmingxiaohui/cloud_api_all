@@ -10,7 +10,7 @@ import java.util.Map;
 @Mapper
 public interface SolarPanelAreaMapper extends BaseMapper<SolarPanelArea> {
 
-    List<SolarPanelArea> selectList(Map map);
+    List<SolarPanelArea> selectListByMap(Map map);
 
     int selectListCount(Map map);
 }
