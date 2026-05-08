@@ -58,7 +58,7 @@ instance.interceptors.response.use(
     // @See: https://github.com/axios/axios/issues/383
     if (!err.response || !err.response.status) {
       message.error('网络异常，请检查后端服务并重试!')
-      return
+      return Promise.reject(err)
     }
     if (err.response?.status !== 200) {
       message.error(`ERROR_CODE: ${err.response?.status}`)
@@ -71,10 +71,10 @@ instance.interceptors.response.use(
       const flag: number = Number(localStorage.getItem(ELocalStorageKey.Flag))
       switch (flag) {
         case EUserType.Web:
-          router.push(ERouterName.PROJECT)
+          router.push('/' + ERouterName.PROJECT)
           break
         case EUserType.Pilot:
-          router.push(ERouterName.PILOT)
+          router.push('/' + ERouterName.PILOT)
           break
       }
     }

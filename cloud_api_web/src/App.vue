@@ -9,7 +9,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, onErrorCaptured } from 'vue'
 import { useMyStore } from './store'
 import GMap from '/@/components/GMap.vue'
 import map from '/@/components/g-map/mapPanel.vue'
@@ -28,6 +28,16 @@ export default defineComponent({
     const loadState = computed(() => isLoading.value)
     const store = useMyStore()
     const locale = zhCN
+
+    // 错误边界：捕获子组件错误，防止向上传播导致页面空白
+    onErrorCaptured((err, instance, info) => {
+      console.error('App Error Captured:', err)
+      console.error('Component:', instance)
+      console.error('Info:', info)
+      // 返回 false 阻止错误继续向上传播
+      return false
+    })
+
     return { locale, loadState }
   }
 })

@@ -201,11 +201,11 @@
           <el-button class="btn" @click="opensettingVisible" >属性配置</el-button>
         </div>
         <div class="kv">
-    <span class="label">电池电量</span>
+    <!-- <span class="label">电池电量</span>
     <span class="value">
       <template v-if="batteryPct !== null">{{ batteryPct }} %</template>
       <template v-else>--</template>
-    </span>
+    </span> -->
   </div>
         <!-- 弹窗 -->
     </div>
@@ -275,7 +275,7 @@
         </div>
         <!-- 负载控制按钮 -->
         <div class="btn-list">
-            <Select v-model:value="payloadSelectInfo.value" style="width: 110px; marginRight: 5px" :options="payloadSelectInfo.options" @change="handlePayloadChange"/>
+            <Select v-model:value="payloadSelectInfo.value" style="width: 90px; font-size: 12px;" placeholder="选择相机" :options="payloadSelectInfo.options" @change="handlePayloadChange"/>
             <el-button class="btn" @click="onAuthPayload">负载控制</el-button>
         </div>
         <div class="btn-list">
@@ -1359,6 +1359,10 @@ watchEffect(async () => {
 :deep(drone-control-popconfirm .ant-input-number-input ){
   color: #303030 !important;
 }
+:deep(.ant-select:not(.ant-select-customize-input) .ant-select-selector ){
+  background-color: #163B81;
+  border:1px solid #719fff; ;
+}
 .container {
   display: flex;         /* 使用 Flexbox 布局 */
   width: 100%;          /* 设定宽度为 100% */
@@ -1394,6 +1398,7 @@ watchEffect(async () => {
     }
    }
    .btn-list{
+      margin-left: 10px;
       display: grid;
       grid-template-columns: repeat(2, 1fr); /* 两列布局 */
       gap: 10px;
@@ -1416,11 +1421,11 @@ watchEffect(async () => {
     box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
     border: 1px solid #719fff;
     border-radius: 4px;
-    width:  100px;
-    height: 36px;
+    width:  85px;
+    height: 30px;
     font-family: PingFangSC, PingFang SC;
     font-weight: 500;
-    font-size: 14px;
+    font-size: 13px;
     margin-left: 0 !important;
     color: #ffffff;
     &:hover{
@@ -1539,6 +1544,7 @@ watchEffect(async () => {
   // writing-mode: vertical-rl;
 }
 .message-box{
+    margin: 5px;
     -webkit-box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
     box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
     border: 1px solid #719fff;

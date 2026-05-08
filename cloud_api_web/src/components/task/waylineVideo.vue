@@ -39,7 +39,7 @@
                      <div class="nav-title">
                         无人机直播
                      </div>
-                     <div>
+                     <!-- <div>
                         <div class="tab-section">
                             <div class="tab" :class="{ active: activeTab === 'load' }" @click="switchTab('load')">
                                 负载直播
@@ -48,7 +48,7 @@
                                 飞行相机
                             </div>
                         </div>
-                     </div>
+                     </div> -->
                  </div>
 
                 <!-- 视频流部分 -->
@@ -79,7 +79,6 @@
                     <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/nav-icon.png" />
                     <span class="text_9">设备信息</span>
                 </div>
-                <!-- 切换标签区域：设备状态、设备运维（放在机舱上方） -->
                 <div class="tab-box">
                     <div class="tab" :class="{ active: activeRightTab === 'status' }" @click="switchRightTab('status')">
                         设备状态
@@ -89,7 +88,8 @@
                         设备运维
                     </div>
                 </div>
-
+                <div style="height: calc(100vh - 210px); overflow-y: auto;">
+                                    <!-- 切换标签区域：设备状态、设备运维（放在机舱上方） -->
                 <!-- 上部分：机舱 -->
                 <div class="upper-part" v-if="activeRightTab === 'status'">
                     <deviceState :deviceInfo="deviceInfo" />
@@ -132,6 +132,7 @@
                     <DockControlPanel :sn="osdVisible.gateway_sn"  :deviceInfo="deviceInfo" @close-control-panel="onCloseControlPanel">
                     </DockControlPanel>
                 </div>
+                </div>
             </div>
         </div>
     </div>
@@ -139,22 +140,22 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, watch, onMounted } from 'vue'
-import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
-import LivestreamDock from '/@/components/livestream-dock-debug.vue'
-import LivestreamOthers from '/@/components/livestream-others-debug.vue'
 import { getNowTaskApi, getWaylineJobs } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
-import droneControlPanel from '/@/components/devices/drone_control/drone-control.vue'
-import deviceState from '/@/components/devices/drone_control/device_state.vue'
-import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
-import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
 import { ELocalStorageKey, EDeviceTypeName } from '/@/types'
 import {
   DeviceOsd, DeviceStatus, DockOsd, EGear, EModeCode, GatewayOsd, EDockModeCode,
   NetworkStateQualityEnum, NetworkStateTypeEnum, RainfallEnum, DroneInDockEnum
 } from '/@/types/device'
 import { useRoute } from 'vue-router'
+import waylinePanel from '/@/components/g-map/showLineAtPlan.vue'
+import LivestreamDock from '/@/components/livestream-dock-debug.vue'
+import LivestreamOthers from '/@/components/livestream-others-debug.vue'
+import droneControlPanel from '/@/components/devices/drone_control/drone-control.vue'
+import deviceState from '/@/components/devices/drone_control/device_state.vue'
+import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
+import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
 const body = {
   page: 1,
   total: 0,
@@ -222,8 +223,6 @@ function onTaskProgressWs (data) {
   if (output) {
     const { status, progress } = output || {}
     const taskItem = plansData.data.find(task => task.job_id === bid)
-    console.log('当前任务', taskItem)
-    console.log('renwuliebiao', plansData.data)
     taskInfo.execute_time = taskItem.begin_time
     taskInfo.job_name = taskItem.job_name
     taskInfo.file_name = taskItem.file_name
@@ -336,30 +335,24 @@ function switchRightTab (tab) {
 
 .box-left {
     background: rgba(59, 116, 255, 0.15);
-    width: 20%;
-    // padding: 10px;
-    // border-radius: 15px;
+    width: 30%;
     height: calc(100vh - 120px);
     display: flex;
     flex-direction: column;
     overflow-y: hidden;
-    // justify-content: space-between;
 }
 .nav{
-    height: 30px;
+    height: 28px;
     background: url('/@/assets/v4/livestream-nav.png') 100% no-repeat;
     background-size: 100% 100%;
     width: 100%;
     z-index: 3000;
     display: flex;
     align-items: center;
-    padding-bottom: 5px;
-    // justify-content: center;
+    padding-bottom: 3px;
+    flex-shrink: 0;
     .thumbnail_1{
-        // margin-top: 10px;
-        // width: 10px;
     }
-    // margin: -20px 0 0 1px;
     .text_9 {
 
         // width: 40px;
@@ -442,21 +435,19 @@ function switchRightTab (tab) {
     height: calc(100% - 210px);
 }
 .video-section {
-    // height: 45%;
-    // width: 100%;
-    // margin: 10px;
-    height: 38%;
-    // width:ca;
+    height: 35%;
+    min-height: 140px;
     margin: 5px 10px 0 10px;
     border: 1px solid #51658A;
+    flex-shrink: 0;
 }
 .title{
-    height: 30px;
+    height: 28px;
     background: url('../../assets/v4/debug_icon.png')
     100% no-repeat;
     background-size: 100% 100%;
-    // width: 100%;
-    margin: 15px 10px 10px 10px;
+    margin: 8px 10px 5px 10px;
+    flex-shrink: 0;
     .text-box {
         background-image: linear-gradient(
             180deg,
@@ -497,7 +488,7 @@ function switchRightTab (tab) {
 }
 
 .map-section {
-    height: 50%;
+    height: 48%;
     // width: 100%;
     // margin-bottom: 8%;
     margin: 5px 10px 0 10px;
@@ -513,11 +504,8 @@ function switchRightTab (tab) {
 
 .box-middle {
     background: rgba(59, 116, 255, 0.15);
-    // flex: 1;
-    width:50%;
+    width: 45%;
     margin-left: 10px;
-    // padding: 10px;
-    // border-radius: 15px;
     height: calc(100vh - 120px);
     display: flex;
     flex-direction: column;
@@ -606,18 +594,13 @@ function switchRightTab (tab) {
 }
 
 .box-right {
-    flex: 1;
+    width: 25%;
     background: rgba(59, 116, 255, 0.15);
-    // width: 23%;
-    // margin-left: 10px;
-    // width: 100%;
     margin-left: 10px;
     padding: 10px 0;
-    // border-radius: 15px;
     height: calc(100vh - 120px);
     display: flex;
     flex-direction: column;
-    overflow-y: auto;
 }
 
 .tab-section {

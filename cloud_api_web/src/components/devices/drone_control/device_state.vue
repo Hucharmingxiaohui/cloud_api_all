@@ -214,11 +214,11 @@ useConnectMqtt()
         }
         // border-right: 1px solid #719fff;
         .responsive-image {
-            margin: 0 3px 0 3px;
+            margin: 0 10px;
             width: 100%; /* 自适应宽度 */
-            height: auto; /* 保持纵横比 */
-            aspect-ratio: 1; /* 宽高比为1:1，保持正方形 */
-            object-fit: cover; /* 裁剪内容以填充盒子 */
+            // height: auto; /* 保持纵横比 */
+            // aspect-ratio: 1; /* 宽高比为1:1，保持正方形 */
+            // object-fit: cover; /* 裁剪内容以填充盒子 */
         }
         .caption {
         margin-top: 8px; /* 与图片之间的间距 */

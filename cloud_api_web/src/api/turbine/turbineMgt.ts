@@ -98,6 +98,7 @@ export const deleteInserestPointApi = async function (id): Promise<IWorkspaceRes
  * 光伏板管理
  */
 const HTTP_PREFIX_SOLAR = '/api/solarPanelArea'
+const HTTP_PREFIX_SOLAR1 = '/api/solarPanel'
 
 // 获取所有的光伏板区域参数
 export const getAllSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
@@ -130,6 +131,13 @@ export const deleteSolarPanelApi = async function (id): Promise<IWorkspaceRespon
 // 根据ID查询光伏板参数
 export const getSolarPanelByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_SOLAR}/getById?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 根据ID查询光伏板位置参数
+export const getSolarPanelPostionByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR1}/getById?id=${id}`
   const result = await request.get(url)
   return result.data
 }
@@ -216,5 +224,30 @@ export const deleteInspectionDeviceApi = async function (id): Promise<IWorkspace
 export const getInspectionDeviceByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_INSPECTION}/getById?id=${id}`
   const result = await request.get(url)
+  return result.data
+}
+
+/**
+ * 光伏区域组件管理
+ */
+
+// 1. 获取组件地理位置
+export const getComponentListByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `/api/solarPanelComponent/selectListByComponentId?componentId=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 2. 删除正射图
+export const deleteSolarImgByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
+  const url = `/api/Orthophoto/deleteOrthophoto?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 3. 识别正射图中的组件
+export const detecSolarImgByIdApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = '/api/solarPanel/add'
+  const result = await request.post(url, data)
   return result.data
 }

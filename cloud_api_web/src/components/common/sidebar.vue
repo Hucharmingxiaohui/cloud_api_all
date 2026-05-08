@@ -3,10 +3,10 @@
     <div class="block_1">
       <div class="text-wrapper_1 ">
         <a-row class="ant-row">
-          <a-col :span="1"></a-col>
-          <el-col :span="7" class="text_1"  style="display: flex; justify-content: center;">
+          <!-- <a-col :span="1"></a-col> -->
+          <a-col :span="9" class="text_1"  style="display: flex; justify-content: center;">
             <!-- 左侧菜单 -->
-             <div style="width: 100%;">
+             <div style="width: 100%; ">
              <el-menu
               :default-active="activeIndex"
               class="el-menu-demo"
@@ -56,8 +56,8 @@
               </template>
             </el-menu>
              </div>
-          </el-col>
-          <a-col :span="1"></a-col>
+          </a-col>
+          <!-- <a-col :span="1"></a-col> -->
           <a-col :span="6" class="text_2">
             <span>{{ CURRENT_CONFIG.sysName }}</span>
           </a-col>

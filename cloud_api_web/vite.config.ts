@@ -1,15 +1,15 @@
-import vue from "@vitejs/plugin-vue";
+import vue from '@vitejs/plugin-vue'
 // config alias
-import path from "path";
-import { ConfigEnv, defineConfig, UserConfigExport } from "vite";
-import ViteComponents, { AntDesignVueResolver } from "vite-plugin-components";
+import path from 'path'
+import { ConfigEnv, defineConfig, UserConfigExport } from 'vite'
+import ViteComponents, { AntDesignVueResolver } from 'vite-plugin-components'
 // Introduce eslint plugin
-import eslintPlugin from "vite-plugin-eslint";
-import OptimizationPersist from "vite-plugin-optimize-persist";
-import PkgConfig from "vite-plugin-package-config";
-import viteSvgIcons from "vite-plugin-svg-icons";
+import eslintPlugin from 'vite-plugin-eslint'
+import OptimizationPersist from 'vite-plugin-optimize-persist'
+import PkgConfig from 'vite-plugin-package-config'
+import viteSvgIcons from 'vite-plugin-svg-icons'
 // import { viteVConsole } from "vite-plugin-vconsole";
-import cesium from "vite-plugin-cesium";
+import cesium from 'vite-plugin-cesium'
 
 // https://vitejs.dev/config/
 export default ({ command, mode }: ConfigEnv): UserConfigExport =>
@@ -17,8 +17,8 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
     plugins: [
       vue(),
       cesium({
-      injectCss: false, // 关闭自动注入 CSS
-    }),
+        injectCss: false, // 关闭自动注入 CSS
+      }),
       eslintPlugin({
         fix: true,
       }),
@@ -27,9 +27,9 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
       }),
       viteSvgIcons({
         // 指定需要缓存的图标文件夹
-        iconDirs: [path.resolve(process.cwd(), "src/assets/icons")],
+        iconDirs: [path.resolve(process.cwd(), 'src/assets/icons')],
         // 指定symbolId格式
-        symbolId: "icon-[dir]-[name]",
+        symbolId: 'icon-[dir]-[name]',
       }),
       // viteVConsole({
       //   entry: path.resolve(__dirname, "./src/main.ts"), // 入口文件
@@ -47,7 +47,7 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
     ],
     server: {
       port: 8089,
-      host: "0.0.0.0",  
+      host: '0.0.0.0',
       proxy: {
         // 代理配置
         // '/api': {
@@ -55,32 +55,32 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         //   changeOrigin: true,
         //   rewrite: (path) => path.replace(/^\/api/, ''),
         // },
-        "/pathplanning": {
-          target: "http://172.20.63.238:9527",
+        '/pathplanning': {
+          target: 'http://172.20.63.238:9527',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/path/, ""),
+          rewrite: (path) => path.replace(/^\/path/, ''),
         },
-        "/pathtest1": {
-          target: "https://shona-unsyntactical-quotidianly.ngrok-free.dev",
+        '/pathtest1': {
+          target: 'https://shona-unsyntactical-quotidianly.ngrok-free.dev',
           changeOrigin: true,
           secure: false,
           rewrite: (path) => {
-            const newPath = path.replace(/^\/pathtest1/, "");
-            console.log("[Proxy] 原始路径:", path, "-> 代理路径:", newPath);
-            return newPath;
+            const newPath = path.replace(/^\/pathtest1/, '')
+            console.log('[Proxy] 原始路径:', path, '-> 代理路径:', newPath)
+            return newPath
           },
           configure: (proxy, options) => {
-            console.log("[Proxy] 代理配置已加载:", options.target); // 确认代理初始化
-            proxy.on("proxyReq", (proxyReq, req) => {
+            console.log('[Proxy] 代理配置已加载:', options.target) // 确认代理初始化
+            proxy.on('proxyReq', (proxyReq, req) => {
               console.log(
-                "[Proxy] 代理目标:",
+                '[Proxy] 代理目标:',
                 `${proxyReq.protocol}//${proxyReq.host}${proxyReq.path}`
-              );
-              console.log("[Proxy] 请求头:", proxyReq.getHeaders());
-            });
-            proxy.on("error", (err) => {
-              console.error("[Proxy] 错误:", err);
-            });
+              )
+              console.log('[Proxy] 请求头:', proxyReq.getHeaders())
+            })
+            proxy.on('error', (err) => {
+              console.error('[Proxy] 错误:', err)
+            })
           },
         },
         // '/mapi': {
@@ -89,19 +89,19 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         //   rewrite: (path) => path.replace(/^\/mapi/, ''),
         // },
         '/api': {
-          target: 'http://192.168.160.1:19922',  // 后端接口地址
-          changeOrigin: true,  // 是否更改请求头中的 Origin
-          rewrite: (path) => path.replace(/^\/api/, '')  // 去除 /api 前缀
+          target: 'http://192.168.160.1:19922', // 后端接口地址
+          changeOrigin: true, // 是否更改请求头中的 Origin
+          rewrite: (path) => path.replace(/^\/api/, '') // 去除 /api 前缀
         }
       },
     },
-    envDir: "./env",
+    envDir: './env',
     resolve: {
       alias: [
         {
           // https://github.com/vitejs/vite/issues/279#issuecomment-635646269
-          find: "/@",
-          replacement: path.resolve(__dirname, "./src"),
+          find: '/@',
+          replacement: path.resolve(__dirname, './src'),
         },
       ],
     },
@@ -110,7 +110,7 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         scss: {
           // example : additionalData: `@import "./src/design/styles/variables";`
           // dont need include file extend .scss
-          silenceDeprecations: ["legacy-js-api"],
+          silenceDeprecations: ['legacy-js-api'],
           additionalData: `
           @use "./src/styles/variables" as *;
           @use "./src/styles/common" as *;
@@ -118,9 +118,24 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         },
       },
     },
-    base: "/",
+    base: '/',
     build: {
-      target: ["es2020"], // 最低支持 es2015
+      target: ['es2020'], // 最低支持 es2015
       sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            agora: ['agora-rtc-sdk-ng'],
+            flv: ['flv.js'],
+            pixelstreaming: [
+              '@epicgames-ps/lib-pixelstreamingfrontend-ue5.4',
+              '@epicgames-ps/lib-pixelstreamingfrontend-ui-ue5.4'
+            ],
+            cesium: ['cesium', '@cesium-china/cesium-map'],
+            antd: ['ant-design-vue'],
+            'element-plus': ['element-plus'],
+          }
+        }
+      }
     },
-  });
+  })

@@ -24,9 +24,22 @@ import '/@/assets/iconfonts/iconfont.css'
 import '/@/assets/font/fonts.css'
 
 const app = createInstance(App)
+
+// 全局错误处理：防止未捕获错误导致页面空白
+app.config.errorHandler = (err, instance, info) => {
+  console.error('Vue Global Error:', err)
+  console.error('Component:', instance)
+  console.error('Info:', info)
+}
+
+// 捕获未处理的 Promise 拒绝
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled Promise Rejection:', event.reason)
+  event.preventDefault()
+})
+
 app.use(Antd)
 app.component('Loading', Loading)
-app.mount('#app')
 // 统一注册Icon图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)

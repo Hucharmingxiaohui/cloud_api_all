@@ -101,7 +101,7 @@ const routes: Array<RouteRecordRaw> = [
                 component: () => import('/@/components/variableMgt/solarMgt/solarPanelMgt/index.vue'),
                 meta: {
                   showInMenu: true,
-                  label: '光伏板区域管理',
+                  label: '光伏巡视区域管理',
                   cache: true
                 }
               },
@@ -112,6 +112,16 @@ const routes: Array<RouteRecordRaw> = [
                 meta: {
                   showInMenu: true,
                   label: '光伏板设备管理',
+                  cache: true
+                }
+              },
+              {
+                path: '/variableMgt/solarMgt/solarComponentMgt',
+                name: 'solarComponentMgt',
+                component: () => import('/@/components/variableMgt/solarMgt/solarComponentMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '光伏组件定位管理',
                   cache: true
                 }
               },
@@ -155,7 +165,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/remoteDebug',
         name: 'remoteDebug',
-        component: () => import('/@/components/task/waylineVideo.vue'),
+        component: () => import(/* webpackPrefetch: true */ '/@/components/task/waylineVideo.vue'),
         meta: {
           showInMenu: false,
           label: '控制台',
@@ -166,7 +176,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/' + ERouterName.LIVESTREAM,
         name: ERouterName.LIVESTREAM,
-        component: () => import('/@/pages/page-web/projects/livestream.vue'),
+        component: () => import(/* webpackPrefetch: true */ '/@/pages/page-web/projects/livestream.vue'),
         meta: {
           showInMenu: true,
           label: '视频直播',
@@ -545,6 +555,12 @@ router.beforeEach((to, from, next) => {
 
 router.afterEach(() => {
   isLoading.value = false
+})
+
+// 路由级错误处理：捕获懒加载组件失败等导航错误
+router.onError((error) => {
+  isLoading.value = false
+  console.error('Router navigation error:', error)
 })
 
 export { routes, isLoading }

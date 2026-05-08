@@ -28,7 +28,7 @@ import {
   DeviceOsd, DeviceStatus, DockOsd, EGear, EModeCode, GatewayOsd, EDockModeCode,
   NetworkStateQualityEnum, NetworkStateTypeEnum, RainfallEnum, DroneInDockEnum
 } from '/@/types/device'
-import { onMounted, watch, ref, nextTick, reactive, computed } from 'vue'
+import { onMounted, watch, ref, nextTick, reactive, computed, defineAsyncComponent } from 'vue'
 import { getRoot } from '/@/root'
 import { useMyStore } from '/@/store'
 import { ELocalStorageKey, ERouterName } from '/@/types/enums'
@@ -36,14 +36,12 @@ import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusM
 import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
-import TwoDModel from '/@/components/g-map/mapPanel1.vue'
-import ThreeDModel from '/@/components/cesium/3DModelPanel.vue'
-import tsaPanel from '/@/components/tsaPanel.vue'
-// import ttt from '/@/components/GMap.vue'
-import deviceState from '/@/components/devices/drone_control/device_state.vue'
-// import control from '/@/components/control/loadHandle.vue'
 import { EDeviceTypeName } from '/@/types'
-import UEPix from '/@/components/uePix/UEPix.vue'
+
+// 重型组件改为异步加载，减少首屏 bundle 体积
+const TwoDModel = defineAsyncComponent(() => import('/@/components/g-map/mapPanel1.vue'))
+const tsaPanel = defineAsyncComponent(() => import('/@/components/tsaPanel.vue'))
+const UEPix = defineAsyncComponent(() => import('/@/components/uePix/UEPix.vue'))
 const showLive1 = ref<boolean>(false)
 const scorllHeight = ref() // 容器自适应滚动高度
 
