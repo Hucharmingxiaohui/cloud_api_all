@@ -1,4 +1,4 @@
-package com.dji.sample.df.wind.handler;
+package com.dji.sample.df.uavHandlerDf;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;

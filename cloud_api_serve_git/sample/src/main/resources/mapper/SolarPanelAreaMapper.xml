@@ -5,7 +5,7 @@
 
 <mapper namespace="com.dji.sample.df.solar.dao.SolarPanelAreaMapper">
 
-    <select id="selectList" resultType="com.dji.sample.df.solar.model.entity.SolarPanelArea">
+    <select id="selectListByMap" resultType="com.dji.sample.df.solar.model.entity.SolarPanelArea">
         SELECT * FROM manage_solar_panel_area
         <where>
             <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">

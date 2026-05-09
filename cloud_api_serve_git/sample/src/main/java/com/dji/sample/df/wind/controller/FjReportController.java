@@ -20,8 +20,9 @@ import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
+import com.dji.sample.df.solar.service.GfReportService;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
-import com.dji.sample.df.wind.handler.PictureSaveHandler;
+import com.dji.sample.df.uavHandlerDf.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
@@ -67,6 +68,8 @@ public class FjReportController {
     ReportService reportService;
     @Autowired
     private FjReportService fjReportService;
+    @Autowired
+    private GfReportService gfReportService;
     @Autowired
     private FjFileConfig fileConfig;
     @Autowired
@@ -132,48 +135,74 @@ public class FjReportController {
         if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==4){
             waylineJobEntity.setIsAnalyzed(2);
             waylineJobMapper.updateById(waylineJobEntity);
-            pictureSaveHandler.pictureSave(jobId);
+            Result result = pictureSaveHandler.pictureSave(jobId);
+            if (result.getCode() == 0) {
+                AnalysisRequest request = new AnalysisRequest();
+                request.setFunction("defect_fgxj");
+                request.setFile_path(fileConfig.getFilePictrueUrl() + jobId);
+                // 动态生成文件名列表
+                List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
+                        eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId));
+                List<String> fileNames = new ArrayList<>();
+                for (MediaFileEntity mediaFileEntity : mediaFileEntities) {
+                    String fileName = mediaFileEntity.getFileName();
+                    fileNames.add(fileName);
+                }
+                request.setFile_name(fileNames);
+                AnalysisResponse response = gfReportService.sendGfAnalysisRequest(request);
+                if (response != null) {
+                    System.out.println("分析结果: " + response);
+                }
+                gfReportService.processAndAddDefects(response, jobId);
+//              分析完成
+                waylineJobEntity.setIsAnalyzed(1);
+                log.info(jobId+"分析完成。。。");
+                waylineJobMapper.updateById(waylineJobEntity);
+                return Result.success("success");
+            }
             return Result.success("success");
         }
-        waylineJobEntity.setIsAnalyzed(2);
-        waylineJobMapper.updateById(waylineJobEntity);
-        log.info(jobId+"正在分析。。。");
-        Result result = pictureSaveHandler.pictureSave(jobId);
-        if (result.getCode() == 0) {
-             AnalysisRequest request = new AnalysisRequest();
-             request.setFunction("defect_fjxj");
-             request.setFile_path(fileConfig.getFilePictrueUrl() + jobId);
-             // 动态生成文件名列表
-             List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
-                     eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId));
-             // 从Redis获取图片命名规则
-//             String fanPointsJson = redisUtils.get("fanPoints").toString();
-            FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                    .eq(FanWaylinePoints::getJobId, jobId));
-            JSONArray jsonArray = new JSONArray();
-            Integer jobType = fanWaylinePoints.getJobType();
-            JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
-            JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
-            if(jobType==0){
-                jsonArray.addAll(djiPoints);
-            }else if(jobType==1){
-                jsonArray.addAll(videoPoints);
-                jsonArray.addAll(djiPoints);
+//      风机计划
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==1){
+            waylineJobEntity.setIsAnalyzed(2);
+            waylineJobMapper.updateById(waylineJobEntity);
+            log.info(jobId+"正在分析。。。");
+            Result result = pictureSaveHandler.pictureSave(jobId);
+            if (result.getCode() == 0) {
+                AnalysisRequest request = new AnalysisRequest();
+                request.setFunction("defect_fjxj");
+                request.setFile_path(fileConfig.getFilePictrueUrl() + jobId);
+                // 动态生成文件名列表
+                List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
+                        eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId));
+
+                FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
+                        .eq(FanWaylinePoints::getJobId, jobId));
+                JSONArray jsonArray = new JSONArray();
+                Integer jobType = fanWaylinePoints.getJobType();
+                JSONArray djiPoints = JSON.parseArray(fanWaylinePoints.getDjiFanPoints());
+                JSONArray videoPoints = JSON.parseArray(fanWaylinePoints.getVideoFanPoints());
+                if(jobType==0){
+                    jsonArray.addAll(djiPoints);
+                }else if(jobType==1){
+                    jsonArray.addAll(videoPoints);
+                    jsonArray.addAll(djiPoints);
+                }
+                List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
+                log.info("文件名为-------------"+fileNames);
+                log.info("request为-------------"+request);
+                request.setFile_name(fileNames);
+                AnalysisResponse response = fjReportService.sendFjAnalysisRequest(request);
+                if (response != null) {
+                    System.out.println("分析结果: " + response);
+                }
+                fjReportService.processAndAddDefects(response, jobId);
+//              分析完成
+                waylineJobEntity.setIsAnalyzed(1);
+                log.info(jobId+"分析完成。。。");
+                waylineJobMapper.updateById(waylineJobEntity);
+                return Result.success("success");
             }
-             List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
-             log.info("文件名为-------------"+fileNames);
-             log.info("request为-------------"+request);
-             request.setFile_name(fileNames);
-             AnalysisResponse response = fjReportService.sendFjAnalysisRequest(request);
-             if (response != null) {
-                 System.out.println("分析结果: " + response);
-             }
-             fjReportService.processAndAddDefects(response, jobId);
-//           分析完成
-             waylineJobEntity.setIsAnalyzed(1);
-             log.info(jobId+"分析完成。。。");
-             waylineJobMapper.updateById(waylineJobEntity);
-             return Result.success("success");
         }
         return Result.success("success");
     }
@@ -325,14 +354,19 @@ public class FjReportController {
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         String reportId =null;
         if(planType==0){
-//         普通任务生成报告
+//           普通任务生成报告
              reportId = fjReportService.createNewReport(jobId);
              fjReportService.genNormalPatrolTaskWordNew(reportId,jobId);
              log.info("生成普通报告------");
         }else if(planType==1){
+//           风机任务生成报告
              reportId = fjReportService.createNewReport(jobId);
-
+             fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
+        } else if (planType==4) {
+//           光伏任务生成报告
+            reportId = fjReportService.createNewReport(jobId);
             fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
+
         }
 
 //      已进行巡检

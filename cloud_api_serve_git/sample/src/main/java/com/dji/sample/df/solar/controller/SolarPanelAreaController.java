@@ -1,21 +1,18 @@
 package com.dji.sample.df.solar.controller;
 
 import com.df.framework.vo.Result;
-import com.dji.sample.df.solar.model.dto.SolarDetectRequestCutDTO;
 import com.dji.sample.df.solar.model.dto.SolarDetectRequestDTO;
-import com.dji.sample.df.solar.model.dto.SolarDetectResponseDTO;
 import com.dji.sample.df.solar.model.entity.SolarPanelArea;
 import com.dji.sample.df.solar.service.SolarPanelAreaService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
 import javax.annotation.Resource;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+
+/**
+ * 光伏区域管理接口
+ */
 
 @Slf4j
 @RestController
@@ -24,14 +21,6 @@ public class SolarPanelAreaController {
 
     @Resource
     private SolarPanelAreaService solarPanelAreaService;
-
-    @Value("${wayline.detect-area-gen-url}")
-    private String detectAreaGenUrl;
-    private final RestTemplate restTemplate;
-
-    public SolarPanelAreaController(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
 
     /**
      * 新增光伏区域参数
@@ -50,164 +39,19 @@ public class SolarPanelAreaController {
         boolean success = solarPanelAreaService.updateSolarPanelAreaById(solarPanelArea);
         return success ? Result.success("更新成功") : Result.error("更新失败");
     }
+
     /**
-     * 将完整的SolarDetectRequestDTO转换为精简的SolarDetectRequestCutDTO
-     * 直接在Controller中实现转换逻辑
-     */
-    public SolarDetectRequestCutDTO convertToCutDto(SolarDetectRequestDTO fullDto) {
-        SolarDetectRequestCutDTO cutDto = new SolarDetectRequestCutDTO();
-
-        // 1. 复制基本字段
-        cutDto.setSolar_area_name(fullDto.getSolar_area_name());
-
-        // 2. 复制检测区域列表
-        if (fullDto.getDetect_areas() != null) {
-            List<SolarDetectRequestCutDTO.DetectAreaDTO> cutAreas =
-                    fullDto.getDetect_areas().stream()
-                            .map(fullArea -> {
-                                SolarDetectRequestCutDTO.DetectAreaDTO cutArea =
-                                        new SolarDetectRequestCutDTO.DetectAreaDTO();
-
-                                // 复制区域名称
-                                cutArea.setArea_name(fullArea.getArea_name());
-
-                                // 复制角点像素
-                                if (fullArea.getCorners_pixels() != null) {
-                                    List<SolarDetectRequestCutDTO.CornerPixelDTO> cutPixels =
-                                            fullArea.getCorners_pixels().stream()
-                                                    .map(fullPixel -> {
-                                                        SolarDetectRequestCutDTO.CornerPixelDTO cutPixel =
-                                                                new SolarDetectRequestCutDTO.CornerPixelDTO();
-                                                        cutPixel.setRow(fullPixel.getRow());
-                                                        cutPixel.setCol(fullPixel.getCol());
-                                                        return cutPixel;
-                                                    })
-                                                    .collect(Collectors.toList());
-                                    cutArea.setCorners_pixels(cutPixels);
-                                }
-
-                                return cutArea;
-                            })
-                            .collect(Collectors.toList());
-            cutDto.setDetect_areas(cutAreas);
-        }
-
-        return cutDto;
-    }
-    /**
-     * 调用检测接口，直接返回DTO
-     */
-    private SolarDetectResponseDTO callDetectApi(SolarDetectRequestCutDTO cutRequest) {
-        try {
-            // 设置请求头
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            // 创建请求实体
-            HttpEntity<SolarDetectRequestCutDTO> requestEntity =
-                    new HttpEntity<>(cutRequest, headers);
-
-            // 发送POST请求，直接接收DTO
-            ResponseEntity<SolarDetectResponseDTO> response = restTemplate.exchange(
-                    detectAreaGenUrl,
-                    HttpMethod.POST,
-                    requestEntity,
-                    SolarDetectResponseDTO.class
-            );
-
-            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-                return response.getBody();
-            } else {
-                throw new RuntimeException("外部接口调用失败, 状态码: " + response.getStatusCodeValue());
-            }
-
-        } catch (Exception e) {
-            log.error("调用检测接口失败", e);
-            throw new RuntimeException("外部接口调用失败: " + e.getMessage(), e);
-        }
-    }
-    /**
-     * 根据前端正射图更新光伏区域参数
+     * 根据前端正射图新增光伏区域
      */
     @PostMapping("/detectAreaGenSolar")
     public Result detectAreaGenSolar(@RequestBody SolarDetectRequestDTO solarDetectRequestDTO) {
-
-        log.info("接收光伏检测请求, 区域名称: {}", solarDetectRequestDTO.getSolar_area_name());
-
-        // 1. 将完整DTO转换为精简版DTO
-        SolarDetectRequestCutDTO cutRequest = convertToCutDto(solarDetectRequestDTO);
-
-        // 2. 验证转换结果
-        if (cutRequest.getSolar_area_name() == null || cutRequest.getDetect_areas() == null) {
-            return Result.error("转换后的数据无效");
-        }
-
-        // 3. 使用精简版DTO调用外部接口
-        log.info("调用外部检测接口, URL: {}", detectAreaGenUrl);
-        SolarDetectResponseDTO solarDetectResponseDTO = callDetectApi(cutRequest);
-        List<SolarDetectResponseDTO.DetectAreaResponseDTO> detectAreas = solarDetectResponseDTO.getData().getDetect_areas();
-        boolean result = true;
-        for (int i = 0; i < detectAreas.size(); i++) {
-            // 1. 创建一个空的SolarPanel对象
-            SolarPanelArea solarPanelArea = new SolarPanelArea();
-
-            // 2. 从请求参数中赋值
-            solarPanelArea.setOrthophotoId(solarDetectRequestDTO.getOrthophoto_id());
-            solarPanelArea.setSolarPanelAreaName(solarDetectRequestDTO.getDetect_areas().get(i).getArea_name());  // solar_area_name -> solarPanelName
-            solarPanelArea.setFlightAltitude(solarDetectRequestDTO.getFlight_altitude());  // flight_altitude -> flightAltitude
-            solarPanelArea.setTiltAngle(solarDetectRequestDTO.getTilt_angle());            // tilt_angle -> tiltAngle
-            solarPanelArea.setHorizontalLines(solarDetectRequestDTO.getHorizontal_lines()); // horizontal_lines -> horizontalLines
-            solarPanelArea.setAreaHeight(solarDetectRequestDTO.getArea_height());           // area_height -> areaHeight
-            solarPanelArea.setPanelHeight(solarDetectRequestDTO.getPanel_height());         // panel_height -> panelHeight
-            solarPanelArea.setPanelHeading(solarDetectRequestDTO.getPanel_heading());       // panel_heading -> panelHeading
-            solarPanelArea.setMargin(solarDetectRequestDTO.getMargin());                    // margin -> margin
-            solarPanelArea.setPointsPerLine(solarDetectRequestDTO.getPoints_per_line());    // points_per_line -> pointsPerLine
-
-            // 3. 从响应结果中获取地理坐标数据
-//          SolarDetectResponseDTO.ResponseData responseData = solarDetectResponseDTO.getData();
-//          List<SolarDetectResponseDTO.DetectAreaResponseDTO> detectAreas = responseData.getDetect_areas();
-            if (detectAreas != null && !detectAreas.isEmpty()) {
-                // 注意：这里需要处理地理坐标的转换逻辑
-                // 通常检测区域会有多个，您需要决定如何将地理坐标保存到SolarPanel的四个角点字段中
-                    SolarDetectResponseDTO.DetectAreaResponseDTO firstArea = detectAreas.get(i);
-                    List<SolarDetectResponseDTO.GeoCoordinateDTO> cornersGeo = firstArea.getCorners_geo();
-
-                    if (cornersGeo != null && cornersGeo.size() >= 4) {
-                        // 假设corners_geo列表中的4个点对应矩形的4个角
-                        solarPanelArea.setCorner1Lng(cornersGeo.get(0).getLon());  // 第一个点的经度
-                        solarPanelArea.setCorner1Lat(cornersGeo.get(0).getLat());  // 第一个点的纬度
-
-                        solarPanelArea.setCorner2Lng(cornersGeo.get(1).getLon());  // 第二个点的经度
-                        solarPanelArea.setCorner2Lat(cornersGeo.get(1).getLat());  // 第二个点的纬度
-
-                        solarPanelArea.setCorner3Lng(cornersGeo.get(2).getLon());  // 第三个点的经度
-                        solarPanelArea.setCorner3Lat(cornersGeo.get(2).getLat());  // 第三个点的纬度
-
-                        solarPanelArea.setCorner4Lng(cornersGeo.get(3).getLon());  // 第四个点的经度
-                        solarPanelArea.setCorner4Lat(cornersGeo.get(3).getLat());  // 第四个点的纬度
-//                      保存像素点到数据库
-                        solarPanelArea.setCorner1Col(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(0).getCol());
-                        solarPanelArea.setCorner1Row(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(0).getRow());
-                        solarPanelArea.setCorner2Col(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(1).getCol());
-                        solarPanelArea.setCorner2Row(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(1).getRow());
-                        solarPanelArea.setCorner3Col(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(2).getCol());
-                        solarPanelArea.setCorner3Row(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(2).getRow());
-                        solarPanelArea.setCorner4Col(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(3).getCol());
-                        solarPanelArea.setCorner4Row(cutRequest.getDetect_areas().get(i).getCorners_pixels().get(3).getRow());
-                    }
-
-                log.info(solarPanelArea.toString());
-                boolean success = solarPanelAreaService.saveSolarPanelArea(solarPanelArea);
-                result = result && success;
-            }
-        }
-        return result ? Result.success("更新成功") : Result.error("更新失败");
+        return solarPanelAreaService.detectAreaGenSolar(solarDetectRequestDTO);
     }
     /**
      * 根据ID删除光伏区域参数
      */
     @GetMapping("/delete")
-    public Result delete(@RequestParam Long id) {
+    public Result delete(@RequestParam String id) {
         boolean success = solarPanelAreaService.removeSolarPanelAreaById(id);
         return success ? Result.success("删除成功") : Result.error("删除失败");
     }

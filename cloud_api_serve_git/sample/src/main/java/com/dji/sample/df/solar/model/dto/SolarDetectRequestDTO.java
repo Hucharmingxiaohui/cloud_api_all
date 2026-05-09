@@ -18,7 +18,7 @@ public class SolarDetectRequestDTO {
      * 正射图id
      */
     @NotEmpty(message = "正射图id不能为空")
-    private Integer orthophoto_id;
+    private String orthophoto_id;
 
     /**
      * 光伏区域名称

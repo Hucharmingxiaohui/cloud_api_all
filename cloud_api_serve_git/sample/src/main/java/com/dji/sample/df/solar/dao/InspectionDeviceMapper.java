@@ -10,7 +10,7 @@ import java.util.Map;
 @Mapper
 public interface InspectionDeviceMapper extends BaseMapper<InspectionDevice> {
 
-    List<InspectionDevice> selectList(Map map);
+    List<InspectionDevice> selectListByMap(Map map);
 
     int selectListCount(Map map);
 }

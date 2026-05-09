@@ -49,7 +49,7 @@ public class InspectionDeviceServiceImpl extends ServiceImpl<InspectionDeviceMap
     public Map<String, Object> selectList(Map<String, Object> params) {
         // 使用分页工具类设置分页参数
         PageUtil.setPageArgs(params);
-        List<InspectionDevice> list = inspectionDeviceMapper.selectList(params);
+        List<InspectionDevice> list = inspectionDeviceMapper.selectListByMap(params);
         int count = inspectionDeviceMapper.selectListCount(params);
 
         Map<String, Object> result = new HashMap<>();
