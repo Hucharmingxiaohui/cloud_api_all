@@ -24,10 +24,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -171,7 +168,7 @@ public class PictureSaveHandler {
                                 "file_" + mediaFileEntity.getFileId() + ".dat";
                     }
                     String filePictrueUrl = fileConfig.getFilePictrueUrl();
-                    String localFilePath = downloadAndConvertToJpeg(url.toString(), fileName, filePictrueUrl, jobId);
+                    String localFilePath = downloadAndConvertToJpeg3(url.toString(), fileName, filePictrueUrl, jobId);
                     map.put(fileName, localFilePath);
                     index++;
                 }
@@ -322,6 +319,42 @@ public class PictureSaveHandler {
             System.err.println("图片处理失败: " + e.getMessage());
             throw e;
         }
+    }
+
+    public static String downloadAndConvertToJpeg3(String url, String localFileName, String filePictrueUrl, String jobId) throws IOException {
+        // 创建临时目录
+        String tempDir = filePictrueUrl + "/" + jobId;
+        Path tempPath = Paths.get(tempDir);
+        if (!Files.exists(tempPath)) {
+            Files.createDirectories(tempPath);
+        }
+
+        // 提取文件名（不含原始扩展名）
+        String fileNameWithoutExt;
+        if (localFileName.contains(".")) {
+            fileNameWithoutExt = localFileName.substring(0, localFileName.lastIndexOf('.'));
+        } else {
+            fileNameWithoutExt = localFileName;
+        }
+        // 强制使用 .jpg 后缀（但文件内容保持原始字节不变）
+        String finalFileName = fileNameWithoutExt + ".jpg";
+        String localFilePath = tempDir + "/" + finalFileName;
+
+        // 直接通过 HTTP 流下载并写入文件，不经过图像解码
+        try (InputStream in = new URL(url).openStream();
+             OutputStream out = new FileOutputStream(localFilePath)) {
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        } catch (IOException e) {
+            System.err.println("下载图片失败: " + e.getMessage());
+            throw e;
+        }
+
+        System.out.println("图片保存成功（已保留所有原始信息）: " + localFilePath);
+        return localFilePath;
     }
 
     public Integer extractWaypointNumber(String fileName) {

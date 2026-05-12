@@ -37,7 +37,7 @@ public class GfReportServiceImpl implements GfReportService {
             String requestBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(waylineUrlConfig.getAnalysisUrl()))
+                    .uri(URI.create(waylineUrlConfig.getGfAnalysisUrl()))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                     .build();

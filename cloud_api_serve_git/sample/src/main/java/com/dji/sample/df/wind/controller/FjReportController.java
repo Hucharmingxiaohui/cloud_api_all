@@ -29,6 +29,7 @@ import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.service.FjReportService;
 
+import com.dji.sample.df.wind.utils.ImageFileNameUtils;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
@@ -138,7 +139,7 @@ public class FjReportController {
             Result result = pictureSaveHandler.pictureSave(jobId);
             if (result.getCode() == 0) {
                 AnalysisRequest request = new AnalysisRequest();
-                request.setFunction("defect_fgxj");
+                request.setFunction("defect_gfxj");
                 request.setFile_path(fileConfig.getFilePictrueUrl() + jobId);
                 // 动态生成文件名列表
                 List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
@@ -148,7 +149,9 @@ public class FjReportController {
                     String fileName = mediaFileEntity.getFileName();
                     fileNames.add(fileName);
                 }
-                request.setFile_name(fileNames);
+                request.setFile_name(ImageFileNameUtils.jpegToJpg(fileNames));
+                log.info("文件名为-------------"+fileNames);
+                log.info("request为-------------"+request);
                 AnalysisResponse response = gfReportService.sendGfAnalysisRequest(request);
                 if (response != null) {
                     System.out.println("分析结果: " + response);
@@ -364,8 +367,9 @@ public class FjReportController {
              fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
         } else if (planType==4) {
 //           光伏任务生成报告
+            log.info("生成光伏报告------");
             reportId = fjReportService.createNewReport(jobId);
-            fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
+            fjReportService.genGfPatrolTaskWordNew(reportId,jobId);
 
         }
 

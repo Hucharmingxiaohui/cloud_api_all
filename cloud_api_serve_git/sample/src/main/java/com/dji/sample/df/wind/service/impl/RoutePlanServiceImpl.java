@@ -11,7 +11,9 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
+import com.dji.sample.df.solar.dao.OrthophotoEntityMapper;
 import com.dji.sample.df.solar.dao.SolarPanelAreaMapper;
+import com.dji.sample.df.solar.model.entity.OrthophotoEntity;
 import com.dji.sample.df.solar.model.entity.SolarPanelArea;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
@@ -101,6 +103,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
     @Autowired
     private SolarPanelAreaMapper solarPanelAreaMapper;
+
+    @Autowired
+    private OrthophotoEntityMapper orthophotoEntityMapper;
 
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
@@ -1013,6 +1018,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         Map map = new HashMap();
         String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
         SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(solarPanelId);
+        OrthophotoEntity orthophotoEntity = orthophotoEntityMapper.selectById(solarPanelArea.getOrthophotoId());
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
         // 构建 solar_params
         Double corner1Lng = solarPanelArea.getCorner1Lng();
@@ -1052,6 +1058,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         root.put("corners", corners);
         root.put("solar_params", solarParams);
         root.put("route_params", routeParams);
+        root.put("orthophoto_id", solarPanelArea.getOrthophotoId());
+        root.put("orthophoto_name", orthophotoEntity.getName());
         String jsonString = root.toString();
         String response = httpUtils.sendPostJson(url, jsonString);
         JSONObject jsonResponse = JSONObject.parseObject(response);
@@ -1064,6 +1072,13 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+//      创建计划带可变参数，每次航线不一样动态生成
+
+//      表：正射图id,光伏区域id,kmz文件路径，kmz文件名称，
+//      写接口传光伏区域id，解析成经纬度-像素-显示，
+//      重新生成航线，覆盖一条数据
+//      最终确认：把表中包含光伏区域id的kmz进行导入
+
         String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
         String creator = "adminPC";
         importKmzNoValiService.importKmzFile(file, workspaceId, creator, null);
