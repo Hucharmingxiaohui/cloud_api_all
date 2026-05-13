@@ -136,4 +136,11 @@ public class SolarPanel implements Serializable {
      */
     @TableField("orthophoto_id")
     private String orthophotoId;
+
+    /**
+     * 正射图名称
+     */
+    @TableField(exist = false)
+    private String orthophotoName;
+
 }

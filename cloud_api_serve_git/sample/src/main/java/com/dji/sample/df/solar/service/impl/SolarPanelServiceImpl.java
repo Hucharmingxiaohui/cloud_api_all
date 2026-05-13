@@ -3,8 +3,10 @@ package com.dji.sample.df.solar.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.dji.sample.df.commonDf.util.PageUtil;
+import com.dji.sample.df.solar.dao.OrthophotoEntityMapper;
 import com.dji.sample.df.solar.dao.SolarPanelComponentMapper;
 import com.dji.sample.df.solar.dao.SolarPanelMapper;
+import com.dji.sample.df.solar.model.entity.OrthophotoEntity;
 import com.dji.sample.df.solar.model.entity.SolarPanel;
 import com.dji.sample.df.solar.model.entity.SolarPanelComponent;
 import com.dji.sample.df.solar.service.SolarPanelService;
@@ -23,6 +25,8 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
     private SolarPanelMapper solarPanelMapper;
     @Resource
     private SolarPanelComponentMapper solarPanelComponentMapper;
+    @Resource
+    private OrthophotoEntityMapper orthophotoEntityMapper;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -192,6 +196,11 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
         // 使用原风格的分页工具类 PageUtil（需存在）
 //        PageUtil.setPageArgs(params);
         List<SolarPanel> list = solarPanelMapper.selectListByMap(params);
+        for (SolarPanel solarPanel : list) {
+            OrthophotoEntity orthophotoEntity = orthophotoEntityMapper.selectOne(new LambdaQueryWrapper<OrthophotoEntity>()
+                    .eq(OrthophotoEntity::getId, solarPanel.getOrthophotoId()));
+            solarPanel.setOrthophotoName(orthophotoEntity.getName());
+        }
 //        int count = solarPanelMapper.selectListCount(params);
 //
 //        Map<String, Object> result = new HashMap<>();
