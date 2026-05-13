@@ -28,4 +28,10 @@ public class SolarPanelComponentServiceImpl extends ServiceImpl<SolarPanelCompon
         List<SolarPanelComponent> solarPanelComponents = solarPanelComponentMapper.selectListByComponentId(componentId);
         return solarPanelComponents;
     }
+
+    @Override
+    public List<SolarPanelComponent> selectListByOrthophotoId(String orthophotoId) {
+        List<SolarPanelComponent> solarPanelComponents = solarPanelComponentMapper.selectListByOrthophotoId(orthophotoId);
+        return solarPanelComponents;
+    }
 }

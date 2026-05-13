@@ -17,4 +17,6 @@ public interface SolarPanelComponentMapper extends BaseMapper<SolarPanelComponen
 
     List<SolarPanelComponent> selectListByComponentId(@Param("componentId") String componentId);
 
+    List<SolarPanelComponent> selectListByOrthophotoId(@Param("orthophotoId") String orthophotoId);
+
 }

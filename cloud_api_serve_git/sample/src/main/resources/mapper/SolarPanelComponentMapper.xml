@@ -21,4 +21,9 @@
         WHERE orthophoto_id = #{orthophotoId}
     </select>
 
+    <select id="selectListByOrthophotoId" resultType="com.dji.sample.df.solar.model.entity.SolarPanelComponent">
+        SELECT * FROM manage_solar_panel_component
+        WHERE orthophoto_id = #{orthophotoId}
+    </select>
+
 </mapper>
