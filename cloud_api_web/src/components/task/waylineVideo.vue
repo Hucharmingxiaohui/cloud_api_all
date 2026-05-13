@@ -28,7 +28,12 @@
                 </div>
 
                 <div class="map-section">
-                    <waylinePanel />
+                    <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+                    <div style="width: 100%; height: 100%;">
+                       <waylinePanel v-if="!isFlatMap && isMounted"  />
+                       <UEPix v-if="isFlatMap && isMounted" />
+                    </div>
+
                 </div>
             </div>
 
@@ -139,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, watch, onMounted } from 'vue'
+import { ref, computed, reactive, watch, onMounted, defineAsyncComponent } from 'vue'
 import { getNowTaskApi, getWaylineJobs } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
@@ -156,6 +161,11 @@ import droneControlPanel from '/@/components/devices/drone_control/drone-control
 import deviceState from '/@/components/devices/drone_control/device_state.vue'
 import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
 import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
+import UEPix from '/@/components/uePix/UEPix.vue'
+
+const isFlatMap = ref(false) // 是否二维地图
+const isMounted = ref(false) // 是否已经完成初始化
+
 const body = {
   page: 1,
   total: 0,
@@ -268,6 +278,7 @@ onMounted(() => {
   }
 
   getPlans()
+  isMounted.value = true
 })
 // 左侧视频流切换标签
 const activeTab = ref('load') // 默认选中负载直播标签
@@ -336,6 +347,7 @@ function switchRightTab (tab) {
 .box-left {
     background: rgba(59, 116, 255, 0.15);
     width: 30%;
+    padding: 10px 0;
     height: calc(100vh - 120px);
     display: flex;
     flex-direction: column;
@@ -346,10 +358,10 @@ function switchRightTab (tab) {
     background: url('/@/assets/v4/livestream-nav.png') 100% no-repeat;
     background-size: 100% 100%;
     width: 100%;
-    z-index: 3000;
+    // z-index: 1000;
     display: flex;
     align-items: center;
-    padding-bottom: 3px;
+    padding-bottom: 5px;
     flex-shrink: 0;
     .thumbnail_1{
     }
@@ -494,6 +506,21 @@ function switchRightTab (tab) {
     margin: 5px 10px 0 10px;
     padding: 2px;
     border: 1px solid #51658A;
+    position: relative;
+    .map-switch{
+        position: absolute;
+        right: 30px;
+        top: 20px;
+        color: rgb(17, 193, 224);
+        font-size: 20px;
+        height: 30px;
+        width: 30px;
+        border-radius: 50%;
+        background: #075f8e;
+        text-align: center;
+        z-index: 2000;
+        cursor: pointer;
+    }
 }
 
 .map {

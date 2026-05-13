@@ -3,7 +3,7 @@
   <div class="child-container">
     <div class="player-container" ref="playerContainer">
     </div>
-    <div class="send-info">
+    <!-- <div class="send-info">
       <el-form label-position="top" class="message-form">
         <el-form-item label="输入指令:">
           <el-input v-model="sendData.sendInfo" type="textarea" :rows="4"></el-input>
@@ -15,7 +15,7 @@
           <el-input v-model="sendData.responseInfo" type="textarea" :rows="4"></el-input>
         </el-form-item>
       </el-form>
-    </div>
+    </div> -->
   </div>
 
 </template>
@@ -129,7 +129,7 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 .player-container {
-  width: 80%;
+  width: 100%;
   height: 100%;
   min-height: -webkit-fill-available;
   font-family: 'Montserrat';

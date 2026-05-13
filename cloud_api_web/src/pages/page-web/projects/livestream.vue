@@ -13,7 +13,7 @@
         </div> -->
       </div>
       <div class="box-right">
-         <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+        <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
         <div style="width: 100%; height: 100%; border: 2px solid white;">
           <UEPix v-if="isFlatMap && isMounted" />
           <TwoDModel v-if="!isFlatMap && isMounted" />
