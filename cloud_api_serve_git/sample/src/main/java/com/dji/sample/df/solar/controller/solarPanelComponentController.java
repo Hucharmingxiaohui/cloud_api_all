@@ -43,4 +43,13 @@ public class solarPanelComponentController {
         List<SolarPanelComponent> solarPanelComponents = solarPanelComponentService.selectListByComponentId(componentId);
         return Result.success(solarPanelComponents);
     }
+
+    /**
+     * 根据正射图id查询光伏组件
+     */
+    @GetMapping("/selectListByOrthophotoId")
+    public Result<Map> selectListByOrthophotoId(@RequestParam String orthophotoId) {
+        List<SolarPanelComponent> solarPanelComponents = solarPanelComponentService.selectListByOrthophotoId(orthophotoId);
+        return Result.success(solarPanelComponents);
+    }
 }

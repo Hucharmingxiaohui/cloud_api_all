@@ -303,6 +303,7 @@ wayline:
     solar-panel-wayline: "http://172.20.63.157:5001/solar"
   wayline-state-url: "http://172.20.63.157:5002/state"
   analysis-url: "http://172.20.63.157:20022/api"
+  gf-analysis-url: "http://172.20.63.157:20023/gfapi"
   detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
   start-segmentation-url: "http://172.20.63.157:5005/startSegmentation"
 #  系统编码
@@ -345,7 +346,10 @@ ue:
   switch: true
   stateUrl: http://172.20.63.106:19922/api/taskStatus
 
-# 正射图存储路径配置
-orthophoto:
-  #  /dji/orthophoto
-  upload-dir: D:/orthophoto/
+#光伏配置
+solar:
+  # 正射图存储路径配置
+  orthophoto:
+    #  /dji/orthophoto
+    upload-dir: D:/orthophoto/
+  stationName: "光伏电站"

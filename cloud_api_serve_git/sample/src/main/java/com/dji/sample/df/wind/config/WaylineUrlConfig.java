@@ -12,6 +12,7 @@ public class WaylineUrlConfig {
     private BuildKmzUrl buildKmzUrl;
     private String waylineStateUrl;
     private String analysisUrl;
+    private String gfAnalysisUrl;
     private String detectAreaGenUrl;
     private String startSegmentationUrl;
 

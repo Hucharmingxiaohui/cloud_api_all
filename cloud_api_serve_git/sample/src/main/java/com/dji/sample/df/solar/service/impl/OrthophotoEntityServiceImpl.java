@@ -34,7 +34,7 @@ import java.util.UUID;
 @Service
 @Slf4j
 public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMapper, OrthophotoEntity> implements OrthophotoEntityService {
-    @Value("${orthophoto.upload-dir}")
+    @Value("${solar.orthophoto.upload-dir}")
     private String uploadDir;
 
     @Resource

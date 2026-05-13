@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -79,12 +80,12 @@ public class SolarPanelController {
     }
 
     /**
-     * 分页/条件查询光伏板列表
+     * 分页/条件查询光伏板列表(没有分页，给航线服务用）
      */
     @GetMapping("/selectList")
     public Result<Map> selectList(@RequestParam Map<String, Object> params) {
-        Map<String, Object> resultMap = solarPanelService.selectList(params);
-        return Result.success(resultMap);
+        List<SolarPanel> solarPanels = solarPanelService.selectList(params);
+        return Result.success(solarPanels);
     }
 
 }
