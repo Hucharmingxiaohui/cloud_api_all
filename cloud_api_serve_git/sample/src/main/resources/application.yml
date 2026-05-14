@@ -1,6 +1,6 @@
 server:
   port: 6789
-  base-url: "http://172.20.63.157:6789"
+  base-url: "http://127.0.0.1:6789"
 spring:
   main:
     allow-bean-definition-overriding: true

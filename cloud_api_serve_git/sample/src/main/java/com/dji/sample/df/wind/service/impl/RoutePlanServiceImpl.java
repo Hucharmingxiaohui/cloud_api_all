@@ -1,5 +1,6 @@
 package com.dji.sample.df.wind.service.impl;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -1013,55 +1014,110 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
     @Override
-    public Map<String,Object> buildSolarPanelWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
-//      光伏航线
-        Map map = new HashMap();
-        String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
-        SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(solarPanelId);
-        OrthophotoEntity orthophotoEntity = orthophotoEntityMapper.selectById(solarPanelArea.getOrthophotoId());
-        String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
-        // 构建 solar_params
-        Double corner1Lng = solarPanelArea.getCorner1Lng();
-        Double corner1Lat = solarPanelArea.getCorner1Lat();
-        Double corner2Lng = solarPanelArea.getCorner2Lng();
-        Double corner2Lat = solarPanelArea.getCorner2Lat();
-        Double corner3Lng = solarPanelArea.getCorner3Lng();
-        Double corner3Lat = solarPanelArea.getCorner3Lat();
-        Double corner4Lng = solarPanelArea.getCorner4Lng();
-        Double corner4Lat = solarPanelArea.getCorner4Lat();
-        Double areaHeight = solarPanelArea.getAreaHeight();
-        // 构建 corners 数组
-        JSONArray corners = new JSONArray();
-        double[][] points = {
-                {corner1Lng, corner1Lat, areaHeight},
-                {corner2Lng, corner2Lat, areaHeight},
-                {corner3Lng, corner3Lat, areaHeight},
-                {corner4Lng, corner4Lat, areaHeight}
-        };
-        for (double[] point : points) {
-            JSONObject corner = new JSONObject();
-            corner.put("lon", point[0]);
-            corner.put("lat", point[1]);
-            corner.put("height", point[2]);
-            corners.add(corner);
+    public Map<String, Object> buildSolarPanelWayline(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+        Map<String, Object> map = new HashMap<>();
+        PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, pubWaylineJobPlanDfEntity.getPlanId()));
+        if (entity1 != null) {
+            map.put("result", false);
+            return map;
         }
-        JSONObject solarParams = new JSONObject();
-        solarParams.put("panelHeight", solarPanelArea.getPanelHeight());
-        solarParams.put("flightAltitude", solarPanelArea.getFlightAltitude());
-        solarParams.put("panelHeading", solarPanelArea.getPanelHeading());
-        solarParams.put("panelTilt", solarPanelArea.getTiltAngle());
-        solarParams.put("margin", solarPanelArea.getMargin());
-        JSONObject routeParams = new JSONObject();
-        routeParams.put("horizontalLines", solarPanelArea.getHorizontalLines());
-        routeParams.put("pointsPerLine", solarPanelArea.getPointsPerLine());
+        String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
+
+        // 解析逗号分隔的多个光伏区域ID
+        String[] solarPanelIds = solarPanelId.split(",");
+        JSONArray areas = new JSONArray();
+        SolarPanelArea firstSolarPanelArea = null;
+        OrthophotoEntity orthophotoEntity = null;
+
+        for (String panelId : solarPanelIds) {
+            panelId = panelId.trim();
+            if (panelId.isEmpty()) {
+                continue;
+            }
+            SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(panelId);
+            if (solarPanelArea == null) {
+                continue;
+            }
+            if (firstSolarPanelArea == null) {
+                firstSolarPanelArea = solarPanelArea;
+                orthophotoEntity = orthophotoEntityMapper.selectById(solarPanelArea.getOrthophotoId());
+            }
+
+            Double corner1Lng = solarPanelArea.getCorner1Lng();
+            Double corner1Lat = solarPanelArea.getCorner1Lat();
+            Double corner2Lng = solarPanelArea.getCorner2Lng();
+            Double corner2Lat = solarPanelArea.getCorner2Lat();
+            Double corner3Lng = solarPanelArea.getCorner3Lng();
+            Double corner3Lat = solarPanelArea.getCorner3Lat();
+            Double corner4Lng = solarPanelArea.getCorner4Lng();
+            Double corner4Lat = solarPanelArea.getCorner4Lat();
+            Double areaHeight = solarPanelArea.getAreaHeight();
+
+            JSONArray corners = new JSONArray();
+            double[][] points = {
+                    {corner1Lng, corner1Lat, areaHeight},
+                    {corner2Lng, corner2Lat, areaHeight},
+                    {corner3Lng, corner3Lat, areaHeight},
+                    {corner4Lng, corner4Lat, areaHeight}
+            };
+            for (double[] point : points) {
+                JSONObject corner = new JSONObject();
+                corner.put("lon", point[0]);
+                corner.put("lat", point[1]);
+                corner.put("height", point[2]);
+                corners.add(corner);
+            }
+            areas.add(corners);
+        }
+
+        if (firstSolarPanelArea == null) {
+            map.put("result", false);
+            return map;
+        }
+
+        String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
+        String type = pubWaylineJobPlanDfEntity.getType();
         JSONObject root = new JSONObject();
-        root.put("corners", corners);
-        root.put("solar_params", solarParams);
-        root.put("route_params", routeParams);
-        root.put("orthophoto_id", solarPanelArea.getOrthophotoId());
-        root.put("orthophoto_name", orthophotoEntity.getName());
+
+        if ("uniform".equals(type)) {
+            root.put("type", "uniform");
+            root.put("areas", areas);
+
+            JSONObject solarParams = new JSONObject();
+            solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
+            solarParams.put("flightAltitude", firstSolarPanelArea.getFlightAltitude());
+            solarParams.put("panelHeading", firstSolarPanelArea.getPanelHeading());
+            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            solarParams.put("margin", firstSolarPanelArea.getMargin());
+            root.put("solar_params", solarParams);
+
+            JSONObject routeParams = new JSONObject();
+            routeParams.put("horizontalLines", firstSolarPanelArea.getHorizontalLines());
+            routeParams.put("pointsPerLine", firstSolarPanelArea.getPointsPerLine());
+            root.put("route_params", routeParams);
+        } else {
+            root.put("areas", areas);
+
+            JSONObject solarParams = new JSONObject();
+            solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
+            solarParams.put("panelHeading", 0);
+            solarParams.put("flightAltitude", firstSolarPanelArea.getFlightAltitude());
+            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            root.put("solar_params", solarParams);
+        }
+
+        root.put("orthophoto_id", firstSolarPanelArea.getOrthophotoId());
+        root.put("orthophoto_name", orthophotoEntity != null ? orthophotoEntity.getName() : "");
+
         String jsonString = root.toString();
         String response = httpUtils.sendPostJson(url, jsonString);
+        if(pubWaylineJobPlanDfEntity.getIndex() == 0){
+            map.put("result",true);
+            map.put("wayline", JSON.parseObject(response));
+            map.put("plan",pubWaylineJobPlanDfEntity);
+            return map;
+        }
         JSONObject jsonResponse = JSONObject.parseObject(response);
         String routeName = jsonResponse.getString("routeName");
         String projectPath = System.getProperty("user.dir");
@@ -1072,12 +1128,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-//      创建计划带可变参数，每次航线不一样动态生成
-
-//      表：正射图id,光伏区域id,kmz文件路径，kmz文件名称，
-//      写接口传光伏区域id，解析成经纬度-像素-显示，
-//      重新生成航线，覆盖一条数据
-//      最终确认：把表中包含光伏区域id的kmz进行导入
 
         String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
         String creator = "adminPC";
@@ -1091,31 +1141,20 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             log.error("导入外部航线失败");
         }
         pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
-//      航线类型：航点
         pubWaylineJobPlanDfEntity.setWaylineType(0);
-//      创建计划存数据库
         pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
-        // 获取当前系统时间戳（以毫秒为单位）
         long currentTimeMillis = System.currentTimeMillis();
-        //如果是立即执行任务，添加begin_time
-        if(pubWaylineJobPlanDfEntity.getTaskType()==0){
+        if (pubWaylineJobPlanDfEntity.getTaskType() == 0) {
             pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);
         }
         pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
         pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
         pubWaylineJobPlanDfEntity.setWaylineType(0);
-        //校验paln_id是否重复
-        PubWaylineJobPlanDfEntity entity1 = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
-                eq(PubWaylineJobPlanDfEntity::getPlanId,pubWaylineJobPlanDfEntity.getPlanId()));
-        if(entity1!=null){//plan_id重复
-            map.put("result",false);
-            return map;
-        }else{//plan_id不重复
-            pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
-            map.put("result",true);
-            map.put("plan",pubWaylineJobPlanDfEntity);
-            return map;
-        }
+
+        pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
+        map.put("result", true);
+        map.put("plan", pubWaylineJobPlanDfEntity);
+        return map;
     }
 
 }

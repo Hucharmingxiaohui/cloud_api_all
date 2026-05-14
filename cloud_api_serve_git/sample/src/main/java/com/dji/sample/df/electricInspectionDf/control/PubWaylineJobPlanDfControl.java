@@ -41,10 +41,12 @@ public class PubWaylineJobPlanDfControl {
 
     @PostMapping("/createWaylinePlan")
     HttpResultResponse createWaylinePlan(HttpServletRequest request,@RequestBody PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+
         CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
         String workspaceId = customClaim.getWorkspaceId();
         String creator = customClaim.getUsername();
 //      为了后续风机航线创建任务
+
         redisUtils.set("workspaceId", workspaceId);
         redisUtils.set("creator", creator);
         Map<String, Object> waylineJObPlan = pubWaylineJobPlanDfService.createWaylineJObPlan(pubWaylineJobPlanDfEntity);

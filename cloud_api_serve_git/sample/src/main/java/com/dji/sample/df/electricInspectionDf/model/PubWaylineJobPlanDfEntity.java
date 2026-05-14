@@ -114,7 +114,8 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
 
     @TableField("strategy_type")
     private Integer strategyType;//策略类型：0普通1多机连续执行
-
+    @TableField("image_format")
+    private String imageFormat;
     @Transient
     @TableField(exist = false)
     private String deviceList;
@@ -126,4 +127,10 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @Transient
     @TableField(exist = false)
     private List<String> fanIdList;
+    @Transient
+    @TableField(exist = false)
+    private String type;//自动生成航线还是自定义航线
+    @Transient
+    @TableField(exist = false)
+    private Integer index;//0代表仅生成航线不保存计划 1代表生成航线
 }
