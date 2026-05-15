@@ -9,6 +9,7 @@ import com.df.server.entity.sys.SysDictDataEntity;
 import com.df.server.mapper.sys.SysDictDataMapper;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
@@ -407,7 +408,7 @@ public class FjReportServiceImpl implements FjReportService {
 
         // 6. 添加缺陷详情（按第二个文档的格式）
         // 缺陷详情表格表头
-        String[] defectHeaderTitles = {"序号", "光伏板名称", "光伏组件位置", "采集时间", "缺陷主要类型", "缺陷描述"};
+        String[] defectHeaderTitles = {"序号", "光伏板名称", "缺陷光伏组件位置", "采集时间", "缺陷主要类型", "缺陷描述"};
 
         for (int i = 0; i < defectList.size(); i++) {
             DefectEntity defect = defectList.get(i);
@@ -434,14 +435,18 @@ public class FjReportServiceImpl implements FjReportService {
             dataRow.getCell(0).setText(String.valueOf(i + 1));
             dataRow.getCell(0).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
-            // 扇叶名称
+            // 光伏板名称
             setCellFont(dataRow.getCell(1), "宋体", 10, false);
-            dataRow.getCell(1).setText(defect.getFanCode());
+            dataRow.getCell(1).setText(defect.getSolarPanelName());
             dataRow.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
-            // 扇叶部位
+            // 缺陷光伏组件名称
+            String defectComponentName ="-";
+            if(StringUtils.isNotEmpty(defect.getDefectComponentName())){
+                defectComponentName = defect.getDefectComponentName();
+            }
             setCellFont(dataRow.getCell(2), "宋体", 10, false);
-            dataRow.getCell(2).setText(defect.getFanPart());
+            dataRow.getCell(2).setText(defectComponentName);
             dataRow.getCell(2).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 采集时间

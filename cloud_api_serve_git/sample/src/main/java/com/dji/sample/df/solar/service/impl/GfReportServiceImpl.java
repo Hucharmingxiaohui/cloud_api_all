@@ -1,6 +1,9 @@
 package com.dji.sample.df.solar.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.dji.sample.center.utils.StringUtils;
+import com.dji.sample.df.solar.model.entity.GfPositionRequest;
+import com.dji.sample.df.solar.model.entity.GfPositionResponse;
 import com.dji.sample.df.solar.service.GfReportService;
 import com.dji.sample.df.wind.config.WaylineUrlConfig;
 import com.dji.sample.df.wind.dao.*;
@@ -58,6 +61,34 @@ public class GfReportServiceImpl implements GfReportService {
         }
     }
 
+    @Override
+    public GfPositionResponse sendGfPositionRequest(GfPositionRequest request) {
+        try {
+            String requestBody = objectMapper.writeValueAsString(request);
+
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+//                    todo 需改
+                    .uri(URI.create(waylineUrlConfig.getGfDefectLocalizationUrl()))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                    .build();
+
+            HttpResponse<String> httpResponse = httpClient.send(httpRequest,
+                    HttpResponse.BodyHandlers.ofString());
+
+            if (httpResponse.statusCode() == 200) {
+                return objectMapper.readValue(httpResponse.body(), GfPositionResponse.class);
+            } else {
+                System.err.println("请求失败，状态码: " + httpResponse.statusCode());
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("发送分析请求时发生错误: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+
     /**
      * 获取当前时间
      */
@@ -77,7 +108,7 @@ public class GfReportServiceImpl implements GfReportService {
         for (AnalysisResponse.ResultItem item : response.getResultsList()) {
             // 处理所有类型的desc数据
             if (item.isDescList()) {
-                // desc是列表类型
+                // desc是列表类型,代表有缺陷
                 List<String> defectTypes = item.getDescAsList();
                 if (defectTypes != null) {
                     DefectEntity defect = createDefectFromResult(item, defectTypes, currentTime);
@@ -111,6 +142,11 @@ public class GfReportServiceImpl implements GfReportService {
         // 设置缺陷类型和描述
         Map<String, Integer> defectCount = countDefectTypes(defectTypes);
         String mainDefectType = getMainDefectType(defectCount);
+        defect.setOriginalDefectType(defectTypes.toString());
+        List<List<Integer>> centerPoints = item.getCenter_points();
+        if (centerPoints != null && !centerPoints.isEmpty()) {
+            defect.setDefectPosition(centerPoints.toString());
+        }
         defect.setDefectType(mainDefectType);
         defect.setDefectDescription(generateDefectDescription(defectCount));
 
@@ -165,6 +201,106 @@ public class GfReportServiceImpl implements GfReportService {
         addDefects(defects,jobId);
     }
 
+    @Override
+    public List<GfPositionRequest.Image> producePositionParam(List<DefectEntity> defectEntities){
+        List<GfPositionRequest.Image> images = new ArrayList<>();
+        for (DefectEntity defectEntity : defectEntities) {
+            GfPositionRequest.Image image = new GfPositionRequest.Image();
+            image.setImageName(extractOriginalFileName(defectEntity.getImagePath()));
+            Integer imageType = defectEntity.getImageType();
+            if (imageType == 0) {
+                image.setImageType("visable");
+            }else if(imageType == 1){
+                image.setImageType("ir");
+            }
+            image.setDefectId(defectEntity.getId());
+            Integer isDefect = defectEntity.getIsDefect();
+            if(isDefect == 0){
+                image.setHasDefect(false);
+            }else{
+//              有缺陷才传defects参数
+                image.setHasDefect(true);
+                String originalDefectType = defectEntity.getOriginalDefectType();
+                String defectPosition = defectEntity.getDefectPosition();
+                List<GfPositionRequest.Defect> defects = new ArrayList<>();
+
+                // 1. 解析缺陷类型列表
+                String typeContent = originalDefectType.substring(1, originalDefectType.length() - 1); // 去掉首尾方括号
+                String[] types = typeContent.split(","); // 按逗号分割
+                List<String> typeList = new ArrayList<>();
+                for (String t : types) {
+                    typeList.add(t.trim()); // 去除首尾空格
+                }
+
+                // 2. 解析坐标列表
+                String posContent = defectPosition.substring(1, defectPosition.length() - 1); // 去掉首尾方括号
+                // 按 "], [" 分割，注意正则表达式需要转义
+                String[] coordPairs = posContent.split("\\], \\[");
+                List<int[]> coordList = new ArrayList<>();
+                for (String pair : coordPairs) {
+                    // 去除可能残留的方括号
+                    String clean = pair.replace("[", "").replace("]", "");
+                    String[] xy = clean.split(",");
+                    int col = Integer.parseInt(xy[0].trim()); // 第一个数字作为 col（x坐标）
+                    int row = Integer.parseInt(xy[1].trim()); // 第二个数字作为 row（y坐标）
+                    coordList.add(new int[]{col, row});
+                }
+
+                // 3. 确保两个列表长度一致
+                if (typeList.size() != coordList.size()) {
+                    // 可根据实际业务处理异常，例如抛异常或只处理最小长度
+                    throw new IllegalStateException("缺陷类型数量与坐标数量不匹配");
+                }
+                // 4. 组装 defect 对象
+                for (int i = 0; i < typeList.size(); i++) {
+                    GfPositionRequest.Defect defect = new GfPositionRequest.Defect();
+                    defect.setDefectType(typeList.get(i));
+                    defect.setCol(coordList.get(i)[0]);
+                    defect.setRow(coordList.get(i)[1]);
+                    defects.add(defect);
+                }
+                image.setDefects(defects);
+            }
+            images.add(image);
+        }
+        return images;
+    }
+
+
+    public static String extractOriginalFileName(String imagePath) {
+        // 获取最后一个斜杠后的完整文件名
+        String fileName = imagePath.substring(imagePath.lastIndexOf('/') + 1);
+        // 去掉 "_result数字" 部分（例如 _result0）
+        return fileName.replaceAll("_result\\d+", "");
+    }
+
+
+    @Override
+    public void processAndUptDefects(GfPositionResponse response, String jobId) {
+        if (response == null || response.getData() == null) {
+            System.out.println("响应数据为空");
+            return;
+        }
+        List<GfPositionResponse.ResultItem> results = response.getData().getResults();
+        for (GfPositionResponse.ResultItem item : results) {
+            DefectEntity defectEntity = defectEntityMapper.selectById(item.getDefectId());
+            if (defectEntity != null) {
+                defectEntity.setSolarPanelName(item.getSolarPanelName());
+                if(item.getHasDefect()){
+                    List<GfPositionResponse.Defect> defects = item.getDefects();
+                    List<String> defectComponentNames =new ArrayList<>();
+                    for (GfPositionResponse.Defect defect : defects) {
+                        defectComponentNames.add(defect.getSolarPanelComponentName());
+                    }
+                    defectEntity.setDefectComponentName(defectComponentNames.toString());
+                    defectEntityMapper.updateById(defectEntity);
+                }
+                defectEntityMapper.updateById(defectEntity);
+            }
+        }
+
+    }
+
     /**
      * 新增缺陷数据
      */
@@ -178,11 +314,30 @@ public class GfReportServiceImpl implements GfReportService {
         for (int i = 0; i < defects.size(); i++) {
             DefectEntity defect = defects.get(i);
             defect.setJobId(jobId);
+            String defectType = defect.getDefectType();
+            if(StringUtils.isNotEmpty(defectType)){
+                if(defectType.equals("未见异常") || defectType.equals("无缺陷/无结果")){
+                    defect.setIsDefect(0);
+                }else {
+                    defect.setIsDefect(1);
+                }
+            }
+            defect.setImageType(extractDefectType(defect.getImagePath()));
 //          插入缺陷数据
             defectEntityMapper.insert(defect);
             System.out.println((i + 1) + ". " + defect);
         }
         System.out.println("缺陷数据新增完成");
+    }
+
+    public static Integer extractDefectType(String imagePath) {
+        if (imagePath == null) return null;
+        if (imagePath.contains("_V_")) {
+            return 0;
+        } else if (imagePath.contains("_T_")) {
+            return 1;
+        }
+        return null; // 或其他默认值
     }
 
 }

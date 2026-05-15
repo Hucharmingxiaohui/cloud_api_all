@@ -15,6 +15,7 @@ public class WaylineUrlConfig {
     private String gfAnalysisUrl;
     private String detectAreaGenUrl;
     private String startSegmentationUrl;
+    private String gfDefectLocalizationUrl;
 
     @Data
     public static class BuildKmzUrl {

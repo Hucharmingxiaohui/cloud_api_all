@@ -199,7 +199,9 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
         for (SolarPanel solarPanel : list) {
             OrthophotoEntity orthophotoEntity = orthophotoEntityMapper.selectOne(new LambdaQueryWrapper<OrthophotoEntity>()
                     .eq(OrthophotoEntity::getId, solarPanel.getOrthophotoId()));
-            solarPanel.setOrthophotoName(orthophotoEntity.getName());
+            if (orthophotoEntity != null) {
+                solarPanel.setOrthophotoName(orthophotoEntity.getName());
+            }
         }
 //        int count = solarPanelMapper.selectListCount(params);
 //

@@ -20,12 +20,18 @@ import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
+import com.dji.sample.df.solar.dao.SolarPanelAreaMapper;
+import com.dji.sample.df.solar.model.entity.GfPositionRequest;
+import com.dji.sample.df.solar.model.entity.GfPositionResponse;
+import com.dji.sample.df.solar.model.entity.SolarPanelArea;
 import com.dji.sample.df.solar.service.GfReportService;
+import com.dji.sample.df.wind.dao.DefectEntityMapper;
 import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.uavHandlerDf.PictureSaveHandler;
 import com.dji.sample.df.wind.config.FjFileConfig;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
+import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
 import com.dji.sample.df.wind.service.FjReportService;
 
@@ -98,6 +104,10 @@ public class FjReportController {
     private IFileServiceDf fileService;
     @Autowired
     UniPointMapper2 uniPointMapper2;
+    @Autowired
+    SolarPanelAreaMapper solarPanelAreaMapper;
+    @Autowired
+    DefectEntityMapper defectEntityMapper;
 
     /**
      * 保存巡检图片并分析
@@ -157,6 +167,22 @@ public class FjReportController {
                     System.out.println("分析结果: " + response);
                 }
                 gfReportService.processAndAddDefects(response, jobId);
+ //             加一个组件定位接口调用
+                GfPositionRequest gfPositionRequest = new GfPositionRequest();
+//              传参赋值
+                List<DefectEntity> defectEntities = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>().eq(DefectEntity::getJobId, jobId));
+                List<GfPositionRequest.Image> images = gfReportService.producePositionParam(defectEntities);
+                gfPositionRequest.setImages(images);
+                String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId().split(",")[0];
+                SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectOne(new LambdaQueryWrapper<SolarPanelArea>()
+                        .eq(SolarPanelArea::getId, solarPanelId));
+                gfPositionRequest.setInspectionId(jobId);
+                gfPositionRequest.setAreaHeight(solarPanelArea.getAreaHeight());
+                gfPositionRequest.setPanelHeight(solarPanelArea.getPanelHeight());
+                log.info("gfPositionRequest---"+gfPositionRequest);
+//              发送请求
+                GfPositionResponse gfPositionResponse = gfReportService.sendGfPositionRequest(gfPositionRequest);
+                gfReportService.processAndUptDefects(gfPositionResponse, jobId);
 //              分析完成
                 waylineJobEntity.setIsAnalyzed(1);
                 log.info(jobId+"分析完成。。。");
