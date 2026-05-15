@@ -1,5 +1,8 @@
 package com.dji.sample.df.wind.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class AnalysisResponse {
@@ -31,6 +34,7 @@ public class AnalysisResponse {
 
     // 内部结果项类
     public static class ResultItem {
+        private List<List<Integer>> center_points; // 【新增】对应JSON中的 center_points
         private String code;
         private Double conf;
         private Object desc; // 可能是String或List<String>
@@ -42,8 +46,9 @@ public class AnalysisResponse {
         public ResultItem() {}
 
         // 全参构造函数
-        public ResultItem(String code, Double conf, Object desc,
-                          String function, String resImagePath, String value) {
+        public ResultItem(List<List<Integer>> center_points, String code, Double conf,
+                          Object desc, String function, String resImagePath, String value) {
+            this.center_points = center_points;
             this.code = code;
             this.conf = conf;
             this.desc = desc;
@@ -53,6 +58,19 @@ public class AnalysisResponse {
         }
 
         // Getter和Setter方法
+        public List<List<Integer>> getCenter_points() { return center_points; }
+        // 【重要】替换原有的 Setter，加入对空字符串 "" 的处理
+        @JsonProperty("center_points") // 明确指定 JSON 字段名
+        public void setCenter_points(Object centerPoints) {
+            // 情况1：JSON里是正常的数组 [[388, 251]]
+            if (centerPoints instanceof List) {
+                this.center_points = (List<List<Integer>>) centerPoints;
+            } else {
+                // 情况2：JSON里是空字符串 "" 或者其它异常数据
+                // 直接赋值为空 List，防止报错
+                this.center_points = new ArrayList<>();
+            }
+        }
         public String getCode() { return code; }
         public void setCode(String code) { this.code = code; }
 
@@ -91,11 +109,13 @@ public class AnalysisResponse {
         public List<String> getDescAsList() {
             return isDescList() ? (List<String>) desc : null;
         }
+        // --- end ---
 
         @Override
         public String toString() {
             return "ResultItem{" +
-                    "code='" + code + '\'' +
+                    "center_points=" + center_points +
+                    ", code='" + code + '\'' +
                     ", conf=" + conf +
                     ", desc=" + desc +
                     ", function='" + function + '\'' +

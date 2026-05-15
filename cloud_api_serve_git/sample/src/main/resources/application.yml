@@ -306,6 +306,7 @@ wayline:
   gf-analysis-url: "http://172.20.63.157:20023/gfapi"
   detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
   start-segmentation-url: "http://172.20.63.157:5005/startSegmentation"
+  gf-defect_localization-url: "http://172.20.63.157:5005/defectLocalization"
 #  系统编码
 longyuan:
   sender: "UpperPlatform"

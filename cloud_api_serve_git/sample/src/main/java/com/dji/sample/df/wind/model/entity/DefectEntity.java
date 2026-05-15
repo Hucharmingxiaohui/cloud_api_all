@@ -56,6 +56,12 @@ public class DefectEntity implements Serializable {
     private String acquisitionTime;
 
     /**
+     * 原始缺陷类型
+     */
+    @TableField("original_defect_type")
+    private String originalDefectType;
+
+    /**
      * 缺陷类型
      */
     @TableField("defect_type")
@@ -78,5 +84,29 @@ public class DefectEntity implements Serializable {
      */
     @TableField("is_defect")
     private Integer isDefect;
+
+    /**
+     * 图片名称：0可见光1红外
+     */
+    @TableField("image_type")
+    private Integer imageType;
+
+    /**
+     * 光伏板名称
+     */
+    @TableField("solar_panel_name")
+    private String solarPanelName;
+
+    /**
+     * 光伏组件名称
+     */
+    @TableField("defect_component_name")
+    private String defectComponentName;
+
+    /**
+     * 缺陷位置
+     */
+    @TableField("defect_position")
+    private String defectPosition;
 
 }
