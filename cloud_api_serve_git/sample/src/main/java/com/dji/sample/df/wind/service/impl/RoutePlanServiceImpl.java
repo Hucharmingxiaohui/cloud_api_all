@@ -1079,22 +1079,33 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
         String type = pubWaylineJobPlanDfEntity.getType();
         JSONObject root = new JSONObject();
-
+        if(pubWaylineJobPlanDfEntity.getImageFormat() != null){
+            root.put("imageFormat", pubWaylineJobPlanDfEntity.getImageFormat());
+        }
         if ("uniform".equals(type)) {
             root.put("type", "uniform");
             root.put("areas", areas);
 
             JSONObject solarParams = new JSONObject();
             solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
-            solarParams.put("flightAltitude", firstSolarPanelArea.getFlightAltitude());
-            solarParams.put("panelHeading", firstSolarPanelArea.getPanelHeading());
-            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
-            solarParams.put("margin", firstSolarPanelArea.getMargin());
+            solarParams.put("flightAltitude", pubWaylineJobPlanDfEntity.getFlightAltitude());
+            solarParams.put("panelHeading", pubWaylineJobPlanDfEntity.getPanelHeading());
+            if(pubWaylineJobPlanDfEntity.getTiltAngle() ==null) {
+                solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            }else{
+                solarParams.put("panelTilt", pubWaylineJobPlanDfEntity.getTiltAngle());
+            }
+            if(pubWaylineJobPlanDfEntity.getMargin()!=null) {
+                solarParams.put("margin", pubWaylineJobPlanDfEntity.getMargin());
+            }
             root.put("solar_params", solarParams);
 
             JSONObject routeParams = new JSONObject();
-            routeParams.put("horizontalLines", firstSolarPanelArea.getHorizontalLines());
-            routeParams.put("pointsPerLine", firstSolarPanelArea.getPointsPerLine());
+            if(pubWaylineJobPlanDfEntity.getHorizontalLines()!=null) {
+                routeParams.put("horizontalLines", pubWaylineJobPlanDfEntity.getHorizontalLines());
+            }
+            if(pubWaylineJobPlanDfEntity.getPointsPerLine()!=null)
+            routeParams.put("pointsPerLine", pubWaylineJobPlanDfEntity.getPointsPerLine());
             root.put("route_params", routeParams);
         } else {
             root.put("areas", areas);
@@ -1102,14 +1113,13 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             JSONObject solarParams = new JSONObject();
             solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
             solarParams.put("panelHeading", 0);
-            solarParams.put("flightAltitude", firstSolarPanelArea.getFlightAltitude());
+            solarParams.put("flightAltitude", pubWaylineJobPlanDfEntity.getFlightAltitude());
             solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
             root.put("solar_params", solarParams);
         }
 
         root.put("orthophoto_id", firstSolarPanelArea.getOrthophotoId());
         root.put("orthophoto_name", orthophotoEntity != null ? orthophotoEntity.getName() : "");
-
         String jsonString = root.toString();
         String response = httpUtils.sendPostJson(url, jsonString);
         if(pubWaylineJobPlanDfEntity.getIndex() == 0){

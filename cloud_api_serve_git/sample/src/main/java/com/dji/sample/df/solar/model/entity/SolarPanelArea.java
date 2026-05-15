@@ -85,24 +85,10 @@ public class SolarPanelArea implements Serializable {
     private Double corner4Lat;
 
     /**
-     * 航线高度（米）
-     */
-    @TableField("flight_altitude")
-    private Double flightAltitude;
-
-    /**
      * 光伏板倾角（度）
      */
     @TableField("tilt_angle")
     private Double tiltAngle;
-
-    /**
-     * 横向航线数
-     */
-    @TableField("horizontal_lines")
-    private Integer horizontalLines;
-
-    // ========== 新增字段 ==========
 
     /**
      * 光伏区域海拔
@@ -115,24 +101,6 @@ public class SolarPanelArea implements Serializable {
      */
     @TableField("panel_height")
     private Double panelHeight;
-
-    /**
-     * 光伏板朝向
-     */
-    @TableField("panel_heading")
-    private Double panelHeading;
-
-    /**
-     * 区域边距
-     */
-    @TableField("margin")
-    private Double margin;
-
-    /**
-     * 航线内点数
-     */
-    @TableField("points_per_line")
-    private Integer pointsPerLine;
 
     /**
      * 角1像素列号

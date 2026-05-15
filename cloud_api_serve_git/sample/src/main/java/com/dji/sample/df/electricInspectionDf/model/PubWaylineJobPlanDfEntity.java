@@ -116,6 +116,16 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     private Integer strategyType;//策略类型：0普通1多机连续执行
     @TableField("image_format")
     private String imageFormat;
+    @TableField("horizontal_lines")
+    private Integer horizontalLines;//横向航线数
+    @TableField("flight_altitude")
+    private Double flightAltitude;//航线高度（米）
+    @TableField("panel_heading")
+    private Double panelHeading;//光伏板朝向
+    @TableField("margin")
+    private Double margin;//区域边距
+    @TableField("points_per_line")
+    private Integer pointsPerLine;//航线内点数
     @Transient
     @TableField(exist = false)
     private String deviceList;
@@ -133,4 +143,7 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @Transient
     @TableField(exist = false)
     private Integer index;//0代表仅生成航线不保存计划 1代表生成航线
+    @Transient
+    @TableField(exist = false)
+    private Double tiltAngle;//光伏板倾角，如果输入就按输入，如果不输入就查询数据库
 }

@@ -107,14 +107,9 @@ public class SolarPanelAreaServiceImpl extends ServiceImpl<SolarPanelAreaMapper,
             // 2. 从请求参数中赋值
             solarPanelArea.setOrthophotoId(solarDetectRequestDTO.getOrthophoto_id());
             solarPanelArea.setSolarPanelAreaName(solarDetectRequestDTO.getDetect_areas().get(i).getArea_name());  // solar_area_name -> solarPanelName
-            solarPanelArea.setFlightAltitude(solarDetectRequestDTO.getFlight_altitude());  // flight_altitude -> flightAltitude
             solarPanelArea.setTiltAngle(solarDetectRequestDTO.getTilt_angle());            // tilt_angle -> tiltAngle
-            solarPanelArea.setHorizontalLines(solarDetectRequestDTO.getHorizontal_lines()); // horizontal_lines -> horizontalLines
             solarPanelArea.setAreaHeight(solarDetectRequestDTO.getArea_height());           // area_height -> areaHeight
             solarPanelArea.setPanelHeight(solarDetectRequestDTO.getPanel_height());         // panel_height -> panelHeight
-            solarPanelArea.setPanelHeading(solarDetectRequestDTO.getPanel_heading());       // panel_heading -> panelHeading
-            solarPanelArea.setMargin(solarDetectRequestDTO.getMargin());                    // margin -> margin
-            solarPanelArea.setPointsPerLine(solarDetectRequestDTO.getPoints_per_line());    // points_per_line -> pointsPerLine
 
             // 3. 从响应结果中获取地理坐标数据
 //          SolarDetectResponseDTO.ResponseData responseData = solarDetectResponseDTO.getData();
