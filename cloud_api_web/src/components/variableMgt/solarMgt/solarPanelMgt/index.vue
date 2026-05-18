@@ -54,100 +54,39 @@
               label="序号"
               width="60"
             />
-            <el-table-column label="光伏板区域ID" align="center" width="100">
+            <el-table-column label="光伏板区域ID" align="center">
               <template #default="scope">
                 <div class="ellipsis">{{ scope.row.id }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="光伏板区域名称" align="center" width="150">
+            <el-table-column label="光伏板区域名称" align="center">
               <template #default="scope">
-                <div class="ellipsis">{{ scope.row.solar_panel_area_name }}</div>
+                <div class="ellipsis">
+                  {{ scope.row.solar_panel_area_name }}
+                </div>
               </template>
             </el-table-column>
-            <el-table-column label="角1经度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner1_lng }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角1纬度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner1_lat }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角2经度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner2_lng }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角2纬度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner2_lat }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角3经度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner3_lng }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角3纬度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner3_lat }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角4经度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner4_lng }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="角4纬度" align="center">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.corner4_lat }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="航线高度(米)" align="center" width="110">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.flight_altitude }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="光伏板倾角(度)" align="center" width="120">
+            <el-table-column label="光伏板倾角(度)" align="center">
               <template #default="scope">
                 <div class="ellipsis">{{ scope.row.tilt_angle }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="横向航线数" align="center" width="100">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.horizontal_lines }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="光伏区域海拔" align="center" width="110">
+            <el-table-column label="光伏区域海拔" align="center">
               <template #default="scope">
                 <div class="ellipsis">{{ scope.row.area_height }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="光伏架设高度" align="center" width="110">
+            <el-table-column label="光伏架设高度" align="center">
               <template #default="scope">
                 <div class="ellipsis">{{ scope.row.panel_height }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="光伏板朝向" align="center" width="100">
+            <el-table-column label="操作">
               <template #default="scope">
-                <div class="ellipsis">{{ scope.row.panel_heading }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="区域边距" align="center" width="100">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.margin }}</div>
-              </template>
-            </el-table-column>
-            <el-table-column label="航线内点数" align="center" width="100">
-              <template #default="scope">
-                <div class="ellipsis">{{ scope.row.points_per_line }}</div>
-              </template>
-            </el-table-column>
-
-            <el-table-column label="操作" width="150" fixed="right">
-              <template #default="scope">
-                <el-button link type="primary" @click="openEditDialog(scope.row)"
+                <el-button
+                  link
+                  type="primary"
+                  @click="openEditDialog(scope.row)"
                   >编辑</el-button
                 >
                 <el-button link type="danger" @click="handleDelete(scope.row)"
@@ -184,7 +123,11 @@
         >
           <el-row :gutter="20">
             <el-col :span="12">
-              <el-form-item label="光伏板名称" required prop="solar_panel_area_name">
+              <el-form-item
+                label="光伏板名称"
+                required
+                prop="solar_panel_area_name"
+              >
                 <el-input
                   v-model="insertForm.solar_panel_area_name"
                   maxlength="50"
@@ -214,7 +157,11 @@
                   maxlength="50"
                 ></el-input>
               </el-form-item>
-              <el-form-item label="航线高度(米)" prop="flight_altitude" required>
+              <el-form-item
+                label="航线高度(米)"
+                prop="flight_altitude"
+                required
+              >
                 <el-input
                   v-model="insertForm.flight_altitude"
                   maxlength="50"
@@ -227,10 +174,7 @@
                 ></el-input>
               </el-form-item>
               <el-form-item label="区域边距" prop="margin" required>
-                <el-input
-                  v-model="insertForm.margin"
-                  maxlength="50"
-                ></el-input>
+                <el-input v-model="insertForm.margin" maxlength="50"></el-input>
               </el-form-item>
               <el-form-item label="航线内点数" prop="points_per_line" required>
                 <el-input
@@ -288,7 +232,6 @@
                   maxlength="50"
                 ></el-input>
               </el-form-item>
-
             </el-col>
           </el-row>
         </el-form>
@@ -306,7 +249,7 @@
       <el-dialog
         v-model="editDialog"
         title="编辑光伏板"
-        width="1000"
+        width="600"
         style="background-color: #0A2D63; color: white"
       >
         <el-form
@@ -315,119 +258,31 @@
           :rules="formRules"
           ref="editFormRef"
         >
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="光伏板名称" required prop="solar_panel_area_name">
-                <el-input
-                  v-model="editForm.solar_panel_area_name"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角1经度" prop="corner1_lng" required>
-                <el-input
-                  v-model="editForm.corner1_lng"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角1纬度" prop="corner1_lat" required>
-                <el-input
-                  v-model="editForm.corner1_lat"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角2经度" prop="corner2_lng" required>
-                <el-input
-                  v-model="editForm.corner2_lng"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角2纬度" prop="corner2_lat" required>
-                <el-input
-                  v-model="editForm.corner2_lat"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="航线高度(米)" prop="flight_altitude" required>
-                <el-input
-                  v-model="editForm.flight_altitude"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="光伏板倾角(度)" prop="tilt_angle" required>
-                <el-input
-                  v-model="editForm.tilt_angle"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="区域边距" prop="margin" required>
-                <el-input
-                  v-model="editForm.margin"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="航线内点数" prop="points_per_line" required>
-                <el-input
-                  v-model="editForm.points_per_line"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="角3经度" prop="corner3_lng" required>
-                <el-input
-                  v-model="editForm.corner3_lng"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角3纬度" prop="corner3_lat" required>
-                <el-input
-                  v-model="editForm.corner3_lat"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角4经度" prop="corner4_lng" required>
-                <el-input
-                  v-model="editForm.corner4_lng"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="角4纬度" prop="corner4_lat" required>
-                <el-input
-                  v-model="editForm.corner4_lat"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="横向航线数" prop="horizontal_lines" required>
-                <el-input
-                  v-model="editForm.horizontal_lines"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="光伏区域海拔" prop="area_height" required>
-                <el-input
-                  v-model="editForm.area_height"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="光伏架设高度" prop="panel_height" required>
-                <el-input
-                  v-model="editForm.panel_height"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-              <el-form-item label="光伏板朝向" prop="panel_heading" required>
-                <el-input
-                  v-model="editForm.panel_heading"
-                  maxlength="50"
-                ></el-input>
-              </el-form-item>
-
-            </el-col>
-          </el-row>
+          <el-form-item
+            label="光伏板名称"
+            required
+            prop="solar_panel_area_name"
+          >
+            <el-input
+              v-model="editForm.solar_panel_area_name"
+              maxlength="50"
+            ></el-input>
+          </el-form-item>
+          <el-form-item label="光伏板倾角(度)" prop="tilt_angle" required>
+            <el-input v-model="editForm.tilt_angle" maxlength="50"></el-input>
+          </el-form-item>
+          <el-form-item label="光伏区域海拔" prop="area_height" required>
+            <el-input v-model="editForm.area_height" maxlength="50"></el-input>
+          </el-form-item>
+          <el-form-item label="光伏架设高度" prop="panel_height" required>
+            <el-input v-model="editForm.panel_height" maxlength="50"></el-input>
+          </el-form-item>
         </el-form>
         <template v-slot:footer>
           <div class="dialog-footer">
-            <el-button @click="editDialog = false" class="nobtn">取 消</el-button>
+            <el-button @click="editDialog = false" class="nobtn"
+              >取 消</el-button
+            >
             <el-button type="primary" @click="handleEdit()" class="okbtn"
               >确 定</el-button
             >
@@ -436,10 +291,9 @@
       </el-dialog>
     </div>
     <div class="container-tab2" v-else>
-       <SolarDraw @back="backPage"/>
+      <SolarDraw @back="backPage" />
     </div>
   </div>
-
 </template>
 
 <script lang="ts" setup>
@@ -484,22 +338,9 @@ const insertForm = reactive({
 const editForm = reactive({
   id: '',
   solar_panel_area_name: '',
-  corner1_lng: '',
-  corner1_lat: '',
-  corner2_lng: '',
-  corner2_lat: '',
-  corner3_lng: '',
-  corner3_lat: '',
-  corner4_lng: '',
-  corner4_lat: '',
-  flight_altitude: '',
   tilt_angle: '',
-  horizontal_lines: '',
   area_height: '',
-  panel_height: '',
-  panel_heading: '',
-  margin: '',
-  points_per_line: ''
+  panel_height: ''
 })
 const tableData = ref([])
 
@@ -656,22 +497,9 @@ function openEditDialog (row:any) {
   Object.assign(editForm, {
     id: row.id,
     solar_panel_area_name: row.solar_panel_area_name,
-    corner1_lng: row.corner1_lng,
-    corner1_lat: row.corner1_lat,
-    corner2_lng: row.corner2_lng,
-    corner2_lat: row.corner2_lat,
-    corner3_lng: row.corner3_lng,
-    corner3_lat: row.corner3_lat,
-    corner4_lng: row.corner4_lng,
-    corner4_lat: row.corner4_lat,
-    flight_altitude: row.flight_altitude,
     tilt_angle: row.tilt_angle,
-    horizontal_lines: row.horizontal_lines,
     area_height: row.area_height,
-    panel_height: row.panel_height,
-    panel_heading: row.panel_heading,
-    margin: row.margin,
-    points_per_line: row.points_per_line
+    panel_height: row.panel_height
   })
 }
 
@@ -685,22 +513,9 @@ async function handleEdit () {
     const submitData = {
       id: editForm.id,
       solar_panel_area_name: editForm.solar_panel_area_name,
-      corner1_lng: Number(editForm.corner1_lng),
-      corner1_lat: Number(editForm.corner1_lat),
-      corner2_lng: Number(editForm.corner2_lng),
-      corner2_lat: Number(editForm.corner2_lat),
-      corner3_lng: Number(editForm.corner3_lng),
-      corner3_lat: Number(editForm.corner3_lat),
-      corner4_lng: Number(editForm.corner4_lng),
-      corner4_lat: Number(editForm.corner4_lat),
-      flight_altitude: Number(editForm.flight_altitude),
       tilt_angle: Number(editForm.tilt_angle),
-      horizontal_lines: Number(editForm.horizontal_lines),
       area_height: Number(editForm.area_height),
-      panel_height: Number(editForm.panel_height),
-      panel_heading: Number(editForm.panel_heading),
-      margin: Number(editForm.margin),
-      points_per_line: Number(editForm.points_per_line)
+      panel_height: Number(editForm.panel_height)
     }
     const res = await updateSolarPanelConfigApi(submitData)
     if (res.code !== 0) {

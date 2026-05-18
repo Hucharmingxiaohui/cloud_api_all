@@ -3,181 +3,262 @@
     <div class="box-left">
       <div class="box_title">
         <div class="thumbnail_1"></div>
-        <div class="box_text">新建计划</div>
+        <div class="box_text">新建光伏计划</div>
       </div>
 
       <div class="create-plan-wrapper">
         <div class="content">
           <el-form
             :model="planBody"
-            label-width="110px"
+            label-width="120px"
             ref="valueRef"
             :rules="rules"
             label-position="left"
-            style="padding: 10px;"
           >
-            <el-form-item label="计划名称" required prop="name">
-              <el-input v-model="planBody.name" maxlength="50"></el-input>
-            </el-form-item>
-            <el-form-item
-              label="光伏板区域"
-              required
-              prop="solar_panel_id"
-            >
-              <el-select v-model="planBody.solar_panel_id" @change="handleSolarPanelChange">
-                <el-option
-                  v-for="item in solarTable"
-                  :label="item.solar_panel_area_name"
-                  :value="item.id"
-                  :key="item.id"
-                ></el-option>
-              </el-select>
-            </el-form-item>
-            <div
-              class="wayline-panel"
-              style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
-              v-if="planBody.file_id"
-            >
-              <div class="title">
-                <el-tooltip :content="wayline.name">
-                  <div class="wayline-name">{{ wayline.name }}</div>
-                </el-tooltip>
-              </div>
-              <div
-                class="ml10 mt5"
-                style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px; text-align: left;"
+            <!-- 第一步: 基础信息 -->
+            <div v-if="currentStep === 1">
+              <el-form-item label="计划名称：" required prop="name">
+                <el-input v-model="planBody.name" maxlength="50"></el-input>
+              </el-form-item>
+              <el-form-item
+                label="光伏板区域："
+                required
+                prop="solar_panel_id"
               >
-                <span><RocketOutlined /></span>
-                <span
-                  class="ml5"
-                  >{{ DEVICE_NAME[wayline.drone_model_key] }}</span
-                >
-                <span class="ml10"
-                  ><CameraFilled
-                    style="border-top: 1px solid; padding-top: -3px;"
-                /></span>
-                <span
-                  class="ml5"
-                  v-for="payload in wayline.payload_model_keys"
-                  :key="payload.id"
-                >
-                  {{ DEVICE_NAME[payload] }}
-                </span>
-              </div>
+                <el-select v-model="selectedSolarIds" multiple collapse-tags @change="handleSolarPanelChange">
+                  <el-option
+                    v-for="item in solarTable"
+                    :label="item.solar_panel_area_name"
+                    :value="item.id"
+                    :key="item.id"
+                  ></el-option>
+                </el-select>
+              </el-form-item>
               <div
-                class="mt5 ml10"
-                style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
+                class="wayline-panel"
+                style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
+                v-if="planBody.file_id"
               >
-                <span class="mr10"
-                  >更新于{{ new Date(wayline.update_time).toLocaleString() }}</span
+                <div class="title">
+                  <el-tooltip :content="wayline.name">
+                    <div class="wayline-name">{{ wayline.name }}</div>
+                  </el-tooltip>
+                </div>
+                <div
+                  class="ml10 mt5"
+                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px; text-align: left;"
                 >
+                  <span><el-icon><Promotion /></el-icon></span>
+                  <span
+                    class="ml5"
+                    >{{ DEVICE_NAME[wayline.drone_model_key] }}</span
+                  >
+                  <span class="ml10"
+                    ><el-icon><Camera /></el-icon></span>
+                  <span
+                    class="ml5"
+                    v-for="payload in wayline.payload_model_keys"
+                    :key="payload.id"
+                  >
+                    {{ DEVICE_NAME[payload] }}
+                  </span>
+                </div>
+                <div
+                  class="mt5 ml10"
+                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
+                >
+                  <span class="mr10"
+                    >更新于{{ new Date(wayline.update_time).toLocaleString() }}</span
+                  >
+                </div>
               </div>
-            </div>
 
-            <el-form-item label="执行设备" required prop="dock_sn">
-              <div
-                @click="selectDevice"
-                style="margin-left: 120px"
-                class="block_2"
-              >
-                选择设备
-              </div>
-            </el-form-item>
-            <div
-              class="panel"
-              style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
-            >
-              <div class="title">
-                <el-tooltip :content="dock.nickname">
-                  <div class="wayline-name">{{ dock.nickname }}</div>
-                </el-tooltip>
-              </div>
-              <div
-                class="ml10 mt5"
-                style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
-              >
-                <span><RocketOutlined /></span>
-                <span
-                  class="ml5"
-                  >{{ dock.children?.nickname ?? 'No drone' }}</span
-                >
-              </div>
-            </div>
-            <el-form-item
-              label="时间方案"
-              required
-              prop="task_type"
-              label-position="top"
-            >
-              <el-radio-group v-model="planBody.task_type" size="large">
-                <el-radio-button style="width: 0" />
-                <el-radio-button
-                  v-for="type in TaskTypeOptions"
-                  :value="type.value"
-                  :key="type.value"
-                  class="radio-custom"
-                  >{{ type.label }}</el-radio-button
-                >
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item
-              label="开始时间"
-              required
-              prop="begin_time"
-              v-if="planBody.task_type === TaskType.Timed || planBody.task_type === TaskType.Condition"
-            >
-              <el-date-picker
-                v-model="planBody.begin_time"
-                type="datetime"
-                placeholder="选择日期和时间"
-                value-format="x"
-                format="YYYY-MM-DD HH:mm:ss"
-              />
-            </el-form-item>
-            <el-form-item label="返航高度(m)" prop="rth_altitude" required>
-              <el-input v-model="planBody.rth_altitude"></el-input>
-            </el-form-item>
-            <el-form-item style="margin-bottom: 40px;">
-              <div class="footer">
-                <el-button
-                  class="mr10"
-                  style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
-                  @click="closePlan"
-                  >取消
-                </el-button>
+              <el-form-item label="执行设备：" required prop="dock_sn">
                 <el-button
                   type="primary"
-                  style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
-                  @click="onSubmit"
-                  >确认
+                   style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
+                  @click="selectDevice"
+                >
+                  选择设备
                 </el-button>
+              </el-form-item>
+              <div
+                class="panel"
+                style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
+              >
+                <div class="title">
+                  <el-tooltip :content="dock.nickname">
+                    <div class="wayline-name">{{ dock.nickname }}</div>
+                  </el-tooltip>
+                </div>
+                <div
+                  class="ml10 mt5"
+                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
+                >
+                  <span><el-icon><Promotion /></el-icon></span>
+                  <span
+                    class="ml5"
+                    >{{ dock.children?.nickname ?? 'No drone' }}</span
+                  >
+                </div>
               </div>
-            </el-form-item>
+              <el-form-item
+                label="时间方案："
+                required
+                prop="task_type"
+              >
+                <el-radio-group v-model="planBody.task_type" size="large">
+                  <el-radio
+                    v-for="type in TaskTypeOptions"
+                    :value="type.value"
+                    :key="type.value"
+                    class="radio-custom"
+                    >{{ type.label }}</el-radio
+                  >
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item
+                label="开始时间："
+                required
+                prop="begin_time"
+                v-if="planBody.task_type === TaskType.Timed || planBody.task_type === TaskType.Condition"
+              >
+                <el-date-picker
+                  style="width:250px"
+                  v-model="planBody.begin_time"
+                  type="datetime"
+                  placeholder="选择日期和时间"
+                  value-format="x"
+                  format="YYYY-MM-DD HH:mm:ss"
+                />
+              </el-form-item>
+              <el-form-item label="返航高度(m)：" prop="rth_altitude" required>
+                <el-input v-model="planBody.rth_altitude"></el-input>
+              </el-form-item>
+
+              <el-form-item
+                label="光伏参数："
+                required
+                prop="type"
+              >
+                <el-radio-group v-model="planBody.type" size="large">
+                  <el-radio value="uniform">自定义</el-radio>
+                  <el-radio value="auto">自动检测</el-radio>
+                </el-radio-group>
+              </el-form-item>
+
+              <!-- 第一步底部按钮 -->
+
+               <div class="footer">
+                  <el-button
+                    class="mr10"
+                    style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
+                    @click="closePlan"
+                    >取消
+                  </el-button>
+                  <el-button
+                    class="mr10"
+                    style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
+                    @click="handleNextStep"
+                    >下一步
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
+                    @click="previewWayline"
+                    >航线预览
+                  </el-button>
+                </div>
+            </div>
+
+            <!-- 第二步: 光伏参数配置 -->
+            <div v-if="currentStep === 2">
+              <!-- 红外/可见光选择 (uniform & auto 共有) -->
+              <el-form-item label="相机类型：" required prop="image_format">
+                <el-radio-group v-model="planBody.image_format" size="large">
+                  <el-radio value="visible">可见光</el-radio>
+                  <el-radio value="ir">红外</el-radio>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="航线高度：" required prop="flight_altitude">
+                <el-input v-model="planBody.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
+              </el-form-item>
+              <el-form-item label="光伏板朝向：" required prop="panel_heading">
+                <el-input v-model="planBody.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
+              </el-form-item>
+
+              <!-- uniform 模式下额外字段 -->
+              <template v-if="planBody.type === 'uniform'">
+                <el-form-item label="横向航线数：" required prop="horizontal_lines">
+                  <el-input v-model="planBody.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
+                </el-form-item>
+                <el-form-item label="光伏板朝向：" required prop="panel_heading">
+                  <el-input v-model="planBody.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
+                </el-form-item>
+                <el-form-item label="区域边距：" required prop="margin">
+                  <el-input v-model="planBody.margin" type="number" placeholder="请输入区域边距"></el-input>
+                </el-form-item>
+                <el-form-item label="航线内点数：" required prop="points_per_line">
+                  <el-input v-model="planBody.points_per_line" type="number" placeholder="请输入航线内点数"></el-input>
+                </el-form-item>
+              </template>
+
+              <!-- auto 模式下字段 -->
+              <template v-if="planBody.type === 'auto'">
+                <el-form-item label="光伏板倾角：" required prop="tilt_angle">
+                  <el-input v-model="planBody.tilt_angle" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
+                </el-form-item>
+              </template>
+
+              <!-- 第二步底部按钮 -->
+              <el-form-item style="margin-bottom: 40px;">
+                <div class="footer">
+                  <el-button
+                    class="mr10"
+                    style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
+                    @click="handlePrevStep"
+                    >上一步
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
+                    @click="onSubmit"
+                    >确认
+                  </el-button>
+                </div>
+              </el-form-item>
+            </div>
           </el-form>
         </div>
       </div>
     </div>
     <div class="box-right">
-      <loadSolarPanel :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" />
+      <loadSolarPanel :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo"/>
     </div>
   </div>
 
-  <div
-    v-if="drawerVisible"
-    style="position: absolute; left: 460px; width: 280px; height: 605px; float: right; top: 145px; z-index: 1000; color: white; background: #282828;"
+  <el-drawer
+    v-model="drawerVisible"
+    title="选择设备"
+    size="300px"
+    :with-header="false"
+    :modal="false"
+    style="background: #282828; color: white;"
   >
-    <div >
+    <div style="position: relative; height: 100%;">
+      <div style="position: absolute; top: 15px; right: 10px; z-index: 10;">
+        <el-button link style="color: white;" @click="closePanel">
+          <el-icon><Close /></el-icon>
+        </el-button>
+      </div>
       <SelectDock />
     </div>
-    <div style="position: absolute; top: 15px; right: 10px;">
-      <a style="color: white;" @click="closePanel"><CloseOutlined /></a>
-    </div>
-  </div>
+  </el-drawer>
 </template>
 
 <script lang="ts" setup>
 import { computed, onMounted, onUnmounted, reactive, ref, toRaw, UnwrapRef, nextTick } from 'vue'
-import { CloseOutlined, RocketOutlined, CameraFilled, UserOutlined, PlusCircleOutlined, MinusCircleOutlined } from '@ant-design/icons-vue'
+import { Promotion, Camera, Close } from '@element-plus/icons-vue'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { useMyStore } from '/@/store'
 import { WaylineType, WaylineFile } from '/@/types/wayline'
@@ -207,7 +288,9 @@ const dock = computed<Device>(() => {
 })
 const solarTable = ref([]) // 光伏板区域列表
 const selectedImagePath = ref('') // 选中光伏板区域对应的正射图path
-const selectedDetectAreas = ref<any>(null) // 选中光伏板区域的检测区域
+const selectedDetectAreas = ref<any[]>([]) // 选中光伏板区域的检测区域（支持多选）
+const selectedSolarIds = ref<string[]>([]) // 选中的光伏板区域ID数组
+const waylineInfo = ref()
 const planBody = reactive({
   plan_source: '系统创建',
   name: '',
@@ -227,11 +310,22 @@ const planBody = reactive({
   rth_altitude: '',
   out_of_control: 0, // 默认返回
   enable_status: 0,
-  plan_priority: 1
+  plan_priority: 1,
+  type: 'auto',
+  // 第二步表单字段
+  image_format: 'visible', // 红外/可见光: infrared | visible
+  flight_altitude: '', // 航线高度(uniform)
+  tilt_angle: '', // 光伏板倾角
+  horizontal_lines: '', // 横向航线数(uniform)
+  panel_heading: '', // 光伏板朝向
+  margin: '', // 区域边距(uniform)
+  points_per_line: '', // 航线内点数(uniform)
+  index: 0 // index为0时不会向数据库存航线且会返回wayline（航线的具体信息），为1时不返回wayline，会存入数据库
 })
 
 const drawerVisible = ref(false)
 const valueRef = ref()
+const currentStep = ref(1) // 当前步骤: 1=基础信息, 2=光伏参数
 const rules = {
   rth_altitude: [
     { required: true, message: '请输入返航高度', trigger: 'blur' },
@@ -310,38 +404,40 @@ const rules = {
 
   out_of_control: [
     { required: true, message: '请选择失联动作', trigger: 'change' }
+  ],
+  // 第二步表单校验规则
+  image_format: [
+    { required: true, message: '请选择相机类型', trigger: 'change' }
+  ],
+  flight_altitude: [
+    { required: true, message: '请输入航线高度', trigger: 'blur' },
+    { pattern: /^[1-9]\d*$/, message: '航线高度必须是正整数', trigger: 'blur' }
+  ],
+  tilt_angle: [
+    { required: true, message: '请输入光伏板倾角', trigger: 'blur' },
+    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
+  ],
+  horizontal_lines: [
+    { required: true, message: '请输入横向航线数', trigger: 'blur' },
+    { pattern: /^[1-9]\d*$/, message: '横向航线数必须是正整数', trigger: 'blur' }
+  ],
+  panel_heading: [
+    { required: true, message: '请输入光伏板朝向', trigger: 'blur' },
+    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
+  ],
+  margin: [
+    { required: true, message: '请输入区域边距', trigger: 'blur' },
+    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
+  ],
+  points_per_line: [
+    { required: true, message: '请输入航线内点数', trigger: 'blur' },
+    { pattern: /^[1-9]\d*$/, message: '航线内点数必须是正整数', trigger: 'blur' }
   ]
 }
 
 onMounted(async () => {
   getSolarPanel()
 })
-
-/**
- * 创建航线
- */
-async function onSubmit () {
-  try {
-    const valid = await valueRef.value.validate()
-    if (valid) {
-      // 1.创建飞行计划
-      const res = await createFlyPlan(planBody)
-      if (res.code !== 0) {
-        ElMessage.warning('请填写必填项!')
-        return
-      }
-      ElMessage.success('创建成功!')
-      // 2. 执行飞行计划 单次定时计划，立即执行飞行任务
-      // if (planBody.task_type === TaskType.Timed) {
-
-      // }
-      // 返回飞行计划管理页面
-      closePlan()
-    }
-  } catch (error) {
-
-  }
-}
 
 /**
  * @description: 查询光伏板ID列表
@@ -377,27 +473,51 @@ async function getOrthophotoPath (id:any) {
   }
 }
 
-// 光伏板区域选择变化
-async function handleSolarPanelChange (id: string | number) {
+// 光伏板区域选择变化（支持条件多选）
+async function handleSolarPanelChange (ids: string[]) {
   selectedImagePath.value = ''
-  selectedDetectAreas.value = null
+  selectedDetectAreas.value = []
 
-  if (!id) return
-  console.log(solarTable.value)
-  const orthophotoItem = solarTable.value.find((item) => item.id === id
-  )
-  try {
-    // selectedDetectAreas.value = orthophotoItem
-    // selectedImagePath.value = 'D:\\orthophoto\\测试.jpg'
-    if (orthophotoItem.orthophoto_id) {
-      const path = await getOrthophotoPath(orthophotoItem.orthophoto_id)
-      selectedDetectAreas.value = orthophotoItem
-      selectedImagePath.value = path
-    } else {
-      ElMessage.warning('为查询到关联正射图!')
+  if (!ids || ids.length === 0) {
+    planBody.solar_panel_id = ''
+    return
+  }
+
+  // 多选时校验 tilt_angle / area_height / panel_height 是否一致
+  if (ids.length > 1) {
+    const selectedItems = solarTable.value.filter((item: any) => ids.includes(item.id))
+    const first = selectedItems[0]
+    const isSameParams = selectedItems.every((item: any) =>
+      item.tilt_angle === first.tilt_angle &&
+      item.area_height === first.area_height &&
+      item.panel_height === first.panel_height
+    )
+
+    if (!isSameParams) {
+      // 参数不一致，只保留最新选择
+      const lastId = ids[ids.length - 1]
+      selectedSolarIds.value = [lastId]
+      planBody.solar_panel_id = lastId
+      const item = solarTable.value.find((it: any) => it.id === lastId)
+      if (item) {
+        const path = await getOrthophotoPath(item.orthophoto_id)
+        selectedDetectAreas.value = [item]
+        selectedImagePath.value = path
+        //  'D:\\orthophoto\\测试.jpg'
+      }
+      ElMessage.warning('所选区域光伏参数不一致，仅保留最新选择')
+      return
     }
-  } catch (error) {
-    console.error('获取光伏板区域详情失败:', error)
+  }
+
+  // 参数一致或单选，保留当前选择
+  selectedSolarIds.value = ids
+  planBody.solar_panel_id = ids.join(',')
+  const items = solarTable.value.filter((item: any) => ids.includes(item.id))
+  if (items.length > 0) {
+    const path = await getOrthophotoPath(items[0].orthophoto_id)
+    selectedDetectAreas.value = items
+    selectedImagePath.value = path
   }
 }
 
@@ -415,6 +535,84 @@ function selectDevice () {
   drawerVisible.value = true
   selectType.value = '2'
 }
+
+/**
+ * @description: 下一步 - 校验第一步表单并切换到第二步
+ */
+async function handleNextStep () {
+  try {
+    // 只校验第一步的字段
+    const valid = await valueRef.value.validateField([
+      'name', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
+    ])
+    if (valid) {
+      currentStep.value = 2
+    }
+  } catch (error) {
+    ElMessage.warning('请填写必填项!')
+  }
+}
+
+/**
+ * @description: 上一步 - 返回第一步
+ */
+function handlePrevStep () {
+  currentStep.value = 1
+}
+
+/**
+ * 预览航线
+ */
+async function previewWayline () {
+  try {
+    // 只校验第一步的字段
+    const valid = await valueRef.value.validateField([
+      'name', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
+    ])
+    if (valid) {
+      planBody.index = 0
+      const res = await createFlyPlan(planBody)
+      if (res.code !== 0) {
+        ElMessage.error('航线预览异常!')
+        return
+      }
+      waylineInfo.value = res.data.wayline.area.points
+    }
+  } catch (error) {
+    ElMessage.warning('请填写必填项!')
+  }
+}
+
+/**
+ * 创建航线
+ */
+async function onSubmit () {
+  try {
+    // 第二步需要校验的字段
+    const step2Fields = ['image_format']
+    if (planBody.type === 'uniform') {
+      step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
+    } else {
+      step2Fields.push('tilt_angle', 'panel_heading')
+    }
+
+    const valid = await valueRef.value.validateField(step2Fields)
+    if (valid) {
+      // 1.创建飞行计划
+      const res = await createFlyPlan(planBody)
+      if (res.code !== 0) {
+        ElMessage.warning('请填写必填项!')
+        return
+      }
+      ElMessage.success('创建成功!')
+      // 返回飞行计划管理页面
+      closePlan()
+    }
+  } catch (error) {
+    ElMessage.warning('请填写必填项!')
+  }
+}
+
 </script>
 
 <style lang="scss" scoped>
@@ -426,31 +624,31 @@ function selectDevice () {
 }
 
 //表单样式
-:deep(.el-form-item__label){
-    background-image: linear-gradient(180deg,
-      rgba(255, 255, 255, 1) 0,
-      rgba(192, 228, 255, 1) 100%);
-  font-size: 21px;
-  font-family: YouSheBiaoTiHei-Regular;
-  font-weight: normal;
-  text-align: left;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+:deep(.el-input) {
+  --el-input-border-color: #1d4292;
 }
 :deep(.el-input__wrapper){
-  background-color: #041b75;;
+  background-color: #041b75;
 }
 :deep(.el-input__inner){
   color: white;
 }
 :deep(.el-select__placeholder){
-  color: white;
-}
-:deep(.el-form-item){
-  margin: 30px auto;
+  color: rgb(198, 196, 196);
 }
 :deep(.el-select__wrapper){
   background-color: #041b75;
+  box-shadow: none;
+  border: 1px solid #1d4292;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+:deep(.el-form-item__label) {
+  color: #fff;
+  font-size: 14px;
 }
 
 .box-left {
@@ -460,7 +658,7 @@ function selectDevice () {
   width: 440px;
   /* 左侧占据 20% 的宽度 */
   // background-color: #4CAF50; /* 绿色背景 */
-  padding: 20px;
+  padding: 10px;
   /* 内边距 */
   color: white;
   /* 字体颜色 */
@@ -479,7 +677,7 @@ function selectDevice () {
     padding-left: 10px;     /* 根据需要添加左内边距 */
     margin-bottom: 10px;
     .thumbnail_1{
-      width: 24px;
+      width: 22px;
       height: 22px;
       margin-right: 15px;
       background: url('/@/assets/v4/plan_icon1.png') 100% no-repeat;
@@ -492,7 +690,7 @@ function selectDevice () {
         rgba(255, 255, 255, 1) 0,
         rgba(144, 201, 255, 1) 100%
       );
-      font-size: 24px;
+      font-size: 20px;
       font-family: Google Sans-Medium;
       font-weight: 500;
       text-align: justified;
@@ -522,27 +720,16 @@ function selectDevice () {
   height:calc(100vh - 110px);
 }
 .create-plan-wrapper {
-  background-color: #09214B;
+  background-color: #06265a;
   color: #fff;
-  padding-bottom: 0;
-  /* height: fit-content; */
   display: flex;
   flex-direction: column;
-  /* width: 100%; */
   width: 400px;
   overflow-y: auto;
   height: calc(100vh - 210px);
-  // border: 1px solid #c5c8cc;
-
-  .header {
-    height: 52px;
-    border-bottom: 1px solid #4f4f4f;
-    font-weight: 700;
-    font-size: 16px;
-    padding-left: 10px;
-    display: flex;
-    align-items: center;
-  }
+  padding: 20px;
+  border: 2px solid rgba(0, 79, 169, 0.4);
+  // box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 
   ::-webkit-scrollbar {
     display: none;
@@ -550,37 +737,14 @@ function selectDevice () {
 
   .content {
     height: calc(100% - 100px);
-    // overflow-y: auto;
 
     form {
-      margin: 10px;
-    }
-
-    :deep(form label, input, .ant-input, .ant-calendar-range-picker-separator,
-    .ant-input:hover, .ant-time-picker .anticon, .ant-calendar-picker .anticon) {
-      background-color: #031846;
-      color: #fff;
-    }
-
-    .ant-input-suffix {
-      color: #fff;
-    }
-
-    .plan-timer-form-item {
-
-      .ant-radio-button-wrapper{
-        background-color: #031846;
-        color: #fff;
-        width: 33%;
-        text-align: center;
-        &.ant-radio-button-wrapper-checked{
-          background-color: #1890ff;
-        }
-      }
+      margin: 0;
     }
   }
 
   .footer {
+    margin-bottom: 40px;
     display: flex;
     padding:10px 0;
 
@@ -613,18 +777,7 @@ function selectDevice () {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.block_2 {
-  box-shadow: 0px 0px 4px 0px rgba(6, 151, 255, 0.5);
-  background-color: rgba(0, 87, 218, 0.11);
-  border-radius: 2px;
-  width: 100px;
-  height: 24px;
-  color: #1890ff;
-  line-height: 24px;
-  text-align: center;
-  border: 0.800000011920929px solid rgba(0, 120, 218, 0.78);
-  margin-left: 232px;
-}
+/* .block_2 已替换为 el-button */
 .wayline-panel {
   background: #3c3c3c;
   margin-left: auto;
@@ -737,19 +890,7 @@ function selectDevice () {
 
 }
 
-::v-deep .custom-label1 .ant-form-item-label>label {
-  background-image: linear-gradient(180deg,
-      rgba(255, 255, 255, 1) 0,
-      rgba(192, 228, 255, 1) 100%);
-  // color: rgb(255, 0, 0);
-  font-size: 18px;
-  font-family: YouSheBiaoTiHei-Regular;
-  font-weight: normal;
-  text-align: left;
-  white-space: nowrap;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+// 下拉框
 
 // 下拉框
 .select-operation {

@@ -94,7 +94,7 @@
                     </div>
                 </div>
                 <div style="height: calc(100vh - 210px); overflow-y: auto;">
-                                    <!-- 切换标签区域：设备状态、设备运维（放在机舱上方） -->
+                <!-- 切换标签区域：设备状态、设备运维（放在机舱上方） -->
                 <!-- 上部分：机舱 -->
                 <div class="upper-part" v-if="activeRightTab === 'status'">
                     <deviceState :deviceInfo="deviceInfo" />

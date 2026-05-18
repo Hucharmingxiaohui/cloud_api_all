@@ -55,14 +55,14 @@
               >
               </el-option>
             </el-select>
-            <el-button
+            <!-- <el-button
               type="primary"
               size="small"
               @click="openImportDialog"
               :disabled="isDrawing"
             >
               导入
-            </el-button>
+            </el-button> -->
           </div>
         </div>
 
@@ -214,29 +214,14 @@
       <div class="param-panel">
         <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">光伏区域参数</h3>
         <el-form :model="paramForm" label-width="120px" label-position="left" style="color: #fff;">
-          <el-form-item label="航线高度（米）" required>
-            <el-input v-model="paramForm.flight_altitude" type="number" placeholder="请输入航线高度" />
-          </el-form-item>
           <el-form-item label="光伏板倾角（度）" required>
             <el-input v-model="paramForm.tilt_angle" type="number" placeholder="请输入光伏板倾角" />
-          </el-form-item>
-          <el-form-item label="横向航线数" required>
-            <el-input v-model="paramForm.horizontal_lines" type="number" placeholder="请输入横向航线数" />
           </el-form-item>
           <el-form-item label="光伏区域海拔" required>
             <el-input v-model="paramForm.area_height" type="number" placeholder="请输入光伏区域海拔" />
           </el-form-item>
           <el-form-item label="光伏架设高度" required>
             <el-input v-model="paramForm.panel_height" type="number" placeholder="请输入光伏架设高度" />
-          </el-form-item>
-          <el-form-item label="光伏板朝向" required>
-            <el-input v-model="paramForm.panel_heading" type="number" placeholder="请输入光伏板朝向" />
-          </el-form-item>
-          <el-form-item label="区域边距" required>
-            <el-input v-model="paramForm.margin" type="number" placeholder="请输入区域边距" />
-          </el-form-item>
-          <el-form-item label="航线内点数" required>
-            <el-input v-model="paramForm.points_per_line" type="number" placeholder="请输入航线内点数" />
           </el-form-item>
         </el-form>
       </div>
@@ -393,14 +378,9 @@ const imageLoading = ref(false)
 
 // 航线参数表单
 const paramForm = reactive({
-  flight_altitude: null as number | null,
   tilt_angle: null as number | null,
-  horizontal_lines: null as number | null,
   area_height: null as number | null,
-  panel_height: null as number | null,
-  panel_heading: null as number | null,
-  margin: null as number | null,
-  points_per_line: null as number | null
+  panel_height: null as number | null
 })
 
 // 颜色列表（用于区分不同区域）
@@ -825,8 +805,7 @@ async function saveDetectionAreas () {
 
   // 校验所有数值参数
   const numericFields = [
-    'flight_altitude', 'tilt_angle', 'horizontal_lines',
-    'area_height', 'panel_height', 'panel_heading', 'margin', 'points_per_line'
+    'tilt_angle', 'area_height', 'panel_height'
   ]
   for (const field of numericFields) {
     if (paramForm[field] === null || paramForm[field] === undefined || paramForm[field] === '') {
@@ -852,14 +831,9 @@ async function saveDetectionAreas () {
           col: Math.round(p.x * scaleX)
         }))
       })),
-      flight_altitude: Number(paramForm.flight_altitude),
       tilt_angle: Number(paramForm.tilt_angle),
-      horizontal_lines: Number(paramForm.horizontal_lines),
       area_height: Number(paramForm.area_height),
-      panel_height: Number(paramForm.panel_height),
-      panel_heading: Number(paramForm.panel_heading),
-      margin: Number(paramForm.margin),
-      points_per_line: Number(paramForm.points_per_line)
+      panel_height: Number(paramForm.panel_height)
     }
 
     const res = await insertSolarPanelApi(saveData)
@@ -871,14 +845,9 @@ async function saveDetectionAreas () {
       activeAreaId.value = null
       clearCanvas()
       // 重置表单
-      paramForm.flight_altitude = null
       paramForm.tilt_angle = null
-      paramForm.horizontal_lines = null
       paramForm.area_height = null
       paramForm.panel_height = null
-      paramForm.panel_heading = null
-      paramForm.margin = null
-      paramForm.points_per_line = null
       emit('back')
     } else {
       ElMessage.error(res.message || '保存失败')

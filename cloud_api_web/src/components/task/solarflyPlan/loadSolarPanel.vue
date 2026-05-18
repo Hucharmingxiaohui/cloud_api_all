@@ -35,7 +35,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, watch, defineProps } from 'vue'
+import { ref, watch, defineProps, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Picture, Loading } from '@element-plus/icons-vue'
 import { getOrthophotoByUrlApi } from '/@/api/turbine/turbineMgt'
@@ -57,9 +57,20 @@ interface DetectArea {
   corner4_row: number
 }
 
+interface WaylinePoint {
+  col: number
+  row: number
+  lon: number
+  lat: number
+  height: number
+  heading: number
+  pitch: number
+}
+
 const props = defineProps<{
   imagePath: string
-  detectAreas: DetectArea | null
+  detectAreas: DetectArea[],
+  waylineInfo: WaylinePoint[]
 }>()
 
 const selectedImage = ref<string>('')
@@ -72,16 +83,25 @@ const CANVAS_WIDTH = 1000
 const CANVAS_HEIGHT = 750
 
 // 监听 props 变化
-watch(() => [props.imagePath, props.detectAreas], async ([newPath, newArea]) => {
-  console.log('props.imagePath=', props.imagePath)
-  console.log('props.detectAreas=', props.detectAreas)
-  if (newPath && newArea && typeof newArea === 'object' && 'corner1_col' in newArea) {
+watch(() => [props.imagePath, props.detectAreas, props.waylineInfo], async ([newPath, newAreas, newWayline]) => {
+  if (newPath && newAreas && Array.isArray(newAreas) && newAreas.length > 0) {
     await loadImage(newPath as string)
+    // loadTestImage()
   } else {
     selectedImage.value = ''
     clearCanvas()
   }
+
+  // waylineInfo 变化时重新绘制
+  if (newWayline && Array.isArray(newWayline) && newWayline.length > 0 && imageRef.value?.complete) {
+    drawWayline()
+  }
 }, { deep: true })
+
+// onMounted(() => {
+//   loadTestImage()
+//   drawWayline()
+// })
 
 // 加载图片
 async function loadImage (path: string) {
@@ -98,6 +118,15 @@ async function loadImage (path: string) {
   }
 }
 
+async function loadTestImage () {
+  try {
+    selectedImage.value = new URL('./test.jpg', import.meta.url).href
+  } catch (error) {
+    ElMessage.error('加载测试图片失败')
+    console.error(error)
+  }
+}
+
 // 图片加载完成
 function onImageLoad () {
   imageLoading.value = false
@@ -108,7 +137,8 @@ function onImageLoad () {
   canvas.height = CANVAS_HEIGHT
   ctx.value = canvas.getContext('2d')
 
-  drawSingleArea()
+  drawAreas()
+  drawWayline()
 }
 
 function onImageError () {
@@ -122,9 +152,12 @@ function clearCanvas () {
   ctx.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
 }
 
-// 绘制单个区域
-function drawSingleArea () {
-  if (!ctx.value || !imageRef.value || !props.detectAreas) return
+// 区域颜色池
+const AREA_COLORS = ['#FF6B6B', '#4ADE80', '#60A5FA', '#F59E0B', '#A78BFA', '#EC4899']
+
+// 绘制所有区域
+function drawAreas () {
+  if (!ctx.value || !imageRef.value || !props.detectAreas || props.detectAreas.length === 0) return
 
   clearCanvas()
 
@@ -134,23 +167,23 @@ function drawSingleArea () {
   const scaleX = CANVAS_WIDTH / naturalWidth
   const scaleY = CANVAS_HEIGHT / naturalHeight
 
-  const area = props.detectAreas
+  props.detectAreas.forEach((area, index) => {
+    const color = AREA_COLORS[index % AREA_COLORS.length]
 
-  const points: Point[] = [
-    { x: Math.round(area.corner1_col * scaleX), y: Math.round(area.corner1_row * scaleY) },
-    { x: Math.round(area.corner2_col * scaleX), y: Math.round(area.corner2_row * scaleY) },
-    { x: Math.round(area.corner3_col * scaleX), y: Math.round(area.corner3_row * scaleY) },
-    { x: Math.round(area.corner4_col * scaleX), y: Math.round(area.corner4_row * scaleY) }
-  ]
+    const points: Point[] = [
+      { x: Math.round(area.corner1_col * scaleX), y: Math.round(area.corner1_row * scaleY) },
+      { x: Math.round(area.corner2_col * scaleX), y: Math.round(area.corner2_row * scaleY) },
+      { x: Math.round(area.corner3_col * scaleX), y: Math.round(area.corner3_row * scaleY) },
+      { x: Math.round(area.corner4_col * scaleX), y: Math.round(area.corner4_row * scaleY) }
+    ]
 
-  drawArea(points, area.solar_panel_area_name)
+    drawArea(points, area.solar_panel_area_name, color)
+  })
 }
 
 // 绘制区域
-function drawArea (points: Point[], name: string) {
+function drawArea (points: Point[], name: string, color: string = '#FF6B6B') {
   if (!ctx.value || points.length !== 4) return
-
-  const color = '#FF6B6B'
 
   // 绘制四边形边框
   ctx.value.strokeStyle = color
@@ -187,6 +220,61 @@ function drawPoint (x: number, y: number, color: string) {
   ctx.value.fillStyle = color
   ctx.value.setLineDash([])
   ctx.value.fillRect(x - half, y - half, size, size)
+}
+
+// 绘制航线
+function drawWayline () {
+  if (!ctx.value || !imageRef.value || !props.waylineInfo || props.waylineInfo.length === 0) return
+
+  const naturalWidth = imageRef.value.naturalWidth || CANVAS_WIDTH
+  const naturalHeight = imageRef.value.naturalHeight || CANVAS_HEIGHT
+
+  const scaleX = CANVAS_WIDTH / naturalWidth
+  const scaleY = CANVAS_HEIGHT / naturalHeight
+
+  const waylineColor = '#4ADE80'
+  const textColor = '#FFFFFF'
+
+  // 连线
+  ctx.value.strokeStyle = waylineColor
+  ctx.value.lineWidth = 2
+  ctx.value.setLineDash([])
+  ctx.value.beginPath()
+
+  props.waylineInfo.forEach((point: WaylinePoint, index: number) => {
+    const x = Math.round(point.col * scaleX)
+    const y = Math.round(point.row * scaleY)
+
+    if (index === 0) {
+      ctx.value!.moveTo(x, y)
+    } else {
+      ctx.value!.lineTo(x, y)
+    }
+  })
+  ctx.value.stroke()
+
+  // 航点标记和名称
+  props.waylineInfo.forEach((point: WaylinePoint, index: number) => {
+    const x = Math.round(point.col * scaleX)
+    const y = Math.round(point.row * scaleY)
+
+    // 绘制航点圆圈
+    const radius = 5
+    ctx.value!.beginPath()
+    ctx.value!.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.value!.fillStyle = waylineColor
+    ctx.value!.fill()
+    ctx.value!.strokeStyle = '#FFFFFF'
+    ctx.value!.lineWidth = 1.5
+    ctx.value!.stroke()
+
+    // 绘制航点名称
+    const name = `航点${index + 1}`
+    ctx.value!.fillStyle = textColor
+    ctx.value!.font = 'bold 12px Arial'
+    ctx.value!.textBaseline = 'bottom'
+    ctx.value!.fillText(name, x + 8, y - 5)
+  })
 }
 </script>
 
