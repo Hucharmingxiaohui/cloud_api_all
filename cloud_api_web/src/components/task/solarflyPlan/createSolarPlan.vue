@@ -622,6 +622,7 @@ async function onSubmit () {
     const valid = await valueRef.value.validateField(step2Fields)
     if (valid) {
       // 1.创建飞行计划
+      planBody.index = 1
       const res = await createFlyPlan(planBody)
       if (res.code !== 0) {
         ElMessage.warning('请填写必填项!')
