@@ -137,13 +137,13 @@
               </el-form-item>
 
               <el-form-item
-                label="光伏参数："
+                label="航线规划："
                 required
                 prop="type"
               >
                 <el-radio-group v-model="planBody.type" size="large">
                   <el-radio value="uniform">自定义</el-radio>
-                  <el-radio value="auto">自动检测</el-radio>
+                  <el-radio value="auto">自适应</el-radio>
                 </el-radio-group>
               </el-form-item>
 
@@ -162,28 +162,22 @@
                     @click="handleNextStep"
                     >下一步
                   </el-button>
-                  <el-button
-                    type="primary"
-                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
-                    @click="previewWayline"
-                    >航线预览
-                  </el-button>
                 </div>
             </div>
 
             <!-- 第二步: 光伏参数配置 -->
             <div v-if="currentStep === 2">
               <!-- 红外/可见光选择 (uniform & auto 共有) -->
-              <el-form-item label="相机类型：" required prop="image_format">
-                <el-radio-group v-model="planBody.image_format" size="large">
-                  <el-radio value="visible">可见光</el-radio>
-                  <el-radio value="ir">红外</el-radio>
-                </el-radio-group>
+              <el-form-item label="相机类型：" required prop="image_format_list">
+                <el-checkbox-group v-model="planBody.image_format_list" size="large">
+                  <el-checkbox value="visible">可见光</el-checkbox>
+                  <el-checkbox value="ir">红外</el-checkbox>
+                </el-checkbox-group>
               </el-form-item>
               <el-form-item label="航线高度：" required prop="flight_altitude">
                 <el-input v-model="planBody.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
               </el-form-item>
-              <el-form-item label="光伏板朝向：" required prop="panel_heading">
+              <el-form-item label="光伏板朝向：" :required="planBody.type !== 'auto'" prop="panel_heading">
                 <el-input v-model="planBody.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
               </el-form-item>
 
@@ -191,9 +185,6 @@
               <template v-if="planBody.type === 'uniform'">
                 <el-form-item label="横向航线数：" required prop="horizontal_lines">
                   <el-input v-model="planBody.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
-                </el-form-item>
-                <el-form-item label="光伏板朝向：" required prop="panel_heading">
-                  <el-input v-model="planBody.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
                 </el-form-item>
                 <el-form-item label="区域边距：" required prop="margin">
                   <el-input v-model="planBody.margin" type="number" placeholder="请输入区域边距"></el-input>
@@ -205,7 +196,7 @@
 
               <!-- auto 模式下字段 -->
               <template v-if="planBody.type === 'auto'">
-                <el-form-item label="光伏板倾角：" required prop="tilt_angle">
+                <el-form-item label="光伏板倾角：" :required="planBody.type !== 'auto'" prop="tilt_angle">
                   <el-input v-model="planBody.tilt_angle" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
                 </el-form-item>
               </template>
@@ -218,6 +209,12 @@
                     style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
                     @click="handlePrevStep"
                     >上一步
+                  </el-button>
+                  <el-button
+                    type="primary"
+                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
+                    @click="previewWayline"
+                    >航线预览
                   </el-button>
                   <el-button
                     type="primary"
@@ -313,7 +310,8 @@ const planBody = reactive({
   plan_priority: 1,
   type: 'auto',
   // 第二步表单字段
-  image_format: 'visible', // 红外/可见光: infrared | visible
+  image_format_list: ['visible'], // 相机类型多选
+  image_format: computed(() => planBody.image_format_list.join(',')), // 提交时转为逗号分隔字符串
   flight_altitude: '', // 航线高度(uniform)
   tilt_angle: '', // 光伏板倾角
   horizontal_lines: '', // 横向航线数(uniform)
@@ -406,7 +404,7 @@ const rules = {
     { required: true, message: '请选择失联动作', trigger: 'change' }
   ],
   // 第二步表单校验规则
-  image_format: [
+  image_format_list: [
     { required: true, message: '请选择相机类型', trigger: 'change' }
   ],
   flight_altitude: [
@@ -414,16 +412,36 @@ const rules = {
     { pattern: /^[1-9]\d*$/, message: '航线高度必须是正整数', trigger: 'blur' }
   ],
   tilt_angle: [
-    { required: true, message: '请输入光伏板倾角', trigger: 'blur' },
-    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
+    {
+      validator: (rule, value, callback) => {
+        if (planBody.type !== 'auto' && !value) {
+          callback(new Error('请输入光伏板倾角'))
+        } else if (value && !/^[0-9]+(\.[0-9]+)?$/.test(value)) {
+          callback(new Error('请输入有效的数字'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   horizontal_lines: [
     { required: true, message: '请输入横向航线数', trigger: 'blur' },
     { pattern: /^[1-9]\d*$/, message: '横向航线数必须是正整数', trigger: 'blur' }
   ],
   panel_heading: [
-    { required: true, message: '请输入光伏板朝向', trigger: 'blur' },
-    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
+    {
+      validator: (rule, value, callback) => {
+        if (planBody.type !== 'auto' && !value) {
+          callback(new Error('请输入光伏板朝向'))
+        } else if (value && !/^[0-9]+(\.[0-9]+)?$/.test(value)) {
+          callback(new Error('请输入有效的数字'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
   ],
   margin: [
     { required: true, message: '请输入区域边距', trigger: 'blur' },
@@ -566,12 +584,17 @@ function handlePrevStep () {
 async function previewWayline () {
   try {
     // 只校验第一步的字段
-    const valid = await valueRef.value.validateField([
-      'name', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
-    ])
-    if (valid) {
-      planBody.index = 0
-      const res = await createFlyPlan(planBody)
+      const step2Fields = ['image_format_list']
+      if (planBody.type === 'uniform') {
+        step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
+      } else {
+        step2Fields.push('flight_altitude')
+      }
+
+      const valid = await valueRef.value.validateField(step2Fields)
+      if (valid) {
+        planBody.index = 0
+        const res = await createFlyPlan(planBody)
       if (res.code !== 0) {
         ElMessage.error('航线预览异常!')
         return
@@ -589,11 +612,11 @@ async function previewWayline () {
 async function onSubmit () {
   try {
     // 第二步需要校验的字段
-    const step2Fields = ['image_format']
+    const step2Fields = ['image_format_list']
     if (planBody.type === 'uniform') {
       step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
     } else {
-      step2Fields.push('tilt_angle', 'panel_heading')
+      step2Fields.push('flight_altitude')
     }
 
     const valid = await valueRef.value.validateField(step2Fields)
