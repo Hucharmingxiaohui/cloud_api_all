@@ -43,6 +43,7 @@ import com.dji.sample.manage.model.entity.WorkspaceEntity;
 import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -180,6 +181,9 @@ public class FjReportController {
                 gfPositionRequest.setAreaHeight(solarPanelArea.getAreaHeight());
                 gfPositionRequest.setPanelHeight(solarPanelArea.getPanelHeight());
                 log.info("gfPositionRequest---"+gfPositionRequest);
+                ObjectMapper objectMapper = new ObjectMapper();
+                String actualJson = objectMapper.writeValueAsString(gfPositionRequest);
+                System.out.println("真正的 JSON 是：" + actualJson);
 //              发送请求
                 GfPositionResponse gfPositionResponse = gfReportService.sendGfPositionRequest(gfPositionRequest);
                 gfReportService.processAndUptDefects(gfPositionResponse, jobId);
@@ -254,6 +258,71 @@ public class FjReportController {
             return Result.success(4);
         }
         return Result.success(0);
+    }
+
+
+    /**
+     * 巡视报告界面接口-巡视报告生成
+     */
+    @PostMapping("/createTaskReport")
+    public Result createHisTaskReport(@RequestBody JSONObject jsonObject) {
+        String jobId = jsonObject.get("jobId").toString();
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
+        if(isAnalyzed == null){
+            return Result.analyzing("巡检结果还在分析，请稍后尝试");
+        }else {
+            Integer isReported = waylineJobEntity.getIsReported();
+            if(isReported == 1){
+                return Result.duplicate("巡检结果已生成巡检报告，无需重复生成");
+            }
+        }
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+        Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
+        String reportId =null;
+        if(planType==0){
+//           普通任务生成报告
+             reportId = fjReportService.createNewReport(jobId);
+             fjReportService.genNormalPatrolTaskWordNew(reportId,jobId);
+             log.info("生成普通报告------");
+        }else if(planType==1){
+//           风机任务生成报告
+             reportId = fjReportService.createNewReport(jobId);
+             fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
+        } else if (planType==4) {
+//           光伏任务生成报告
+            log.info("生成光伏报告------");
+            reportId = fjReportService.createNewReport(jobId);
+            fjReportService.genGfPatrolTaskWordNew(reportId,jobId);
+
+        }
+
+//      已进行巡检
+        waylineJobEntity.setIsReported(1);
+        waylineJobMapper.updateById(waylineJobEntity);
+        log.info("创建巡视报告记录，排队生成报告，reportId:{} jobId {}", reportId, jobId);
+        return Result.success("reportId:"+reportId);
+    }
+
+//  删除报告，重新生成报告用，之前调用
+    @GetMapping("deleteReport")
+    public Result deleteReport(@RequestParam String jobId) {
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(
+                new LambdaQueryWrapper<WaylineJobEntity>()
+                        .eq(WaylineJobEntity::getJobId, jobId)
+        );
+        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
+        File reportFile = new File(reportPath);
+
+        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
+        waylineJobEntity.setIsReported(0);
+        waylineJobMapper.updateById(waylineJobEntity);
+        if (isFileDeleted) {
+            return Result.success("报告删除成功，可以重新生成");
+        } else {
+            return Result.error("报告删除失败，请检查文件是否存在");
+        }
     }
 
     @GetMapping("/exportPic")
@@ -362,69 +431,6 @@ public class FjReportController {
         return null;
     }
 
-    /**
-     * 巡视报告界面接口-巡视报告生成
-     */
-    @PostMapping("/createTaskReport")
-    public Result createHisTaskReport(@RequestBody JSONObject jsonObject) {
-        String jobId = jsonObject.get("jobId").toString();
-        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
-        Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
-        if(isAnalyzed == null){
-            return Result.analyzing("巡检结果还在分析，请稍后尝试");
-        }else {
-            Integer isReported = waylineJobEntity.getIsReported();
-            if(isReported == 1){
-                return Result.duplicate("巡检结果已生成巡检报告，无需重复生成");
-            }
-        }
-        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
-        Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
-        String reportId =null;
-        if(planType==0){
-//           普通任务生成报告
-             reportId = fjReportService.createNewReport(jobId);
-             fjReportService.genNormalPatrolTaskWordNew(reportId,jobId);
-             log.info("生成普通报告------");
-        }else if(planType==1){
-//           风机任务生成报告
-             reportId = fjReportService.createNewReport(jobId);
-             fjReportService.genFjPatrolTaskWordNew(reportId,jobId);
-        } else if (planType==4) {
-//           光伏任务生成报告
-            log.info("生成光伏报告------");
-            reportId = fjReportService.createNewReport(jobId);
-            fjReportService.genGfPatrolTaskWordNew(reportId,jobId);
-
-        }
-
-//      已进行巡检
-        waylineJobEntity.setIsReported(1);
-        waylineJobMapper.updateById(waylineJobEntity);
-        log.info("创建巡视报告记录，排队生成报告，reportId:{} jobId {}", reportId, jobId);
-        return Result.success("reportId:"+reportId);
-    }
-
-//  删除报告，重新生成报告用，之前调用
-    @GetMapping("deleteReport")
-    public Result deleteReport(@RequestParam String jobId) {
-        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(
-                new LambdaQueryWrapper<WaylineJobEntity>()
-                        .eq(WaylineJobEntity::getJobId, jobId)
-        );
-        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
-        File reportFile = new File(reportPath);
-
-        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
-        waylineJobEntity.setIsReported(0);
-        waylineJobMapper.updateById(waylineJobEntity);
-        if (isFileDeleted) {
-            return Result.success("报告删除成功，可以重新生成");
-        } else {
-            return Result.error("报告删除失败，请检查文件是否存在");
-        }
-    }
 
     /**
      * 删除报告文件

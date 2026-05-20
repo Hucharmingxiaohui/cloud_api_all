@@ -170,7 +170,7 @@
               <!-- 红外/可见光选择 (uniform & auto 共有) -->
               <el-form-item label="相机类型：" required prop="image_format_list">
                 <el-checkbox-group v-model="planBody.image_format_list" size="large">
-                  <el-checkbox value="visible">可见光</el-checkbox>
+                  <el-checkbox value="visable">可见光</el-checkbox>
                   <el-checkbox value="ir">红外</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
@@ -310,7 +310,7 @@ const planBody = reactive({
   plan_priority: 1,
   type: 'auto',
   // 第二步表单字段
-  image_format_list: ['visible'], // 相机类型多选
+  image_format_list: ['visable'], // 相机类型多选
   image_format: computed(() => planBody.image_format_list.join(',')), // 提交时转为逗号分隔字符串
   flight_altitude: '', // 航线高度(uniform)
   tilt_angle: '', // 光伏板倾角
@@ -584,17 +584,17 @@ function handlePrevStep () {
 async function previewWayline () {
   try {
     // 只校验第一步的字段
-      const step2Fields = ['image_format_list']
-      if (planBody.type === 'uniform') {
-        step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
-      } else {
-        step2Fields.push('flight_altitude')
-      }
+    const step2Fields = ['image_format_list']
+    if (planBody.type === 'uniform') {
+      step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
+    } else {
+      step2Fields.push('flight_altitude')
+    }
 
-      const valid = await valueRef.value.validateField(step2Fields)
-      if (valid) {
-        planBody.index = 0
-        const res = await createFlyPlan(planBody)
+    const valid = await valueRef.value.validateField(step2Fields)
+    if (valid) {
+      planBody.index = 0
+      const res = await createFlyPlan(planBody)
       if (res.code !== 0) {
         ElMessage.error('航线预览异常!')
         return

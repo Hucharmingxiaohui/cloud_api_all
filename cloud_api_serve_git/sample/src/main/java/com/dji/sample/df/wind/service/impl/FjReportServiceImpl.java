@@ -27,11 +27,14 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sample.wayline.service.impl.WaylineJobServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.*;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.math.BigInteger;
 import java.util.function.Function;
 
 import javax.annotation.Resource;
@@ -103,7 +106,7 @@ public class FjReportServiceImpl implements FjReportService {
 
 
     @Override
-    public void genGfPatrolTaskWordNew(String reportId, String jobId) {
+    public void genGfPatrolTaskWordNew(String reportId, String jobId){
         // 1. 从数据库获取巡检任务、缺陷等信息
         FjReportEntity fjReportEntity = fjReportMapper.selectById(reportId);
         String taskName = fjReportEntity.getName();
@@ -113,6 +116,24 @@ public class FjReportServiceImpl implements FjReportService {
         );
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().
                 eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+        // 获取原始 ID 字符串
+        String solarPanelIdStr = pubWaylineJobPlanDfEntity.getSolarPanelId();
+        List<SolarPanelArea> solarPanelAreaList = new ArrayList<>();
+        if (solarPanelIdStr != null && !solarPanelIdStr.trim().isEmpty()) {
+            // 按逗号分割，并去除每个 ID 的前后空格
+            String[] ids = solarPanelIdStr.split(",");
+            for (String id : ids) {
+                String trimmedId = id.trim();
+                if (!trimmedId.isEmpty()) {
+                    // 如果是单个 ID 或多个 ID，都可以批量或逐个查询
+                    // 这里为了简单起见，逐个查询；若数据量大可改用 selectBatchIds
+                    SolarPanelArea area = solarPanelAreaMapper.selectById(trimmedId);
+                    if (area != null) {
+                        solarPanelAreaList.add(area);
+                    }
+                }
+            }
+        }
         SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(pubWaylineJobPlanDfEntity.getSolarPanelId());
         Long beginTime = waylineJobEntity.getBeginTime();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -121,7 +142,8 @@ public class FjReportServiceImpl implements FjReportService {
         String stationName = solarStationName;
         // 获取缺陷列表
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()
-                .eq(DefectEntity::getJobId, jobId));
+                .eq(DefectEntity::getJobId, jobId)
+                .orderByAsc(DefectEntity::getId));   // 按 id 升序排列
         // 计算缺陷数量
         Long defectCount = defectList.stream()
                 .filter(defect -> !defect.getDefectType().contains("未见异常"))
@@ -332,51 +354,44 @@ public class FjReportServiceImpl implements FjReportService {
         defectSummary.setAlignment(ParagraphAlignment.LEFT);
         defectSummary.setSpacingAfter(200);
 
-        // 1.2 无人机巡检光伏典型缺陷类型分类
-        XWPFParagraph subSection12 = document.createParagraph();
-        XWPFRun subSection12Run = subSection12.createRun();
-        subSection12Run.setText("1.2无人机巡检光伏典型缺陷类型分类");
-        subSection12Run.setBold(true);
-        subSection12Run.setFontSize(14);
-        subSection12Run.setFontFamily("宋体");
-        subSection12.setAlignment(ParagraphAlignment.LEFT);
-        subSection12.setSpacingAfter(200);
+        // 1.2 无人机巡检光伏缺陷分布图（可见光）
+        String annotatedImage = waylineJobEntity.getAnnotatedImage();
+        if (StringUtils.isNotEmpty(annotatedImage)) {
+            String filePictrueUrl = fileConfig.getFilePictrueUrl();
+            String annotatedImagePath = filePictrueUrl + annotatedImage;
 
-        // 创建缺陷类型分类表格
-        XWPFTable defectTypeTable = document.createTable(9, 2);
-        defectTypeTable.setWidth("100%");
+            // 添加可见光缺陷分布图小标题
+            XWPFParagraph subTitleVisible = document.createParagraph();
+            XWPFRun titleRunVisible = subTitleVisible.createRun();
+            titleRunVisible.setText("可见光光伏缺陷分布图");
+            titleRunVisible.setBold(true);
+            titleRunVisible.setFontSize(12);
+            titleRunVisible.setFontFamily("宋体");
+            subTitleVisible.setAlignment(ParagraphAlignment.LEFT);
+            subTitleVisible.setSpacingAfter(200);
 
-        // 填充表头
-        XWPFTableRow headerRow = defectTypeTable.getRow(0);
-        setCellFont(headerRow.getCell(0), "宋体", 11, true);
-        headerRow.getCell(0).setText("缺陷类型");
-        headerRow.getCell(0).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+            // 插入可见光图片
+            addImageToDocument(document, annotatedImagePath, 500, 400); // 宽度500，高度400（可根据需要调整）
+        }
 
-        setCellFont(headerRow.getCell(1), "宋体", 11, true);
-        headerRow.getCell(1).setText("缺陷数量");
-        headerRow.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+        // 1.3 红外光光伏缺陷分布图（如果存在）
+        String annotatedImageIr = waylineJobEntity.getAnnotatedImageIr();
+        if (StringUtils.isNotEmpty(annotatedImageIr)) {
+            String filePictrueUrl = fileConfig.getFilePictrueUrl();
+            String annotatedImageIrPath = filePictrueUrl + annotatedImageIr;
 
-        // 填充缺陷类型数据（这里写死数据，实际应该从数据库统计）
-        String[][] defectTypeData = {
-                {"雷击损伤", "0"},
-                {"胶衣脱落", "0"},
-                {"胶漆鼓包", "0"},
-                {"轮毂漏油", "0"},
-                {"叶片覆冰", "0"},
-                {"叶片开裂", "0"},
-                {"叶片腐蚀", "0"},
-                {"塔筒腐蚀", "0"}
-        };
+            // 添加红外光缺陷分布图小标题
+            XWPFParagraph subTitleIr = document.createParagraph();
+            XWPFRun titleRunIr = subTitleIr.createRun();
+            titleRunIr.setText("红外光光伏缺陷分布图");
+            titleRunIr.setBold(true);
+            titleRunIr.setFontSize(12);
+            titleRunIr.setFontFamily("宋体");
+            subTitleIr.setAlignment(ParagraphAlignment.LEFT);
+            subTitleIr.setSpacingAfter(200);
 
-        for (int i = 0; i < 8; i++) {
-            XWPFTableRow row = defectTypeTable.getRow(i + 1);
-            setCellFont(row.getCell(0), "宋体", 11, false);
-            row.getCell(0).setText(defectTypeData[i][0]);
-            row.getCell(0).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
-
-            setCellFont(row.getCell(1), "宋体", 11, false);
-            row.getCell(1).setText(defectTypeData[i][1]);
-            row.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+            // 插入红外光图片
+            addImageToDocument(document, annotatedImageIrPath, 500, 400);
         }
 
         // 添加空行
@@ -399,8 +414,15 @@ public class FjReportServiceImpl implements FjReportService {
         // 任务描述
         XWPFParagraph taskDescription = document.createParagraph();
         XWPFRun taskDescriptionRun = taskDescription.createRun();
-        taskDescriptionRun.setText("任务描述: 本次巡检光伏区域为"+solarPanelArea.getSolarPanelAreaName()+",巡检光伏图片"+
-                mediaCount + "张,缺陷数量"+defectCount + "处,主要缺陷类型为"+mostCommonDefectType);
+        String areaNames = solarPanelAreaList.stream()
+                .map(SolarPanelArea::getSolarPanelAreaName)
+                .filter(name -> name != null && !name.isEmpty())
+                .collect(Collectors.joining("、")); // 用顿号或逗号分隔
+        if (areaNames.isEmpty()) {
+            areaNames = "未知区域";
+        }
+        taskDescriptionRun.setText("任务描述: 本次巡检光伏区域为" + areaNames + ",巡检光伏图片" +
+                mediaCount + "张,缺陷数量" + defectCount + "处,主要缺陷类型为" + mostCommonDefectType);
         taskDescriptionRun.setFontSize(11);
         taskDescriptionRun.setFontFamily("宋体");
         taskDescription.setAlignment(ParagraphAlignment.LEFT);
@@ -594,6 +616,39 @@ public class FjReportServiceImpl implements FjReportService {
         }
     }
 
+    /**
+     * 将图片插入到 Word 文档末尾
+     * @param document Word 文档对象
+     * @param imagePath 图片全路径
+     * @param width 图片宽度（像素，POI会自动转换）
+     * @param height 图片高度
+     */
+    private void addImageToDocument(XWPFDocument document, String imagePath, int width, int height) {
+        try (FileInputStream fis = new FileInputStream(imagePath)) {
+            // 读取图片字节
+            byte[] pictureBytes = fis.readAllBytes();
+
+            // 根据文件扩展名确定图片类型
+            int pictureType = XWPFDocument.PICTURE_TYPE_JPEG;
+            if (imagePath.toLowerCase().endsWith(".png")) {
+                pictureType = XWPFDocument.PICTURE_TYPE_PNG;
+            } else if (imagePath.toLowerCase().endsWith(".gif")) {
+                pictureType = XWPFDocument.PICTURE_TYPE_GIF;
+            }
+
+            // 创建段落并插入图片
+            XWPFParagraph paragraph = document.createParagraph();
+            XWPFRun run = paragraph.createRun();
+            run.addPicture(new ByteArrayInputStream(pictureBytes), pictureType, imagePath, Units.toEMU(width), Units.toEMU(height));
+            paragraph.setAlignment(ParagraphAlignment.CENTER); // 图片居中
+        } catch (Exception e) {
+            // 记录日志，或者抛出运行时异常
+            e.printStackTrace();
+            // 可选：在文档中写入错误提示
+            XWPFParagraph errorPara = document.createParagraph();
+            errorPara.createRun().setText("图片加载失败：" + imagePath);
+        }
+    }
 
     @Override
     public void genFjPatrolTaskWordNew(String reportId, String jobId) {

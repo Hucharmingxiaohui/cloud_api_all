@@ -130,4 +130,15 @@ public class WaylineJobEntity implements Serializable {
 
     @TableField("analyzed_num")
     private Integer analyzedNum;
+    /**
+     * 光伏标注图路径
+     */
+    @TableField("annotated_image")
+    private String annotatedImage;
+    /**
+     * 光伏标注图路径(红外）
+     */
+    @TableField("annotated_image_ir")
+    private String annotatedImageIr;
+
 }
