@@ -122,7 +122,7 @@ public class FjReportController {
 //      正在分析（实则是正在保存加分析）
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
-//      如果不是风机任务直接返回不分析，状态置为3（改为对接分析服务）
+//      航点航线计划
         if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==0){
 
             waylineJobEntity.setIsAnalyzed(2);
@@ -282,7 +282,7 @@ public class FjReportController {
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         String reportId =null;
         if(planType==0){
-//           普通任务生成报告
+//           航点航线任务生成报告
              reportId = fjReportService.createNewReport(jobId);
              fjReportService.genNormalPatrolTaskWordNew(reportId,jobId);
              log.info("生成普通报告------");

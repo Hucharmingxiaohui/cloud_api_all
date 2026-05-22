@@ -38,7 +38,11 @@ import java.math.BigInteger;
 import java.util.function.Function;
 
 import javax.annotation.Resource;
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.awt.image.BufferedImage;
 import java.io.*;
@@ -134,7 +138,6 @@ public class FjReportServiceImpl implements FjReportService {
                 }
             }
         }
-        SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectById(pubWaylineJobPlanDfEntity.getSolarPanelId());
         Long beginTime = waylineJobEntity.getBeginTime();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
         String formattedTime = sdf.format(new Date(beginTime));
@@ -144,15 +147,27 @@ public class FjReportServiceImpl implements FjReportService {
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()
                 .eq(DefectEntity::getJobId, jobId)
                 .orderByAsc(DefectEntity::getId));   // 按 id 升序排列
-        // 计算缺陷数量
-        Long defectCount = defectList.stream()
+        Integer visibleNum = defectEntityMapper.selectCount(new LambdaQueryWrapper<DefectEntity>()
+                .eq(DefectEntity::getJobId, jobId)
+                .eq(DefectEntity::getImageType, 0));
+        Integer irNum = defectEntityMapper.selectCount(new LambdaQueryWrapper<DefectEntity>()
+                .eq(DefectEntity::getJobId, jobId)
+                .eq(DefectEntity::getImageType, 1));
+        // 计算可见光缺陷数量
+        Long visibleDefectCount = defectList.stream()
+                .filter(defectEntity -> defectEntity.getImageType()== 0)
+                .filter(defect -> !defect.getDefectType().contains("未见异常"))
+                .count();
+        // 计算红外缺陷数量
+        Long irDefectCount = defectList.stream()
+                .filter(defectEntity -> defectEntity.getImageType()== 1)
                 .filter(defect -> !defect.getDefectType().contains("未见异常"))
                 .count();
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().
                 eq(MediaFileEntity::getJobId, jobId).orderByAsc(MediaFileEntity::getId));
         // 图片数量
         Integer mediaCount = mediaFileEntities.size();
-//      主要缺陷类型
+        //主要缺陷类型
         String mostCommonDefectType = defectList.stream()
                 .filter(defect -> !defect.getDefectType().contains("未见异常"))
                 .map(DefectEntity::getDefectType)  // 获取缺陷类型
@@ -222,7 +237,7 @@ public class FjReportServiceImpl implements FjReportService {
         document.createParagraph().createRun().addBreak();
 
         // 添加基本信息表格（风机编号和巡检地点）
-        XWPFTable infoTable = document.createTable(2, 2);
+        XWPFTable infoTable = document.createTable(1, 2);
         infoTable.setWidth("100%");
 
         // 设置表格样式
@@ -240,9 +255,6 @@ public class FjReportServiceImpl implements FjReportService {
         cell12.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
         setCellFont(cell12, "宋体", 11, false);
         cell12.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
-
-        // 添加空行
-        document.createParagraph().createRun().addBreak();
 
         // 添加编制单位等信息（左对齐）
         XWPFParagraph unitPara = document.createParagraph();
@@ -324,7 +336,7 @@ public class FjReportServiceImpl implements FjReportService {
         subSection11.setSpacingAfter(200);
 
         // 创建巡检概况表格
-        XWPFTable overviewTable = document.createTable(4, 2);
+        XWPFTable overviewTable = document.createTable(3, 2);
         overviewTable.setWidth("100%");
 
         // 填充巡检概况表格
@@ -422,7 +434,8 @@ public class FjReportServiceImpl implements FjReportService {
             areaNames = "未知区域";
         }
         taskDescriptionRun.setText("任务描述: 本次巡检光伏区域为" + areaNames + ",巡检光伏图片" +
-                mediaCount + "张,缺陷数量" + defectCount + "处,主要缺陷类型为" + mostCommonDefectType);
+                mediaCount + "张,其中可见光图片"+visibleNum+"张,红外图片"+irNum+"张,可见光图片缺陷数量" + visibleDefectCount +
+                "处,红外图片缺陷数量"+irDefectCount+"处,主要缺陷类型为" + mostCommonDefectType);
         taskDescriptionRun.setFontSize(11);
         taskDescriptionRun.setFontFamily("宋体");
         taskDescription.setAlignment(ParagraphAlignment.LEFT);
@@ -497,36 +510,32 @@ public class FjReportServiceImpl implements FjReportService {
                     imagePara.setAlignment(ParagraphAlignment.CENTER); // 图片居中
                     XWPFRun imageRun = imagePara.createRun();
 
-                    // 使用原图，不压缩
-                    FileInputStream fis = new FileInputStream(imagePath);
-
                     // 获取图片原始尺寸
                     BufferedImage bufferedImage = ImageIO.read(new File(imagePath));
                     int originalWidth = bufferedImage.getWidth();
                     int originalHeight = bufferedImage.getHeight();
 
-                    // 尝试方法1：使用非常大的EMU值
-                    // 1英寸 = 914400 EMU, 1厘米 = 360000 EMU
-                    // 我们设置一个非常大的尺寸，比如20厘米宽，15厘米高
-
                     System.out.println("插入图片: " + imagePath);
                     System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
 
-                    // 方法1：使用固定的大EMU值
-                    int targetWidthEMU = 14 * 360000;  // 20厘米 = 7,200,000 EMU
-                    int targetHeightEMU = 11 * 360000; // 15厘米 = 5,400,000 EMU
+                    // 使用固定的大EMU值（保持原来的显示尺寸）
+                    int targetWidthEMU = 14 * 360000;  // 14厘米 = 5,040,000 EMU
+                    int targetHeightEMU = 11 * 360000; // 11厘米 = 3,960,000 EMU
 
                     System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
 
-                    // 使用addPicture方法，直接传入EMU值
+                    // 压缩图片质量为50%，减小文件大小
+                    byte[] compressedBytes = compressImage(imagePath, 0.5f);
+                    System.out.println("压缩后图片大小: " + compressedBytes.length + " 字节");
+
+                    // 使用压缩后的图片字节数组
                     imageRun.addPicture(
-                            fis,
+                            new ByteArrayInputStream(compressedBytes),
                             XWPFDocument.PICTURE_TYPE_JPEG,
                             extractFileName(imagePath),
                             targetWidthEMU,
                             targetHeightEMU
                     );
-                    fis.close();
 
                     // 图片后添加空行
                     document.createParagraph();
@@ -1155,36 +1164,32 @@ public class FjReportServiceImpl implements FjReportService {
                     imagePara.setAlignment(ParagraphAlignment.CENTER); // 图片居中
                     XWPFRun imageRun = imagePara.createRun();
 
-                    // 使用原图，不压缩
-                    FileInputStream fis = new FileInputStream(imagePath);
-
                     // 获取图片原始尺寸
                     BufferedImage bufferedImage = ImageIO.read(new File(imagePath));
                     int originalWidth = bufferedImage.getWidth();
                     int originalHeight = bufferedImage.getHeight();
 
-                    // 尝试方法1：使用非常大的EMU值
-                    // 1英寸 = 914400 EMU, 1厘米 = 360000 EMU
-                    // 我们设置一个非常大的尺寸，比如20厘米宽，15厘米高
-
                     System.out.println("插入图片: " + imagePath);
                     System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
 
-                    // 方法1：使用固定的大EMU值
-                    int targetWidthEMU = 14 * 360000;  // 20厘米 = 7,200,000 EMU
-                    int targetHeightEMU = 11 * 360000; // 15厘米 = 5,400,000 EMU
+                    // 使用固定的大EMU值（保持原来的显示尺寸）
+                    int targetWidthEMU = 14 * 360000;  // 14厘米 = 5,040,000 EMU
+                    int targetHeightEMU = 11 * 360000; // 11厘米 = 3,960,000 EMU
 
                     System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
 
-                    // 使用addPicture方法，直接传入EMU值
+                    // 压缩图片质量为50%，减小文件大小
+                    byte[] compressedBytes = compressImage(imagePath, 0.5f);
+                    System.out.println("压缩后图片大小: " + compressedBytes.length + " 字节");
+
+                    // 使用压缩后的图片字节数组
                     imageRun.addPicture(
-                            fis,
+                            new ByteArrayInputStream(compressedBytes),
                             XWPFDocument.PICTURE_TYPE_JPEG,
                             extractFileName(imagePath),
                             targetWidthEMU,
                             targetHeightEMU
                     );
-                    fis.close();
 
                     // 图片后添加空行
                     document.createParagraph();
@@ -1839,8 +1844,8 @@ public class FjReportServiceImpl implements FjReportService {
                     System.out.println("插入图片: " + imagePath);
                     System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
 
-                    int targetWidthEMU = 14 * 360000;  // 20厘米 = 7,200,000 EMU
-                    int targetHeightEMU = 11 * 360000; // 15厘米 = 5,400,000 EMU
+                    int targetWidthEMU = 7 * 360000;  // 7厘米 = 2,520,000 EMU（压缩为原来的一半）
+                    int targetHeightEMU = 6 * 360000; // 6厘米 = 2,160,000 EMU（压缩为原来的一半）
 
                     System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
 
@@ -2230,6 +2235,23 @@ public class FjReportServiceImpl implements FjReportService {
         }
 
         System.out.println("缺陷数据新增完成");
+    }
+
+    private byte[] compressImage(String imagePath, float quality) throws IOException {
+        BufferedImage image = ImageIO.read(new File(imagePath));
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageOutputStream ios = ImageIO.createImageOutputStream(baos);
+        ImageWriter writer = ImageIO.getImageWritersByFormatName("jpg").next();
+        ImageWriteParam param = writer.getDefaultWriteParam();
+        param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        param.setCompressionQuality(quality);
+        writer.setOutput(ios);
+        IIOImage iioImage = new IIOImage(image, null, null);
+        writer.write(iioImage);
+        writer.dispose();
+        ios.close();
+        baos.close();
+        return baos.toByteArray();
     }
 
 }

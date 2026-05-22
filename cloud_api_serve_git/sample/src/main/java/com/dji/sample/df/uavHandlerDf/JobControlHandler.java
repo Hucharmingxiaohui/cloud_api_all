@@ -239,17 +239,21 @@ public class JobControlHandler {
                                 uploadStallMap.remove(taskCode);
                                 log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==0){
-//                              普通任务先不分析直接保存
-//                                Result<Map> result = pictureSaveHandler.pictureSave(jobId);
-                                Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
-                                if(result.getCode() == 0){
-                                    if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
-                                        sendPatrolResult(taskCode, taskName, waylineJobEntity);
+//                              航点航线计划
+                                try {
+                                    Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);
+                                    if(result.getCode() == 0){
+                                        if(isCenterTask.equals("1") && !jobId.equals(taskCode)){
+                                            sendPatrolResult(taskCode, taskName, waylineJobEntity);
+                                        }
                                     }
+                                } catch (Exception e) {
+                                    log.error("pictureSaveAndAnalysis failed", e);
+                                } finally {
+                                    monitoringTasks.remove(taskCode);
+                                    uploadStallMap.remove(taskCode);
+                                    log.info("任务完成，停止监控: taskCode={}", taskCode);
                                 }
-                                monitoringTasks.remove(taskCode);
-                                uploadStallMap.remove(taskCode);
-                                log.info("任务完成，停止监控: taskCode={}", taskCode);
                             }else if(planType==3){
                                 log.info("执行普通计划保存图片---");
                                 Result result = fjReportController.pictureSaveAndAnalysis(jsonObject);

@@ -334,9 +334,10 @@ public class GfReportServiceImpl implements GfReportService {
                         defectComponentNames.add(defect.getSolarPanelComponentName());
                         defectTypes.add(defect.getDefectType());
                     }
-                    defectEntity.setDefectType(defectTypes.toString());
-                    defectEntity.setDefectDescription(defectTypes.toString());
-
+                    if(defectEntity.getImageType()==1){
+                        defectEntity.setDefectType(defectTypes.toString());
+                        defectEntity.setDefectDescription(defectTypes.toString());
+                    }
                     defectEntity.setDefectComponentName(defectComponentNames.toString());
                     defectEntityMapper.updateById(defectEntity);
                 }

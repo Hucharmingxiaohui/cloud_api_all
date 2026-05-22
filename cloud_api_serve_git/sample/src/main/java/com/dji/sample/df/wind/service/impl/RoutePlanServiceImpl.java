@@ -1112,9 +1112,15 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 
             JSONObject solarParams = new JSONObject();
             solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
-            solarParams.put("panelHeading", 0);
+            if(pubWaylineJobPlanDfEntity.getPanelHeading()!=null) {
+                solarParams.put("panelHeading", pubWaylineJobPlanDfEntity.getPanelHeading());
+            }
             solarParams.put("flightAltitude", pubWaylineJobPlanDfEntity.getFlightAltitude());
-            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            if(pubWaylineJobPlanDfEntity.getTiltAngle() !=null) {
+                solarParams.put("panelTilt", pubWaylineJobPlanDfEntity.getTiltAngle());
+            }else {
+                solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            }
             root.put("solar_params", solarParams);
         }
 
@@ -1159,7 +1165,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
         pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
         pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
-        pubWaylineJobPlanDfEntity.setWaylineType(0);
 
         pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
         map.put("result", true);
@@ -1168,3 +1173,4 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
 }
+
