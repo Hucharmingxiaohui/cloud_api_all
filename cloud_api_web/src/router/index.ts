@@ -55,101 +55,101 @@ const routes: Array<RouteRecordRaw> = [
     meta: { showInMenu: false, cache: false },
     children: [
       // 左侧菜单 - 变量管理（父菜单，含子路由）
-      {
-        path: '/variableMgt',
-        name: 'variableMgt',
-        meta: {
-          showInMenu: true,
-          label: '变量管理',
-          position: 'left',
-          cache: false
-        },
-        children: [
-          {
-            path: '/variableMgt/fanMgt',
-            name: 'fanMgt',
-            component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
-            meta: {
-              showInMenu: true,
-              label: '风机管理',
-              cache: true
-            }
-          },
-          {
-            path: '/variableMgt/interestPointMgt',
-            name: 'interestPointMgt',
-            component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
-            meta: {
-              showInMenu: true,
-              label: '兴趣点管理',
-              cache: true
-            }
-          },
-          {
-            path: '/variableMgt/solarMgt',
-            name: 'solarMgt',
-            meta: {
-              showInMenu: true,
-              label: '光伏管理',
-              position: 'left',
-              cache: false
-            },
-            children: [
-              {
-                path: '/variableMgt/solarMgt/solarPanelMgt',
-                name: 'solarPanelMgt',
-                component: () => import('/@/components/variableMgt/solarMgt/solarPanelMgt/index.vue'),
-                meta: {
-                  showInMenu: true,
-                  label: '光伏巡视区域管理',
-                  cache: true
-                }
-              },
-              {
-                path: '/variableMgt/solarMgt/solarDeviceMgt',
-                name: 'solarDeviceMgt',
-                component: () => import('/@/components/variableMgt/solarMgt/solarDeviceMgt/index.vue'),
-                meta: {
-                  showInMenu: true,
-                  label: '光伏板设备管理',
-                  cache: true
-                }
-              },
-              {
-                path: '/variableMgt/solarMgt/solarComponentMgt',
-                name: 'solarComponentMgt',
-                component: () => import('/@/components/variableMgt/solarMgt/solarComponentMgt/index.vue'),
-                meta: {
-                  showInMenu: true,
-                  label: '光伏组件定位管理',
-                  cache: true
-                }
-              },
-              // {
-              //   path: '/variableMgt/solarMgt/solarPanelLabel',
-              //   name: 'solarPanelLabel',
-              //   component: () => import('/@/components/variableMgt/solarMgt/solarPanelLabel/index.vue'),
-              //   meta: {
-              //     showInMenu: true,
-              //     label: '光伏板区域标注',
-              //     cache: true
-              //   }
-              // },
-            ]
-          },
-        ]
-      },
-      {
-        path: '/' + ERouterName.Points_Management,
-        name: ERouterName.Points_Management,
-        component: () => import('/@/components/points/points_manage.vue'),
-        meta: {
-          showInMenu: true,
-          label: '点位管理',
-          position: 'left',
-          cache: true
-        }
-      },
+      // {
+      //   path: '/variableMgt',
+      //   name: 'variableMgt',
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '变量管理',
+      //     position: 'left',
+      //     cache: false
+      //   },
+      //   children: [
+      //     {
+      //       path: '/variableMgt/fanMgt',
+      //       name: 'fanMgt',
+      //       component: () => import('/@/components/variableMgt/fanMgt/index.vue'),
+      //       meta: {
+      //         showInMenu: true,
+      //         label: '风机管理',
+      //         cache: true
+      //       }
+      //     },
+      //     {
+      //       path: '/variableMgt/interestPointMgt',
+      //       name: 'interestPointMgt',
+      //       component: () => import('/@/components/variableMgt/interestPointMgt/index.vue'),
+      //       meta: {
+      //         showInMenu: true,
+      //         label: '兴趣点管理',
+      //         cache: true
+      //       }
+      //     },
+      //     {
+      //       path: '/variableMgt/solarMgt',
+      //       name: 'solarMgt',
+      //       meta: {
+      //         showInMenu: true,
+      //         label: '光伏管理',
+      //         position: 'left',
+      //         cache: false
+      //       },
+      //       children: [
+      //         {
+      //           path: '/variableMgt/solarMgt/solarPanelMgt',
+      //           name: 'solarPanelMgt',
+      //           component: () => import('/@/components/variableMgt/solarMgt/solarPanelMgt/index.vue'),
+      //           meta: {
+      //             showInMenu: true,
+      //             label: '光伏巡视区域管理',
+      //             cache: true
+      //           }
+      //         },
+      //         {
+      //           path: '/variableMgt/solarMgt/solarDeviceMgt',
+      //           name: 'solarDeviceMgt',
+      //           component: () => import('/@/components/variableMgt/solarMgt/solarDeviceMgt/index.vue'),
+      //           meta: {
+      //             showInMenu: true,
+      //             label: '光伏板设备管理',
+      //             cache: true
+      //           }
+      //         },
+      //         {
+      //           path: '/variableMgt/solarMgt/solarComponentMgt',
+      //           name: 'solarComponentMgt',
+      //           component: () => import('/@/components/variableMgt/solarMgt/solarComponentMgt/index.vue'),
+      //           meta: {
+      //             showInMenu: true,
+      //             label: '光伏组件定位管理',
+      //             cache: true
+      //           }
+      //         },
+      //         // {
+      //         //   path: '/variableMgt/solarMgt/solarPanelLabel',
+      //         //   name: 'solarPanelLabel',
+      //         //   component: () => import('/@/components/variableMgt/solarMgt/solarPanelLabel/index.vue'),
+      //         //   meta: {
+      //         //     showInMenu: true,
+      //         //     label: '光伏板区域标注',
+      //         //     cache: true
+      //         //   }
+      //         // },
+      //       ]
+      //     },
+      //   ]
+      // },
+      // {
+      //   path: '/' + ERouterName.Points_Management,
+      //   name: ERouterName.Points_Management,
+      //   component: () => import('/@/components/points/points_manage.vue'),
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '点位管理',
+      //     position: 'left',
+      //     cache: true
+      //   }
+      // },
       {
         path: '/' + ERouterName.Indoor_Points,
         name: ERouterName.Indoor_Points,
@@ -207,17 +207,17 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
-      {
-        path: '/' + ERouterName.NEW_WAYLINE,
-        name: ERouterName.NEW_WAYLINE,
-        component: () => import('/@/components/WaylinePanel.vue'),
-        meta: {
-          showInMenu: true,
-          label: '航线管理',
-          position: 'right',
-          cache: true
-        }
-      },
+      // {
+      //   path: '/' + ERouterName.NEW_WAYLINE,
+      //   name: ERouterName.NEW_WAYLINE,
+      //   component: () => import('/@/components/WaylinePanel.vue'),
+      //   meta: {
+      //     showInMenu: true,
+      //     label: '航线管理',
+      //     position: 'right',
+      //     cache: true
+      //   }
+      // },
       // 右侧菜单 - 任务管理（父菜单，含子路由）
       {
         path: '/taskManage', // 父菜单路径
@@ -230,68 +230,68 @@ const routes: Array<RouteRecordRaw> = [
         },
         children: [
           // 子菜单 - 普通点位计划
-          {
-            path: '/taskManage/' + ERouterName.FLY_WAYLINE_PLAN,
-            name: ERouterName.FLY_WAYLINE_PLAN,
-            component: () => import('/@/components/task/flyWaylinePlan.vue'),
-            meta: {
-              showInMenu: true,
-              label: '点位航线计划',
-              cache: true
-            }
-          },
+          // {
+          //   path: '/taskManage/' + ERouterName.FLY_WAYLINE_PLAN,
+          //   name: ERouterName.FLY_WAYLINE_PLAN,
+          //   component: () => import('/@/components/task/flyWaylinePlan.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '点位航线计划',
+          //     cache: true
+          //   }
+          // },
           {
             path: '/taskManage/common-fly-wayline-plan',
             name: 'commonFlyPlan',
             component: () => import('/@/components/task/commonFlyWaylinePlan.vue'),
             meta: {
               showInMenu: true,
-              label: '普通航线计划',
+              label: '室内无人机计划',
               cache: true
             }
           },
-          {
-            path: '/taskManage/solarPlanMgt',
-            name: 'solarPlanMgt',
-            component: () => import('../components/task/solarflyPlan/solarPlanMgt.vue'),
-            meta: {
-              showInMenu: true,
-              label: '光伏板计划',
-              cache: true
-            }
-          },
-          {
-            path: '/taskManage/createSolarPlan',
-            name: 'createSolarPlan',
-            component: () => import('/@/components/task/solarflyPlan/createSolarPlan.vue'),
-            meta: {
-              showInMenu: false,
-              label: '创建光伏板计划',
-              cache: true
-            }
-          },
-
-          // 子菜单 - 风机计划
-          {
-            path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
-            name: ERouterName.FLY_FAN_PLAN,
-            component: () => import('/@/components/task/flyFanPlan.vue'),
-            meta: {
-              showInMenu: true,
-              label: '风机计划',
-              cache: true
-            }
-          },
-          {
-            path: '/taskManage/interestPointPlan',
-            name: 'interestPointPlan',
-            component: () => import('/@/components/task/interestPointPlan.vue'),
-            meta: {
-              showInMenu: true,
-              label: '兴趣点环绕计划',
-              cache: true
-            }
-          },
+          // {
+          //   path: '/taskManage/solarPlanMgt',
+          //   name: 'solarPlanMgt',
+          //   component: () => import('../components/task/solarflyPlan/solarPlanMgt.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '光伏板计划',
+          //     cache: true
+          //   }
+          // },
+          // {
+          //   path: '/taskManage/createSolarPlan',
+          //   name: 'createSolarPlan',
+          //   component: () => import('/@/components/task/solarflyPlan/createSolarPlan.vue'),
+          //   meta: {
+          //     showInMenu: false,
+          //     label: '创建光伏板计划',
+          //     cache: true
+          //   }
+          // },
+          //
+          // // 子菜单 - 风机计划
+          // {
+          //   path: '/taskManage/' + ERouterName.FLY_FAN_PLAN,
+          //   name: ERouterName.FLY_FAN_PLAN,
+          //   component: () => import('/@/components/task/flyFanPlan.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '风机计划',
+          //     cache: true
+          //   }
+          // },
+          // {
+          //   path: '/taskManage/interestPointPlan',
+          //   name: 'interestPointPlan',
+          //   component: () => import('/@/components/task/interestPointPlan.vue'),
+          //   meta: {
+          //     showInMenu: true,
+          //     label: '兴趣点环绕计划',
+          //     cache: true
+          //   }
+          // },
 
           // 子菜单 - 飞行任务
           {

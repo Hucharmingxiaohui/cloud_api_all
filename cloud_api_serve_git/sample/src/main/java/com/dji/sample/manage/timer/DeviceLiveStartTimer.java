@@ -43,33 +43,33 @@ public class DeviceLiveStartTimer {
             List<DeviceDTO> list = boundDevicesWithDomain.getList();
             for (DeviceDTO device : list) {
                 if(device.getStatus()){
-                    log.info("开启机巢直播---");
-//                  开启机巢直播
-                    JSONObject jsonObject = new JSONObject();
-                    LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                    liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
-                    VideoId videoId = new VideoId();
-                    videoId.setDroneSn(device.getDeviceSn());
-                    PayloadIndex payloadIndex = new PayloadIndex();
-                    payloadIndex.setType(DeviceTypeEnum.DOCK_CAMERA);
-                    payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
-                    payloadIndex.setPosition(PayloadPositionEnum.FPV);
-                    videoId.setPayloadIndex(payloadIndex);
-                    videoId.setVideoType(VideoTypeEnum.NORMAL);
-                    liveTypeDTO.setVideoId(videoId);
-                    liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
-                    HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
+//                    log.info("开启机巢直播---");
+////                  开启机巢直播
+//                    JSONObject jsonObject = new JSONObject();
+//                    LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
+//                    liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
+//                    VideoId videoId = new VideoId();
+//                    videoId.setDroneSn(device.getDeviceSn());
+//                    PayloadIndex payloadIndex = new PayloadIndex();
+//                    payloadIndex.setType(DeviceTypeEnum.DOCK_CAMERA);
+//                    payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
+//                    payloadIndex.setPosition(PayloadPositionEnum.FPV);
+//                    videoId.setPayloadIndex(payloadIndex);
+//                    videoId.setVideoType(VideoTypeEnum.NORMAL);
+//                    liveTypeDTO.setVideoId(videoId);
+//                    liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
+//                    HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
                 }
 //                if(device.getChildren().getStatus()){
                     log.info("开启无人机直播---");
 //                  开启无人机直播
                     JSONObject jsonObject = new JSONObject();
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                    liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
+                    liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
                     VideoId videoId = new VideoId();
                     videoId.setDroneSn(device.getChildDeviceSn());
                     PayloadIndex payloadIndex = new PayloadIndex();
-                    payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
+                    payloadIndex.setType(DeviceTypeEnum.M3E_CAMERA);
                     payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
                     payloadIndex.setPosition(PayloadPositionEnum.FRONT_LEFT);
                     videoId.setPayloadIndex(payloadIndex);

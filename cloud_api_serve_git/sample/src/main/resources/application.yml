@@ -11,7 +11,7 @@ spring:
     druid:
       type: com.alibaba.druid.pool.DruidDataSource
       driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://172.20.63.157:9200/cloud_sample?useSSL=false&allowPublicKeyRetrieval=true
+      url: jdbc:mysql://172.20.63.105:9200/cloud_sample?useSSL=false&allowPublicKeyRetrieval=true
       username: root
       password: dfe@1500
       initial-size: 10
@@ -20,7 +20,7 @@ spring:
       max-wait: 60000
 
   redis:
-    host: 172.20.63.157
+    host: 172.20.63.105
     port: 9201
     database: 0
     username:
@@ -66,7 +66,7 @@ mqtt:
   BASIC:
     protocol: MQTT # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
     #    联网
-    host: 172.20.63.157
+    host: 172.20.63.105
     port: 9205
     username: df1560
     password: dfe2k_1500
@@ -76,7 +76,7 @@ mqtt:
   DRC:
     protocol: WS # @see com.dji.sample.component.mqtt.model.MqttProtocolEnum
     #联网地址
-    host: 172.20.63.157
+    host: 172.20.63.105
     port: 9207
     path: /mqtt
     username: df1560
@@ -135,7 +135,7 @@ url:
 oss:
   enable: true
   provider: minio
-  endpoint: http://172.20.63.157:9202
+  endpoint: http://172.20.63.105:9202
   access-key: minioadmin
   secret-key: minioadmin
   bucket: djicloud
@@ -170,7 +170,7 @@ livestream:
 
     # RTMP  Note: This IP is the address of the streaming server. If you want to see livestream on web page, you need to convert the RTMP stream to WebRTC stream.
     rtmp:
-      url: rtmp://172.20.63.157:2035/live/ # Example: 'rtmp://192.168.1.1/live/'
+      url: rtmp://172.20.63.105:2035/live/ # Example: 'rtmp://192.168.1.1/live/'
     rtsp:
       username: 1
       password: 1
@@ -178,7 +178,7 @@ livestream:
 
     # GB28181 Note:If you don't know what these parameters mean, you can go to Pilot2 and select the GB28181 page in the cloud platform. Where the parameters same as these parameters.
     gb28181:
-      serverIP: 172.20.63.157
+      serverIP: 172.20.63.105
       serverPort: 8086
       serverID: 1
       agentID: 1
@@ -188,7 +188,7 @@ livestream:
 
     # Webrtc: Only supports using whip standard
     whip:
-      url: http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
+      url: http://172.20.63.105:2085/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
 
 #配置动态航线文件夹参数
 singlePointUrl: D:\KmzKml\
@@ -240,7 +240,7 @@ mybatis-plus:
 #  巡视
 #FTPS相关配置
 ftps:
-  ftpIp: 172.20.63.157
+  ftpIp: 172.20.63.105
   ftpPort: 10012
   userName: dfftp
   password: dfe2k_1500
@@ -258,9 +258,9 @@ video:
 vtask:
   enabled: true
   #分析服务地址
-  analyseUrl: http://172.20.63.157:20011/picAnalyse
+  analyseUrl: http://172.20.63.105:20011/picAnalyse
   #本地部署IP（配置的IP要求分析服务能访问到）
-  localIp: 172.20.63.157
+  localIp: 172.20.63.105
 other:
   logFilePath: /dfe-patrol-dog/logs
 
@@ -295,18 +295,18 @@ fjfile:
 
 wayline:
   build-kmz-url:
-    top-wayline: "http://172.20.63.157:5001/top"
-    single-wayline: "http://172.20.63.157:5001/single"
-    working-wayline: "http://172.20.63.157:5001/working"
-    stop-wayline: "http://172.20.63.157:5001/stop"
-    interest-point-wayline: "http://172.20.63.157:5001/poi"
-    solar-panel-wayline: "http://172.20.63.157:5001/solar"
-  wayline-state-url: "http://172.20.63.157:5002/state"
-  analysis-url: "http://172.20.63.157:20022/api"
-  gf-analysis-url: "http://172.20.63.157:20023/gfapi"
-  detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
-  start-segmentation-url: "http://172.20.63.157:5005/startSegmentation"
-  gf-defect_localization-url: "http://172.20.63.157:5005/defectLocalization"
+    top-wayline: "http://172.20.63.105:5001/top"
+    single-wayline: "http://172.20.63.105:5001/single"
+    working-wayline: "http://172.20.63.105:5001/working"
+    stop-wayline: "http://172.20.63.105:5001/stop"
+    interest-point-wayline: "http://172.20.63.105:5001/poi"
+    solar-panel-wayline: "http://172.20.63.105:5001/solar"
+  wayline-state-url: "http://172.20.63.105:5002/state"
+  analysis-url: "http://172.20.63.105:20022/api"
+  gf-analysis-url: "http://172.20.63.105:20023/gfapi"
+  detect-area-gen-url: "http://172.20.63.105:5005/detectArea"
+  start-segmentation-url: "http://172.20.63.105:5005/startSegmentation"
+  gf-defect_localization-url: "http://172.20.63.105:5005/defectLocalization"
 #  系统编码
 longyuan:
   sender: "UpperPlatform"
