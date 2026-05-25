@@ -43,6 +43,8 @@ public class GlobalMVCConfigurer implements WebMvcConfigurer {
         excludePaths.add("/control/api/v1/devices/jobs/in_flight_wayline_deliver");
         excludePaths.add("/api/solarPanel/**");
         excludePaths.add("/api/solarPanelComponent/**");
+        excludePaths.add("/api/points/**");
+        excludePaths.add("/indoorTask/**");
 //        excludePaths.add("/wayline/api/v1/**");
         // Intercept for all request interfaces.
         registry.addInterceptor(authInterceptor).addPathPatterns("/**").excludePathPatterns(excludePaths);

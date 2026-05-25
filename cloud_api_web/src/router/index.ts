@@ -150,6 +150,17 @@ const routes: Array<RouteRecordRaw> = [
           cache: true
         }
       },
+      {
+        path: '/' + ERouterName.Indoor_Points,
+        name: ERouterName.Indoor_Points,
+        component: () => import('/@/components/indoorPoints/index.vue'),
+        meta: {
+          showInMenu: true,
+          label: '室内点位',
+          position: 'left',
+          cache: true
+        }
+      },
 
       {
         path: '/' + ERouterName.DEVICES,

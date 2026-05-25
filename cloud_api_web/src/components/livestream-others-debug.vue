@@ -95,7 +95,7 @@ onMounted(() => {
 */
 const timestamp = new Date().getTime().toString()
 const liveURL = config.rtcURL
-livetypeSelected.value = 4
+livetypeSelected.value = 1
 claritySelected.value = 2
 async function getcameraInfo () {
   await getLiveCapacity({})

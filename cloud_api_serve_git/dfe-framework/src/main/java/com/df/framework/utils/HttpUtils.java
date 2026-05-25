@@ -147,6 +147,57 @@ public class HttpUtils {
         return body;
     }
 
+    /**
+     * 向指定 URL 模板发送 GET 请求（支持路径参数和查询参数）
+     *
+     * @param urlTemplate  URL 模板，例如 "http://192.168.3.110:5000/api/v1/mission/{taskId}/status"
+     * @param pathParams   路径参数映射，例如 {"taskId": "123"}
+     * @param queryParams  查询参数映射（URL 问号后的参数），可为 null
+     * @param token        认证凭证，可为 null
+     * @param tokenKey     凭证的 Header 键名，如 "Authorization"、"x-token" 等
+     * @return 响应体字符串
+     */
+    public String sendGetWithPathParams(String urlTemplate, Map<String, Object> pathParams,
+                                        Map<String, Object> queryParams, String token, String tokenKey) {
+        log.info("【GET 路径模板】 {}", urlTemplate);
+        log.info("【路径参数】 {}", pathParams);
+        log.info("【查询参数】 {}", queryParams);
+        log.info("【GET token】 {}： {}", tokenKey, token);
+
+        // 1. 构建 UriComponentsBuilder
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(urlTemplate);
+
+        // 2. 添加查询参数（必须在替换路径变量之前或之后都可以，因为查询参数不包含路径占位符）
+        if (queryParams != null && !queryParams.isEmpty()) {
+            for (Map.Entry<String, Object> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue());
+            }
+        }
+
+        // 3. 替换路径变量，生成最终 URI
+        URI uri;
+        if (pathParams != null && !pathParams.isEmpty()) {
+            uri = builder.buildAndExpand(pathParams).encode().toUri();
+        } else {
+            uri = builder.build().encode().toUri();
+        }
+
+        // 4. 设置请求头
+        HttpHeaders headers = new HttpHeaders();
+        if (StringUtils.isNotBlank(token) && StringUtils.isNotBlank(tokenKey)) {
+            headers.set(tokenKey, token);
+        }
+        HttpEntity<String> request = new HttpEntity<>(headers);
+
+        // 5. 发起 GET 请求
+        ResponseEntity<String> responseEntity = httpClientTemplate.exchange(uri, HttpMethod.GET, request, String.class);
+        log.info("【GET 结果】 {}", responseEntity.getBody());
+        return responseEntity.getBody();
+    }
+
+    public String sendGetWithPathParams(String urlTemplate, Map<String, Object> pathParams, Map<String, Object> queryParams) {
+        return sendGetWithPathParams(urlTemplate, pathParams, queryParams, null, null);
+    }
     /*public static void main(String[] args) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
         TrustStrategy acceptingTrustStrategy = ((x509Certificates, authType) -> true);
         SSLContext sslContext = SSLContexts.custom().loadTrustMaterial(null, acceptingTrustStrategy).build();
