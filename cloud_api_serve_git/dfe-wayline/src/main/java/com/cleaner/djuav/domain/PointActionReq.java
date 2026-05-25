@@ -73,6 +73,8 @@ public class PointActionReq implements Serializable {
     //2025/7/30 xtj  补充精准动作拍照orientedShoot相关参数
     private String orientedPhotoMode;
 
+    private String orientedFileSuffix;
+
     private Double focalLength;
 
     private Double AFPos;
@@ -96,11 +98,5 @@ public class PointActionReq implements Serializable {
     private Double orientedCameraShutterTime;
 
     private Integer orientedCameraISO;
-
-
-
-
-
-
 
 }

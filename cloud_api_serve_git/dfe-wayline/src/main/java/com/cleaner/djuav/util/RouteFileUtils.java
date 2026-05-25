@@ -234,7 +234,7 @@ public class RouteFileUtils {
             }
         } else {
             if (StringUtils.equals(fileType, FileTypeConstants.KML)) {
-               // System.out.println("buildKmlPlacemark_3");
+                // System.out.println("buildKmlPlacemark_3");
                 List<KmlPlacemark> kmlPlacemarkList = new ArrayList<>();
                 kmlPlacemarkList.add(buildMappingKmlPlacemark(kmlParams));
                 kmlFolder.setPlacemarkList(kmlPlacemarkList);
@@ -685,6 +685,8 @@ public class RouteFileUtils {
             kmlActionActuatorFuncParam.setGimbalHeadingYawBase("north");
             kmlActionActuatorFuncParam.setGimbalRotateMode("absoluteAngle");
             kmlActionActuatorFuncParam.setOrientedPhotoMode(String.valueOf(pointActionReq.getOrientedPhotoMode()));
+            kmlActionActuatorFuncParam.setFileSuffix(pointActionReq.getOrientedFileSuffix());
+            kmlActionActuatorFuncParam.setOrientedFileSuffix(pointActionReq.getOrientedFileSuffix());
             kmlActionActuatorFuncParam.setImageWidth(String.valueOf(pointActionReq.getFocusRegionWidth()));
             kmlActionActuatorFuncParam.setImageHeight(String.valueOf(pointActionReq.getFocusRegionWidth()));
             kmlActionActuatorFuncParam.setAFPos("159");
