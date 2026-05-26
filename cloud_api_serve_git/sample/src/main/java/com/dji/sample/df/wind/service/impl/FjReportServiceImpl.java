@@ -480,8 +480,10 @@ public class FjReportServiceImpl implements FjReportService {
             if(StringUtils.isNotEmpty(defect.getDefectComponentName())){
                 defectComponentName = defect.getDefectComponentName();
             }
+            int lastUnderscore = defectComponentName.lastIndexOf('_');
+            String substring = defectComponentName.substring(lastUnderscore + 1);
             setCellFont(dataRow.getCell(2), "宋体", 10, false);
-            dataRow.getCell(2).setText(defectComponentName);
+            dataRow.getCell(2).setText(substring);
             dataRow.getCell(2).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 采集时间

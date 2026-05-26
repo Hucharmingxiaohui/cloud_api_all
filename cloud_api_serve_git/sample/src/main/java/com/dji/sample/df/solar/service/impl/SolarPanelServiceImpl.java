@@ -57,7 +57,7 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
             for (JsonNode array : arrays) {
                 // ========== 1. 处理阵列（光伏板）==========
                 String arrayLabel = array.get("array_label").asText();
-                String fullPanelName = solarAreaName + "-" + arrayLabel;
+                String fullPanelName = solarAreaName + "_" + arrayLabel;
 
                 // 构建面板实体并填充数据
                 SolarPanel sp = new SolarPanel();
@@ -118,7 +118,7 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
                         // int col = component.get("col").asInt();
 
                         SolarPanelComponent spc = new SolarPanelComponent();
-                        spc.setSolarPanelComponentName(fullPanelName+"-"+compLabel);
+                        spc.setSolarPanelComponentName(fullPanelName+"_"+compLabel);
                         spc.setOrthophotoId(orthophotoId);
                         spc.setSolarPanelId(realPanelId);   // 使用真实的面板ID
                         // spc.setRow(row);   // 若实体类有字段，设置
@@ -152,7 +152,7 @@ public class SolarPanelServiceImpl extends ServiceImpl<SolarPanelMapper, SolarPa
                         LambdaQueryWrapper<SolarPanelComponent> compWrapper = new LambdaQueryWrapper<>();
                         compWrapper.eq(SolarPanelComponent::getSolarPanelId, realPanelId)
                                 .eq(SolarPanelComponent::getOrthophotoId, orthophotoId)
-                                .eq(SolarPanelComponent::getSolarPanelComponentName, fullPanelName+"-"+compLabel);
+                                .eq(SolarPanelComponent::getSolarPanelComponentName, fullPanelName+"_"+compLabel);
                         SolarPanelComponent existingComp = solarPanelComponentMapper.selectOne(compWrapper);
 
                         if (existingComp != null) {

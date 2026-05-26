@@ -34,54 +34,6 @@ public class SolarDetectRequestDTO {
     private List<DetectAreaDTO> detect_areas;
 
     /**
-     * 航线高度（米）
-     */
-    @NotNull(message = "飞行高度不能为空")
-    private Double flight_altitude;
-
-    /**
-     * 光伏板倾角（度）
-     */
-    @NotNull(message = "倾角不能为空")
-    private Double tilt_angle;
-
-    /**
-     * 横向航线数
-     */
-    @NotNull(message = "横向航线数不能为空")
-    private Integer horizontal_lines;
-
-    /**
-     * 光伏区域海拔
-     */
-    @NotNull(message = "区域海拔不能为空")
-    private Double area_height;
-
-    /**
-     * 光伏架设高度
-     */
-    @NotNull(message = "光伏板高度不能为空")
-    private Double panel_height;
-
-    /**
-     * 光伏板朝向
-     */
-    @NotNull(message = "光伏板朝向不能为空")
-    private Double panel_heading;
-
-    /**
-     * 区域边距
-     */
-    @NotNull(message = "区域边距不能为空")
-    private Double margin;
-
-    /**
-     * 航线内点数
-     */
-    @NotNull(message = "航线内点数不能为空")
-    private Integer points_per_line;
-
-    /**
      * 检测区域内部类
      */
     @Data
@@ -101,6 +53,54 @@ public class SolarDetectRequestDTO {
         @Size(min = 4, max = 4, message = "必须包含4个角点坐标")
         @Valid
         private List<CornerPixelDTO> corners_pixels;
+
+        /**
+         * 航线高度（米）
+         */
+        @NotNull(message = "飞行高度不能为空")
+        private Double flight_altitude;
+
+        /**
+         * 光伏板倾角（度）
+         */
+        @NotNull(message = "倾角不能为空")
+        private Double tilt_angle;
+
+        /**
+         * 横向航线数
+         */
+        @NotNull(message = "横向航线数不能为空")
+        private Integer horizontal_lines;
+
+        /**
+         * 光伏区域海拔
+         */
+        @NotNull(message = "区域海拔不能为空")
+        private Double area_height;
+
+        /**
+         * 光伏架设高度
+         */
+        @NotNull(message = "光伏板高度不能为空")
+        private Double panel_height;
+
+        /**
+         * 光伏板朝向
+         */
+        @NotNull(message = "光伏板朝向不能为空")
+        private Double panel_heading;
+
+        /**
+         * 区域边距
+         */
+        @NotNull(message = "区域边距不能为空")
+        private Double margin;
+
+        /**
+         * 航线内点数
+         */
+        @NotNull(message = "航线内点数不能为空")
+        private Integer points_per_line;
     }
 
     /**

@@ -30,8 +30,8 @@
                 <div class="map-section">
                     <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
                     <div style="width: 100%; height: 100%;">
-                       <waylinePanel v-if="!isFlatMap && isMounted"  />
-                       <UEPix v-if="isFlatMap && isMounted" />
+                       <UEPix v-if="!isFlatMap && isMounted"  />
+                       <waylinePanel v-if="isFlatMap && isMounted" />
                     </div>
 
                 </div>
