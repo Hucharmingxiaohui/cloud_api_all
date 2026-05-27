@@ -4,10 +4,13 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import org.hibernate.validator.constraints.Range;
 import javax.persistence.Transient;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -81,13 +84,17 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
 
     @TableField("plan_priority") // MyBatis-Plus注解，指定数据库字段名
     private Integer planPriority; // 计划优先级
+
     @TableField("task_days") // MyBatis-Plus注解，指定数据库字段名
     private String taskDays;
+
     @TableField("task_periods") // MyBatis-Plus注解，指定数据库字段名
     private String taskPeriods;
+
     @Range(min = 50, max = 90)
     @TableField("min_battery_capacity")
     private Integer minBatteryCapacity;
+
     @TableField("min_storage_capacity")
     private Integer minStorageCapacity;
 
@@ -114,18 +121,7 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
 
     @TableField("strategy_type")
     private Integer strategyType;//策略类型：0普通1多机连续执行
-    @TableField("image_format")
-    private String imageFormat;
-    @TableField("horizontal_lines")
-    private Integer horizontalLines;//横向航线数
-    @TableField("flight_altitude")
-    private Double flightAltitude;//航线高度（米）
-    @TableField("panel_heading")
-    private Double panelHeading;//光伏板朝向
-    @TableField("margin")
-    private Double margin;//区域边距
-    @TableField("points_per_line")
-    private Integer pointsPerLine;//航线内点数
+
     @Transient
     @TableField(exist = false)
     private String deviceList;
@@ -137,13 +133,69 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @Transient
     @TableField(exist = false)
     private List<String> fanIdList;
-    @Transient
-    @TableField(exist = false)
-    private String type;//自动生成航线还是自定义航线
-    @Transient
-    @TableField(exist = false)
-    private Integer index;//0代表仅生成航线不保存计划 1代表生成航线
+
+    @TableField("image_format")
+    private String imageFormat;//照片类型
+
+    @TableField("horizontal_lines")
+    private Integer horizontalLines;//横向航线数
+
+    @TableField("flight_altitude")
+    private Double flightAltitude;//航线高度（米）
+
+    @TableField("panel_heading")
+    private Double panelHeading;//光伏板朝向
+
+    @TableField("margin")
+    private Double margin;//区域边距
+
+    @TableField("points_per_line")
+    private Integer pointsPerLine;//航线内点数
+
     @Transient
     @TableField(exist = false)
     private Double tiltAngle;//光伏板倾角，如果输入就按输入，如果不输入就查询数据库
+
+    @Transient
+    @TableField(exist = false)
+    private String type;//自动生成航线还是自定义航线
+
+    @Transient
+    @TableField(exist = false)
+    private Integer index;//0代表仅生成航线不保存计划 1代表生成航线
+
+    @TableField(exist = false)
+    private String areaConfigJson;//每个区域独立参数JSON（不持久化）
+
+    @JsonIgnore
+    public String getAreaConfigJson() {
+        return areaConfigJson;
+    }
+
+    public void setAreaConfigJson(String areaConfigJson) {
+        this.areaConfigJson = areaConfigJson;
+    }
+
+    public List<AreaConfig> getAreaConfigs() {
+        if (this.areaConfigJson == null || this.areaConfigJson.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return JSON.parseArray(this.areaConfigJson, AreaConfig.class);
+    }
+
+    public void setAreaConfigs(List<AreaConfig> configs) {
+        this.areaConfigJson = configs != null ? JSON.toJSONString(configs) : null;
+    }
+
+    @Data
+    public static class AreaConfig {
+        private String solarPanelId;
+        private Double panelHeight;
+        private Double flightAltitude;
+        private Double panelHeading;
+        private Double panelTilt;
+        private Double margin;
+        private Integer horizontalLines;
+        private Integer pointsPerLine;
+    }
 }
