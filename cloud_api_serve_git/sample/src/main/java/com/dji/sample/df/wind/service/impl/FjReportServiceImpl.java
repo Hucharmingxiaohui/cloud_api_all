@@ -186,41 +186,44 @@ public class FjReportServiceImpl implements FjReportService {
         if (document.getStyles() != null) {
             XWPFStyle style = document.getStyles().getStyle("Normal");
             if (style != null) {
-                style.getCTStyle().getRPr().addNewRFonts().setAscii("宋体");
-                style.getCTStyle().getRPr().addNewRFonts().setEastAsia("宋体");
+                style.getCTStyle().getRPr().addNewRFonts().setAscii("微软雅黑");
+                style.getCTStyle().getRPr().addNewRFonts().setEastAsia("微软雅黑");
             }
         }
         // ========== 第一页开始 ==========
+
+        // 顶端间距，让内容在页面垂直居中
+        document.createParagraph().setSpacingBefore(1800);
 
         // 添加光伏电场名称标题
         XWPFParagraph farmTitle = document.createParagraph();
         XWPFRun farmTitleRun = farmTitle.createRun();
         farmTitleRun.setText(stationName);
         farmTitleRun.setBold(true);
-        farmTitleRun.setFontSize(18);
-        farmTitleRun.setFontFamily("宋体");
+        farmTitleRun.setFontSize(26);
+        farmTitleRun.setFontFamily("微软雅黑");
         farmTitle.setAlignment(ParagraphAlignment.CENTER);
-        farmTitle.setSpacingAfter(200); // 设置段后间距
+        farmTitle.setSpacingAfter(400);
 
         // 添加报告类型标题
         XWPFParagraph reportTitle = document.createParagraph();
         XWPFRun reportTitleRun = reportTitle.createRun();
         reportTitleRun.setText("光伏智能巡检结果分析报告");
         reportTitleRun.setBold(true);
-        reportTitleRun.setFontSize(16);
-        reportTitleRun.setFontFamily("宋体");
+        reportTitleRun.setFontSize(22);
+        reportTitleRun.setFontFamily("微软雅黑");
         reportTitle.setAlignment(ParagraphAlignment.CENTER);
-        reportTitle.setSpacingAfter(200);
+        reportTitle.setSpacingAfter(600);
 
         // 添加公司名称
         XWPFParagraph companyTitle = document.createParagraph();
         XWPFRun companyTitleRun = companyTitle.createRun();
         companyTitleRun.setText("东方电子股份有限公司");
         companyTitleRun.setBold(true);
-        companyTitleRun.setFontSize(14);
-        companyTitleRun.setFontFamily("宋体");
+        companyTitleRun.setFontSize(16);
+        companyTitleRun.setFontFamily("微软雅黑");
         companyTitle.setAlignment(ParagraphAlignment.CENTER);
-        companyTitle.setSpacingAfter(300);
+        companyTitle.setSpacingAfter(200);
 
         // 添加日期
         XWPFParagraph datePara = document.createParagraph();
@@ -228,71 +231,73 @@ public class FjReportServiceImpl implements FjReportService {
         SimpleDateFormat dateSdf = new SimpleDateFormat("yyyy年MM月dd日");
         String currentDate = dateSdf.format(new Date());
         dateRun.setText(currentDate);
-        dateRun.setFontSize(12);
-        dateRun.setFontFamily("宋体");
+        dateRun.setFontSize(14);
+        dateRun.setFontFamily("微软雅黑");
         datePara.setAlignment(ParagraphAlignment.CENTER);
-        datePara.setSpacingAfter(400);
+        datePara.setSpacingAfter(600);
 
-        // 添加空行
-        document.createParagraph().createRun().addBreak();
-
-        // 添加基本信息表格（风机编号和巡检地点）
+        // 添加基本信息表格（巡检地点）
+        document.createParagraph().setSpacingAfter(200);
         XWPFTable infoTable = document.createTable(1, 2);
-        infoTable.setWidth("100%");
-
-        // 设置表格样式
-        infoTable.setCellMargins(100, 100, 100, 100); // 设置单元格边距
+        setTableBorders(infoTable);
+        infoTable.setCellMargins(120, 120, 120, 120);
 
         XWPFTableRow row1 = infoTable.getRow(0);
         XWPFTableCell cell11 = row1.getCell(0);
         cell11.setText("巡检地点");
         cell11.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
-        setCellFont(cell11, "宋体", 11, true);
+        setCellFont(cell11, "微软雅黑", 12, true);
         cell11.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+        setCellShd(cell11, "D9E2F3");
 
         XWPFTableCell cell12 = row1.getCell(1);
         cell12.setText(stationName);
         cell12.setVerticalAlignment(XWPFTableCell.XWPFVertAlign.CENTER);
-        setCellFont(cell12, "宋体", 11, false);
+        setCellFont(cell12, "微软雅黑", 12, false);
         cell12.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
-        // 添加编制单位等信息（左对齐）
+        // 底部信息区（空行分隔）
+        document.createParagraph().setSpacingAfter(400);
+
+        // 添加编制单位等信息（居中对齐）
         XWPFParagraph unitPara = document.createParagraph();
         XWPFRun unitRun = unitPara.createRun();
         unitRun.setText("编制单位：东方电子股份有限公司");
-        unitRun.setFontSize(11);
-        unitRun.setFontFamily("宋体");
-        unitPara.setAlignment(ParagraphAlignment.LEFT);
-        unitPara.setSpacingAfter(100);
+        unitRun.setFontSize(12);
+        unitRun.setFontFamily("微软雅黑");
+        unitPara.setAlignment(ParagraphAlignment.CENTER);
+        unitPara.setSpacingAfter(120);
 
         XWPFParagraph addressPara = document.createParagraph();
         XWPFRun addressRun = addressPara.createRun();
         addressRun.setText("地址：山东省烟台市芝罘区机场路2号");
-        addressRun.setFontSize(11);
-        addressRun.setFontFamily("宋体");
-        addressPara.setAlignment(ParagraphAlignment.LEFT);
-        addressPara.setSpacingAfter(100);
+        addressRun.setFontSize(12);
+        addressRun.setFontFamily("微软雅黑");
+        addressPara.setAlignment(ParagraphAlignment.CENTER);
+        addressPara.setSpacingAfter(120);
 
         XWPFParagraph contactPara = document.createParagraph();
         XWPFRun contactRun = contactPara.createRun();
         contactRun.setText("联系方式：0535-5520188");
-        contactRun.setFontSize(11);
-        contactRun.setFontFamily("宋体");
-        contactPara.setAlignment(ParagraphAlignment.LEFT);
+        contactRun.setFontSize(12);
+        contactRun.setFontFamily("微软雅黑");
+        contactPara.setAlignment(ParagraphAlignment.CENTER);
         contactPara.setSpacingAfter(200);
 
         // ========== 第一页结束，插入分页符 ==========
         insertPageBreak(document);
 
         // ========== 第二页：注意事项 ==========
+        document.createParagraph().setSpacingBefore(1200);
+
         XWPFParagraph noticeTitle = document.createParagraph();
         XWPFRun noticeTitleRun = noticeTitle.createRun();
         noticeTitleRun.setText("注意事项");
         noticeTitleRun.setBold(true);
-        noticeTitleRun.setFontSize(14);
-        noticeTitleRun.setFontFamily("宋体");
+        noticeTitleRun.setFontSize(18);
+        noticeTitleRun.setFontFamily("微软雅黑");
         noticeTitle.setAlignment(ParagraphAlignment.CENTER);
-        noticeTitle.setSpacingAfter(300);
+        noticeTitle.setSpacingAfter(500);
 
         String[] notices = {
                 "1. 本报告针对光伏电站组件及关键设备外部可见部分进行智能巡检分析，内部电气性能检测不在本报告范围内。",
@@ -304,11 +309,11 @@ public class FjReportServiceImpl implements FjReportService {
             XWPFParagraph p = document.createParagraph();
             XWPFRun r = p.createRun();
             r.setText(notice);
-            r.setFontSize(11);
-            r.setFontFamily("宋体");
+            r.setFontSize(12);
+            r.setFontFamily("微软雅黑");
             p.setAlignment(ParagraphAlignment.LEFT);
-            p.setSpacingAfter(100);
-            p.setFirstLineIndent(400);
+            p.setSpacingAfter(200);
+            p.setFirstLineIndent(480);
         }
 
         // ========== 第二页结束，插入分页符 ==========
@@ -321,7 +326,7 @@ public class FjReportServiceImpl implements FjReportService {
         section1Run.setText("1 报告概述");
         section1Run.setBold(true);
         section1Run.setFontSize(16);
-        section1Run.setFontFamily("宋体");
+        section1Run.setFontFamily("微软雅黑");
         section1Title.setAlignment(ParagraphAlignment.CENTER);
         section1Title.setSpacingAfter(300);
 
@@ -331,13 +336,24 @@ public class FjReportServiceImpl implements FjReportService {
         subSection11Run.setText("1.1 巡检概况");
         subSection11Run.setBold(true);
         subSection11Run.setFontSize(14);
-        subSection11Run.setFontFamily("宋体");
+        subSection11Run.setFontFamily("微软雅黑");
         subSection11.setAlignment(ParagraphAlignment.LEFT);
         subSection11.setSpacingAfter(200);
+
+        // 表名（表格上面居中）
+        XWPFParagraph overviewTableCaption = document.createParagraph();
+        XWPFRun overviewTableCaptionRun = overviewTableCaption.createRun();
+        overviewTableCaptionRun.setText("表1 巡检概况");
+        overviewTableCaptionRun.setBold(true);
+        overviewTableCaptionRun.setFontSize(11);
+        overviewTableCaptionRun.setFontFamily("微软雅黑");
+        overviewTableCaption.setAlignment(ParagraphAlignment.CENTER);
+        overviewTableCaption.setSpacingAfter(100);
 
         // 创建巡检概况表格
         XWPFTable overviewTable = document.createTable(3, 2);
         overviewTable.setWidth("100%");
+        setTableBorders(overviewTable);
 
         // 填充巡检概况表格
         String[][] overviewData = {
@@ -348,13 +364,16 @@ public class FjReportServiceImpl implements FjReportService {
 
         for (int i = 0; i < 3; i++) {
             XWPFTableRow row = overviewTable.getRow(i);
-            setCellFont(row.getCell(0), "宋体", 11, true);
-            row.getCell(0).setText(overviewData[i][0]);
-            row.getCell(0).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+            XWPFTableCell cell0 = row.getCell(0);
+            setCellFont(cell0, "微软雅黑", 11, true);
+            cell0.setText(overviewData[i][0]);
+            cell0.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+            setCellShd(cell0, "D9E2F3");
 
-            setCellFont(row.getCell(1), "宋体", 11, false);
-            row.getCell(1).setText(overviewData[i][1]);
-            row.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+            XWPFTableCell cell1 = row.getCell(1);
+            setCellFont(cell1, "微软雅黑", 11, false);
+            cell1.setText(overviewData[i][1]);
+            cell1.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
         }
 
         // 添加主要缺陷项目
@@ -362,7 +381,7 @@ public class FjReportServiceImpl implements FjReportService {
         XWPFRun defectSummaryRun = defectSummary.createRun();
         defectSummaryRun.setText("使用无人机检测光伏区域存在的主要缺陷项目如下：" + mostCommonDefectType);
         defectSummaryRun.setFontSize(11);
-        defectSummaryRun.setFontFamily("宋体");
+        defectSummaryRun.setFontFamily("微软雅黑");
         defectSummary.setAlignment(ParagraphAlignment.LEFT);
         defectSummary.setSpacingAfter(200);
 
@@ -378,12 +397,22 @@ public class FjReportServiceImpl implements FjReportService {
             titleRunVisible.setText("可见光光伏缺陷分布图");
             titleRunVisible.setBold(true);
             titleRunVisible.setFontSize(12);
-            titleRunVisible.setFontFamily("宋体");
-            subTitleVisible.setAlignment(ParagraphAlignment.LEFT);
+            titleRunVisible.setFontFamily("微软雅黑");
+            subTitleVisible.setAlignment(ParagraphAlignment.CENTER);
             subTitleVisible.setSpacingAfter(200);
 
             // 插入可见光图片
-            addImageToDocument(document, annotatedImagePath, 500, 400); // 宽度500，高度400（可根据需要调整）
+            addImageToDocument(document, annotatedImagePath, 14, 10);
+
+            // 图名（图片下面居中）
+            XWPFParagraph figCaptionVisible = document.createParagraph();
+            XWPFRun figCaptionVisibleRun = figCaptionVisible.createRun();
+            figCaptionVisibleRun.setText("图1 可见光光伏缺陷分布图");
+            figCaptionVisibleRun.setFontSize(10);
+            figCaptionVisibleRun.setFontFamily("微软雅黑");
+            figCaptionVisible.setAlignment(ParagraphAlignment.CENTER);
+            figCaptionVisible.setSpacingBefore(100);
+            figCaptionVisible.setSpacingAfter(200);
         }
 
         // 1.3 红外光光伏缺陷分布图（如果存在）
@@ -398,12 +427,22 @@ public class FjReportServiceImpl implements FjReportService {
             titleRunIr.setText("红外光光伏缺陷分布图");
             titleRunIr.setBold(true);
             titleRunIr.setFontSize(12);
-            titleRunIr.setFontFamily("宋体");
-            subTitleIr.setAlignment(ParagraphAlignment.LEFT);
+            titleRunIr.setFontFamily("微软雅黑");
+            subTitleIr.setAlignment(ParagraphAlignment.CENTER);
             subTitleIr.setSpacingAfter(200);
 
             // 插入红外光图片
-            addImageToDocument(document, annotatedImageIrPath, 500, 400);
+            addImageToDocument(document, annotatedImageIrPath, 14, 10);
+
+            // 图名（图片下面居中）
+            XWPFParagraph figCaptionIr = document.createParagraph();
+            XWPFRun figCaptionIrRun = figCaptionIr.createRun();
+            figCaptionIrRun.setText("图2 红外光光伏缺陷分布图");
+            figCaptionIrRun.setFontSize(10);
+            figCaptionIrRun.setFontFamily("微软雅黑");
+            figCaptionIr.setAlignment(ParagraphAlignment.CENTER);
+            figCaptionIr.setSpacingBefore(100);
+            figCaptionIr.setSpacingAfter(200);
         }
 
         // 添加空行
@@ -419,7 +458,7 @@ public class FjReportServiceImpl implements FjReportService {
         resultSummaryRun.setText("2.巡检结果汇总");
         resultSummaryRun.setBold(true);
         resultSummaryRun.setFontSize(16);
-        resultSummaryRun.setFontFamily("宋体");
+        resultSummaryRun.setFontFamily("微软雅黑");
         resultSummaryTitle.setAlignment(ParagraphAlignment.CENTER);
         resultSummaryTitle.setSpacingAfter(300);
 
@@ -437,7 +476,7 @@ public class FjReportServiceImpl implements FjReportService {
                 mediaCount + "张,其中可见光图片"+visibleNum+"张,红外图片"+irNum+"张,可见光图片缺陷数量" + visibleDefectCount +
                 "处,红外图片缺陷数量"+irDefectCount+"处,主要缺陷类型为" + mostCommonDefectType);
         taskDescriptionRun.setFontSize(11);
-        taskDescriptionRun.setFontFamily("宋体");
+        taskDescriptionRun.setFontFamily("微软雅黑");
         taskDescription.setAlignment(ParagraphAlignment.LEFT);
         taskDescription.setSpacingAfter(300);
 
@@ -448,30 +487,42 @@ public class FjReportServiceImpl implements FjReportService {
         for (int i = 0; i < defectList.size(); i++) {
             DefectEntity defect = defectList.get(i);
 
+            // 表名（表格上面居中）
+            XWPFParagraph defectTableCaption = document.createParagraph();
+            XWPFRun defectTableCaptionRun = defectTableCaption.createRun();
+            defectTableCaptionRun.setText(String.format("表%d 缺陷%d详情", i + 2, i + 1));
+            defectTableCaptionRun.setBold(true);
+            defectTableCaptionRun.setFontSize(10);
+            defectTableCaptionRun.setFontFamily("微软雅黑");
+            defectTableCaption.setAlignment(ParagraphAlignment.CENTER);
+            defectTableCaption.setSpacingAfter(100);
+            defectTableCaption.setSpacingBefore(200);
+
             // 创建缺陷信息表格（2行：表头行和数据行）
             XWPFTable defectTable = document.createTable(2, 6);
             defectTable.setWidth("100%");
+            setTableBorders(defectTable);
 
             // 表头行
             XWPFTableRow headerRow1 = defectTable.getRow(0);
             for (int j = 0; j < defectHeaderTitles.length; j++) {
                 XWPFTableCell cell = headerRow1.getCell(j);
-                setCellFont(cell, "宋体", 10, true);
+                setCellFont(cell, "微软雅黑", 10, true);
                 cell.setText(defectHeaderTitles[j]);
-                // 设置表头居中
                 cell.getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
+                setCellShd(cell, "D9E2F3");
             }
 
             // 数据行
             XWPFTableRow dataRow = defectTable.getRow(1);
 
             // 序号
-            setCellFont(dataRow.getCell(0), "宋体", 10, false);
+            setCellFont(dataRow.getCell(0), "微软雅黑", 10, false);
             dataRow.getCell(0).setText(String.valueOf(i + 1));
             dataRow.getCell(0).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 光伏板名称
-            setCellFont(dataRow.getCell(1), "宋体", 10, false);
+            setCellFont(dataRow.getCell(1), "微软雅黑", 10, false);
             dataRow.getCell(1).setText(defect.getSolarPanelName());
             dataRow.getCell(1).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
@@ -482,55 +533,51 @@ public class FjReportServiceImpl implements FjReportService {
             }
             int lastUnderscore = defectComponentName.lastIndexOf('_');
             String substring = defectComponentName.substring(lastUnderscore + 1);
-            setCellFont(dataRow.getCell(2), "宋体", 10, false);
+            setCellFont(dataRow.getCell(2), "微软雅黑", 10, false);
             dataRow.getCell(2).setText(substring);
             dataRow.getCell(2).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 采集时间
-            setCellFont(dataRow.getCell(3), "宋体", 10, false);
+            setCellFont(dataRow.getCell(3), "微软雅黑", 10, false);
             dataRow.getCell(3).setText(defect.getAcquisitionTime());
             dataRow.getCell(3).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 缺陷主要类型
-            setCellFont(dataRow.getCell(4), "宋体", 10, false);
+            setCellFont(dataRow.getCell(4), "微软雅黑", 10, false);
             dataRow.getCell(4).setText(defect.getDefectType());
             dataRow.getCell(4).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 缺陷描述
-            setCellFont(dataRow.getCell(5), "宋体", 10, false);
+            setCellFont(dataRow.getCell(5), "微软雅黑", 10, false);
             dataRow.getCell(5).setText(defect.getDefectDescription());
             dataRow.getCell(5).getParagraphs().get(0).setAlignment(ParagraphAlignment.CENTER);
 
             // 添加空行
             document.createParagraph().createRun().addBreak();
 
-            // 添加图片（调整大小适应页面）
+            // 添加图片（按比例缩放，适应页面宽度）
             String imagePath = defect.getImagePath();
+            String imageTitle = String.format("图%d 缺陷%d图片", i + 3, i + 1);
             if (new File(imagePath).exists()) {
                 try {
-                    XWPFParagraph imagePara = document.createParagraph();
-                    imagePara.setAlignment(ParagraphAlignment.CENTER); // 图片居中
-                    XWPFRun imageRun = imagePara.createRun();
+                    byte[] compressedBytes = compressImage(imagePath, 0.5f);
 
-                    // 获取图片原始尺寸
                     BufferedImage bufferedImage = ImageIO.read(new File(imagePath));
                     int originalWidth = bufferedImage.getWidth();
                     int originalHeight = bufferedImage.getHeight();
 
-                    System.out.println("插入图片: " + imagePath);
-                    System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
+                    int targetWidthEMU = 14 * 360000;
+                    int targetHeightEMU = (int)((long)targetWidthEMU * originalHeight / originalWidth);
 
-                    // 使用固定的大EMU值（保持原来的显示尺寸）
-                    int targetWidthEMU = 14 * 360000;  // 14厘米 = 5,040,000 EMU
-                    int targetHeightEMU = 11 * 360000; // 11厘米 = 3,960,000 EMU
+                    int maxHeightEMU = 9 * 360000;
+                    if (targetHeightEMU > maxHeightEMU) {
+                        targetHeightEMU = maxHeightEMU;
+                    }
 
-                    System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
+                    XWPFParagraph imagePara = document.createParagraph();
+                    imagePara.setAlignment(ParagraphAlignment.CENTER);
+                    XWPFRun imageRun = imagePara.createRun();
 
-                    // 压缩图片质量为50%，减小文件大小
-                    byte[] compressedBytes = compressImage(imagePath, 0.5f);
-                    System.out.println("压缩后图片大小: " + compressedBytes.length + " 字节");
-
-                    // 使用压缩后的图片字节数组
                     imageRun.addPicture(
                             new ByteArrayInputStream(compressedBytes),
                             XWPFDocument.PICTURE_TYPE_JPEG,
@@ -539,71 +586,36 @@ public class FjReportServiceImpl implements FjReportService {
                             targetHeightEMU
                     );
 
-                    // 图片后添加空行
-                    document.createParagraph();
+                    // 图名（图片下面居中）
+                    XWPFParagraph imgCaption = document.createParagraph();
+                    XWPFRun imgCaptionRun = imgCaption.createRun();
+                    imgCaptionRun.setText(imageTitle);
+                    imgCaptionRun.setFontSize(10);
+                    imgCaptionRun.setFontFamily("微软雅黑");
+                    imgCaption.setAlignment(ParagraphAlignment.CENTER);
+                    imgCaption.setSpacingBefore(60);
+                    imgCaption.setSpacingAfter(200);
                 } catch (Exception e) {
                     e.printStackTrace();
-                    // 方法1失败，尝试方法2：使用更大的EMU值
-                    try {
+                    try (FileInputStream fis = new FileInputStream(imagePath)) {
                         XWPFParagraph imagePara = document.createParagraph();
                         imagePara.setAlignment(ParagraphAlignment.CENTER);
                         XWPFRun imageRun = imagePara.createRun();
 
-                        FileInputStream fis = new FileInputStream(imagePath);
-
-                        // 方法2：使用非常大的EMU值（接近页面宽度）
-                        // A4纸宽度约21厘米，高度29.7厘米
-                        // 我们设置宽度为15厘米，高度按比例计算
-                        double widthCm = 15.0; // 15厘米
-                        double heightCm = 11.0; // 11厘米
-
-                        int widthEMU = (int)(widthCm * 360000);  // 15厘米 = 5,400,000 EMU
-                        int heightEMU = (int)(heightCm * 360000); // 11厘米 = 3,960,000 EMU
-
-                        System.out.println("方法2目标尺寸: " + widthEMU + "x" + heightEMU + " EMU");
-
+                        int widthEMU = 14 * 360000;
                         imageRun.addPicture(
                                 fis,
                                 XWPFDocument.PICTURE_TYPE_JPEG,
                                 extractFileName(imagePath),
                                 widthEMU,
-                                heightEMU
+                                (int)(widthEMU * 0.75)
                         );
-                        fis.close();
-
-                        document.createParagraph();
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                        // 方法3：尝试不使用ImageIO读取尺寸，直接使用原图
-                        try {
-                            XWPFParagraph imagePara = document.createParagraph();
-                            imagePara.setAlignment(ParagraphAlignment.CENTER);
-                            XWPFRun imageRun = imagePara.createRun();
-
-                            FileInputStream fis = new FileInputStream(imagePath);
-
-                            // 方法3：使用Word页面宽度（大约15厘米）
-                            // 直接使用固定的大EMU值
-                            int veryLargeWidthEMU = 10000000;  // 约27.8厘米
-                            int veryLargeHeightEMU = 7500000;  // 约20.8厘米
-
-                            imageRun.addPicture(
-                                    fis,
-                                    XWPFDocument.PICTURE_TYPE_JPEG,
-                                    extractFileName(imagePath),
-                                    veryLargeWidthEMU,
-                                    veryLargeHeightEMU
-                            );
-                            fis.close();
-
-                            document.createParagraph();
-                        } catch (Exception ex2) {
-                            ex2.printStackTrace();
-                            XWPFParagraph errorPara = document.createParagraph();
-                            errorPara.setAlignment(ParagraphAlignment.CENTER);
-                            XWPFRun errorRun = errorPara.createRun();
-                            errorRun.setText("图片插入失败: " + ex2.getMessage());
-                        }
+                        XWPFParagraph errorPara = document.createParagraph();
+                        errorPara.setAlignment(ParagraphAlignment.CENTER);
+                        XWPFRun errorRun = errorPara.createRun();
+                        errorRun.setText("图片插入失败: " + ex.getMessage());
                     }
                 }
             } else {
@@ -628,18 +640,12 @@ public class FjReportServiceImpl implements FjReportService {
     }
 
     /**
-     * 将图片插入到 Word 文档末尾
-     * @param document Word 文档对象
-     * @param imagePath 图片全路径
-     * @param width 图片宽度（像素，POI会自动转换）
-     * @param height 图片高度
+     * 将图片插入到 Word 文档末尾（自适应宽度，居中）
      */
-    private void addImageToDocument(XWPFDocument document, String imagePath, int width, int height) {
+    private void addImageToDocument(XWPFDocument document, String imagePath, int widthCm, int heightCm) {
         try (FileInputStream fis = new FileInputStream(imagePath)) {
-            // 读取图片字节
             byte[] pictureBytes = fis.readAllBytes();
 
-            // 根据文件扩展名确定图片类型
             int pictureType = XWPFDocument.PICTURE_TYPE_JPEG;
             if (imagePath.toLowerCase().endsWith(".png")) {
                 pictureType = XWPFDocument.PICTURE_TYPE_PNG;
@@ -647,15 +653,17 @@ public class FjReportServiceImpl implements FjReportService {
                 pictureType = XWPFDocument.PICTURE_TYPE_GIF;
             }
 
-            // 创建段落并插入图片
+            int widthEMU = widthCm * 360000;
+            int heightEMU = heightCm * 360000;
+
             XWPFParagraph paragraph = document.createParagraph();
+            paragraph.setAlignment(ParagraphAlignment.CENTER);
+            paragraph.getCTP().addNewPPr().addNewJc().setVal(STJc.CENTER);
+
             XWPFRun run = paragraph.createRun();
-            run.addPicture(new ByteArrayInputStream(pictureBytes), pictureType, imagePath, Units.toEMU(width), Units.toEMU(height));
-            paragraph.setAlignment(ParagraphAlignment.CENTER); // 图片居中
+            run.addPicture(new ByteArrayInputStream(pictureBytes), pictureType, imagePath, widthEMU, heightEMU);
         } catch (Exception e) {
-            // 记录日志，或者抛出运行时异常
             e.printStackTrace();
-            // 可选：在文档中写入错误提示
             XWPFParagraph errorPara = document.createParagraph();
             errorPara.createRun().setText("图片加载失败：" + imagePath);
         }
@@ -1949,6 +1957,32 @@ public class FjReportServiceImpl implements FjReportService {
         XWPFParagraph paragraph = document.createParagraph();
         XWPFRun run = paragraph.createRun();
         run.addBreak(BreakType.PAGE);
+    }
+
+    // 辅助方法：设置表格边框
+    private void setTableBorders(XWPFTable table) {
+        CTTblBorders borders = table.getCTTbl().getTblPr().addNewTblBorders();
+        setBorder(borders.addNewTop());
+        setBorder(borders.addNewBottom());
+        setBorder(borders.addNewLeft());
+        setBorder(borders.addNewRight());
+        setBorder(borders.addNewInsideH());
+        setBorder(borders.addNewInsideV());
+    }
+
+    private void setBorder(CTBorder border) {
+        border.setVal(STBorder.SINGLE);
+        border.setSz(new BigInteger("4"));
+        border.setSpace(new BigInteger("0"));
+        border.setColor("000000");
+    }
+
+    // 辅助方法：设置单元格底色
+    private void setCellShd(XWPFTableCell cell, String color) {
+        CTShd shd = cell.getCTTc().addNewTcPr().addNewShd();
+        shd.setVal(STShd.Enum.forString("clear"));
+        shd.setColor("auto");
+        shd.setFill(color);
     }
 
     // 辅助方法：设置单元格字体
