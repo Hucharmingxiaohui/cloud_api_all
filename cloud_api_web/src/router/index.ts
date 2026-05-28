@@ -207,6 +207,17 @@ const routes: Array<RouteRecordRaw> = [
           }
         ]
       },
+      {
+        path: '/' + ERouterName.DRONE_LIVE,
+        name: ERouterName.DRONE_LIVE,
+        component: () => import('/@/components/live-video/index.vue'),
+        meta: {
+          showInMenu: true,
+          label: '无人机直播',
+          position: 'left',
+          cache: false
+        }
+      },
       // {
       //   path: '/' + ERouterName.NEW_WAYLINE,
       //   name: ERouterName.NEW_WAYLINE,

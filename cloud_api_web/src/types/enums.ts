@@ -28,6 +28,7 @@ export enum ERouterName {
     Organization = 'organization',
     HOSTCONNECT = 'host-connect',
     Indoor_Points = 'indoor-points',
+    DRONE_LIVE = 'drone-live',
 
     PILOT = 'pilot-login',
     PILOT_HOME = 'pilot-home',
