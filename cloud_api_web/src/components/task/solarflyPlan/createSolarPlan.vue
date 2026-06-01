@@ -170,36 +170,43 @@
               <!-- 红外/可见光选择 (uniform & auto 共有) -->
               <el-form-item label="相机类型：" required prop="image_format_list">
                 <el-checkbox-group v-model="planBody.image_format_list" size="large">
-                  <el-checkbox value="visible">可见光</el-checkbox>
+                  <el-checkbox value="visable">可见光</el-checkbox>
                   <el-checkbox value="ir">红外</el-checkbox>
                 </el-checkbox-group>
               </el-form-item>
-              <el-form-item label="航线高度：" required prop="flight_altitude">
-                <el-input v-model="planBody.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
-              </el-form-item>
-              <el-form-item label="光伏板朝向：" :required="planBody.type !== 'auto'" prop="panel_heading">
-                <el-input v-model="planBody.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
-              </el-form-item>
+              <div
+                v-for="config in areaConfigs"
+                :key="config.solar_panel_id"
+                class="area-config-card"
+              >
+                <div class="area-config-title">{{ config.solar_panel_name }}</div>
+                <el-form-item label="航线高度：" required>
+                  <el-input v-model="config.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
+                </el-form-item>
+                <el-form-item label="光伏板朝向：" required>
+                  <el-input v-model="config.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
+                </el-form-item>
 
-              <!-- uniform 模式下额外字段 -->
-              <template v-if="planBody.type === 'uniform'">
-                <el-form-item label="横向航线数：" required prop="horizontal_lines">
-                  <el-input v-model="planBody.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
-                </el-form-item>
-                <el-form-item label="区域边距：" required prop="margin">
-                  <el-input v-model="planBody.margin" type="number" placeholder="请输入区域边距"></el-input>
-                </el-form-item>
-                <el-form-item label="航线内点数：" required prop="points_per_line">
-                  <el-input v-model="planBody.points_per_line" type="number" placeholder="请输入航线内点数"></el-input>
-                </el-form-item>
-              </template>
+                <!-- uniform 模式下额外字段 -->
+                <template v-if="planBody.type === 'uniform'">
+                  <el-form-item label="横向航线数：" required>
+                    <el-input v-model="config.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
+                  </el-form-item>
+                  <el-form-item label="区域边距：" required>
+                    <el-input v-model="config.margin" type="number" placeholder="请输入区域边距"></el-input>
+                  </el-form-item>
+                  <el-form-item label="航线内点数：" required>
+                    <el-input v-model="config.points_per_line" type="number" placeholder="请输入航线内点数"></el-input>
+                  </el-form-item>
+                </template>
 
-              <!-- auto 模式下字段 -->
-              <template v-if="planBody.type === 'auto'">
-                <el-form-item label="光伏板倾角：" :required="planBody.type !== 'auto'" prop="tilt_angle">
-                  <el-input v-model="planBody.tilt_angle" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
-                </el-form-item>
-              </template>
+                <!-- auto 模式下字段 -->
+                <template v-if="planBody.type === 'auto'">
+                  <el-form-item label="光伏板倾角：" required>
+                    <el-input v-model="config.panel_tilt" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
+                  </el-form-item>
+                </template>
+              </div>
 
               <!-- 第二步底部按钮 -->
               <el-form-item style="margin-bottom: 40px;">
@@ -288,6 +295,20 @@ const selectedImagePath = ref('') // 选中光伏板区域对应的正射图path
 const selectedDetectAreas = ref<any[]>([]) // 选中光伏板区域的检测区域（支持多选）
 const selectedSolarIds = ref<string[]>([]) // 选中的光伏板区域ID数组
 const waylineInfo = ref()
+
+interface AreaConfig {
+  solar_panel_id: string
+  solar_panel_name: string
+  flight_altitude: string
+  panel_heading: string
+  margin: string
+  horizontal_lines: string
+  points_per_line: string
+  panel_tilt: string
+}
+
+const areaConfigs = ref<AreaConfig[]>([])
+
 const planBody = reactive({
   plan_source: '系统创建',
   name: '',
@@ -309,15 +330,8 @@ const planBody = reactive({
   enable_status: 0,
   plan_priority: 1,
   type: 'auto',
-  // 第二步表单字段
-  image_format_list: ['visible'], // 相机类型多选
+  image_format_list: ['visable'], // 相机类型多选
   image_format: computed(() => planBody.image_format_list.join(',')), // 提交时转为逗号分隔字符串
-  flight_altitude: '', // 航线高度(uniform)
-  tilt_angle: '', // 光伏板倾角
-  horizontal_lines: '', // 横向航线数(uniform)
-  panel_heading: '', // 光伏板朝向
-  margin: '', // 区域边距(uniform)
-  points_per_line: '', // 航线内点数(uniform)
   index: 0 // index为0时不会向数据库存航线且会返回wayline（航线的具体信息），为1时不返回wayline，会存入数据库
 })
 
@@ -406,50 +420,6 @@ const rules = {
   // 第二步表单校验规则
   image_format_list: [
     { required: true, message: '请选择相机类型', trigger: 'change' }
-  ],
-  flight_altitude: [
-    { required: true, message: '请输入航线高度', trigger: 'blur' },
-    { pattern: /^[1-9]\d*$/, message: '航线高度必须是正整数', trigger: 'blur' }
-  ],
-  tilt_angle: [
-    {
-      validator: (rule, value, callback) => {
-        if (planBody.type !== 'auto' && !value) {
-          callback(new Error('请输入光伏板倾角'))
-        } else if (value && !/^[0-9]+(\.[0-9]+)?$/.test(value)) {
-          callback(new Error('请输入有效的数字'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ],
-  horizontal_lines: [
-    { required: true, message: '请输入横向航线数', trigger: 'blur' },
-    { pattern: /^[1-9]\d*$/, message: '横向航线数必须是正整数', trigger: 'blur' }
-  ],
-  panel_heading: [
-    {
-      validator: (rule, value, callback) => {
-        if (planBody.type !== 'auto' && !value) {
-          callback(new Error('请输入光伏板朝向'))
-        } else if (value && !/^[0-9]+(\.[0-9]+)?$/.test(value)) {
-          callback(new Error('请输入有效的数字'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ],
-  margin: [
-    { required: true, message: '请输入区域边距', trigger: 'blur' },
-    { pattern: /^[0-9]+(\.[0-9]+)?$/, message: '请输入有效的数字', trigger: 'blur' }
-  ],
-  points_per_line: [
-    { required: true, message: '请输入航线内点数', trigger: 'blur' },
-    { pattern: /^[1-9]\d*$/, message: '航线内点数必须是正整数', trigger: 'blur' }
   ]
 }
 
@@ -491,47 +461,127 @@ async function getOrthophotoPath (id:any) {
   }
 }
 
-// 光伏板区域选择变化（支持条件多选）
+function createAreaConfig (item: any): AreaConfig {
+  return {
+    solar_panel_id: item.id,
+    solar_panel_name: item.solar_panel_area_name || item.name || item.id,
+    flight_altitude: '',
+    panel_heading: '',
+    margin: '',
+    horizontal_lines: '',
+    points_per_line: '',
+    panel_tilt: item.tilt_angle !== undefined && item.tilt_angle !== null ? String(item.tilt_angle) : ''
+  }
+}
+
+function syncAreaConfigs (items: any[]) {
+  areaConfigs.value = items.map((item: any) => {
+    const existing = areaConfigs.value.find(config => config.solar_panel_id === item.id)
+    return existing || createAreaConfig(item)
+  })
+}
+
+function isEmptyValue (value: string) {
+  return value === null || value === undefined || value === ''
+}
+
+function isPositiveInteger (value: string) {
+  return /^[1-9]\d*$/.test(String(value))
+}
+
+function isNumberValue (value: string) {
+  return /^[0-9]+(\.[0-9]+)?$/.test(String(value))
+}
+
+function validateAreaConfigs () {
+  if (areaConfigs.value.length === 0) {
+    ElMessage.warning('请选择光伏板区域')
+    return false
+  }
+
+  for (const config of areaConfigs.value) {
+    if (isEmptyValue(config.flight_altitude) || !isPositiveInteger(config.flight_altitude)) {
+      ElMessage.warning(`请填写有效的航线高度：${config.solar_panel_name}`)
+      return false
+    }
+    if (isEmptyValue(config.panel_heading) || !isNumberValue(config.panel_heading)) {
+      ElMessage.warning(`请填写有效的光伏板朝向：${config.solar_panel_name}`)
+      return false
+    }
+
+    if (planBody.type === 'uniform') {
+      if (isEmptyValue(config.horizontal_lines) || !isPositiveInteger(config.horizontal_lines)) {
+        ElMessage.warning(`请填写有效的横向航线数：${config.solar_panel_name}`)
+        return false
+      }
+      if (isEmptyValue(config.margin) || !isNumberValue(config.margin)) {
+        ElMessage.warning(`请填写有效的区域边距：${config.solar_panel_name}`)
+        return false
+      }
+      if (isEmptyValue(config.points_per_line) || !isPositiveInteger(config.points_per_line)) {
+        ElMessage.warning(`请填写有效的航线内点数：${config.solar_panel_name}`)
+        return false
+      }
+    }
+
+    if (planBody.type === 'auto' && (isEmptyValue(config.panel_tilt) || !isNumberValue(config.panel_tilt))) {
+      ElMessage.warning(`请填写有效的光伏板倾角：${config.solar_panel_name}`)
+      return false
+    }
+  }
+
+  return true
+}
+
+function getAreaConfigPayload () {
+  return areaConfigs.value.map(config => {
+    const baseConfig: any = {
+      solar_panel_id: config.solar_panel_id,
+      flight_altitude: Number(config.flight_altitude),
+      panel_heading: Number(config.panel_heading)
+    }
+
+    if (planBody.type === 'uniform') {
+      return {
+        ...baseConfig,
+        margin: Number(config.margin),
+        horizontal_lines: Number(config.horizontal_lines),
+        points_per_line: Number(config.points_per_line)
+      }
+    }
+
+    return {
+      ...baseConfig,
+      panel_tilt: Number(config.panel_tilt)
+    }
+  })
+}
+
+function getSubmitPlanBody () {
+  return {
+    ...toRaw(planBody),
+    file_id: planBody.file_id,
+    dock_sn: planBody.dock_sn,
+    image_format: planBody.image_format,
+    area_configs: getAreaConfigPayload()
+  }
+}
+
+// 光伏板区域选择变化（支持多选）
 async function handleSolarPanelChange (ids: string[]) {
   selectedImagePath.value = ''
   selectedDetectAreas.value = []
 
   if (!ids || ids.length === 0) {
     planBody.solar_panel_id = ''
+    areaConfigs.value = []
     return
   }
 
-  // 多选时校验 tilt_angle / area_height / panel_height 是否一致
-  if (ids.length > 1) {
-    const selectedItems = solarTable.value.filter((item: any) => ids.includes(item.id))
-    const first = selectedItems[0]
-    const isSameParams = selectedItems.every((item: any) =>
-      item.tilt_angle === first.tilt_angle &&
-      item.area_height === first.area_height &&
-      item.panel_height === first.panel_height
-    )
-
-    if (!isSameParams) {
-      // 参数不一致，只保留最新选择
-      const lastId = ids[ids.length - 1]
-      selectedSolarIds.value = [lastId]
-      planBody.solar_panel_id = lastId
-      const item = solarTable.value.find((it: any) => it.id === lastId)
-      if (item) {
-        const path = await getOrthophotoPath(item.orthophoto_id)
-        selectedDetectAreas.value = [item]
-        selectedImagePath.value = path
-        //  'D:\\orthophoto\\测试.jpg'
-      }
-      ElMessage.warning('所选区域光伏参数不一致，仅保留最新选择')
-      return
-    }
-  }
-
-  // 参数一致或单选，保留当前选择
   selectedSolarIds.value = ids
   planBody.solar_panel_id = ids.join(',')
   const items = solarTable.value.filter((item: any) => ids.includes(item.id))
+  syncAreaConfigs(items)
   if (items.length > 0) {
     const path = await getOrthophotoPath(items[0].orthophoto_id)
     selectedDetectAreas.value = items
@@ -583,18 +633,10 @@ function handlePrevStep () {
  */
 async function previewWayline () {
   try {
-    // 只校验第一步的字段
-      const step2Fields = ['image_format_list']
-      if (planBody.type === 'uniform') {
-        step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
-      } else {
-        step2Fields.push('flight_altitude')
-      }
-
-      const valid = await valueRef.value.validateField(step2Fields)
-      if (valid) {
-        planBody.index = 0
-        const res = await createFlyPlan(planBody)
+    const valid = await valueRef.value.validateField(['image_format_list'])
+    if (valid && validateAreaConfigs()) {
+      planBody.index = 0
+      const res = await createFlyPlan(getSubmitPlanBody())
       if (res.code !== 0) {
         ElMessage.error('航线预览异常!')
         return
@@ -611,19 +653,11 @@ async function previewWayline () {
  */
 async function onSubmit () {
   try {
-    // 第二步需要校验的字段
-    const step2Fields = ['image_format_list']
-    if (planBody.type === 'uniform') {
-      step2Fields.push('flight_altitude', 'tilt_angle', 'horizontal_lines', 'panel_heading', 'margin', 'points_per_line')
-    } else {
-      step2Fields.push('flight_altitude')
-    }
-
-    const valid = await valueRef.value.validateField(step2Fields)
-    if (valid) {
+    const valid = await valueRef.value.validateField(['image_format_list'])
+    if (valid && validateAreaConfigs()) {
       // 1.创建飞行计划
       planBody.index = 1
-      const res = await createFlyPlan(planBody)
+      const res = await createFlyPlan(getSubmitPlanBody())
       if (res.code !== 0) {
         ElMessage.warning('请填写必填项!')
         return
@@ -779,6 +813,24 @@ async function onSubmit () {
     }
   }
 }
+
+.area-config-card {
+  padding: 14px 12px 2px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(206, 227, 255, 0.18);
+  border-radius: 4px;
+}
+
+.area-config-title {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
 .wayline-name{
   background-color: #06142B; text-shadow: 0px 0px 4px rgba(52, 191, 255, 0.5);
   background-image: linear-gradient(

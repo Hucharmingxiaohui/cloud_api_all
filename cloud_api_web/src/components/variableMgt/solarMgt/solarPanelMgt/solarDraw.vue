@@ -213,16 +213,25 @@
        <!-- 右侧参数区域 -->
       <div class="param-panel">
         <h3 style="color: #fff; margin: 0 0 15px 0; font-size: 16px; font-weight: 600;">光伏区域参数</h3>
-        <el-form :model="paramForm" label-width="120px" label-position="left" style="color: #fff;">
-          <el-form-item label="光伏板倾角（度）" required>
-            <el-input v-model="paramForm.tilt_angle" type="number" placeholder="请输入光伏板倾角" />
-          </el-form-item>
-          <el-form-item label="光伏区域海拔" required>
-            <el-input v-model="paramForm.area_height" type="number" placeholder="请输入光伏区域海拔" />
-          </el-form-item>
-          <el-form-item label="光伏架设高度" required>
-            <el-input v-model="paramForm.panel_height" type="number" placeholder="请输入光伏架设高度" />
-          </el-form-item>
+        <div v-if="detectionAreas.length === 0" class="param-empty">
+          请先在左侧绘制检测区域，系统会按区域数量生成参数表单
+        </div>
+        <el-form v-else label-width="120px" label-position="left" style="color: #fff;">
+          <div v-for="area in detectionAreas" :key="area.id" class="area-param-card">
+            <div class="area-param-title">
+              <span class="area-param-color"></span>
+              <span>{{ area.name }}</span>
+            </div>
+            <el-form-item label="光伏板倾角（度）" required>
+              <el-input v-model="area.params.tilt_angle" type="number" placeholder="请输入光伏板倾角" />
+            </el-form-item>
+            <el-form-item label="光伏区域海拔" required>
+              <el-input v-model="area.params.area_height" type="number" placeholder="请输入光伏区域海拔" />
+            </el-form-item>
+            <el-form-item label="光伏架设高度" required>
+              <el-input v-model="area.params.panel_height" type="number" placeholder="请输入光伏架设高度" />
+            </el-form-item>
+          </div>
         </el-form>
       </div>
     </div>
@@ -338,6 +347,12 @@ interface Point {
   y: number
 }
 
+interface AreaParams {
+  tilt_angle: number | string | null
+  area_height: number | string | null
+  panel_height: number | string | null
+}
+
 // 绘制状态
 const isDrawing = ref(false)
 const isDrawingPolygon = ref(false)
@@ -349,6 +364,7 @@ interface DetectionArea {
   id: number
   name: string
   points: Point[] // 4个顶点
+  params: AreaParams
 }
 
 const detectionAreas = ref<DetectionArea[]>([])
@@ -375,13 +391,6 @@ const uploadRef = ref()
 const imageScale = ref(1)
 const mousePosition = reactive({ x: -1, y: -1 })
 const imageLoading = ref(false)
-
-// 航线参数表单
-const paramForm = reactive({
-  tilt_angle: null as number | null,
-  area_height: null as number | null,
-  panel_height: null as number | null
-})
 
 // 颜色列表（用于区分不同区域）
 const areaColors = [
@@ -442,6 +451,7 @@ async function handleImageChange () {
   try {
     // 👇 这里只会执行一次！
     const imageUrl = await getImageUrlFrom(selected.path)
+    //
     selectedImage.value = imageUrl
     detectionAreas.value = []
     activeAreaId.value = null
@@ -609,7 +619,12 @@ function handleMouseDown (event: MouseEvent) {
     const newArea: DetectionArea = {
       id: areaIdCounter++,
       name: `检测区${detectionAreas.value.length + 1}`,
-      points: [...drawingPoints]
+      points: [...drawingPoints],
+      params: {
+        tilt_angle: null,
+        area_height: null,
+        panel_height: null
+      }
     }
 
     detectionAreas.value.push(newArea)
@@ -803,13 +818,12 @@ async function saveDetectionAreas () {
     return
   }
 
-  // 校验所有数值参数
-  const numericFields = [
-    'tilt_angle', 'area_height', 'panel_height'
-  ]
-  for (const field of numericFields) {
-    if (paramForm[field] === null || paramForm[field] === undefined || paramForm[field] === '') {
-      ElMessage.warning('请填写完整参数')
+  for (const area of detectionAreas.value) {
+    const { tilt_angle, area_height, panel_height } = area.params
+    if (tilt_angle === null || tilt_angle === undefined || tilt_angle === '' ||
+      area_height === null || area_height === undefined || area_height === '' ||
+      panel_height === null || panel_height === undefined || panel_height === '') {
+      ElMessage.warning(`请填写完整参数：${area.name}`)
       return
     }
   }
@@ -829,11 +843,11 @@ async function saveDetectionAreas () {
         corners_pixels: area.points.map(p => ({
           row: Math.round(p.y * scaleY),
           col: Math.round(p.x * scaleX)
-        }))
-      })),
-      tilt_angle: Number(paramForm.tilt_angle),
-      area_height: Number(paramForm.area_height),
-      panel_height: Number(paramForm.panel_height)
+        })),
+        tilt_angle: Number(area.params.tilt_angle),
+        area_height: Number(area.params.area_height),
+        panel_height: Number(area.params.panel_height)
+      }))
     }
 
     const res = await insertSolarPanelApi(saveData)
@@ -844,10 +858,6 @@ async function saveDetectionAreas () {
       detectionAreas.value = []
       activeAreaId.value = null
       clearCanvas()
-      // 重置表单
-      paramForm.tilt_angle = null
-      paramForm.area_height = null
-      paramForm.panel_height = null
       emit('back')
     } else {
       ElMessage.error(res.message || '保存失败')
@@ -1422,6 +1432,49 @@ const formatCoords = computed(() => (area: DetectionArea) => {
       padding: 20px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       height: 750px;
+      overflow-y: auto;
+
+      .param-empty {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #a0aec0;
+        font-size: 13px;
+        line-height: 1.6;
+        text-align: center;
+        padding: 0 10px;
+      }
+
+      .area-param-card {
+        padding: 14px 12px 4px;
+        margin-bottom: 14px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+
+        &:last-child {
+          margin-bottom: 0;
+        }
+
+        .area-param-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: #fff;
+          font-size: 14px;
+          font-weight: 600;
+          margin-bottom: 12px;
+        }
+
+        .area-param-color {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: #fff;
+          flex-shrink: 0;
+        }
+      }
     }
   }
 }
