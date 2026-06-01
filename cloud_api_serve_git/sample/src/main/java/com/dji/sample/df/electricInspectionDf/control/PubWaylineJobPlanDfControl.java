@@ -55,8 +55,17 @@ public class PubWaylineJobPlanDfControl {
 
             PubWaylineJobPlanDfEntity planDfEntity = (PubWaylineJobPlanDfEntity) waylineJObPlan.get("plan");
 //          定时任务则立即执行
-            if(planDfEntity.getTaskType()==1) {
-                pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+            Integer planType = planDfEntity.getPlanType();
+            if(planType==4){
+//              光伏计划，index适配光伏计划  0返回航线 1新建计划
+                Integer index = planDfEntity.getIndex();
+                if(planDfEntity.getTaskType()==1 && index != 0) {
+                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+                }
+            }else {
+                if(planDfEntity.getTaskType()==1) {
+                    pubWaylineJobPlanDfService.expressPlan(customClaim, planDfEntity);
+                }
             }
             return HttpResultResponse.success(waylineJObPlan).setMessage("创建飞行计划成功");
         }else{

@@ -1024,12 +1024,20 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
         String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId();
 
-        // 解析逗号分隔的多个光伏区域ID
+        // 解析每个区域的独立参数
+        Map<String, PubWaylineJobPlanDfEntity.AreaConfig> areaConfigMap = new HashMap<>();
+        List<PubWaylineJobPlanDfEntity.AreaConfig> configs = pubWaylineJobPlanDfEntity.getAreaConfigs();
+        for (PubWaylineJobPlanDfEntity.AreaConfig cfg : configs) {
+            areaConfigMap.put(cfg.getSolarPanelId(), cfg);
+        }
+
         String[] solarPanelIds = solarPanelId.split(",");
         JSONArray areas = new JSONArray();
         SolarPanelArea firstSolarPanelArea = null;
         OrthophotoEntity orthophotoEntity = null;
-
+        PubWaylineJobPlanDfEntity.AreaConfig firstAreaConfig = null;
+        int areaIndex = 0;
+//      遍历每个区域进行航线参数赋值
         for (String panelId : solarPanelIds) {
             panelId = panelId.trim();
             if (panelId.isEmpty()) {
@@ -1039,10 +1047,19 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             if (solarPanelArea == null) {
                 continue;
             }
+//          获取首个区域数据库参数
             if (firstSolarPanelArea == null) {
                 firstSolarPanelArea = solarPanelArea;
                 orthophotoEntity = orthophotoEntityMapper.selectById(solarPanelArea.getOrthophotoId());
             }
+//          获取首个区域航线参数
+            if(firstAreaConfig == null){
+                firstAreaConfig = areaConfigMap.get(panelId);
+            }
+            areaIndex++;
+
+            // 获取该区域的独立参数（如果有），否则用计划实体的共享参数
+            PubWaylineJobPlanDfEntity.AreaConfig areaCfg = areaConfigMap.get(panelId);
 
             Double corner1Lng = solarPanelArea.getCorner1Lng();
             Double corner1Lat = solarPanelArea.getCorner1Lat();
@@ -1054,21 +1071,62 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             Double corner4Lat = solarPanelArea.getCorner4Lat();
             Double areaHeight = solarPanelArea.getAreaHeight();
 
-            JSONArray corners = new JSONArray();
-            double[][] points = {
+            JSONArray points = new JSONArray();
+            double[][] coords = {
                     {corner1Lng, corner1Lat, areaHeight},
                     {corner2Lng, corner2Lat, areaHeight},
                     {corner3Lng, corner3Lat, areaHeight},
                     {corner4Lng, corner4Lat, areaHeight}
             };
-            for (double[] point : points) {
-                JSONObject corner = new JSONObject();
-                corner.put("lon", point[0]);
-                corner.put("lat", point[1]);
-                corner.put("height", point[2]);
-                corners.add(corner);
+            for (double[] point : coords) {
+                JSONObject p = new JSONObject();
+                p.put("lon", point[0]);
+                p.put("lat", point[1]);
+                p.put("height", point[2]);
+                points.add(p);
             }
-            areas.add(corners);
+
+            JSONObject areaObj = new JSONObject();
+            areaObj.put("area_name", solarPanelArea.getSolarPanelAreaName());
+            areaObj.put("file_suffix", String.format("area%02d", areaIndex));
+            areaObj.put("points", points);
+
+            JSONObject areaSolarParams = new JSONObject();
+            String type = pubWaylineJobPlanDfEntity.getType();
+//          自定义航线
+            if ("uniform".equals(type)) {
+                if (areaCfg != null) {
+                    areaSolarParams.put("panelHeight", solarPanelArea.getPanelHeight());
+                    areaSolarParams.put("flightAltitude", areaCfg.getFlightAltitude());
+                    areaSolarParams.put("panelHeading", areaCfg.getPanelHeading());
+                    areaSolarParams.put("panelTilt", solarPanelArea.getTiltAngle());
+                    areaSolarParams.put("margin", areaCfg.getMargin());
+                }
+                areaObj.put("solar_params", areaSolarParams);
+                JSONObject areaRouteParams = new JSONObject();
+                if (areaCfg != null) {
+                    areaRouteParams.put("horizontalLines", areaCfg.getHorizontalLines());
+                    areaRouteParams.put("pointsPerLine", areaCfg.getPointsPerLine());
+                }
+                areaObj.put("route_params", areaRouteParams);
+                areas.add(areaObj);
+            }else {
+//          自适应航线
+                if (areaCfg != null) {
+                    areaSolarParams.put("panelHeight", solarPanelArea.getPanelHeight());
+                    areaSolarParams.put("flightAltitude", areaCfg.getFlightAltitude());
+                    if(areaCfg.getPanelHeading()!=null){
+                        areaSolarParams.put("panelHeading", areaCfg.getPanelHeading());
+                    }
+                    if(areaCfg.getPanelTilt()!=null){
+                        areaSolarParams.put("panelTilt", areaCfg.getPanelTilt());
+                    }else {
+                        areaSolarParams.put("panelTilt", solarPanelArea.getTiltAngle());
+                    }
+                }
+                areaObj.put("solar_params", areaSolarParams);
+                areas.add(areaObj);
+            }
         }
 
         if (firstSolarPanelArea == null) {
@@ -1077,50 +1135,49 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
 
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
-        String type = pubWaylineJobPlanDfEntity.getType();
+//      构建整体json
         JSONObject root = new JSONObject();
         if(pubWaylineJobPlanDfEntity.getImageFormat() != null){
             root.put("imageFormat", pubWaylineJobPlanDfEntity.getImageFormat());
         }
+
+        String type = pubWaylineJobPlanDfEntity.getType();
+//      共用航线参数
         if ("uniform".equals(type)) {
             root.put("type", "uniform");
             root.put("areas", areas);
-
             JSONObject solarParams = new JSONObject();
             solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
-            solarParams.put("flightAltitude", pubWaylineJobPlanDfEntity.getFlightAltitude());
-            solarParams.put("panelHeading", pubWaylineJobPlanDfEntity.getPanelHeading());
-            if(pubWaylineJobPlanDfEntity.getTiltAngle() ==null) {
-                solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
-            }else{
-                solarParams.put("panelTilt", pubWaylineJobPlanDfEntity.getTiltAngle());
-            }
-            if(pubWaylineJobPlanDfEntity.getMargin()!=null) {
-                solarParams.put("margin", pubWaylineJobPlanDfEntity.getMargin());
-            }
+            solarParams.put("flightAltitude", firstAreaConfig.getFlightAltitude());
+            solarParams.put("panelHeading", firstAreaConfig.getPanelHeading());
+            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            solarParams.put("margin", firstAreaConfig.getMargin());
             root.put("solar_params", solarParams);
-
             JSONObject routeParams = new JSONObject();
-            if(pubWaylineJobPlanDfEntity.getHorizontalLines()!=null) {
-                routeParams.put("horizontalLines", pubWaylineJobPlanDfEntity.getHorizontalLines());
-            }
-            if(pubWaylineJobPlanDfEntity.getPointsPerLine()!=null)
-            routeParams.put("pointsPerLine", pubWaylineJobPlanDfEntity.getPointsPerLine());
+            routeParams.put("horizontalLines", firstAreaConfig.getHorizontalLines());
+            routeParams.put("pointsPerLine", firstAreaConfig.getPointsPerLine());
             root.put("route_params", routeParams);
         } else {
+            root.put("type", "adaptive");
             root.put("areas", areas);
-
             JSONObject solarParams = new JSONObject();
+            solarParams.put("flightAltitude", firstAreaConfig.getFlightAltitude());
             solarParams.put("panelHeight", firstSolarPanelArea.getPanelHeight());
-            solarParams.put("panelHeading", 0);
-            solarParams.put("flightAltitude", pubWaylineJobPlanDfEntity.getFlightAltitude());
-            solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            if(firstAreaConfig.getPanelHeading()!=null) {
+                solarParams.put("panelHeading", firstAreaConfig.getPanelHeading());
+            }
+            if(firstAreaConfig.getPanelTilt() !=null) {
+                solarParams.put("panelTilt", firstAreaConfig.getPanelTilt());
+            }else {
+                solarParams.put("panelTilt", firstSolarPanelArea.getTiltAngle());
+            }
             root.put("solar_params", solarParams);
         }
 
         root.put("orthophoto_id", firstSolarPanelArea.getOrthophotoId());
         root.put("orthophoto_name", orthophotoEntity != null ? orthophotoEntity.getName() : "");
         String jsonString = root.toString();
+        log.info("调用光伏航线接口, 请求参数: {}", jsonString);
         String response = httpUtils.sendPostJson(url, jsonString);
         if(pubWaylineJobPlanDfEntity.getIndex() == 0){
             map.put("result",true);
@@ -1159,7 +1216,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
         pubWaylineJobPlanDfEntity.setCreateTime(currentTimeMillis);
         pubWaylineJobPlanDfEntity.setUpdateTime(currentTimeMillis);
-        pubWaylineJobPlanDfEntity.setWaylineType(0);
 
         pubWaylineJobPlanDfMapper.insert(pubWaylineJobPlanDfEntity);
         map.put("result", true);
@@ -1168,3 +1224,4 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
 }
+

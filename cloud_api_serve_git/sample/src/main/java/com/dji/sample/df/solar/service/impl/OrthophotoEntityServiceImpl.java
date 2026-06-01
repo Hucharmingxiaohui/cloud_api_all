@@ -181,7 +181,9 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
     public JSONArray selectComponentsById(String id) {
         JSONArray jsonArray = new JSONArray();
         List<SolarPanel> solarPanels = solarPanelMapper.selectList(
-                new LambdaQueryWrapper<SolarPanel>().eq(SolarPanel::getOrthophotoId, id)
+                new LambdaQueryWrapper<SolarPanel>()
+                        .eq(SolarPanel::getOrthophotoId, id)
+                        .last("ORDER BY CAST(SUBSTRING_INDEX(solar_panel_name, '-', -1) AS UNSIGNED)")
         );
 
         for (SolarPanel solarPanel : solarPanels) {
@@ -193,18 +195,69 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
                     new LambdaQueryWrapper<SolarPanelComponent>()
                             .eq(SolarPanelComponent::getSolarPanelId, solarPanel.getId())
             );
+            sortSolarPanelComponentsByName(solarPanelComponents);
             JSONArray childrenArray = new JSONArray();
             for (SolarPanelComponent component : solarPanelComponents) {
                 // 关键：每次循环创建一个新的 JSONObject
                 JSONObject child = new JSONObject();
                 child.put("componentId", component.getId());
-                child.put("componentName", component.getSolarPanelComponentName());
+                child.put("componentName", extractRowColumnSuffix(component));
                 childrenArray.add(child);
             }
             jsonObject.put("children", childrenArray);
             jsonArray.add(jsonObject);
         }
         return  jsonArray;
+    }
+
+    /**
+     * 从组件名称中提取末尾的 "x-y" 部分
+     * @param component 光伏组件对象
+     * @return 末尾的 "x-y" 字符串，例如 "2-2"
+     * @throws IllegalArgumentException 如果名称格式不符合预期
+     */
+    private String extractRowColumnSuffix(SolarPanelComponent component) {
+        String name = component.getSolarPanelComponentName();
+        // 查找最后一个 '_' 的位置
+        int lastUnderscore = name.lastIndexOf('_');
+        if (lastUnderscore == -1) {
+            throw new IllegalArgumentException("组件名称中缺少 '_' : " + name);
+        }
+        return name.substring(lastUnderscore + 1);
+    }
+
+    /**
+     * 按组件名称末尾的 "行-列" 数值对组件列表进行排序（原地排序）
+     * @param components 待排序的组件列表
+     */
+    private void sortSolarPanelComponentsByName(List<SolarPanelComponent> components) {
+        if (components == null || components.isEmpty()) {
+            return;
+        }
+        components.sort((c1, c2) -> {
+            String name1 = c1.getSolarPanelComponentName();
+            String name2 = c2.getSolarPanelComponentName();
+
+            // 提取最后一个 '_' 后面的部分（例如 "2-1"）
+            String suffix1 = name1.substring(name1.lastIndexOf('_') + 1);
+            String suffix2 = name2.substring(name2.lastIndexOf('_') + 1);
+
+            // 按 '-' 拆分并转为整数
+            String[] parts1 = suffix1.split("-");
+            String[] parts2 = suffix2.split("-");
+
+            int row1 = Integer.parseInt(parts1[0]);
+            int col1 = Integer.parseInt(parts1[1]);
+            int row2 = Integer.parseInt(parts2[0]);
+            int col2 = Integer.parseInt(parts2[1]);
+
+            // 先比较行，再比较列
+            if (row1 != row2) {
+                return Integer.compare(row1, row2);
+            } else {
+                return Integer.compare(col1, col2);
+            }
+        });
     }
 
 }

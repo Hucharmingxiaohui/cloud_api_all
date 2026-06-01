@@ -37,6 +37,9 @@ public class GfPositionResponse implements Serializable {
         @JsonProperty("annotated_image")
         private String annotatedImage;
 
+        @JsonProperty("annotated_image_ir")
+        private String annotatedImageIr;
+
         private List<ResultItem> results;
     }
 
@@ -50,6 +53,9 @@ public class GfPositionResponse implements Serializable {
     public static class ResultItem implements Serializable {
         @JsonProperty("defect_id")
         private String defectId;
+
+        @JsonProperty("image_type")
+        private String imageType;
 
         @JsonProperty("original_name")
         private String originalName;

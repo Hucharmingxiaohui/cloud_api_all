@@ -1,5 +1,6 @@
 package com.dji.sample.df.solar.model.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
@@ -10,6 +11,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class GfPositionRequest {
 
     @JsonProperty("inspection_id")
@@ -26,6 +28,7 @@ public class GfPositionRequest {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Image {
 
         @JsonProperty("defect_id")
@@ -48,11 +51,24 @@ public class GfPositionRequest {
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class Defect {
+        // ---- 可见光 (visible) 的字段 ----
         @JsonProperty("defect_type")
         private String defectType;
 
         private Integer col;
         private Integer row;
+
+        // ---- 红外 (ir) 的字段 ----
+        @JsonProperty("center_col")
+        private Integer centerCol;
+
+        @JsonProperty("center_row")
+        private Integer centerRow;
+
+        private Integer width;
+        private Integer height;
     }
 }

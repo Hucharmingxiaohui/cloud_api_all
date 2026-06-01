@@ -10,7 +10,13 @@ import com.dji.sample.df.wind.dao.*;
 import com.dji.sample.df.wind.model.entity.AnalysisRequest;
 import com.dji.sample.df.wind.model.entity.AnalysisResponse;
 import com.dji.sample.df.wind.model.entity.DefectEntity;
+import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.entity.WaylineJobEntity;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,12 +30,15 @@ import java.util.*;
 
 
 @Service
+@Slf4j
 public class GfReportServiceImpl implements GfReportService {
 
     @Autowired
     private WaylineUrlConfig waylineUrlConfig;
     @Autowired
     DefectEntityMapper defectEntityMapper;
+    @Autowired
+    IWaylineJobMapper waylineJobMapper;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final HttpClient httpClient = HttpClient.newHttpClient();
@@ -65,7 +74,7 @@ public class GfReportServiceImpl implements GfReportService {
     public GfPositionResponse sendGfPositionRequest(GfPositionRequest request) {
         try {
             String requestBody = objectMapper.writeValueAsString(request);
-
+            objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
             HttpRequest httpRequest = HttpRequest.newBuilder()
 //                    todo 需改
                     .uri(URI.create(waylineUrlConfig.getGfDefectLocalizationUrl()))
@@ -101,7 +110,7 @@ public class GfReportServiceImpl implements GfReportService {
      * @param response API响应数据
      * @return 缺陷对象列表
      */
-    public List<DefectEntity> convertToDefects(AnalysisResponse response) {
+    public List<DefectEntity> convertToDefects(AnalysisResponse response) throws JsonProcessingException {
         List<DefectEntity> defects = new ArrayList<>();
         String currentTime = getCurrentTime();
 
@@ -123,6 +132,11 @@ public class GfReportServiceImpl implements GfReportService {
                     DefectEntity defect = createDefectFromResult(item, defectTypes, currentTime);
                     defects.add(defect);
                 }
+            }else {
+//              适配红外情况
+                List<String> defectTypes = Collections.singletonList("未见异常");
+                DefectEntity defect = createDefectFromResult(item, defectTypes, currentTime);
+                defects.add(defect);
             }
         }
 
@@ -133,7 +147,7 @@ public class GfReportServiceImpl implements GfReportService {
      * 从结果项创建缺陷对象
      */
     private DefectEntity createDefectFromResult(AnalysisResponse.ResultItem item,
-                                                List<String> defectTypes, String currentTime) {
+                                                List<String> defectTypes, String currentTime) throws JsonProcessingException {
         String imagePath = item.getResImagePath();
         DefectEntity defect = new DefectEntity();
         defect.setAcquisitionTime(currentTime);
@@ -146,6 +160,13 @@ public class GfReportServiceImpl implements GfReportService {
         List<List<Integer>> centerPoints = item.getCenter_points();
         if (centerPoints != null && !centerPoints.isEmpty()) {
             defect.setDefectPosition(centerPoints.toString());
+        }
+        List<AnalysisResponse.ResultItem.PanelBox> panelBoxes = item.getPanel_boxes();
+        if (panelBoxes != null && !panelBoxes.isEmpty()) {
+            ObjectMapper objectMapper = new ObjectMapper();
+            // 将 list 直接转为 JSON 字符串存入数据库
+            String defectPositionJson = objectMapper.writeValueAsString(panelBoxes);
+            defect.setDefectPosition(defectPositionJson);
         }
         defect.setDefectType(mainDefectType);
         defect.setDefectDescription(generateDefectDescription(defectCount));
@@ -191,7 +212,7 @@ public class GfReportServiceImpl implements GfReportService {
      * 处理API响应并新增缺陷数据
      * @param response API响应数据
      */
-    public void processAndAddDefects(AnalysisResponse response,String jobId) {
+    public void processAndAddDefects(AnalysisResponse response,String jobId) throws JsonProcessingException {
         if (response == null || response.getResultsList() == null) {
             System.out.println("响应数据为空");
             return;
@@ -208,16 +229,33 @@ public class GfReportServiceImpl implements GfReportService {
             GfPositionRequest.Image image = new GfPositionRequest.Image();
             image.setImageName(extractOriginalFileName(defectEntity.getImagePath()));
             Integer imageType = defectEntity.getImageType();
+            image.setDefectId(defectEntity.getId());
             if (imageType == 0) {
                 image.setImageType("visable");
             }else if(imageType == 1){
                 image.setImageType("ir");
             }
-            image.setDefectId(defectEntity.getId());
             Integer isDefect = defectEntity.getIsDefect();
-            if(isDefect == 0){
-                image.setHasDefect(false);
-            }else{
+            if(imageType == 1){
+//              红外直接传defects参数
+                // === 红外缺陷处理 ===
+                image.setHasDefect(true);
+                String defectPositionJson = defectEntity.getDefectPosition();
+                List<GfPositionRequest.Defect> defects = new ArrayList<>();
+                if (defectPositionJson != null && !defectPositionJson.isEmpty()) {
+                    try {
+                        // 1. 尝试直接解析为 JSON 列表（新数据库格式）
+                        defects = objectMapper.readValue(
+                                defectPositionJson,
+                                new TypeReference<List<GfPositionRequest.Defect>>(){}
+                        );
+                    } catch (Exception e) {
+                      e.printStackTrace();
+                    }
+                }
+                image.setDefects(defects);
+
+            }else if(imageType == 0 && isDefect == 1){
 //              有缺陷才传defects参数
                 image.setHasDefect(true);
                 String originalDefectType = defectEntity.getOriginalDefectType();
@@ -260,6 +298,8 @@ public class GfReportServiceImpl implements GfReportService {
                     defects.add(defect);
                 }
                 image.setDefects(defects);
+            }else {
+                image.setHasDefect(false);
             }
             images.add(image);
         }
@@ -289,8 +329,14 @@ public class GfReportServiceImpl implements GfReportService {
                 if(item.getHasDefect()){
                     List<GfPositionResponse.Defect> defects = item.getDefects();
                     List<String> defectComponentNames =new ArrayList<>();
+                    List<String> defectTypes =new ArrayList<>();
                     for (GfPositionResponse.Defect defect : defects) {
                         defectComponentNames.add(defect.getSolarPanelComponentName());
+                        defectTypes.add(defect.getDefectType());
+                    }
+                    if(defectEntity.getImageType()==1){
+                        defectEntity.setDefectType(defectTypes.toString());
+                        defectEntity.setDefectDescription(defectTypes.toString());
                     }
                     defectEntity.setDefectComponentName(defectComponentNames.toString());
                     defectEntityMapper.updateById(defectEntity);
@@ -298,7 +344,13 @@ public class GfReportServiceImpl implements GfReportService {
                 defectEntityMapper.updateById(defectEntity);
             }
         }
-
+        log.info("保存缺陷分布图--------");
+        WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        String annotatedImage = response.getData().getAnnotatedImage();
+        String annotatedImageIr = response.getData().getAnnotatedImageIr();
+        waylineJobEntity.setAnnotatedImage(annotatedImage);
+        waylineJobEntity.setAnnotatedImageIr(annotatedImageIr);
+        waylineJobMapper.updateById(waylineJobEntity);
     }
 
     /**
@@ -332,9 +384,9 @@ public class GfReportServiceImpl implements GfReportService {
 
     public static Integer extractDefectType(String imagePath) {
         if (imagePath == null) return null;
-        if (imagePath.contains("_V_")) {
+        if (imagePath.contains("_V_") || imagePath.contains("_V")) {
             return 0;
-        } else if (imagePath.contains("_T_")) {
+        } else if (imagePath.contains("_T_") || imagePath.contains("_T")) {
             return 1;
         }
         return null; // 或其他默认值

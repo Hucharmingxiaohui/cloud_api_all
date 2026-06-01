@@ -1,11 +1,11 @@
 const CURRENT_CONFIG = {
   // license
-  baseURL: 'http://172.20.63.56:6789/',
-  kmzURL: 'http://172.20.63.56:6789/',
-  websocketURL: 'ws://172.20.63.56:6789/api/v1/ws',
-  rtmpURL: 'rtmp://172.20.63.56:2035/live/', // 视频请求推流地址
-  rtcURL: 'http://172.20.63.56:2085/rtc/v1/whip/?app=live&stream=', // 视频请求推流地址
-  flvURL: 'http://172.20.63.56:9080/live/',  // 视频流地址
+  baseURL: 'http://172.20.63.157:6789/',
+  kmzURL: 'http://172.20.63.157:6789/',
+  websocketURL: 'ws://172.20.63.157:6789/api/v1/ws',
+  rtmpURL: 'rtmp://172.20.63.157:2035/live/', // 视频请求推流地址
+  rtcURL: 'http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream=', // 视频请求推流地址
+  flvURL: 'http://172.20.63.157:9080/live/',  // 视频流地址
   UEPixURL: 'ws://172.20.63.106:901',
 
   // 风机坐标 用于地图初始显示风机marker,不需要时置空(高德地图坐标)

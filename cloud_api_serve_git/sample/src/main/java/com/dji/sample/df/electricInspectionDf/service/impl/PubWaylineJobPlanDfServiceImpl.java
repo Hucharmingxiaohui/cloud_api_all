@@ -16,6 +16,8 @@ import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService
 import com.dji.sample.df.waylineDf.dao.IWaylineFileMapperDf;
 import com.dji.sample.df.waylineDf.model.entity.WaylineFileEntity;
 import com.dji.sample.df.wind.config.FjFileConfig;
+import com.dji.sample.df.wind.dao.DefectEntityMapper;
+import com.dji.sample.df.wind.model.entity.DefectEntity;
 import com.dji.sample.df.wind.service.RoutePlanService;
 import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.model.MediaFileEntity;
@@ -61,6 +63,8 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     private OssServiceContext ossService;
     @Autowired
     private FjFileConfig fileConfig;
+    @Autowired
+    private DefectEntityMapper defectEntityMapper;
 
 
     //创建计划
@@ -400,7 +404,10 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         if(isFileDeleted){
             log.info("已成功删除报告");
         }
-//      4.删除任务
+//      4.删除缺陷数据
+        defectEntityMapper.delete(new LambdaQueryWrapper<DefectEntity>()
+                .eq(DefectEntity::getJobId,job_id));
+//      5.删除任务
         int flag = waylineJobMapper.delete(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId,job_id));
         if(flag>0){
