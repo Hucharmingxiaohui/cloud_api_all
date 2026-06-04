@@ -183,7 +183,7 @@
                 <el-form-item label="航线高度：" required>
                   <el-input v-model="config.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
                 </el-form-item>
-                <el-form-item label="光伏板朝向：" required>
+                <el-form-item label="光伏板朝向：">
                   <el-input v-model="config.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
                 </el-form-item>
 
@@ -202,7 +202,7 @@
 
                 <!-- auto 模式下字段 -->
                 <template v-if="planBody.type === 'auto'">
-                  <el-form-item label="光伏板倾角：" required>
+                  <el-form-item label="光伏板倾角：">
                     <el-input v-model="config.panel_tilt" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
                   </el-form-item>
                 </template>
@@ -504,12 +504,11 @@ function validateAreaConfigs () {
       ElMessage.warning(`请填写有效的航线高度：${config.solar_panel_name}`)
       return false
     }
-    if (isEmptyValue(config.panel_heading) || !isNumberValue(config.panel_heading)) {
-      ElMessage.warning(`请填写有效的光伏板朝向：${config.solar_panel_name}`)
-      return false
-    }
-
     if (planBody.type === 'uniform') {
+      if (isEmptyValue(config.panel_heading) || !isNumberValue(config.panel_heading)) {
+        ElMessage.warning(`请填写有效的光伏板朝向：${config.solar_panel_name}`)
+        return false
+      }
       if (isEmptyValue(config.horizontal_lines) || !isPositiveInteger(config.horizontal_lines)) {
         ElMessage.warning(`请填写有效的横向航线数：${config.solar_panel_name}`)
         return false
@@ -522,11 +521,6 @@ function validateAreaConfigs () {
         ElMessage.warning(`请填写有效的航线内点数：${config.solar_panel_name}`)
         return false
       }
-    }
-
-    if (planBody.type === 'auto' && (isEmptyValue(config.panel_tilt) || !isNumberValue(config.panel_tilt))) {
-      ElMessage.warning(`请填写有效的光伏板倾角：${config.solar_panel_name}`)
-      return false
     }
   }
 
