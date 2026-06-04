@@ -133,8 +133,14 @@ public class CenterHandler implements Runnable {
 
                     //读到完整报文，进行处理
                     centerMessageHandler.processXmlMessage(xmlStr, requestSerialNum, responseSerialNum);
+                } catch (SocketException e) {
+                    log.warn("【巡视上级TCP通信处理】Socket连接已断开，巡视上级IP:{}，准备重连...", this.centerIp);
+                    this.stop = true;
+                    patrolHostSocketClient.connect();
+                    break;
                 } catch (Exception e) {
-                    log.error("【巡视上级TCP通信处理】处理TCP报文发生异常，巡视上级IP:{}，异常信息：{}", this.centerIp, e);
+                    log.warn("【巡视上级TCP通信处理】处理TCP报文发生异常，巡视上级IP:{}，异常信息：{}", this.centerIp, e.getMessage());
+                    try { Thread.sleep(100); } catch (InterruptedException ignored) {}
                 }
             }
         }

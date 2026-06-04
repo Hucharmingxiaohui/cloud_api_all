@@ -188,7 +188,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         log.info("执行普通航线任务-"+output.getExt().getFlightId()+"  当前航点号为"+currentWaypointIndex+"号");
 //      判断为风机任务，只有第一个风机的top会走普通航线，其他都是空中航线
-        if(pubWaylineJobPlanDfEntity.getPlanType()==1){
+        if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==1){
             // 快速检查航点是否变化
             AtomicInteger previous = processedWaypoints.get(flightId);
             if (!(previous != null && previous.get() >= currentWaypointIndex)) {
