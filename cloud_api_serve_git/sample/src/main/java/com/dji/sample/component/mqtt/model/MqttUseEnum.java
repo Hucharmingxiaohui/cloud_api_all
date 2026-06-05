@@ -15,5 +15,10 @@ public enum MqttUseEnum {
     /**
      * This broker is used for the drc link.
      */
-    DRC
+    DRC,
+
+    /**
+     * This broker is used for the custom link.
+     */
+    CUSTOM
 }

@@ -2,10 +2,10 @@ package com.dji.sdk.mqtt;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
 import org.springframework.stereotype.Component;
-
-import javax.annotation.Resource;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -21,11 +21,15 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
 
     private static final Logger log = LoggerFactory.getLogger(MqttTopicServiceImpl.class);
 
-    @Resource
+    @Autowired(required = false)
+    @Qualifier("mqttInbound")
     private MqttPahoMessageDrivenChannelAdapter adapter;
 
     @Override
     public void subscribe(String... topics) {
+        if (adapter == null) {
+            return;
+        }
         Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
         for (String topic : topics) {
             if (topicSet.contains(topic)) {
@@ -37,6 +41,9 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
 
     @Override
     public void subscribe(String topic, int qos) {
+        if (adapter == null) {
+            return;
+        }
         Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
         if (topicSet.contains(topic)) {
             return;
@@ -47,11 +54,17 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
 
     @Override
     public void unsubscribe(String... topics) {
+        if (adapter == null) {
+            return;
+        }
         log.debug("unsubscribe topic: {}", Arrays.toString(topics));
         adapter.removeTopic(topics);
     }
 
     public String[] getSubscribedTopic() {
+        if (adapter == null) {
+            return new String[0];
+        }
         return adapter.getTopic();
     }
 }

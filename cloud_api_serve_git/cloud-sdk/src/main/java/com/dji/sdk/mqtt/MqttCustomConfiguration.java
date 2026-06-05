@@ -2,6 +2,7 @@ package com.dji.sdk.mqtt;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -18,74 +19,53 @@ import org.springframework.messaging.MessageHandler;
 import javax.annotation.Resource;
 import java.util.UUID;
 
-/**
- * Client configuration for inbound messages.
- * @author sean.zhou
- * @date 2021/11/10
- * @version 0.1
- */
 @Configuration
-@ConditionalOnProperty(value = "cloud-sdk.mqtt.enabled", havingValue = "true", matchIfMissing = true)
-public class MqttConfiguration {
+@ConditionalOnProperty(value = "mqtt.CUSTOM.enabled", havingValue = "true", matchIfMissing = true)
+public class MqttCustomConfiguration {
 
-    private static final Logger log = LoggerFactory.getLogger(MqttConfiguration.class);
+    private static final Logger log = LoggerFactory.getLogger(MqttCustomConfiguration.class);
 
-    @Value("${cloud-sdk.mqtt.inbound-topic: }")
-    private String inboundTopic;
+    @Value("${mqtt.CUSTOM.inbound-topic:}")
+    private String customInboundTopic;
 
     @Resource
-    private MqttPahoClientFactory mqttClientFactory;
+    @Qualifier("customMqttClientFactory")
+    private MqttPahoClientFactory customMqttClientFactory;
 
-    @Resource(name = ChannelName.INBOUND)
-    private MessageChannel inboundChannel;
+    @Resource(name = ChannelName.CUSTOM_INBOUND)
+    private MessageChannel customInboundChannel;
 
-    /**
-     * Clients of inbound message channels.
-     * @return
-     */
     @Bean
-    public MqttPahoMessageDrivenChannelAdapter mqttInbound() {
+    public MqttPahoMessageDrivenChannelAdapter customMqttInbound() {
+        String[] topics = customInboundTopic.split(",");
         MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
-                UUID.randomUUID().toString(), mqttClientFactory, inboundTopic.split(","));
+                UUID.randomUUID().toString(), customMqttClientFactory, topics);
         DefaultPahoMessageConverter converter = new DefaultPahoMessageConverter();
-        // use byte types uniformly
         converter.setPayloadAsBytes(true);
         adapter.setConverter(converter);
         adapter.setQos(1);
-        adapter.setOutputChannel(inboundChannel);
+        adapter.setOutputChannel(customInboundChannel);
         return adapter;
     }
 
-    /**
-     * Clients of outbound message channels.
-     * @return
-     */
     @Bean
-    @ServiceActivator(inputChannel = ChannelName.OUTBOUND)
-    public MessageHandler mqttOutbound() {
+    @ServiceActivator(inputChannel = ChannelName.CUSTOM_OUTBOUND)
+    public MessageHandler customMqttOutbound() {
         MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(
-                UUID.randomUUID().toString(), mqttClientFactory);
+                UUID.randomUUID().toString(), customMqttClientFactory);
         DefaultPahoMessageConverter converter = new DefaultPahoMessageConverter();
-        // use byte types uniformly
         converter.setPayloadAsBytes(true);
-
         messageHandler.setAsync(true);
         messageHandler.setDefaultQos(0);
         messageHandler.setConverter(converter);
         return messageHandler;
     }
 
-
-
-    /**
-     * Define a default channel to handle messages that have no effect.
-     * @return
-     */
     @Bean
-    @ServiceActivator(inputChannel = ChannelName.DEFAULT)
-    public MessageHandler defaultInboundHandler() {
+    @ServiceActivator(inputChannel = ChannelName.CUSTOM_DEFAULT)
+    public MessageHandler customDefaultInboundHandler() {
         return message -> {
-            log.info("The default channel does not handle messages." +
+            log.info("Custom channel default handler." +
                     "\nTopic: " + message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC) +
                     "\nPayload: " + message.getPayload() + "\n");
         };

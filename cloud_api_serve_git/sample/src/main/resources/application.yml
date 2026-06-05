@@ -81,9 +81,21 @@ mqtt:
     path: /mqtt
     username: df1560
     password: dfe2k_1500
+  CUSTOM:
+    enabled: false
+    protocol: MQTT
+    # TODO 请配置独立的 EMQX 服务器地址
+    host: 172.20.63.105
+    port: 9205
+    path: /mqtt
+    username: df1560
+    password: dfe2k_1500
+    # 订阅主题，多个用逗号分隔
+    inbound-topic: /+/+/drone/osd
 
 cloud-sdk:
   mqtt:
+    enabled: true
     # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
     inbound-topic: sys/product/+/status,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
 

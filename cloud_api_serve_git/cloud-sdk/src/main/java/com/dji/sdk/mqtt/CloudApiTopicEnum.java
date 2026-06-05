@@ -28,6 +28,8 @@ public enum CloudApiTopicEnum {
 
     DRC_UP(Pattern.compile("^" + THING_MODEL_PRE + PRODUCT + REGEX_SN + DRC + UP + "$"), ChannelName.INBOUND_DRC_UP),
 
+    CUSTOM_DRONE_OSD(Pattern.compile("^/[^/]+/" + REGEX_SN + "/drone/osd$"), ChannelName.INBOUND_CUSTOM_DRONE_OSD),
+
     UNKNOWN(Pattern.compile("^.*$"), ChannelName.DEFAULT);
 
     private final Pattern pattern;

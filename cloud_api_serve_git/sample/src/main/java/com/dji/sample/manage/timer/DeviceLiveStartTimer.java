@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 
 import java.net.URI;
 import java.util.List;
-
+/*
 @Component
 @Slf4j
 public class DeviceLiveStartTimer {
@@ -86,3 +86,5 @@ public class DeviceLiveStartTimer {
     }
 
 }
+
+ */
