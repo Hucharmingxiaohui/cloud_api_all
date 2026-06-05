@@ -72,4 +72,24 @@ public class MqttMessageChannel {
         return new DirectChannel();
     }
 
+    @Bean(name = ChannelName.INBOUND_CUSTOM_DRONE_OSD)
+    public MessageChannel inboundCustomDroneOsdChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean(name = ChannelName.CUSTOM_INBOUND)
+    public MessageChannel customInboundChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean(name = ChannelName.CUSTOM_OUTBOUND)
+    public MessageChannel customOutboundChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean(name = ChannelName.CUSTOM_DEFAULT)
+    public MessageChannel customDefaultChannel() {
+        return new DirectChannel();
+    }
+
 }

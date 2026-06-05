@@ -165,6 +165,14 @@ public class ChannelName {
     public static final String INBOUND_PROPERTY_SET_REPLY = "inboundPropertySetReply";
 
 
+    // custom drone osd
+    public static final String INBOUND_CUSTOM_DRONE_OSD = "inboundCustomDroneOsd";
+
+    // custom link
+    public static final String CUSTOM_INBOUND = "customInbound";
+    public static final String CUSTOM_OUTBOUND = "customOutbound";
+    public static final String CUSTOM_DEFAULT = "customDefault";
+
     // drc/up
     public static final String INBOUND_DRC_UP = "inboundDrcUp";
 

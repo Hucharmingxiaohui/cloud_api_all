@@ -54,6 +54,25 @@ public class MqttPropertyConfiguration {
     }
 
     /**
+     * Get the configuration options of the custom link of the mqtt client.
+     * @return
+     */
+    static MqttClientOptions getCustomClientOptions() {
+        if (!mqtt.containsKey(MqttUseEnum.CUSTOM)) {
+            throw new RuntimeException("Please configure the custom mqtt connection parameters first.");
+        }
+        return mqtt.get(MqttUseEnum.CUSTOM);
+    }
+
+    /**
+     * Get the mqtt address of the custom link.
+     * @return
+     */
+    public static String getCustomMqttAddress() {
+        return getMqttAddress(getCustomClientOptions());
+    }
+
+    /**
      * Splice the mqtt address according to the parameters of different clients.
      * @param options
      * @return
@@ -114,6 +133,26 @@ public class MqttPropertyConfiguration {
     public MqttPahoClientFactory mqttClientFactory() {
         DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
         factory.setConnectionOptions(mqttConnectOptions());
+        return factory;
+    }
+
+    @Bean
+    public MqttConnectOptions customMqttConnectOptions() {
+        MqttClientOptions customizeOptions = getCustomClientOptions();
+        MqttConnectOptions mqttConnectOptions = new MqttConnectOptions();
+        mqttConnectOptions.setServerURIs(new String[]{ getCustomMqttAddress() });
+        mqttConnectOptions.setUserName(customizeOptions.getUsername());
+        mqttConnectOptions.setPassword(StringUtils.hasText(customizeOptions.getPassword()) ?
+                customizeOptions.getPassword().toCharArray() : new char[0]);
+        mqttConnectOptions.setAutomaticReconnect(true);
+        mqttConnectOptions.setKeepAliveInterval(10);
+        return mqttConnectOptions;
+    }
+
+    @Bean
+    public MqttPahoClientFactory customMqttClientFactory() {
+        DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
+        factory.setConnectionOptions(customMqttConnectOptions());
         return factory;
     }
 }
