@@ -208,6 +208,35 @@ export function drawPoints (viewer, options, longitude, latitude, height) {
       color: Cesium.Color.RED, // 传入的颜色
     },
   })
+
+  if (options.stableLabel) {
+    pointEntity.billboard = new Cesium.BillboardGraphics({
+      image: new URL(options.iconUrl, import.meta.url).href,
+      width: options.iconWidth || 34,
+      height: options.iconHeight || 34,
+      depthTest: false,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      pixelOffset: new Cesium.Cartesian2(0, -16)
+    })
+    pointEntity.label = new Cesium.LabelGraphics({
+      text: options.text || '航点',
+      font: `${Number(options.textFontWeight || 700)} ${Number(options.textFontSize || 15)}px Microsoft Yahei`,
+      fillColor: Cesium.Color.fromCssColorString(options.textColor || '#E3FFFD'),
+      outlineColor: Cesium.Color.BLACK.withAlpha(0.75),
+      outlineWidth: 2,
+      style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('#092C3A').withAlpha(0.78),
+      backgroundPadding: new Cesium.Cartesian2(8, 4),
+      horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      depthTest: false,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      pixelOffset: new Cesium.Cartesian2(0, -36)
+    })
+    return pointEntity
+  }
+
   // 调用 renderBillboard 函数生成 billboard 图像
   renderBillboard(options, (error, result) => {
     if (error) {
@@ -216,12 +245,12 @@ export function drawPoints (viewer, options, longitude, latitude, height) {
     }
     const billboard = new Cesium.BillboardGraphics({
       image: result.image,
-      scale: 1.0,
-      width: 80,
-      height: 80,
+      scale: options.billboardScale || 1.0,
+      width: options.billboardWidth || 80,
+      height: options.billboardHeight || 80,
       depthTest: false,
       disableDepthTestDistance: Number.POSITIVE_INFINITY,
-      pixelOffset: new Cesium.Cartesian2(0, -45)
+      pixelOffset: new Cesium.Cartesian2(0, options.billboardOffsetY || -45)
     })
     pointEntity.billboard = billboard
   })

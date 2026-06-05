@@ -46,6 +46,15 @@
               <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
             </el-button>
           </router-link> -->
+          <router-link to="/wayline/solar3d-editor">
+            <el-button
+              class="new_btn iconfont icon-xinjianhangxian"
+              type="primary"
+              style="margin-left: 10px; width: 150px;"
+            >
+              <span style="margin-left: 5px; font-size: 14px;">光伏三维航线编辑</span>
+            </el-button>
+          </router-link>
 
           <el-upload
             :before-upload="beforeUpload"

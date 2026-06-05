@@ -1,5 +1,4 @@
 import * as Cesium from 'cesium'
-let canvas, context
 /**
  * @author: linmaoxin
  * @date: 2024/12/14
@@ -47,12 +46,8 @@ export function renderBillboard (options, callback) {
     textFontWeight: options.textFontWeight || 500, // 默认 文字粗细
   }
 
-  if (!canvas) {
-    canvas = document.createElement('canvas')
-  }
-  if (!context) {
-    context = canvas.getContext('2d', { willReadFrequently: true })
-  }
+  const canvas = document.createElement('canvas')
+  const context = canvas.getContext('2d', { willReadFrequently: true })
   // 字体初始化
   context.font = `${Number(settings.textFontWeight)} ${Number(settings.textFontSize)}px Microsoft Yahei`
   context.fillStyle = settings.textColor

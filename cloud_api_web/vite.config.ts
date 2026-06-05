@@ -15,6 +15,103 @@ import cesium from 'vite-plugin-cesium'
 export default ({ command, mode }: ConfigEnv): UserConfigExport =>
   defineConfig({
     plugins: [
+      {
+        name: 'solar-3d-preview-dev-api',
+        configureServer (server) {
+          let latestPreview = null
+          let latestPreviewVersion = 0
+
+          server.middlewares.use('/dev-api/solar3d-edited', (req, res, next) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204
+              res.end()
+              return
+            }
+
+            if (req.method !== 'POST') {
+              next()
+              return
+            }
+
+            let body = ''
+            req.on('data', chunk => {
+              body += chunk
+            })
+            req.on('end', async () => {
+              const requestId = req.headers['x-solar-edited-request-id'] || `solar-edited-${Date.now()}`
+              console.log(`[SolarEdited][${requestId}] forward start, bytes=${body.length}`)
+              const controller = new AbortController()
+              const timer = setTimeout(() => controller.abort(), 10000)
+
+              try {
+                const upstream = await fetch('http://172.20.63.157:5001/solar/edited', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body,
+                  signal: controller.signal
+                })
+                const text = await upstream.text()
+                console.log(`[SolarEdited][${requestId}] forward done, status=${upstream.status}, bytes=${text.length}`)
+                res.statusCode = upstream.status
+                res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8')
+                res.end(text)
+              } catch (error) {
+                console.error(`[SolarEdited][${requestId}] forward failed:`, error)
+                res.statusCode = 504
+                res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.end(JSON.stringify({
+                  code: 504,
+                  message: error?.name === 'AbortError' ? '航线服务回传超时' : '航线服务回传失败',
+                  detail: error?.message || String(error)
+                }))
+              } finally {
+                clearTimeout(timer)
+              }
+            })
+          })
+
+          server.middlewares.use('/dev-api/solar3d-preview', (req, res, next) => {
+            if (req.method === 'OPTIONS') {
+              res.statusCode = 204
+              res.end()
+              return
+            }
+
+            if (req.method === 'GET') {
+              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+              res.setHeader('Pragma', 'no-cache')
+              res.setHeader('Expires', '0')
+              res.setHeader('Content-Type', 'application/json; charset=utf-8')
+              res.end(JSON.stringify({ code: 0, data: latestPreview, version: latestPreviewVersion }))
+              return
+            }
+
+            if (req.method === 'POST') {
+              let body = ''
+              req.on('data', chunk => { body += chunk })
+              req.on('end', () => {
+                try {
+                  latestPreview = JSON.parse(body || '{}')
+                  latestPreviewVersion = Date.now()
+                  server.ws.send('solar3d-preview-updated', {
+                    payload: latestPreview,
+                    version: latestPreviewVersion
+                  })
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                  res.end(JSON.stringify({ code: 0, message: 'preview received' }))
+                } catch (error) {
+                  res.statusCode = 400
+                  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                  res.end(JSON.stringify({ code: 400, message: 'invalid json' }))
+                }
+              })
+              return
+            }
+
+            next()
+          })
+        }
+      },
       vue(),
       cesium({
         injectCss: false, // 关闭自动注入 CSS
@@ -59,6 +156,11 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
           target: 'http://172.20.63.238:9527',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/path/, ''),
+        },
+        '/solar-route': {
+          target: 'http://172.20.63.157:5001',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/solar-route/, ''),
         },
         '/pathtest1': {
           target: 'https://shona-unsyntactical-quotidianly.ngrok-free.dev',

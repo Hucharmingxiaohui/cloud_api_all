@@ -127,6 +127,15 @@ function setCamera (position, heading, pitch, roll, focalLengthMM = null) {
 
   })
 
+  if (focalLengthMM && cesium.viewer?.camera.frustum instanceof Cesium.PerspectiveFrustum) {
+    const sensorHeightMM = 7.0
+    const sensorDiagonalMM = 9.6
+    const actualFocalLength = Number(focalLengthMM) / (43.3 / sensorDiagonalMM)
+    cesium.viewer.camera.frustum.fov = 2 * Math.atan(sensorHeightMM / (2 * actualFocalLength))
+  }
+
+  updateCameraParameters()
+
 //   cesium.viewer.camera.flyTo({
 //     destination: Cesium.Cartesian3.fromDegrees(120, 36, 10000)
 //   })

@@ -473,6 +473,12 @@ const routes: Array<RouteRecordRaw> = [
         meta: { showInMenu: false, cache: true }
       },
       {
+        path: '/wayline/solar3d-editor',
+        name: 'solar3dRouteEditor',
+        component: () => import('/@/components/cesium/Solar3DRouteEditor.vue'),
+        meta: { showInMenu: false, cache: true }
+      },
+      {
         path: '/modelManage',
         name: 'modelManage',
         component: () => import('/@/components/cesium/modelPanel.vue'),
