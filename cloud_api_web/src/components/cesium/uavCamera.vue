@@ -25,12 +25,31 @@ const emit = defineEmits()
 
 const viewer = ref(null)
 
+let animFrameId = null
+
+function startRenderLoop () {
+  if (!cesium.viewer || cesium.viewer.isDestroyed()) return
+  cesium.viewer.render()
+  animFrameId = requestAnimationFrame(startRenderLoop)
+}
+
 onMounted(() => {
   initCesiumMap()
   startRenderLoop()
   cesium.viewer.camera.changed.addEventListener(() => {
     updateCameraParameters()
   })
+})
+
+onBeforeUnmount(() => {
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId)
+    animFrameId = null
+  }
+  if (cesium.viewer && !cesium.viewer.isDestroyed()) {
+    cesium.viewer.destroy()
+    cesium.viewer = null
+  }
 })
 // -----------------------------------------------场景--------------------------------------------------
 const cesium = {
@@ -86,12 +105,6 @@ function initCesiumMap () {
   }
   cesium.viewer.scene.postProcessStages.fxaa.enabled = true
   cesium.viewer.scene.debugShowFramesPerSecond = false // 显示帧率
-}
-
-// 地图渲染
-function startRenderLoop () {
-  cesium.viewer.render()
-  requestAnimationFrame(startRenderLoop)
 }
 
 // 加载模型

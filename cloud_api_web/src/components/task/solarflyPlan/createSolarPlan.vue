@@ -1,6 +1,6 @@
 <template>
   <div class="main-box">
-    <div class="box-left">
+    <div class="box-left" v-show="viewMode === '2d'">
       <div class="box_title">
         <div class="thumbnail_1"></div>
         <div class="box_text">新建光伏计划</div>
@@ -236,8 +236,20 @@
         </div>
       </div>
     </div>
-    <div class="box-right">
-      <loadSolarPanel :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo"/>
+    <div class="box-right" :class="{ 'full-width': viewMode === '3d' }">
+      <div class="view-toggle">
+        <el-button-group>
+          <el-button :type="viewMode === '2d' ? 'primary' : ''" @click="viewMode = '2d'" size="small">二维视图</el-button>
+          <el-button :type="viewMode === '3d' ? 'primary' : ''" @click="viewMode = '3d'" size="small">三维视图</el-button>
+        </el-button-group>
+        <el-button v-if="viewMode === '3d'" type="warning" @click="viewMode = '2d'" size="small" style="margin-left: 10px;">返回二维</el-button>
+      </div>
+      <div class="view-content">
+        <loadSolarPanel v-if="viewMode === '2d'" :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo"/>
+        <keep-alive>
+          <Solar3DRouteEditor v-if="viewMode === '3d'" container-id="solar3dPreviewContainer" :embedded="true" />
+        </keep-alive>
+      </div>
     </div>
   </div>
 
@@ -268,11 +280,13 @@ import { useMyStore } from '/@/store'
 import { WaylineType, WaylineFile } from '/@/types/wayline'
 import { Device, DEVICE_NAME } from '/@/types/device'
 import { createPlan, CreatePlan, createFlyPlan } from '/@/api/wayline'
+import { saveSolar3DPreviewPayload } from '/@/api/solar3d-route'
 import { getRoot } from '/@/root'
 import { TaskType, OutOfControlActionOptions, OutOfControlAction, TaskTypeOptions } from '/@/types/task'
 import moment, { Moment } from 'moment'
 import { ElTable, ElTableColumn, ElFormItem, ElForm, ElInput, ElButton, ElSelect, ElOption, ElPagination, ElContainer, ElHeader, ElMain, ElFooter, ElDialog, ElMessage, ElMessageBox, ElText, ElLink, ElTag, ElTooltip } from 'element-plus'
 import loadSolarPanel from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
+import Solar3DRouteEditor from '/@/components/cesium/Solar3DRouteEditor.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi, getSolarPanelImgByIdApi, getOrthophotoListApi, getSolarPanelByIdApi } from '/@/api/turbine/turbineMgt'
@@ -280,6 +294,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useMyStore()
 const selectType = ref('')
+const viewMode = ref<'2d' | '3d'>('2d')
 
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 
@@ -635,7 +650,15 @@ async function previewWayline () {
         ElMessage.error('航线预览异常!')
         return
       }
-      waylineInfo.value = res.data.wayline.area.points
+      waylineInfo.value = res.data.wayline.route_2d.area.points
+      const threeDPayload = res.data.wayline.three_d_payload
+      if (threeDPayload) {
+        saveSolar3DPreviewPayload(threeDPayload)
+        window.postMessage({
+          type: 'SOLAR_3D_ROUTE_PREVIEW',
+          payload: threeDPayload
+        }, '*')
+      }
     }
   } catch (error) {
     ElMessage.warning('请填写必填项!')
@@ -770,6 +793,22 @@ async function onSubmit () {
   // border-radius: 15px;
   border: none;
   height:calc(100vh - 110px);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.view-toggle {
+  text-align: right;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+.view-content {
+  flex: 1;
+  overflow: hidden;
+}
+.box-right.full-width {
+  width: 100%;
+  margin-left: 0;
 }
 .create-plan-wrapper {
   background-color: #06265a;

@@ -1,7 +1,7 @@
 <template>
     <!-- <div style="width: 100%; height: 100%;">
         <div style="width: 100%;height: 80px;"></div>
-        <div class="container">
+    <div class="container" :class="{ 'embedded': props.embedded }">
         <div id="cesiumContainer"></div>
         <canvas id="threeContainer"></canvas>
         <div class="show-info">
@@ -116,7 +116,7 @@
       <div class="middle">
         <!-- 右侧占满剩余空间的内容 -->
         <div class="box3">
-          <div id="cesiumContainer"></div>
+          <div :id="cesiumContainerId" class="cesium-container"></div>
           <canvas id="threeContainer"></canvas>
           <!-- <div class="show-info">
             <span> 经度：{{ infoText.longitude }}</span>
@@ -256,7 +256,7 @@
     </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import controlPanel from '../control/ControlDegree.vue'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import AmapMercatorTilingScheme from './AmapMercatorTilingScheme'
@@ -264,7 +264,7 @@ import { AMapImageryProvider, BaiduImageryProvider, GeoVisImageryProvider } from
 import { getLocation, gethWaylineInfo, getWayPointInfo, commitWaylineFile1 } from '/@/api/wayline'
 import * as Cesium from 'cesium'
 import { createSampleWayline, getEllipsoidHeight } from '/@/components/wayline/createWayline'
-import { reactive, onMounted, ref, computed, onBeforeUnmount, watch, nextTick } from 'vue'
+import { reactive, onMounted, ref, computed, onBeforeUnmount, watch, nextTick, defineProps, onActivated, onDeactivated } from 'vue'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { importModelFile, getModelInfoByName, getAllModels, deleteModel } from '/@/api/model'
 import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
@@ -284,6 +284,13 @@ import { generateWaylineRequest } from './kmzRequest'
 import { fetchDevSolar3DPreview, readSolar3DPreviewPayload, saveSolar3DPreviewPayload, submitSolar3DEditedRoute } from '/@/api/solar3d-route'
 import Camera from '/@/pages/page-web/projects/camera.vue'
 import { loadVoxel, checkAndInsertAvoidanceBetweenTwoPoints } from '/src/utils/voxelNav'// 航线规划 体素检测
+
+const props = defineProps<{
+  containerId?: string
+  embedded?: boolean
+}>()
+
+const cesiumContainerId = computed(() => props.containerId || 'cesiumContainer')
 
 let routeEntity = null // 航线 polyline 实体
 const _arrowMat = null
@@ -457,6 +464,8 @@ function GetModels () {
       label: item.model_name,
       value: item.model_id
     }))
+  }).catch(err => {
+    console.warn('获取模型列表失败:', err)
   })
 }
 
@@ -480,8 +489,9 @@ const voxel = null
 onMounted(async () => {
   GetModels()
   init()
+  const tilesetPromise = load3DTiles()
 
-  const cesiumElement = document.getElementById('cesiumContainer')
+  const cesiumElement = document.getElementById(cesiumContainerId.value)
   cesiumElement?.addEventListener('contextmenu', handleRightClick)
   window.receiveSolar3DRoutePreview = (payload) => {
     applySolarPreviewPayload(payload)
@@ -489,9 +499,29 @@ onMounted(async () => {
   window.addEventListener('message', handleSolarPreviewMessage)
   bindSolarPreviewHmrEvents()
   await loadInitialSolarPreview()
+  const tileset = await tilesetPromise
+  if (solarPreview.value && tileset && solarPreview.value.waypoints.length > 0) {
+    zoomToEncompass(tileset, solarPreview.value.waypoints)
+  }
   startSolarPreviewPolling()
 
   // voxel = await loadVoxel('model//Vox') // 这里放 header.json/occupancy.bin 的访问路径根
+})
+
+onActivated(() => {
+  if (animationFrameId) return
+  startRenderLoop()
+  const cached = readSolar3DPreviewPayload()
+  if (cached && !solarPreview.value) {
+    applySolarPreviewPayload(cached)
+  }
+})
+
+onDeactivated(() => {
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId)
+    animationFrameId = null
+  }
 })
 
 function bindSolarPreviewHmrEvents () {
@@ -527,19 +557,19 @@ function startSolarPreviewPolling () {
 }
 
 async function loadInitialSolarPreview () {
+  const cachedPayload = readSolar3DPreviewPayload()
+  if (cachedPayload) {
+    applySolarPreviewPayload(cachedPayload)
+    return
+  }
+
   try {
     const { payload, version } = await fetchDevSolar3DPreview()
     if (payload) {
       applySolarPreviewPayload(payload, version)
-      return
     }
   } catch (error) {
     console.warn('读取本地临时光伏三维预览报文失败:', error)
-  }
-
-  const cachedPayload = readSolar3DPreviewPayload()
-  if (cachedPayload) {
-    applySolarPreviewPayload(cachedPayload)
   }
 }
 
@@ -595,7 +625,12 @@ function clearSceneForPreviewLoad () {
 }
 
 function loadSolarPreview (payload) {
-  if (!payload?.route_draft_id || !Array.isArray(payload.waypoints)) return
+  if (!payload?.route_draft_id || !Array.isArray(payload.waypoints)) {
+    console.warn('Solar3DRouteEditor: 无效的预览数据', payload)
+    return
+  }
+
+  console.log('Solar3DRouteEditor: 加载预览航线', payload.route_draft_id, payload.waypoints.length, '个航点')
 
   clearSceneForPreviewLoad()
   solarPreview.value = payload
@@ -632,12 +667,37 @@ function loadSolarPreview (payload) {
   })
   sessionStorage.setItem('waypointsData', JSON.stringify(tempWaypoints))
   updateRoutePolylineFromTemp()
+
+  if (payload.waypoints.length > 0) {
+    const first = payload.waypoints[0]
+    cesium.viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(first.lon, first.lat, Math.max(first.height + 200, 200)),
+      orientation: {
+        heading: Cesium.Math.toRadians(0),
+        pitch: Cesium.Math.toRadians(-45),
+        roll: 0
+      }
+    })
+  }
+}
+
+function zoomToEncompass (tileset, waypoints) {
+  const centers = waypoints.map(wp =>
+    Cesium.Cartesian3.fromDegrees(wp.lon, wp.lat, wp.height)
+  )
+  if (tileset?.boundingSphere) {
+    centers.push(tileset.boundingSphere.center)
+  }
+  if (centers.length === 0) return
+  const boundingSphere = Cesium.BoundingSphere.fromPoints(centers)
+  cesium.viewer.camera.flyToBoundingSphere(boundingSphere, {
+    offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), boundingSphere.radius * 0.5)
+  })
 }
 
 function init () {
   initCesium()
   startRenderLoop()
-  load3DTiles()
   setupClickEvent()
 }
 // function removeLogo (viewer) {
@@ -646,7 +706,7 @@ function init () {
 // }
 function initCesium () {
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZmJjODE1Yy1kMjU4LTQyZTgtODAyZC1mNzE2MDNhMmQ3YzUiLCJpZCI6MTk5NzQwLCJpYXQiOjE3MDk2Mjg5Mjh9.GuRbyEbm8FknaFOM34kGm9wCbf2XVjp873h_QD-Vs7A'
-  cesium.viewer = new Cesium.Viewer('cesiumContainer', {
+  cesium.viewer = new Cesium.Viewer(cesiumContainerId.value, {
     useDefaultRenderLoop: false,
     selectionIndicator: false,
     infoBox: false,
@@ -711,11 +771,19 @@ function startRenderLoop () {
 }
 //  -------------------------------------------------------------------------------------模型加载-----------------------------------------------------------------------------------------
 // 加载3DTiles模型
-function load3DTiles () {
-  // const tilesetUrl = 'http://172.20.63.157:9000/models/dfelanqiuchang/tileset.json'
-  const tilesetUrl = '/model/dfelanqiuchang/tileset.json' // '/model/Scene/Production_5.json'
-  load3DTilesModels(cesium.viewer, tilesetUrl)
-  childMap.value.loadModel(tilesetUrl)
+async function load3DTiles () {
+  const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
+  const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
+  if (tileset) {
+    console.log('Solar3DRouteEditor: 3D模型加载成功', tileset.boundingSphere)
+    if (!solarPreview.value) {
+      cesium.viewer.zoomTo(tileset)
+    }
+  } else {
+    console.error('Solar3DRouteEditor: 3D模型加载失败', tilesetUrl)
+  }
+  childMap.value?.loadModel(tilesetUrl)
+  return tileset
 }
 
 // 加载glft模型
@@ -1862,6 +1930,13 @@ function createOrUpdateFlowArrowRoute (positions) {
   padding: 10px;
   height: calc(100vh - 100px)
 }
+.container.embedded {
+  height: 100%;
+  padding: 0;
+}
+.container.embedded .middle {
+  width: calc(100% - 800px);
+}
 .left {
   // background-color: #f0f0f0; /* 左侧背景颜色 */
   background: #0a2257; /* 左侧背景颜色 */
@@ -1996,7 +2071,7 @@ function createOrUpdateFlowArrowRoute (positions) {
       width: 100%;
     }
 
-    #cesiumContainer {
+    .cesium-container {
       position: absolute;
       height: 100%;
       width: 100%;

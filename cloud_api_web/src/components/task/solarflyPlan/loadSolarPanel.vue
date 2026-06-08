@@ -96,7 +96,7 @@ watch(() => [props.imagePath, props.detectAreas, props.waylineInfo], async ([new
   if (newWayline && Array.isArray(newWayline) && newWayline.length > 0 && imageRef.value?.complete) {
     drawWayline()
   }
-}, { deep: true })
+}, { deep: true, immediate: true })
 
 // onMounted(() => {
 //   loadTestImage()

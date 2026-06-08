@@ -58,19 +58,13 @@ export function removeLogo (viewer) {
 
 // 加载3DTiles模型
 export function load3DTilesModels (CeramerViewer, tilesetUrl) {
-  Cesium.Cesium3DTileset.fromUrl(tilesetUrl).then((tileset) => {
+  return Cesium.Cesium3DTileset.fromUrl(tilesetUrl).then((tileset) => {
     CeramerViewer.scene.primitives.add(tileset)
-    // const cartographic = Cesium.Cartographic.fromCartesian(tileset.boundingSphere.center)
-    // const surface = Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, cartographic.height)
-    // const offset = Cesium.Cartesian3.fromRadians(cartographic.longitude, cartographic.latitude, 0)
-    // const translation = Cesium.Cartesian3.subtract(offset, surface, new Cesium.Cartesian3())
-    // tileset.modelMatrix = Cesium.Matrix4.fromTranslation(translation)
-    // 设置缩放系数，越小越清晰
     tileset.maximumScreenSpaceError = 1
-    // 定位并缩放到模型位置
-    CeramerViewer.zoomTo(tileset)
+    return tileset
   }).catch((error) => {
     console.error('Error loading tileset:', error)
+    return null
   })
 }
 
