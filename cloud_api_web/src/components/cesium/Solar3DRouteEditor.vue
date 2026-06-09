@@ -1579,6 +1579,17 @@ const currentWaylineName = computed(() => {
 })
 
 async function handlegenerate () {
+  console.log('生成航线按钮点击', {
+    isSolarRouteSubmitting: isSolarRouteSubmitting.value,
+    route_draft_id: solarPreview.value?.route_draft_id,
+    waypointsCount: (() => {
+      try {
+        return (JSON.parse(sessionStorage.getItem('waypointsData')) || []).length
+      } catch {
+        return -1
+      }
+    })()
+  })
   if (isSolarRouteSubmitting.value) {
     ElMessage.warning('光伏三维航线编辑结果正在回传，请勿重复点击')
     return
@@ -1647,7 +1658,7 @@ async function handlegenerate () {
     const data = await submitSolar3DEditedRoute(payload)
 
     if (data?.code !== 0) {
-      ElMessage.error(data?.message || '光伏三维航线编辑回传失败')
+      ElMessage.error(data?.message || data?.msg || '光伏三维航线编辑回传失败')
       return
     }
     ElMessage.success('光伏三维航线编辑结果已回传')
@@ -1655,11 +1666,15 @@ async function handlegenerate () {
   } catch (error) {
     console.error('光伏三维航线编辑回传失败:', error)
     const responseData = error?.response?.data
-    const message = responseData?.message || error?.message || '光伏三维航线编辑回传失败'
+    const message = responseData?.message || responseData?.msg || error?.message || '光伏三维航线编辑回传失败'
     ElMessage.error(message)
   } finally {
     isSolarRouteSubmitting.value = false
     loadingInstance.close()
+    console.log('生成航线流程结束，提交状态已重置', {
+      isSolarRouteSubmitting: isSolarRouteSubmitting.value,
+      route_draft_id: solarPreview.value?.route_draft_id
+    })
   }
 }
 

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import request from '/@/api/http/request'
 
 export interface Solar3DPreviewWaypoint {
   waypoint_id?: string
@@ -39,23 +40,44 @@ export interface Solar3DEditedPayload {
 export const SOLAR_3D_PREVIEW_STORAGE_KEY = 'solar3dRoutePreview'
 
 export async function submitSolar3DEditedRoute (data: Solar3DEditedPayload): Promise<any> {
-  const isDev = import.meta.env.MODE === 'development'
-  const configuredURL = window.CURRENT_CONFIG?.solarRouteURL?.replace(/\/$/, '')
-  const url = isDev
-    ? '/dev-api/solar3d-edited'
-    : `${configuredURL || 'http://172.20.63.157:5001'}/solar/edited`
-
+  const url = '/api/solar3d/edited'
   const requestId = `solar-edited-${Date.now()}-${Math.random().toString(16).slice(2)}`
-  console.log('光伏三维航线编辑回传请求ID:', requestId)
+  const startedAt = Date.now()
 
-  const result = await axios.post(url, data, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Solar-Edited-Request-Id': requestId
-    },
-    timeout: 12000
+  console.log('光伏三维航线编辑回传请求:', {
+    requestId,
+    url,
+    route_draft_id: data.route_draft_id,
+    waypointCount: data.waypoints.length,
+    firstWaypoint: data.waypoints[0],
+    lastWaypoint: data.waypoints[data.waypoints.length - 1]
   })
-  return result.data
+
+  try {
+    const result = await request.post(url, data, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 120000
+    })
+    console.log('光伏三维航线编辑回传响应:', {
+      requestId,
+      elapsedMs: Date.now() - startedAt,
+      status: result.status,
+      data: result.data
+    })
+    return result.data
+  } catch (error) {
+    console.error('光伏三维航线编辑回传请求异常:', {
+      requestId,
+      elapsedMs: Date.now() - startedAt,
+      message: error?.message,
+      code: error?.code,
+      status: error?.response?.status,
+      response: error?.response?.data
+    })
+    throw error
+  }
 }
 
 export async function fetchDevSolar3DPreviewPayload (): Promise<Solar3DPreviewPayload | null> {

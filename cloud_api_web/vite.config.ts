@@ -39,14 +39,18 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
             })
             req.on('end', async () => {
               const requestId = req.headers['x-solar-edited-request-id'] || `solar-edited-${Date.now()}`
+              const startedAt = Date.now()
+              req.on('close', () => {
+                console.warn(`[SolarEdited][${requestId}] client closed, elapsed=${Date.now() - startedAt}ms`)
+              })
               console.log(`[SolarEdited][${requestId}] forward start, bytes=${body.length}`)
               const controller = new AbortController()
-              const timer = setTimeout(() => controller.abort(), 10000)
+              const timer = setTimeout(() => controller.abort(), 120000)
 
               try {
                 const upstream = await fetch('http://172.20.63.157:5001/solar/edited', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 'Content-Type': 'application/json', 'Connection': 'close' },
                   body,
                   signal: controller.signal
                 })
@@ -54,11 +58,15 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
                 console.log(`[SolarEdited][${requestId}] forward done, status=${upstream.status}, bytes=${text.length}`)
                 res.statusCode = upstream.status
                 res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8')
-                res.end(text)
+                res.setHeader('Connection', 'close')
+                res.end(text, () => {
+                  console.log(`[SolarEdited][${requestId}] response sent, elapsed=${Date.now() - startedAt}ms`)
+                })
               } catch (error) {
                 console.error(`[SolarEdited][${requestId}] forward failed:`, error)
                 res.statusCode = 504
                 res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                res.setHeader('Connection', 'close')
                 res.end(JSON.stringify({
                   code: 504,
                   message: error?.name === 'AbortError' ? '航线服务回传超时' : '航线服务回传失败',
