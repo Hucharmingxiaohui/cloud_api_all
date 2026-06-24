@@ -288,6 +288,7 @@ import { loadVoxel, checkAndInsertAvoidanceBetweenTwoPoints } from '/src/utils/v
 const props = defineProps<{
   containerId?: string
   embedded?: boolean
+  planId?: string
 }>()
 
 const cesiumContainerId = computed(() => props.containerId || 'cesiumContainer')
@@ -1627,7 +1628,7 @@ async function handlegenerate () {
     }
 
     const payload = {
-      route_draft_id: solarPreview.value.route_draft_id,
+      route_draft_id: props.planId || solarPreview.value.route_draft_id,
       waypoints: waypointsData.map(point => ({
         lon: Number(point.longitude),
         lat: Number(point.latitude),

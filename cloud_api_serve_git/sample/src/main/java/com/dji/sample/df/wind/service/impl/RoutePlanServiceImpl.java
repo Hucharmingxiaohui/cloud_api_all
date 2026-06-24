@@ -1174,21 +1174,33 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             root.put("solar_params", solarParams);
         }
 
+        root.put("planId", pubWaylineJobPlanDfEntity.getPlanId());
         root.put("orthophoto_id", firstSolarPanelArea.getOrthophotoId());
         root.put("orthophoto_name", orthophotoEntity != null ? orthophotoEntity.getName() : "");
         String jsonString = root.toString();
         log.info("调用光伏航线接口, 请求参数: {}", jsonString);
         String response = httpUtils.sendPostJson(url, jsonString);
         if(pubWaylineJobPlanDfEntity.getIndex() == 0){
+            JSONObject previewWayline = JSON.parseObject(response);
+            JSONObject threeDPayload = previewWayline.getJSONObject("three_d_payload");
+            if (threeDPayload != null) {
+                threeDPayload.put("planId", pubWaylineJobPlanDfEntity.getPlanId());
+                threeDPayload.put("route_draft_id", pubWaylineJobPlanDfEntity.getPlanId());
+            }
             map.put("result",true);
-            map.put("wayline", JSON.parseObject(response));
+            map.put("wayline", previewWayline);
             map.put("plan",pubWaylineJobPlanDfEntity);
             return map;
         }
         JSONObject jsonResponse = JSONObject.parseObject(response);
         String routeName = jsonResponse.getString("routeName");
         String projectPath = System.getProperty("user.dir");
-        String filePath = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator + routeName + ".kmz";
+        String kmzDir = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator;
+        String editedFilePath = kmzDir + routeName + "edited.kmz";
+        String originalFilePath = kmzDir + routeName + ".kmz";
+        String filePath = new File(editedFilePath).exists() ? editedFilePath : originalFilePath;
+        log.info("光伏航线KMZ文件选择, routeName={}, editedFilePath={}, originalFilePath={}, selectedFilePath={}",
+                routeName, editedFilePath, originalFilePath, filePath);
         MultipartFile file = null;
         try {
             file = convert(filePath);
@@ -1209,7 +1221,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
         pubWaylineJobPlanDfEntity.setFileId(entity.getWaylineId());
         pubWaylineJobPlanDfEntity.setWaylineType(0);
-        pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+        if (pubWaylineJobPlanDfEntity.getPlanId() == null || pubWaylineJobPlanDfEntity.getPlanId().trim().isEmpty()) {
+            pubWaylineJobPlanDfEntity.setPlanId(UUID.randomUUID().toString());
+        }
         long currentTimeMillis = System.currentTimeMillis();
         if (pubWaylineJobPlanDfEntity.getTaskType() == 0) {
             pubWaylineJobPlanDfEntity.setBeginTime(currentTimeMillis);

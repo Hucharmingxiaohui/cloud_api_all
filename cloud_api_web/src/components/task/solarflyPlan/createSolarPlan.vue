@@ -247,7 +247,7 @@
       <div class="view-content">
         <loadSolarPanel v-if="viewMode === '2d'" :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo"/>
         <keep-alive>
-          <Solar3DRouteEditor v-if="viewMode === '3d'" container-id="solar3dPreviewContainer" :embedded="true" />
+          <Solar3DRouteEditor v-if="viewMode === '3d'" container-id="solar3dPreviewContainer" :embedded="true" :plan-id="solarCreatePlanId" />
         </keep-alive>
       </div>
     </div>
@@ -295,6 +295,16 @@ const route = useRoute()
 const store = useMyStore()
 const selectType = ref('')
 const viewMode = ref<'2d' | '3d'>('2d')
+
+function createSolarPlanId () {
+  if (window.crypto?.randomUUID) {
+    return window.crypto.randomUUID()
+  }
+  return `solar-plan-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const solarCreatePlanId = createSolarPlanId()
+console.log('新建光伏计划周期 planId:', solarCreatePlanId)
 
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 
@@ -572,6 +582,8 @@ function getSubmitPlanBody () {
     file_id: planBody.file_id,
     dock_sn: planBody.dock_sn,
     image_format: planBody.image_format,
+    plan_id: solarCreatePlanId,
+    planId: solarCreatePlanId,
     area_configs: getAreaConfigPayload()
   }
 }
@@ -653,6 +665,8 @@ async function previewWayline () {
       waylineInfo.value = res.data.wayline.route_2d.area.points
       const threeDPayload = res.data.wayline.three_d_payload
       if (threeDPayload) {
+        threeDPayload.planId = solarCreatePlanId
+        threeDPayload.route_draft_id = solarCreatePlanId
         saveSolar3DPreviewPayload(threeDPayload)
         window.postMessage({
           type: 'SOLAR_3D_ROUTE_PREVIEW',

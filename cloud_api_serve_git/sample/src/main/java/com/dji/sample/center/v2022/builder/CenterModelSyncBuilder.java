@@ -15,10 +15,13 @@ import com.dji.sample.center.v2022.enums.DeviceTypeEnum;
 import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper;
+import com.dji.sample.df.electricInspectionDf.model.PubSubstationDfEntity;
 import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
+import com.dji.sample.df.manageDf.model.entity.WaylinePointEntity;
 import com.dji.sample.df.wind.dao.FanStationPointsMapper;
 import com.dji.sample.df.wind.model.entity.FanStationPoints;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 
 import java.io.File;
@@ -42,13 +45,13 @@ public class CenterModelSyncBuilder {
 
     // 通过 Environment 获取配置值
     private Environment environment = AppContext.getBean(Environment.class);
-    private String longyuanStationCode;
-    private String hebeiStationCode;
+    private String fanPoints;
+    private String stationPoints;
 
     public CenterModelSyncBuilder() {
         // 在构造方法中获取配置值
-        this.longyuanStationCode = environment.getProperty("longyuan.stationCode");
-        this.hebeiStationCode = environment.getProperty("hebei.stationCode");
+        this.fanPoints = environment.getProperty("modelSync.fanPoints");
+        this.stationPoints = environment.getProperty("modelSync.stationPoints");
     }
 
     private static CenterModelSyncBuilder instance = null;
@@ -69,15 +72,10 @@ public class CenterModelSyncBuilder {
     public List<BaseItem> genPatrolUavFile(String subCode) {
         List<BaseItem> items = new ArrayList<>();
         List<PatrolUavPointModelItem> data = new ArrayList<>();
-//        List<WaylinePointEntity> list = iWaylinePointMapper.selectAllData(subCode);
-//        List<PubSubstationDfEntity> pubSubstationDfEntities = pubSubstationDfMapper.selectList(
-//                new LambdaQueryWrapper<PubSubstationDfEntity>()
-//                        .eq(PubSubstationDfEntity::getSubCode, subCode)
-//        );
-//        System.out.println( pubSubstationDfEntities.get(0).getSubName());
-//        String subName = pubSubstationDfEntities.get(0).getSubName();
-//      如果是普通类型查UniPoint。如果风机类型查FanStationPoints,先用场站code写死进行区分
-        if(longyuanStationCode.equals(subCode)){
+
+//      如果是普通类型同步UniPoint表，如果风机类型同步FanStationPoints表
+//      根据配置文件开启开关情况决定点位同步什么类型的点位
+        if("true".equals(fanPoints)) {
             List<FanStationPoints> fanStationPoints = fanStationPointsMapper.selectList(new LambdaQueryWrapper<>());
             if (fanStationPoints != null && fanStationPoints.size() > 0) {
                 for (FanStationPoints entity : fanStationPoints) {
@@ -112,7 +110,10 @@ public class CenterModelSyncBuilder {
                     item.setSave_type_list("2");
                     data.add(item);
                 }
-//              两部分点位，上面是风机点位，下面是航线点位
+            }
+        }
+        if("true".equals(stationPoints)) {
+
                 List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
                 if (uniPoints != null && uniPoints.size() > 0) {
                     for (UniPoint entity : uniPoints) {
@@ -148,71 +149,19 @@ public class CenterModelSyncBuilder {
                     }
                 }
 
-
-                //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
-                String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
-                //生成模型文件
-                PatrolUavPointModelData modelData = new PatrolUavPointModelData();
-                modelData.item = data;
-                this.genModelFile(fileName, modelData);
-                //组织响应消息体
-                PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
-                patrolUavModelItem.setDevice_file_path(fileName);
-                items.add(patrolUavModelItem);
             }
-            return items;
-        }else if(hebeiStationCode.equals(subCode)){
-//          暂时用不到（用上面的逻辑，两种点位都同步，根据有无进行区分）
-            List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
-            if (uniPoints != null && uniPoints.size() > 0) {
-                for (UniPoint entity : uniPoints) {
-                    PatrolUavPointModelItem item = new PatrolUavPointModelItem();
-                    item.setStation_code(subCode);
-                    item.setStation_name(entity.getSubName());
-                    item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
-                    item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
-//              需要确认一下类型
-                    item.setData_type("4");
-                    item.setLower_value("");
-                    item.setUpper_value("");
-                    item.setVideo_pos("");
-                    item.setDevice_id(Optional.ofNullable(entity.getPointCode()).orElse(""));
-                    item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
-                    item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
-                    item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
-                    item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));
-                    item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
-                    item.setMain_device_id(Optional.ofNullable(entity.getDeviceId()).orElse(""));
-                    item.setMain_device_name(Optional.ofNullable(entity.getDeviceName()).orElse(""));
-                    item.setDevice_type(deviceTypeNum(entity.getDeviceName()));
-                    //无人机航拍不巡视表计，暂时设置为空
-                    item.setMeter_type("");
-                    //无人机点位外观类型，暂时设置为空
-                    item.setAppearance_type("");
-                    //现场不需要分析，暂时设置为空
-                    item.setRecognition_type_list(Optional.ofNullable(entity.getPointAnalyseType()).orElse(""));
-                    item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
-                    item.setDevice_info("");
-                    item.setSave_type_list("2");
-                    data.add(item);
-                }
 
-                //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
-                String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
-                //生成模型文件
-                PatrolUavPointModelData modelData = new PatrolUavPointModelData();
-                modelData.item = data;
-                this.genModelFile(fileName, modelData);
-                //组织响应消息体
-                PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
-                patrolUavModelItem.setDevice_file_path(fileName);
-                items.add(patrolUavModelItem);
-            }
+            //文件规范：变电站编码/Model/alarm_threshold_巡视主机编码.xml
+            String fileName = String.format("%s/Model/device_model_%s.xml", subCode, centerNormalConfig.getStationCode());
+            //生成模型文件
+            PatrolUavPointModelData modelData = new PatrolUavPointModelData();
+            modelData.item = data;
+            this.genModelFile(fileName, modelData);
+            //组织响应消息体
+            PatrolUavModelItem patrolUavModelItem = new PatrolUavModelItem();
+            patrolUavModelItem.setDevice_file_path(fileName);
+            items.add(patrolUavModelItem);
             return items;
-        }else {
-//          场站编码不匹配返回空
-            return items;
-        }
     }
 
     /**
