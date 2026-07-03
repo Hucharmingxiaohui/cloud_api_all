@@ -53,6 +53,11 @@ spring:
       charset: UTF-8
       # 长连接保持时间 单位s,不宜过长
       keepAliveTime: 10
+
+# 智能分析接口标准切换: false=一般标准, true=57号文标准
+analyse:
+  standard:
+    document57: false
 jwt:
   issuer: DJI
   subject: CloudApiSample
@@ -196,25 +201,25 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级对接
 switch:
-#  centerNormalTcpEnable: true
-#  centerOtherTcpEnable: true
-#  centerNormalTcpMsgEnable: true
-#  centerOtherTcpMsgEnable: true
-  centerNormalTcpEnable: false
-  centerOtherTcpEnable: false
-  centerNormalTcpMsgEnable: false
-  centerOtherTcpMsgEnable: false
+  centerNormalTcpEnable: true
+  centerOtherTcpEnable: true
+  centerNormalTcpMsgEnable: true
+  centerOtherTcpMsgEnable: true
+#  centerNormalTcpEnable: false
+#  centerOtherTcpEnable: false
+#  centerNormalTcpMsgEnable: false
+#  centerOtherTcpMsgEnable: false
 
 #国网规范对接上级配置
 centernormal:
-  serverIp: 127.0.0.1
+  serverIp: 172.20.63.105
   serverPort: 10019
   stationCode: 192.168.1.16
   serverCode: Server01
 
 #国网规范对接上级ftp
 centerftpsnormal:
-  ftpIp: 172.20.63.150
+  ftpIp: 172.20.63.105
   ftpPort: 10012
   userName: dfftp
   password: dfe2k_1500
@@ -354,3 +359,8 @@ solar:
     #  /dji/orthophoto
     upload-dir: D:/orthophoto/
   stationName: "光伏电站"
+
+modelSync:
+  fanPoints: false
+  stationPoints: true
+

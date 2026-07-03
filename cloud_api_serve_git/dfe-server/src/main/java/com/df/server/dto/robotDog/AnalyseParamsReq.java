@@ -19,17 +19,40 @@ public class AnalyseParamsReq implements Serializable {
      * 实物ID
      */
     private String objectId;
+    //  57号文标准：imageNormalPath   一般: imageNormalUrlPath
     /**
      * 判别基准图
      */
     private String imageNormalUrlPath;
+    private String imageNormalPath;
     /**
      * 类型列表
      */
     private List<String> typeList;
+    //  57号文标准：imagePathList   一般: imageUrlList
     /**
      * 图片URL列表
      */
+    private List<String> imageUrlList;
     private List<String> imagePathList;
 
+    public void setImageNormalPathByStandard(String imageNormalPath, boolean document57) {
+        if (document57) {
+            this.imageNormalPath = imageNormalPath;
+            this.imageNormalUrlPath = null;
+        } else {
+            this.imageNormalUrlPath = imageNormalPath;
+            this.imageNormalPath = null;
+        }
+    }
+
+    public void setImagePathListByStandard(List<String> imagePathList, boolean document57) {
+        if (document57) {
+            this.imagePathList = imagePathList;
+            this.imageUrlList = null;
+        } else {
+            this.imageUrlList = imagePathList;
+            this.imagePathList = null;
+        }
+    }
 }

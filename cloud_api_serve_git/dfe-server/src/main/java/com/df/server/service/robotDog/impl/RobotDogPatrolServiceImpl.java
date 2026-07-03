@@ -5,6 +5,7 @@ import com.df.framework.config.FileConfig;
 import com.df.framework.exception.FastException;
 import com.df.framework.utils.HttpUtils;
 import com.df.framework.utils.CustomStringUtils;
+import com.df.server.config.AnalyseStandardConfig;
 import com.df.server.dto.robotDog.AnalyseImageInfo;
 import com.df.server.dto.robotDog.AnalyseParamsReq;
 import com.df.server.dto.robotDog.RobotDogPointResultDTO;
@@ -59,6 +60,8 @@ public class RobotDogPatrolServiceImpl implements RobotDogPatrolService {
     UniPointMapper uniPointMapper;
     @Autowired
     FileConfig fileConfig;
+    @Autowired
+    private AnalyseStandardConfig analyseStandardConfig;
     @Autowired
     HisUniTaskMapper hisUniTaskMapper;
     @Autowired
@@ -181,7 +184,7 @@ public class RobotDogPatrolServiceImpl implements RobotDogPatrolService {
         AnalyseParamsReq analyseParamsReq = new AnalyseParamsReq();
         //和杨哥有个终生的约定，机器人二次分析的请求，objectId传递，点位编码+"_1"
         analyseParamsReq.setObjectId(pointCode + "_1");
-        analyseParamsReq.setImagePathList(Lists.newArrayList(filePath));
+        analyseParamsReq.setImagePathListByStandard(Lists.newArrayList(filePath), analyseStandardConfig.isDocument57());
         //typeList
         String pointAnalyseType = uniPoint.getPointAnalyseType();
         if (CustomStringUtils.isNotEmpty(pointAnalyseType)) {

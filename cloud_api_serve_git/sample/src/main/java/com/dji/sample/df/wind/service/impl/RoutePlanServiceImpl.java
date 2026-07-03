@@ -1193,7 +1193,11 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             return map;
         }
         JSONObject jsonResponse = JSONObject.parseObject(response);
-        String routeName = jsonResponse.getString("routeName");
+        String routeName = getRouteName(jsonResponse);
+        if (routeName == null || routeName.trim().isEmpty()) {
+            log.error("光伏航线接口响应未返回routeName, response={}", response);
+            throw new RuntimeException("光伏航线接口响应未返回routeName");
+        }
         String projectPath = System.getProperty("user.dir");
         String kmzDir = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator;
         String editedFilePath = kmzDir + routeName + "edited.kmz";
@@ -1237,5 +1241,30 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         return map;
     }
 
-}
 
+    private String getRouteName(JSONObject jsonResponse) {
+        if (jsonResponse == null) {
+            return null;
+        }
+        String routeName = jsonResponse.getString("routeName");
+        if (routeName != null && !routeName.trim().isEmpty()) {
+            return routeName;
+        }
+        JSONObject route2d = jsonResponse.getJSONObject("route_2d");
+        if (route2d != null) {
+            routeName = route2d.getString("routeName");
+            if (routeName != null && !routeName.trim().isEmpty()) {
+                return routeName;
+            }
+        }
+        JSONObject threeDPayload = jsonResponse.getJSONObject("three_d_payload");
+        if (threeDPayload != null) {
+            routeName = threeDPayload.getString("route_name");
+            if (routeName != null && !routeName.trim().isEmpty()) {
+                return routeName;
+            }
+        }
+        return null;
+    }
+
+}

@@ -1,5 +1,6 @@
 package com.df.server.dto.robotDog;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.Data;
@@ -44,7 +45,9 @@ public class AnalyseParamsRecReq {
             private String code;
             private String conf;
             private String desc;
-            private String resImagePath;
+            //          57号文标准：resImagePath   一般: resImageUrl
+            @JsonAlias({"resImagePath", "ResImagePath"})
+            private String resImageUrl;
             private String type;
             private String value;
             private List<Pos> pos;

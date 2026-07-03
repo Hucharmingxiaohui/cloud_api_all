@@ -7,6 +7,7 @@ import com.df.framework.config.FileConfig;
 import com.df.framework.config.VTaskConfig;
 import com.df.framework.utils.CustomStringUtils;
 import com.df.framework.utils.HttpUtils;
+import com.df.server.config.AnalyseStandardConfig;
 import com.df.server.dto.robotDog.AnalyseImageInfo;
 import com.df.server.dto.robotDog.AnalyseParamsRecReq;
 import com.df.server.dto.robotDog.AnalyseParamsReq;
@@ -106,6 +107,8 @@ public class ResultServiceImpl implements ResultService {
     WaylineJobServiceImpl waylineJobServiceimpl;
     @Autowired
     private TemMeasureService temMeasureService;
+    @Autowired
+    private AnalyseStandardConfig analyseStandardConfig;
     //      只针对一个航点对应一个点位（因为点位导入的时候就是点位与一个航点预置位号绑定）
     @Override
     public void handleUavResult(Map<String,String> map,String workspaceId,String jobId) throws Exception {
@@ -263,9 +266,9 @@ public class ResultServiceImpl implements ResultService {
             //发送智能分析
             AnalyseParamsReq analyseParamsReq = new AnalyseParamsReq();
             String regId=uniPoint.getPointCode()+picType;
-//          唯一编码是regId,ObjectId是点位编码+2,1是视频2是机器人
+//          唯一编码是regId,ObjectId是点位编码+2,1是视频2是无人机
             analyseParamsReq.setObjectId(regId + "_2");
-            analyseParamsReq.setImagePathList(Lists.newArrayList(filePath));
+            analyseParamsReq.setImagePathListByStandard(Lists.newArrayList(filePath), analyseStandardConfig.isDocument57());
             //typeList
             String pointAnalyseType = uniPoint.getPointAnalyseType();
             if (CustomStringUtils.isNotEmpty(pointAnalyseType)) {
@@ -389,7 +392,7 @@ public class ResultServiceImpl implements ResultService {
                 if (!results.isEmpty()) {
                     result = results.get(0);
                     code = result.getCode();
-                    resImageUrl = result.getResImagePath();
+                    resImageUrl = result.getResImageUrl();
                     pointValUnit = result.getDesc();
                     if ("2002".equals(code)) {
                         if (StringUtils.isNotBlank(pointValUnit)) {

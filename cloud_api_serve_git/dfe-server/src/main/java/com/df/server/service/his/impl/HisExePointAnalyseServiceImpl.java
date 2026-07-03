@@ -136,7 +136,7 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
                 if (!results.isEmpty()) {
                     result = results.get(0);
                     code = result.getCode();
-                    resImageUrl = result.getResImagePath();
+                    resImageUrl = result.getResImageUrl();
                     pointValUnit = result.getDesc();
                     if ("2002".equals(code)) {
                         if (StringUtils.isNotBlank(pointValUnit)) {
@@ -230,7 +230,7 @@ public class HisExePointAnalyseServiceImpl implements HisExePointAnalyseService 
         String valid = "1"; //识别正常，默认给1
         String point_val = result.getValue();
         String point_val_unit = result.getDesc();
-        String resImageUrl = result.getResImagePath();
+        String resImageUrl = result.getResImageUrl();
         String conf = result.getConf();
 
         //2.如果结果返回多个值，且点位是缺陷类识别，需要特殊处理
