@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
@@ -99,64 +100,7 @@ public class CenterTaskHandler {
             // 遍历所有任务
             for (Object taskObj : allTasks) {
                 try {
-                    if (taskObj == null) continue;
-
-                    String taskInfo = taskObj.toString();
-                    String[] parts = taskInfo.split(":");
-                    if (parts.length < 2) continue;
-
-                    String taskCode = parts[0];
-                    long executeTimestamp = Long.parseLong(parts[1]);
-
-                    // 检查是否到执行时间
-                    if (currentTime >= executeTimestamp) {
-                        // 获取任务详情
-                        Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
-                        if (detailMap == null || detailMap.isEmpty()) {
-                            // 删除无效任务
-                            redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
-                            continue;
-                        }
-
-                        // 转换为String Map
-                        Map<String, String> taskDetail = new HashMap<>();
-                        for (Map.Entry<Object, Object> entry : detailMap.entrySet()) {
-                            if (entry.getKey() != null && entry.getValue() != null) {
-                                taskDetail.put(entry.getKey().toString(), entry.getValue().toString());
-                            }
-                        }
-
-                        String status = taskDetail.get("status");
-                        if ("waiting".equals(status)) {
-                            log.info("执行定时任务: {}", taskCode);
-
-                            // 更新状态为执行中
-                            taskDetail.put("status", "executing");
-                            taskDetail.put("actualStartTime", String.valueOf(currentTime));
-                            redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
-
-                            // 这里需要调用你的执行逻辑,需要区分风机任务和普通任务
-                            // executeTaskLogic(taskCode, taskDetail);
-                            String singleDeviceId = taskDetail.get("deviceId");
-                            String taskName = taskDetail.get("taskName");
-                            String planType = taskDetail.get("planType");
-                            int result = executeTask(planType, singleDeviceId, taskCode, taskName);
-//                          执行成功了才加入监控
-                            if (result == 0) {
-                                redisUtils.set("isCenterTask","1");
-
-                                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                                        .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
-                                );
-                                // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
-                                JobControlHandler.startMonitoringTask(taskCode, taskName);
-                            }
-
-                            // 从有序集合中移除已执行任务
-                            redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
-                        }
-                    }
-
+                    processScheduledTask(taskObj, currentTime);
                 } catch (Exception e) {
                     log.error("处理定时任务失败: {}", taskObj, e);
                 }
@@ -168,6 +112,81 @@ public class CenterTaskHandler {
     }
 
     /**
+     * 处理单个定时任务：判断是否到点、加载详情并触发执行
+     */
+    private void processScheduledTask(Object taskObj, long currentTime) {
+        if (taskObj == null) return;
+
+        String taskInfo = taskObj.toString();
+        String[] parts = taskInfo.split(":");
+        if (parts.length < 2) return;
+
+        String taskCode = parts[0];
+        long executeTimestamp = Long.parseLong(parts[1]);
+
+        // 检查是否到执行时间
+        if (currentTime < executeTimestamp) {
+            return;
+        }
+
+        // 获取任务详情
+        Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
+        if (detailMap == null || detailMap.isEmpty()) {
+            // 删除无效任务
+            redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
+            return;
+        }
+
+        // 转换为String Map
+        Map<String, String> taskDetail = convertToStringMap(detailMap);
+
+        String status = taskDetail.get("status");
+        if (!"waiting".equals(status)) {
+            return;
+        }
+
+        log.info("执行定时任务: {}", taskCode);
+
+        // 更新状态为执行中
+        taskDetail.put("status", "executing");
+        taskDetail.put("actualStartTime", String.valueOf(currentTime));
+        redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
+
+        // 这里需要调用你的执行逻辑,需要区分风机任务和普通任务
+        // executeTaskLogic(taskCode, taskDetail);
+        String singleDeviceId = taskDetail.get("deviceId");
+        String taskName = taskDetail.get("taskName");
+        String planType = taskDetail.get("planType");
+        int result = executeTask(planType, singleDeviceId, taskCode, taskName);
+//      执行成功了才加入监控
+        if (result == 0) {
+            redisUtils.set("isCenterTask","1");
+
+            WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                    .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
+            );
+            // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
+            JobControlHandler.startMonitoringTask(taskCode, taskName);
+        }
+
+        // 从有序集合中移除已执行任务
+        redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
+    }
+
+    /**
+     * 将Redis Hash中的Object键值对转换为String Map
+     */
+    private Map<String, String> convertToStringMap(Map<Object, Object> detailMap) {
+        Map<String, String> taskDetail = new HashMap<>();
+        for (Map.Entry<Object, Object> entry : detailMap.entrySet()) {
+            if (entry.getKey() != null && entry.getValue() != null) {
+                taskDetail.put(entry.getKey().toString(), entry.getValue().toString());
+            }
+        }
+        return taskDetail;
+    }
+
+    /**
      * 执行任务
      */
     private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
@@ -175,57 +194,69 @@ public class CenterTaskHandler {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
 //          间隔航线多对一可以，一对多不可以
             if("0".equals(planType)){
-                UniPoint uniPoint = uniPointMapper2.selectOne(
-                        new QueryWrapper<UniPoint>()
-                                .eq("bay_id", singleDeviceId)
-                                .orderByDesc("id")
-                                .last("LIMIT 1")
-                );
-                String waylineId = uniPoint.getWaylineId();
-                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                        .eq(PubWaylineJobPlanDfEntity::getPlanType, 0)
-                        .eq(PubWaylineJobPlanDfEntity::getFileId, waylineId)
-                        .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
-                        .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
-                        .last("LIMIT 1"));
-                CustomClaim customClaim = new CustomClaim();
-                customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
-                customClaim.setUsername("adminPC");
-                pubWaylineJobPlanDfEntity.setName(taskName);
-                HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
-                if (httpResultResponse.getCode() == 0) {
-                    log.info("成功执行上级任务------");
-                }else {
-                    log.info("执行上级任务失败------");
-                }
-                return httpResultResponse.getCode();
+                return executeNormalTask(singleDeviceId, taskName);
             }else if ("1".equals(planType)){
-                PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                        .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
-                        .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
-                        .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
-                        .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
-                        .last("LIMIT 1"));
-                CustomClaim customClaim = new CustomClaim();
-                customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
-                customClaim.setUsername("adminPC");
-                String fanName = pubWaylineJobPlanDfEntity.getFanName();
-                fanName = fanName.replace("#", "");
-                pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
-                redisUtils.set("taskCode",taskCode);
-                HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
-                if (httpResultResponse.getCode() == 0) {
-                    log.info("成功执行上级任务------");
-                }else {
-                    log.info("执行上级任务失败------");
-                }
-                return httpResultResponse.getCode();
+                return executeFanTask(singleDeviceId, taskCode, taskName);
             }
             return -1;
         } catch (Exception e) {
             log.error("任务执行异常", e);
             return -1;
         }
+    }
+
+    /**
+     * 执行普通任务（planType=0，传入间隔id）
+     */
+    private int executeNormalTask(String singleDeviceId, String taskName) throws SQLException {
+        UniPoint uniPoint = uniPointMapper2.selectOne(
+                new QueryWrapper<UniPoint>()
+                        .eq("bay_id", singleDeviceId)
+                        .orderByDesc("id")
+                        .last("LIMIT 1")
+        );
+        String waylineId = uniPoint.getWaylineId();
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanType, 0)
+                .eq(PubWaylineJobPlanDfEntity::getFileId, waylineId)
+                .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
+                .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
+                .last("LIMIT 1"));
+        pubWaylineJobPlanDfEntity.setName(taskName);
+        return dispatchExpressPlan(pubWaylineJobPlanDfEntity);
+    }
+
+    /**
+     * 执行风机任务（planType=1，传入设备id）
+     */
+    private int executeFanTask(String singleDeviceId, String taskCode, String taskName) throws SQLException {
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
+                .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
+                .eq(PubWaylineJobPlanDfEntity::getTaskType,0)
+                .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
+                .last("LIMIT 1"));
+        String fanName = pubWaylineJobPlanDfEntity.getFanName();
+        fanName = fanName.replace("#", "");
+        pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
+        redisUtils.set("taskCode",taskCode);
+        return dispatchExpressPlan(pubWaylineJobPlanDfEntity);
+    }
+
+    /**
+     * 构造下发凭证并调用上级任务下发接口
+     */
+    private int dispatchExpressPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+        CustomClaim customClaim = new CustomClaim();
+        customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
+        customClaim.setUsername("adminPC");
+        HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+        if (httpResultResponse.getCode() == 0) {
+            log.info("成功执行上级任务------");
+        }else {
+            log.info("执行上级任务失败------");
+        }
+        return httpResultResponse.getCode();
     }
 
     /**

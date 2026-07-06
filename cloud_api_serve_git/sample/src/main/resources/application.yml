@@ -214,7 +214,7 @@ switch:
 centernormal:
   serverIp: 172.20.63.105
   serverPort: 10019
-  stationCode: 192.168.1.16
+  stationCode: uav01
   serverCode: Server01
 
 #国网规范对接上级ftp
@@ -314,18 +314,14 @@ wayline:
   gf-defect_localization-url: "http://172.20.63.157:5005/defectLocalization"
 #  系统编码
 longyuan:
-  sender: "UpperPlatform"
   stationCode: "Sub_WeiLan"
   stationName: "广西蔚蓝风电场"
 uavPlatform:
   sender: "UavPatrolSystem"
   stationCode: "Sub_WeiLan"
-hebei:
-  stationCode: "HDCN"
 
 importPoint:
 #  D:/importPoint/  /home/importPoint/
-  filePath: D:/importPoint/
   modelfilePath: D:/importPoint/模版.xlsx
   subName: "尹夏储能电站"
   systemCode: "UavPatrolSystem"
