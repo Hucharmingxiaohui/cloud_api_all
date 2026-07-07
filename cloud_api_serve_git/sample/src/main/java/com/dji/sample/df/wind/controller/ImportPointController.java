@@ -31,6 +31,10 @@ public class ImportPointController {
     @Value("${importPoint.modelfilePath}")
     String modelfilePath;
 
+    // 点位编码前缀，从配置文件读取
+    @Value("${importPoint.pointCodePrefix}")
+    String pointCodePrefix;
+
     @Autowired
     ImportPointService importPointService;
 
@@ -80,7 +84,7 @@ public class ImportPointController {
                     UUID uuid = UUID.randomUUID();
                     // 生成8位数字
                     String format = String.format("%08d", Math.abs(uuid.getLeastSignificantBits() % 100000000L));
-                    point.setPointCode("YIXIA-"+format);
+                    point.setPointCode(pointCodePrefix+format);
                     importPointService.importPoint(point);
                     successCount++;
                 } catch (Exception e) {

@@ -325,6 +325,8 @@ importPoint:
   modelfilePath: D:/importPoint/模版.xlsx
   subName: "尹夏储能电站"
   systemCode: "UavPatrolSystem"
+  # 点位编码前缀
+  pointCodePrefix: "YIXIA-"
 
 # x86 服务器 SSH 配置
 remote:
