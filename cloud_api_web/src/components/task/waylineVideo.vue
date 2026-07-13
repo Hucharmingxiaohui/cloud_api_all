@@ -6,31 +6,23 @@
                 <div class="nav">
                     <img class="thumbnail_1" referrerpolicy="no-referrer" src="../../assets/v4/nav-icon.png" />
                     <span class="text_9">控制台</span>
-                    <!-- {{ current_sub }} -->
                 </div>
-                <!-- 小标题部分 -->
                 <div class="title">
                     <div class="text-box"> 机场监控</div>
-                    <!-- 机场监控 -->
                 </div>
 
-                <!-- 视频流部分 -->
                 <div class="video-section">
-                    <!-- {{ osdVisible}} -->
                     <LivestreamDock :sn="osdVisible.sn"  :deviceInfo="deviceInfo"></LivestreamDock>
-                     <!-- <div style="display: flex; align-items: center; justify-content: center; color: #fff; font-size: 30px; margin-top: 100px"> 暂不支持</div> -->
                 </div>
 
-                <!-- 地图部分 -->
                 <div class="title">
                     <div class="text-box"> 航线监控</div>
-                    <!-- 机场监控 -->
                 </div>
 
                 <div class="map-section">
-                    <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
-                    <div style="width: 100%; height: 100%;">
-                       <UEPix v-if="!isFlatMap && isMounted"  />
+                    <div title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+                    <div class="map-renderer-box">
+                       <OutdoorRenderer v-if="!isFlatMap && isMounted" />
                        <waylinePanel v-if="isFlatMap && isMounted" />
                     </div>
 
@@ -39,29 +31,16 @@
 
             <!-- 中间内容区域 -->
             <div class="box-middle">
-                <!-- 切换标签部分，放在左侧 -->
-                 <div class="nav-middle">
-                     <div class="nav-title">
+                <div class="nav-middle">
+                    <div class="nav-title">
                         无人机直播
-                     </div>
-                     <!-- <div>
-                        <div class="tab-section">
-                            <div class="tab" :class="{ active: activeTab === 'load' }" @click="switchTab('load')">
-                                负载直播
-                            </div>
-                            <div class="tab" :class="{ active: activeTab === 'flight' }" @click="switchTab('flight')">
-                                飞行相机
-                            </div>
-                        </div>
-                     </div> -->
-                 </div>
+                    </div>
+                </div>
 
-                <!-- 视频流部分 -->
                 <div class="uav-video">
                     <LivestreamOthers :sn="osdVisible.sn"  :deviceInfo="deviceInfo"></LivestreamOthers>
                 </div>
 
-                <!-- 任务名称部分 -->
                 <div class="task-name" style="display: flex; flex-direction: row;">
                     <div style="width: 30%; margin:15px; display: flex;flex-direction: column;">
                         <span style="color: aliceblue; font-size: 14px; font-weight: 500;">任务名称</span>
@@ -94,44 +73,14 @@
                     </div>
                 </div>
                 <div style="height: calc(100vh - 210px); overflow-y: auto;">
-                <!-- 切换标签区域：设备状态、设备运维（放在机舱上方） -->
-                <!-- 上部分：机舱 -->
                 <div class="upper-part" v-if="activeRightTab === 'status'">
                     <deviceState :deviceInfo="deviceInfo" />
                     <droneControlPanel :sn="osdVisible.gateway_sn" :deviceInfo="deviceInfo" :payloads="osdVisible.payloads" />
 
                 </div>
 
-                <!-- 设备运维部分：切换到设备运维时显示6个矩形框 -->
+                <div class="maintenance-section" v-if="activeRightTab === 'maintenance'"></div>
 
-                <div class="maintenance-section" v-if="activeRightTab === 'maintenance'">
-                    <!-- <div class="info-item2">
-                        <p>机场搜星</p>
-                        <p class="data">{{ dataFromBackend.airportSeate }} 个</p>
-                    </div>
-                    <div class="info-item2">
-                        <p>标定状态</p>
-                        <p class="data">{{ dataFromBackend.calibStat }}</p>
-                    </div>
-                    <div class="info-item2">
-                        <p>机场存储</p>
-                        <p class="data">{{ dataFromBackend.airportStor }} G</p>
-                    </div>
-                    <div class="info-item2">
-                        <p>飞行器存储</p>
-                        <p class="data">{{ dataFromBackend.aircraftStor }} G</p>
-                    </div>
-                    <div class="info-item2">
-                        <p>舱内温度</p>
-                        <p class="data">{{ dataFromBackend.cabinTemp }} ℃</p>
-                    </div>
-                    <div class="info-item2">
-                        <p>空调状态</p>
-                        <p class="data">{{ dataFromBackend.airConStat }}</p>
-                    </div> -->
-                </div>
-
-                <!-- 标题“参数” -->
                 <div v-if="activeRightTab === 'maintenance'">
                     <droneSetting :sn="osdVisible.gateway_sn" :deviceInfo="deviceInfo" />
                     <DockControlPanel :sn="osdVisible.gateway_sn"  :deviceInfo="deviceInfo" @close-control-panel="onCloseControlPanel">
@@ -161,7 +110,7 @@ import droneControlPanel from '/@/components/devices/drone_control/drone-control
 import deviceState from '/@/components/devices/drone_control/device_state.vue'
 import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
 import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
-import UEPix from '/@/components/uePix/UEPix.vue'
+import OutdoorRenderer from '/@/components/cloudRenderer/OutdoorRenderer.vue'
 
 const isFlatMap = ref(false) // 是否二维地图
 const isMounted = ref(false) // 是否已经完成初始化
@@ -270,15 +219,19 @@ async function getNowTask () {
 
 const current_sub = ref('') // 当前变电站
 onMounted(() => {
+  isMounted.value = true
   // 从 localStorage 恢复 osdVisible，使 deviceInfo 能够持续接收更新
   const savedOsdInfo = localStorage.getItem('osdInfo')
   if (savedOsdInfo) {
-    const osdData = JSON.parse(savedOsdInfo)
-    store.commit('SET_OSD_VISIBLE_INFO', osdData)
+    try {
+      const osdData = JSON.parse(savedOsdInfo)
+      store.commit('SET_OSD_VISIBLE_INFO', osdData)
+    } catch (error) {
+      console.warn('Restore osdInfo failed:', error)
+    }
   }
 
   getPlans()
-  isMounted.value = true
 })
 // 左侧视频流切换标签
 const activeTab = ref('load') // 默认选中负载直播标签
@@ -507,6 +460,7 @@ function switchRightTab (tab) {
     padding: 2px;
     border: 1px solid #51658A;
     position: relative;
+    overflow: hidden;
     .map-switch{
         position: absolute;
         right: 30px;
@@ -521,6 +475,12 @@ function switchRightTab (tab) {
         z-index: 2000;
         cursor: pointer;
     }
+}
+
+.map-renderer-box {
+    width: 100%;
+    height: 100%;
+    position: relative;
 }
 
 .map {

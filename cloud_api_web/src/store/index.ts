@@ -219,7 +219,11 @@ const mutations: MutationTree<RootStateType> = {
     // delete state.markerInfo.pathMap[info.sn]
   },
   SET_OSD_VISIBLE_INFO (state, info) {
-    state.osdVisible = info
+    const payload = info?.value || info
+    if (!payload) {
+      return
+    }
+    Object.assign(state.osdVisible, payload)
   },
   SET_SELECT_WAYLINE_INFO (state, info) {
     state.waylineInfo = info

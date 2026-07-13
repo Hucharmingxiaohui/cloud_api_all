@@ -774,6 +774,7 @@ function startRenderLoop () {
 // 加载3DTiles模型
 async function load3DTiles () {
   const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
+  // const tilesetUrl = '/model/solarqingxie_1/Scene/solarqingxie_1.json'
   const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
   if (tileset) {
     console.log('Solar3DRouteEditor: 3D模型加载成功', tileset.boundingSphere)

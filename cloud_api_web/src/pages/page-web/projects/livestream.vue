@@ -16,7 +16,7 @@
         <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
         <div style="width: 100%; height: 100%; border: 2px solid white;">
           <TwoDModel v-if="isFlatMap && isMounted" />
-          <UEPix v-if="!isFlatMap && isMounted" />
+          <OutdoorRenderer v-if="!isFlatMap && isMounted" />
         </div>
       </div>
     </div>
@@ -41,7 +41,7 @@ import { EDeviceTypeName } from '/@/types'
 // 重型组件改为异步加载，减少首屏 bundle 体积
 const TwoDModel = defineAsyncComponent(() => import('/@/components/g-map/mapPanel1.vue'))
 const tsaPanel = defineAsyncComponent(() => import('/@/components/tsaPanel.vue'))
-const UEPix = defineAsyncComponent(() => import('/@/components/uePix/UEPix.vue'))
+const OutdoorRenderer = defineAsyncComponent(() => import('/@/components/cloudRenderer/OutdoorRenderer.vue'))
 const showLive1 = ref<boolean>(false)
 const scorllHeight = ref() // 容器自适应滚动高度
 
