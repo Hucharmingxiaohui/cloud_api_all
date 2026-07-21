@@ -86,6 +86,38 @@ const routes: Array<RouteRecordRaw> = [
             }
           },
           {
+            path: '/variableMgt/cloudRenderingMgt',
+            name: 'cloudRenderingMgt',
+            redirect: '/variableMgt/cloudRenderingMgt/outdoor',
+            meta: {
+              showInMenu: true,
+              label: '云渲染管理',
+              cache: false
+            },
+            children: [
+              {
+                path: '/variableMgt/cloudRenderingMgt/outdoor',
+                name: 'cloudRenderingOutdoor',
+                component: () => import('/@/components/variableMgt/cloudRenderingMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '室外渲染配置',
+                  cache: false
+                }
+              },
+              {
+                path: '/variableMgt/cloudRenderingMgt/align',
+                name: 'cloudRenderingAlign',
+                component: () => import('/@/components/variableMgt/cloudRenderingMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '模型配准',
+                  cache: false
+                }
+              }
+            ]
+          },
+          {
             path: '/variableMgt/solarMgt',
             name: 'solarMgt',
             meta: {
@@ -471,6 +503,12 @@ const routes: Array<RouteRecordRaw> = [
         name: 'model',
         component: () => import('/@/components/cesium/3DMapPanel.vue'),
         meta: { showInMenu: false, cache: true }
+      },
+      {
+        path: '/wayline/cloud3d-editor',
+        name: 'cloud3dWaylineEditor',
+        component: () => import('/@/components/cloudRenderer/CloudWaylineEditor.vue'),
+        meta: { showInMenu: false, cache: false }
       },
       {
         path: '/wayline/solar3d-editor',

@@ -9,15 +9,30 @@
     @wheel.prevent="handleWheel"
     @dblclick="handleDoubleClick"
   >
-    <video ref="videoRef" class="cloud-renderer__video" autoplay muted playsinline></video>
+    <video ref="videoRef" class="cloud-renderer__video" :style="{ objectFit: videoFit }" autoplay muted playsinline></video>
     <div v-if="statusText" class="cloud-renderer__status">{{ statusText }}</div>
-    <button class="cloud-renderer__clear" type="button" @click.stop="clearPath">清除轨迹</button>
+    <button v-if="showClearPath" class="cloud-renderer__clear" type="button" @click.stop="clearPath">清除轨迹</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { cloudRendererClient } from './cloudRendererClient'
+import { defineEmits, defineProps, onBeforeUnmount, onMounted, ref, withDefaults } from 'vue'
+import { cloudRendererClient, type CloudRendererClient, type CloudRendererMode } from './cloudRendererClient'
+
+const props = withDefaults(defineProps<{
+  client?: CloudRendererClient
+  renderer?: CloudRendererMode
+  closeOnUnmount?: boolean
+  showClearPath?: boolean
+  videoFit?: 'cover' | 'contain'
+}>(), {
+  client: () => cloudRendererClient,
+  renderer: 'outdoor',
+  closeOnUnmount: false,
+  showClearPath: true,
+  videoFit: 'cover'
+})
+const emit = defineEmits(['status-change'])
 
 const videoRef = ref<HTMLVideoElement | null>(null)
 const statusText = ref('云渲染连接中...')
@@ -41,7 +56,7 @@ function handleMouseMove (event: MouseEvent) {
   const dy = event.clientY - lastY
   lastX = event.clientX
   lastY = event.clientY
-  cloudRendererClient.sendInput(dragAction, { dx, dy })
+  props.client.sendInput(dragAction, { dx, dy })
 }
 
 function handleMouseUp () {
@@ -49,33 +64,39 @@ function handleMouseUp () {
 }
 
 function handleWheel (event: WheelEvent) {
-  cloudRendererClient.sendInput('zoom', { delta: event.deltaY })
+  props.client.sendInput('zoom', { delta: event.deltaY })
 }
 
 function handleDoubleClick (event: MouseEvent) {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
-  cloudRendererClient.pick((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height)
+  props.client.pick((event.clientX - rect.left) / rect.width, (event.clientY - rect.top) / rect.height)
 }
 
 function clearPath () {
-  cloudRendererClient.clearPath()
+  props.client.clearPath()
 }
 
 onMounted(() => {
-  stopStatusListener = cloudRendererClient.onStatusChange(status => {
+  stopStatusListener = props.client.onStatusChange(status => {
     statusText.value = status
+    emit('status-change', status)
   })
-  cloudRendererClient.attachVideo(videoRef.value)
-  cloudRendererClient.start().then(() => {
-    cloudRendererClient.attachVideo(videoRef.value)
+  props.client.attachVideo(videoRef.value)
+  props.client.start(props.renderer).then(() => {
+    props.client.attachVideo(videoRef.value)
+  }).catch(error => {
+    const message = error instanceof Error ? error.message : '云渲染会话启动失败'
+    statusText.value = message
+    emit('status-change', message)
   })
 })
 
 onBeforeUnmount(() => {
   stopStatusListener?.()
   stopStatusListener = null
-  cloudRendererClient.detachVideo(videoRef.value)
+  props.client.detachVideo(videoRef.value)
+  if (props.closeOnUnmount) props.client.close()
 })
 </script>
 

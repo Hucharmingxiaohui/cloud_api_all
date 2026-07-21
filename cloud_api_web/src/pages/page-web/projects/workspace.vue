@@ -4,7 +4,7 @@
       <Sidebar />
     </a-layout-header>
     <a-layout-content class="content-bg" >
-      <router-view />
+      <router-view class="workspace-view" />
     </a-layout-content>
 
   </a-layout>
@@ -174,6 +174,12 @@ onMounted(() => {
     // background-color: #05204B;
     // margin-top: 10px;
     height: calc(100vh - 100px);
+    min-height: 0;
+    overflow: hidden;
+}
+.workspace-view{
+    height: 100%;
+    min-height: 0;
 }
 .map-wrapper{
     width: 100%;

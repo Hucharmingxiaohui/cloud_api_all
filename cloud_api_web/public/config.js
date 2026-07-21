@@ -9,6 +9,7 @@ const CURRENT_CONFIG = {
   UEPixURL: 'ws://172.20.63.106:901',
   cloudRenderer: {
     baseURL: 'http://127.0.0.1:3000',
+    renderer: 'outdoor',
     pointCloudFile: '3dgs/7.1.1.ply',
     rendererParams: {
       alignSplatFile: '3dgs/7.1.1.ply',

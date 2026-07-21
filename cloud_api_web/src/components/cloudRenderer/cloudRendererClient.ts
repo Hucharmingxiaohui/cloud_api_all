@@ -1,4 +1,4 @@
-import { CURRENT_CONFIG } from '/@/api/http/config'
+import { getCloudRendererConfig } from './cloudRendererConfig'
 
 type SignalMessage = {
   type: string
@@ -8,6 +8,8 @@ type SignalMessage = {
 }
 
 type StatusListener = (status: string) => void
+type SignalListener = (message: SignalMessage) => void
+export type CloudRendererMode = 'outdoor' | 'align' | 'wayline'
 
 const DEFAULT_RENDERER_CONFIG = {
   baseURL: 'http://127.0.0.1:3000',
@@ -16,16 +18,10 @@ const DEFAULT_RENDERER_CONFIG = {
     alignSplatFile: '3dgs/7.1.1.ply',
     alignReferenceTileset: '3dgs/dfelanqiuchang/tileset.json'
   },
-  iceServers: [
-    {
-      urls: 'turn:172.20.13.53:3478?transport=udp',
-      username: 'cloudrender',
-      credential: 'CloudRender@123456'
-    }
-  ]
+  iceServers: []
 }
 
-class CloudRendererClient {
+export class CloudRendererClient {
   private sessionId = ''
   private ws: WebSocket | null = null
   private pc: RTCPeerConnection | null = null
@@ -35,11 +31,16 @@ class CloudRendererClient {
   private signalReconnectTimer: number | null = null
   private pendingIceCandidates: any[] = []
   private statusListeners = new Set<StatusListener>()
+  private signalListeners = new Set<SignalListener>()
   private videoElements = new Set<HTMLVideoElement>()
   private closed = false
+  private renderer: CloudRendererMode = 'outdoor'
+  private sessionBaseURL = ''
+  private generation = 0
+  private restartPromise: Promise<void> | null = null
 
   private get config () {
-    const userConfig = CURRENT_CONFIG.cloudRenderer || {}
+    const userConfig = getCloudRendererConfig()
     return {
       ...DEFAULT_RENDERER_CONFIG,
       ...userConfig,
@@ -50,13 +51,18 @@ class CloudRendererClient {
     }
   }
 
-  start () {
+  start (renderer: CloudRendererMode = 'outdoor') {
+    if (this.restartPromise && this.sessionId) return this.restartPromise
+    if (this.sessionId && this.renderer !== renderer) {
+      return this.restart(renderer)
+    }
     this.closed = false
+    this.renderer = renderer
     if (this.startPromise) return this.startPromise
     if (this.sessionId && this.ws) return Promise.resolve()
 
     this.setStatus('云渲染连接中...')
-    this.startPromise = this.createSession()
+    const startPromise = this.createSession()
       .then(() => {
         if (!this.closed) {
           this.connectSignal()
@@ -67,11 +73,12 @@ class CloudRendererClient {
           console.error('Cloud renderer start failed:', error)
           this.setStatus('云渲染启动失败')
         }
+        throw error
       })
       .finally(() => {
-        this.startPromise = null
+        if (this.startPromise === startPromise) this.startPromise = null
       })
-
+    this.startPromise = startPromise
     return this.startPromise
   }
 
@@ -110,8 +117,39 @@ class CloudRendererClient {
     this.sendSignal({ type: 'drone-control', action: 'clear-path' })
   }
 
+  sendAlignCommand (action: string, payload: Record<string, any> = {}) {
+    this.sendSignal({ type: 'align-command', action, ...payload })
+  }
+
+  sendWaylineCommand (action: string, payload: Record<string, any> = {}) {
+    this.sendSignal({ type: 'wayline-command', action, ...payload })
+  }
+
+  onSignalMessage (listener: SignalListener) {
+    this.signalListeners.add(listener)
+    return () => {
+      this.signalListeners.delete(listener)
+    }
+  }
+
+  async restart (renderer: CloudRendererMode = this.renderer) {
+    if (this.restartPromise) return this.restartPromise
+    const videos = [...this.videoElements]
+    const pendingStart = this.startPromise
+    this.restartPromise = (async () => {
+      await this.close()
+      if (pendingStart) await pendingStart.catch(() => undefined)
+      videos.forEach(video => this.attachVideo(video))
+      await this.start(renderer)
+    })().finally(() => {
+      this.restartPromise = null
+    })
+    return this.restartPromise
+  }
+
   async close () {
     this.closed = true
+    this.generation += 1
     this.clearTimers()
     this.closePeer()
     this.ws?.close()
@@ -123,9 +161,11 @@ class CloudRendererClient {
     this.videoElements.clear()
     if (this.sessionId) {
       const currentSession = this.sessionId
+      const sessionBaseURL = this.sessionBaseURL || this.config.baseURL
       this.sessionId = ''
+      this.sessionBaseURL = ''
       try {
-        await fetch(this.buildHttpUrl(`/api/session/${encodeURIComponent(currentSession)}/close`), { method: 'POST' })
+        await fetch(new URL(`/api/session/${encodeURIComponent(currentSession)}/close`, sessionBaseURL).toString(), { method: 'POST' })
       } catch (error) {
         console.warn('Cloud renderer close session failed:', error)
       }
@@ -143,10 +183,13 @@ class CloudRendererClient {
   }
 
   private async createSession () {
+    const generation = this.generation
+    const sessionBaseURL = this.config.baseURL
     const res = await fetch(this.buildHttpUrl('/api/session'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        renderer: this.renderer,
         pointCloudFile: this.config.pointCloudFile,
         rendererParams: this.config.rendererParams
       })
@@ -154,8 +197,16 @@ class CloudRendererClient {
     if (!res.ok) {
       throw new Error(`创建云渲染会话失败：${res.status}`)
     }
-    const data = await res.json()
-    this.sessionId = data.id
+    const response = await res.json()
+    const data = response?.data || response
+    const sessionId = data?.id || data?.sessionId
+    if (!sessionId) throw new Error('云渲染会话响应缺少 id')
+    if (generation !== this.generation || this.closed) {
+      await fetch(new URL(`/api/session/${encodeURIComponent(sessionId)}/close`, sessionBaseURL).toString(), { method: 'POST' }).catch(() => undefined)
+      throw new Error('云渲染会话创建已取消')
+    }
+    this.sessionId = sessionId
+    this.sessionBaseURL = sessionBaseURL
   }
 
   private connectSignal () {
@@ -187,6 +238,8 @@ class CloudRendererClient {
   }
 
   private async handleSignalMessage (msg: SignalMessage) {
+    this.signalListeners.forEach(listener => listener(msg))
+
     if (msg.type === 'renderer-ready') {
       await this.createPeerAndOffer()
       return

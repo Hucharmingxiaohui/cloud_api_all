@@ -37,15 +37,15 @@
           >
             删除
           </el-button>
-          <!-- <router-link to="/wayline/Model">
+          <router-link to="/wayline/cloud3d-editor">
             <el-button
               class="new_btn iconfont icon-xinjianhangxian"
               type="primary"
-              style="margin-left: 10px; width: 100px;"
+              style="margin-left: 10px; width: 160px;"
             >
-              <span style="margin-left: 5px; font-size: 14px;">三维航线</span>
+              <span style="margin-left: 5px; font-size: 14px;">云渲染三维航线</span>
             </el-button>
-          </router-link> -->
+          </router-link>
           <router-link to="/wayline/solar3d-editor">
             <el-button
               class="new_btn iconfont icon-xinjianhangxian"

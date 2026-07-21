@@ -18,6 +18,21 @@
           <TwoDModel v-if="isFlatMap && isMounted" />
           <OutdoorRenderer v-if="!isFlatMap && isMounted" />
         </div>
+        <div v-if="!isFlatMap && livestream.visible" class="liveview">
+          <div class="liveview__header">
+            <div class="liveview__title">监控直播</div>
+            <button class="liveview__close" type="button" @click="closeLivestream">×</button>
+          </div>
+          <div class="liveview__tabs">
+            <el-button class="btn" :class="{ active: showLive }" @click="toggleDroneVideo">无人机视频</el-button>
+            <el-button class="btn" :class="{ active: showDockLive }" @click="toggleDockVideo">机场视频</el-button>
+          </div>
+          <div class="liveview__video">
+            <LivestreamOthers v-if="showLive" :sn="livestream.dorne_sn" />
+            <LivestreamDock v-else-if="showDockLive" :sn="livestream.dock_sn" />
+            <div v-else class="liveview__empty">请选择监控画面</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -42,6 +57,8 @@ import { EDeviceTypeName } from '/@/types'
 const TwoDModel = defineAsyncComponent(() => import('/@/components/g-map/mapPanel1.vue'))
 const tsaPanel = defineAsyncComponent(() => import('/@/components/tsaPanel.vue'))
 const OutdoorRenderer = defineAsyncComponent(() => import('/@/components/cloudRenderer/OutdoorRenderer.vue'))
+const LivestreamOthers = defineAsyncComponent(() => import('/@/components/livestream-others.vue'))
+const LivestreamDock = defineAsyncComponent(() => import('/@/components/livestream-dock.vue'))
 const showLive1 = ref<boolean>(false)
 const scorllHeight = ref() // 容器自适应滚动高度
 
@@ -57,7 +74,8 @@ const isMounted = ref(false) // 是否已经完成初始化
 
 // 无人机视频---------------------------------------------------
 const toggleDroneVideo = () => {
-  showLive.value = !showLive.value
+  showLive.value = true
+  showDockLive.value = false
 }
 // Function to close the video window
 const closeVideo = () => {
@@ -65,7 +83,8 @@ const closeVideo = () => {
 }
 // 机场视频------------------------------------------------------
 const toggleDockVideo = () => {
-  showDockLive.value = !showDockLive.value
+  showDockLive.value = true
+  showLive.value = false
 }
 const closeDockVideo = () => {
   showDockLive.value = false
@@ -183,6 +202,14 @@ const deviceInfo = reactive({
 const osdVisible = computed(() => {
   return store.state.osdVisible
 })
+const livestream = computed(() => store.state.liveStream)
+
+function closeLivestream () {
+  livestream.value.visible = false
+  showLive.value = false
+  showDockLive.value = false
+  store.commit('SET_LIVESTREAM_INFO', livestream)
+}
 
 //  设备联通，位置在地图显示
 watch(() => store?.state.deviceStatusEvent,
@@ -328,6 +355,90 @@ watch(() => store?.state.deviceState, data => {
     border: 1px solid #2da3a5;
     border-radius: 8px;
     overflow: hidden;
+  }
+}
+
+.liveview {
+  position: absolute;
+  z-index: 5000;
+  top: 30px;
+  left: 30px;
+  width: min(520px, calc(100% - 60px));
+  height: 410px;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background: rgba(5, 25, 61, 0.96);
+  border: 1px solid rgba(52, 181, 238, 0.9);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.48), inset 0 0 20px rgba(34, 135, 255, 0.22);
+}
+
+.liveview__header {
+  height: 42px;
+  padding: 0 12px 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(45, 163, 165, 0.45);
+  background: linear-gradient(90deg, rgba(11, 82, 132, 0.82), rgba(5, 25, 61, 0.4));
+}
+
+.liveview__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.liveview__close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #d9f7ff;
+  font-size: 23px;
+  line-height: 24px;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+.liveview__tabs {
+  height: 48px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.liveview__tabs .btn.active {
+  color: #fff;
+  border-color: #47d6ff;
+  background: linear-gradient(to top, #168dc4, #07527c);
+}
+
+.liveview__video {
+  flex: 1;
+  min-height: 0;
+  margin: 0 12px 12px;
+  overflow: hidden;
+  border: 1px solid rgba(45, 163, 165, 0.55);
+  background: #050b12;
+}
+
+.liveview__empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7898ad;
+}
+
+@media (max-width: 900px) {
+  .liveview {
+    top: 18px;
+    left: 18px;
+    width: calc(100% - 36px);
+    height: 360px;
   }
 }
 .box-right1 {
