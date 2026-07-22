@@ -111,7 +111,8 @@
           <section class="edit-section">
             <h3>姿态与拍摄</h3>
             <div class="form-grid">
-              <label>偏航角 / 航向角 (°)<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359" :step="1" controls-position="right" @change="updateCamera" /></label>
+              <label>真实偏航（下发飞机）<el-input-number :model-value="selectedWaypoint.headingTrue" :precision="1" disabled /></label>
+              <label>场景偏航（画面朝向）<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>俯仰角 (°)<el-input-number v-model="selectedWaypoint.camera_params.pitch" :min="-90" :max="0" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>滚转角 (°)<el-input-number v-model="selectedWaypoint.camera_params.roll" :min="-180" :max="180" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>35mm 焦距 (mm)<el-input-number v-model="selectedWaypoint.camera_params.focalLength" :min="1" :max="500" :step="1" controls-position="right" @change="updateCamera" /></label>
@@ -123,7 +124,7 @@
             </div>
             <div class="attitude-nudges">
               <div class="attitude-nudge">
-                <span>偏航角</span>
+                <span>场景偏航</span>
                 <el-button @click="nudgeCamera('heading', angleStep)">向左 +</el-button>
                 <el-button @click="nudgeCamera('heading', -angleStep)">向右 -</el-button>
               </div>
@@ -170,6 +171,7 @@ interface Waypoint {
   height: number
   capture_mode: CaptureMode
   speed: number
+  headingTrue: number
   camera_params: WaypointCamera
 }
 interface WaylineState { routeName: string; selectedIndex: number; waypoints: Waypoint[] }
@@ -312,6 +314,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
       height: Number(point.height),
       capture_mode: captureMode,
       speed: Number(point.speed ?? 5),
+      headingTrue: Number(point.headingTrue),
       camera_params: {
         heading: Number(camera.heading ?? 0),
         pitch: Number(camera.pitch ?? -45),
@@ -319,7 +322,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
         focalLength: Number(camera.focalLength ?? 75)
       }
     }
-    if (![normalized.longitude, normalized.latitude, normalized.height, normalized.speed, normalized.camera_params.heading, normalized.camera_params.pitch, normalized.camera_params.roll, normalized.camera_params.focalLength].every(Number.isFinite)) return null
+    if (![normalized.longitude, normalized.latitude, normalized.height, normalized.speed, normalized.headingTrue, normalized.camera_params.heading, normalized.camera_params.pitch, normalized.camera_params.roll, normalized.camera_params.focalLength].every(Number.isFinite)) return null
     waypoints.push(normalized)
   }
   const selectedIndex = Number(payload.selectedIndex)
@@ -350,7 +353,7 @@ function buildWaylineRequest (routeName: string, points: Waypoint[]) {
     waypointTurnReq: { waypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', useStraightLine: 1 },
     startActionList: [],
     routePointList: points.map((point, index) => {
-      const heading = normalizeHeading(point.camera_params.heading)
+      const heading = normalizeHeading(point.headingTrue)
       const actions: Record<string, unknown>[] = [{ actionIndex: 0, aircraftHeading: heading, aircraftPathMode: 'counterClockwise' }]
       if (point.capture_mode !== 'none') {
         actions.push({
@@ -399,6 +402,7 @@ function validateWaypoints (points: Waypoint[]) {
     if (!Number.isFinite(Number(point.latitude)) || point.latitude < -90 || point.latitude > 90) return `航点 ${index + 1} 纬度无效`
     if (!Number.isFinite(Number(point.height))) return `航点 ${index + 1} 高度无效`
     if (!Number.isFinite(Number(point.speed)) || point.speed <= 0) return `航点 ${index + 1} 速度无效`
+    if (!Number.isFinite(Number(point.headingTrue))) return `航点 ${index + 1} 缺少真实偏航角`
     if (point.capture_mode !== 'none' && (!Number.isFinite(Number(point.camera_params.focalLength)) || point.camera_params.focalLength <= 0)) return `航点 ${index + 1} 焦距无效`
   }
   return ''
