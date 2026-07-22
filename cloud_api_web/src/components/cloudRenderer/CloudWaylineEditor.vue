@@ -182,7 +182,6 @@ const router = useRouter()
 const waylineClient = new CloudRendererClient()
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
-const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
@@ -425,7 +424,6 @@ function validateWaypoints (points: Waypoint[]) {
 function normalizeHeading (value: number) { return Math.min(((Number(value) % 360) + 360) % 360, 359) }
 function captureModeLabel (mode: CaptureMode) { return ({ none: '过渡点', visable: '可见光', ir: '红外', 'visable,ir': '可见光 + 红外' } as Record<CaptureMode, string>)[mode] || '可见光' }
 function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s_]+/g, '-') || 'wayline' }
-function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s]+/g, '_') || 'wayline' }
 function normalizeRouteName (name: string) { return String(name).replace(/_/g, '-') }
 function formatCoordinate (value: number) { return Number(value).toFixed(6) }
 function formatNumber (value: number, precision: number) { return Number(value).toFixed(precision) }
