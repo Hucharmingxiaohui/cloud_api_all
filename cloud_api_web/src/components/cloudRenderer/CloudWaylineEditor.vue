@@ -160,6 +160,8 @@ import { useRouter } from 'vue-router'
 import OutdoorRenderer from './OutdoorRenderer.vue'
 import { CloudRendererClient } from './cloudRendererClient'
 import { getCloudRendererConfig } from './cloudRendererConfig'
+import { importSubKmzFile } from '/@/api/wayline'
+import { ELocalStorageKey } from '/@/types'
 
 type CaptureMode = 'none' | 'visable' | 'ir' | 'visable,ir'
 interface WaypointCamera { heading: number; pitch: number; roll: number; focalLength: number }
@@ -176,7 +178,8 @@ interface WaylineState { routeName: string; selectedIndex: number; waypoints: Wa
 
 const router = useRouter()
 const waylineClient = new CloudRendererClient()
-const waylineState = reactive<WaylineState>({ routeName: `wayline_${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
+const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
+const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
@@ -280,13 +283,20 @@ async function buildKmz () {
     }
     const blob = await response.blob()
     if (!blob.size) throw new Error('云渲染服务返回了空的 KMZ 文件')
+    const fileName = `${sanitizeFileName(routeName)}.kmz`
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `${sanitizeFileName(routeName)}.kmz`
+    anchor.download = fileName
     anchor.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-    ElMessage.success('KMZ 航线已生成并下载')
+
+    if (!workspaceId) throw new Error('未获取到工作空间，无法导入航线')
+    const fileData = new FormData()
+    fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
+    const importRes = await importSubKmzFile(workspaceId, fileData)
+    if (importRes.code !== 0) throw new Error(importRes.message || '航线导入失败')
+    ElMessage.success('KMZ 航线已生成、下载并导入成功')
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return
     ElMessage.error(error instanceof Error ? error.message : 'KMZ 航线生成失败')
@@ -405,12 +415,12 @@ function validateWaypoints (points: Waypoint[]) {
 }
 function normalizeHeading (value: number) { return Math.min(((Number(value) % 360) + 360) % 360, 359) }
 function captureModeLabel (mode: CaptureMode) { return ({ none: '过渡点', visable: '可见光', ir: '红外', 'visable,ir': '可见光 + 红外' } as Record<CaptureMode, string>)[mode] || '可见光' }
-function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s]+/g, '_') || 'wayline' }
+function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s_]+/g, '-') || 'wayline' }
 function formatCoordinate (value: number) { return Number(value).toFixed(6) }
 function formatNumber (value: number, precision: number) { return Number(value).toFixed(precision) }
 function formatDate (date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 }
 
 onBeforeUnmount(() => {
