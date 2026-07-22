@@ -163,7 +163,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="330px">
+          <el-table-column label="操作" width="380px">
             <template #default="scope">
               <div class="action-buttons">
                 <el-button
@@ -181,6 +181,14 @@
                   class="preview"
                   @click="openDrag(scope.row.id, scope.row.template_types[0])"
                   >预览</el-button
+                >
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  :loading="editingWaylineId === scope.row.id"
+                  @click="openCloud3dEdit(scope.row)"
+                  >三维编辑</el-button
                 >
                 <!-- <el-button size="small" link type="primary" class="waylipot"
                   @click="openWaylinePoints(scope.row)">航点</el-button>
@@ -240,6 +248,8 @@ import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-p
 import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, batchDeleteWaylineFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
+import { saveCloudWaylineEditDraft } from '/@/components/cloudRenderer/cloudWaylineMapper'
+import { parseKmzBlobToCloudDraft } from '/@/components/cloudRenderer/kmzBrowserParser'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { DEVICE_NAME } from '/@/types/device'
@@ -261,6 +271,7 @@ import {
 const router = useRouter()
 const searchValue = ref('') // 搜索内容
 const loading = ref(false)
+const editingWaylineId = ref('')
 const store = useMyStore()
 const useGMapCoverHook = useGMapCover(store)
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
@@ -509,6 +520,43 @@ function downloadWayline (waylineId: string, fileName: string) {
   }).finally(() => {
     loading.value = false
   })
+}
+
+/**
+ * 三维编辑：下载 KMZ → 前端本地解析 → 映射云渲染 waypoints → 进入 cloud3d-editor
+ * 不调用后端 getKmzWaypointWayLineInfo（避免后端 Integer.parseInt 小数崩溃）
+ */
+async function openCloud3dEdit (row: { id: string; name?: string; template_types?: number[] }) {
+  if (!row?.id) {
+    ElMessage.error('航线 ID 无效')
+    return
+  }
+  if (editingWaylineId.value) return
+  editingWaylineId.value = row.id
+  try {
+    const blob = await downloadWaylineFile(workspaceId, row.id)
+    if (!blob) throw new Error('航线文件下载失败')
+    const draft = await parseKmzBlobToCloudDraft(blob, {
+      waylineId: row.id,
+      routeName: row.name || ''
+    })
+    saveCloudWaylineEditDraft(draft)
+    console.info('[cloud3d-edit] draft ready', {
+      waylineId: draft.waylineId,
+      routeName: draft.routeName,
+      count: draft.waypoints.length,
+      sample: draft.waypoints[0]
+    })
+    await router.push({
+      path: '/wayline/cloud3d-editor',
+      query: { mode: 'edit', waylineId: row.id }
+    })
+  } catch (error) {
+    console.error('[cloud3d-edit] failed', error)
+    ElMessage.error(error instanceof Error ? error.message : '打开三维编辑失败')
+  } finally {
+    editingWaylineId.value = ''
+  }
 }
 
 function selectRoute (wayline: WaylineFile) {
