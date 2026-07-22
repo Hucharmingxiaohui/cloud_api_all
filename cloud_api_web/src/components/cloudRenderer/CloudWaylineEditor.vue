@@ -178,7 +178,7 @@ interface WaylineState { routeName: string; selectedIndex: number; waypoints: Wa
 
 const router = useRouter()
 const waylineClient = new CloudRendererClient()
-const waylineState = reactive<WaylineState>({ routeName: `wayline_${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
+const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
@@ -194,10 +194,14 @@ const stopSignalListener = waylineClient.onSignalMessage(message => {
     ElMessage.warning('云渲染服务返回了无效的航点状态')
     return
   }
-  waylineState.routeName = payload.routeName || waylineState.routeName
+  const routeName = normalizeRouteName(payload.routeName || waylineState.routeName)
+  waylineState.routeName = routeName
   waylineState.selectedIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : -1
   waylineState.waypoints = Array.isArray(payload.waypoints) ? payload.waypoints : []
-  routeNameInput.value = waylineState.routeName
+  routeNameInput.value = routeName
+  if (payload.routeName !== routeName) {
+    waylineClient.sendWaylineCommand('set-route-name', { value: routeName })
+  }
 })
 
 function handleStatusChange (status: string) { statusText.value = status }
@@ -410,11 +414,12 @@ function validateWaypoints (points: Waypoint[]) {
 function normalizeHeading (value: number) { return Math.min(((Number(value) % 360) + 360) % 360, 359) }
 function captureModeLabel (mode: CaptureMode) { return ({ none: '过渡点', visable: '可见光', ir: '红外', 'visable,ir': '可见光 + 红外' } as Record<CaptureMode, string>)[mode] || '可见光' }
 function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s]+/g, '_') || 'wayline' }
+function normalizeRouteName (name: string) { return String(name).replace(/_/g, '-') }
 function formatCoordinate (value: number) { return Number(value).toFixed(6) }
 function formatNumber (value: number, precision: number) { return Number(value).toFixed(precision) }
 function formatDate (date: Date) {
   const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
 }
 
 onBeforeUnmount(() => {
