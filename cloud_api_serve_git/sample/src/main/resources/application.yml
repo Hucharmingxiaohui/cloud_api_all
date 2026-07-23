@@ -184,13 +184,12 @@ livestream:
     # GB28181 Note:If you don't know what these parameters mean, you can go to Pilot2 and select the GB28181 page in the cloud platform. Where the parameters same as these parameters.
     gb28181:
       serverIP: 172.20.63.157
-      serverPort: 8086
-      serverID: 1
-      agentID: 1
-      agentPassword: 1
-      localPort: 8086
-      channel: 1
-
+      serverPort: 8116
+      serverID: 41010500002000000001
+      agentID: 41010500001320000001
+      agentPassword: "12345678"
+      localPort: 7060
+      channel: 41010500001320000001
     # Webrtc: Only supports using whip standard
     whip:
       url: http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream= #  Example：http://192.168.1.1:1985/rtc/v1/whip/?app=live&stream=
@@ -201,14 +200,14 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级对接
 switch:
-  centerNormalTcpEnable: true
-  centerOtherTcpEnable: true
-  centerNormalTcpMsgEnable: true
-  centerOtherTcpMsgEnable: true
-#  centerNormalTcpEnable: false
-#  centerOtherTcpEnable: false
-#  centerNormalTcpMsgEnable: false
-#  centerOtherTcpMsgEnable: false
+#  centerNormalTcpEnable: true
+#  centerOtherTcpEnable: true
+#  centerNormalTcpMsgEnable: true
+#  centerOtherTcpMsgEnable: true
+  centerNormalTcpEnable: false
+  centerOtherTcpEnable: false
+  centerNormalTcpMsgEnable: false
+  centerOtherTcpMsgEnable: false
 
 #国网规范对接上级配置
 centernormal:
