@@ -115,8 +115,7 @@
           <section class="edit-section">
             <h3>姿态与拍摄</h3>
             <div class="form-grid">
-              <label>真实偏航（下发飞机）<el-input-number :model-value="selectedWaypoint.headingTrue" :precision="1" disabled /></label>
-              <label>场景偏航（画面朝向）<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359" :step="1" controls-position="right" @change="updateCamera" /></label>
+              <label>偏航角 (°)<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359.99" :step="0.1" :precision="2" controls-position="right" @change="updateCamera" /></label>
               <label>俯仰角 (°)<el-input-number v-model="selectedWaypoint.camera_params.pitch" :min="-90" :max="0" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>滚转角 (°)<el-input-number v-model="selectedWaypoint.camera_params.roll" :min="-180" :max="180" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>35mm 焦距 (mm)<el-input-number v-model="selectedWaypoint.camera_params.focalLength" :min="1" :max="500" :step="1" controls-position="right" @change="updateCamera" /></label>
@@ -128,9 +127,9 @@
             </div>
             <div class="attitude-nudges">
               <div class="attitude-nudge">
-                <span>场景偏航</span>
-                <el-button @click="nudgeCamera('heading', angleStep)">向左 +</el-button>
-                <el-button @click="nudgeCamera('heading', -angleStep)">向右 -</el-button>
+                <span>偏航角</span>
+                <el-button @click="nudgeCamera('heading', -angleStep)">向左 -</el-button>
+                <el-button @click="nudgeCamera('heading', angleStep)">向右 +</el-button>
               </div>
               <div class="attitude-nudge">
                 <span>俯仰角</span>
@@ -170,7 +169,7 @@ import {
   readCloudWaylineEditDraft,
   type CloudWaylineDraft
 } from './cloudWaylineMapper'
-import { importSubKmzFile } from '/@/api/wayline'
+import { deleteWaylineFile, importSubKmzFile } from '/@/api/wayline'
 import { getPlatformInfo } from '/@/api/manage'
 import { ELocalStorageKey } from '/@/types'
 
@@ -197,7 +196,12 @@ const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
 const angleStep = ref(1)
 const buildingKmz = ref(false)
-const editMeta = reactive({ mode: 'create' as 'create' | 'edit', waylineId: '', draftLoaded: false })
+const editMeta = reactive({
+  mode: 'create' as 'create' | 'edit',
+  waylineId: '',
+  originalRouteName: '',
+  draftLoaded: false
+})
 let pendingEditDraft: CloudWaylineDraft | null = null
 let kmzController: AbortController | null = null
 const selectedWaypoint = computed(() => waylineState.waypoints[waylineState.selectedIndex] || null)
@@ -224,23 +228,39 @@ function bootstrapEditDraft () {
   }
   editMeta.mode = 'edit'
   editMeta.waylineId = draft.waylineId || waylineId
+  editMeta.originalRouteName = normalizeRouteName(draft.routeName || '')
   pendingEditDraft = draft
   applyDraftToLocalState(draft)
   // 草稿已展示在左侧；session 可清，内存 pending 仍用于 load
   clearCloudWaylineEditDraft()
 }
 
+function unifyHeading (point: { headingTrue?: number; camera_params?: Partial<WaypointCamera> }) {
+  const fromCamera = Number(point.camera_params?.heading)
+  const fromTrue = Number(point.headingTrue)
+  const heading = Number.isFinite(fromCamera) ? fromCamera : (Number.isFinite(fromTrue) ? fromTrue : 0)
+  return normalizeHeading(heading)
+}
+
 function cloneWaypoints (points: CloudWaylineDraft['waypoints'] | Waypoint[]): Waypoint[] {
-  return points.map(point => ({
-    point_name: point.point_name,
-    longitude: point.longitude,
-    latitude: point.latitude,
-    height: point.height,
-    capture_mode: point.capture_mode,
-    speed: point.speed,
-    headingTrue: point.headingTrue,
-    camera_params: { ...point.camera_params }
-  }))
+  return points.map(point => {
+    const heading = unifyHeading(point)
+    return {
+      point_name: point.point_name,
+      longitude: point.longitude,
+      latitude: point.latitude,
+      height: point.height,
+      capture_mode: point.capture_mode,
+      speed: point.speed,
+      headingTrue: heading,
+      camera_params: {
+        heading,
+        pitch: Number(point.camera_params?.pitch ?? -45),
+        roll: Number(point.camera_params?.roll ?? 0),
+        focalLength: Number(point.camera_params?.focalLength ?? 75)
+      }
+    }
+  })
 }
 
 function applyDraftToLocalState (draft: CloudWaylineDraft) {
@@ -339,7 +359,15 @@ function updatePosition () {
   if (point) updateSelected({ longitude: point.longitude, latitude: point.latitude, height: point.height, speed: point.speed })
 }
 function updateCamera () {
-  if (selectedWaypoint.value) updateSelected({ camera_params: { ...selectedWaypoint.value.camera_params } })
+  if (!selectedWaypoint.value) return
+  // 协议统一：仅真实偏航；headingTrue 与 camera_params.heading 保持一致
+  const heading = unifyHeading(selectedWaypoint.value)
+  selectedWaypoint.value.camera_params.heading = heading
+  selectedWaypoint.value.headingTrue = heading
+  updateSelected({
+    headingTrue: heading,
+    camera_params: { ...selectedWaypoint.value.camera_params }
+  })
 }
 function updateCaptureMode () {
   if (selectedWaypoint.value) updateSelected({ capture_mode: selectedWaypoint.value.capture_mode })
@@ -358,10 +386,13 @@ function nudgeHeight (delta: number) {
   updatePosition()
 }
 function nudgeBody (forward: number, right: number) {
-  const point = selectedWaypoint.value
-  if (!point) return
-  const heading = point.camera_params.heading * Math.PI / 180
-  nudgeGeo(forward * Math.sin(heading) + right * Math.cos(heading), forward * Math.cos(heading) - right * Math.sin(heading))
+  if (waylineState.selectedIndex < 0) return
+  // 机体前后左右由云渲染 georef 解算，避免本地用 camera_params.heading 导致镜像
+  waylineClient.sendWaylineCommand('move-body', {
+    index: waylineState.selectedIndex,
+    forward,
+    right
+  })
 }
 function nudgeCamera (field: 'heading' | 'pitch', delta: number) {
   const point = selectedWaypoint.value
@@ -381,11 +412,92 @@ async function clearWaypoints () {
     // User cancelled the confirmation dialog.
   }
 }
+function isSameRouteName (a: string, b: string) {
+  return sanitizeFileName(a) === sanitizeFileName(b)
+}
+
+/** 编辑保存：覆盖原航线 / 另存新名称 / 取消 */
+async function resolveSaveRouteName (currentName: string): Promise<string | null> {
+  const isEditSameName = editMeta.mode === 'edit' &&
+    !!editMeta.waylineId &&
+    isSameRouteName(currentName, editMeta.originalRouteName || currentName)
+
+  if (!isEditSameName) return currentName
+
+  try {
+    await ElMessageBox.confirm(
+      `航线名称「${currentName}」与当前编辑航线相同。\n\n覆盖：删除原航线后导入新文件\n另存为：输入新名称再导入\n取消：不保存`,
+      '保存航线',
+      {
+        type: 'warning',
+        distinguishCancelAndClose: true,
+        confirmButtonText: '覆盖当前航线',
+        cancelButtonText: '另存为新名称',
+        closeOnClickModal: false
+      }
+    )
+    return currentName
+  } catch (action) {
+    if (action === 'cancel') {
+      try {
+        const { value } = await ElMessageBox.prompt('请输入新的航线名称', '另存为', {
+          confirmButtonText: '保存',
+          cancelButtonText: '取消',
+          inputValue: `${currentName}-copy`,
+          inputValidator: (val) => {
+            const name = String(val || '').trim()
+            if (!name) return '名称不能为空'
+            if (isSameRouteName(name, editMeta.originalRouteName || currentName)) return '请使用与原航线不同的名称'
+            return true
+          }
+        })
+        const next = String(value || '').trim()
+        routeNameInput.value = next
+        waylineState.routeName = normalizeRouteName(next)
+        waylineClient.sendWaylineCommand('set-route-name', { value: next })
+        return next
+      } catch {
+        return null
+      }
+    }
+    return null
+  }
+}
+
+async function importKmzBlob (workspaceId: string, blob: Blob, fileName: string, overwriteWaylineId?: string) {
+  if (overwriteWaylineId) {
+    const delRes = await deleteWaylineFile(workspaceId, overwriteWaylineId)
+    if (delRes?.code !== 0) throw new Error(delRes?.message || '删除原航线失败，无法覆盖')
+  }
+  const fileData = new FormData()
+  fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
+  const importRes = await importSubKmzFile(workspaceId, fileData)
+  if (importRes?.code !== 0) {
+    const msg = String(importRes?.message || '航线导入失败')
+    if (/already exists|已存在|filename/i.test(msg)) {
+      throw new Error('航线名称已存在，请更换名称后重试')
+    }
+    throw new Error(msg)
+  }
+}
+
 async function buildKmz () {
   const error = validateWaypoints(waylineState.waypoints)
   if (error) return ElMessage.error(error)
-  const routeName = routeNameInput.value.trim()
+  let routeName = routeNameInput.value.trim()
   if (!routeName) return ElMessage.error('请输入航线名称')
+
+  const resolvedName = await resolveSaveRouteName(routeName)
+  if (!resolvedName) return
+  routeName = resolvedName.trim()
+  if (!routeName) return ElMessage.error('请输入航线名称')
+
+  const overwriteId = editMeta.mode === 'edit' &&
+    editMeta.waylineId &&
+    isSameRouteName(routeName, editMeta.originalRouteName || routeName)
+    ? editMeta.waylineId
+    : ''
+
   buildingKmz.value = true
   kmzController?.abort()
   kmzController = new AbortController()
@@ -413,12 +525,24 @@ async function buildKmz () {
     anchor.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 
-    const workspaceId = await resolveWorkspaceId()
-    const fileData = new FormData()
-    fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
-    const importRes = await importSubKmzFile(workspaceId, fileData)
-    if (importRes.code !== 0) throw new Error(importRes.message || '航线导入失败')
-    ElMessage.success('KMZ 航线已生成、下载并导入成功')
+    try {
+      const workspaceId = await resolveWorkspaceId()
+      await importKmzBlob(workspaceId, blob, fileName, overwriteId || undefined)
+      if (overwriteId) {
+        editMeta.originalRouteName = normalizeRouteName(routeName)
+        ElMessage.success('已覆盖当前航线并导入成功')
+      } else {
+        // 另存成功后，后续同名再存按新航线处理（无原 id 可覆盖）
+        if (editMeta.mode === 'edit' && !isSameRouteName(routeName, editMeta.originalRouteName)) {
+          editMeta.waylineId = ''
+          editMeta.originalRouteName = normalizeRouteName(routeName)
+        }
+        ElMessage.success('KMZ 航线已生成、下载并导入成功')
+      }
+    } catch (importError) {
+      const msg = importError instanceof Error ? importError.message : '航线导入失败'
+      ElMessage.warning(`KMZ 已下载到本地，但导入航线库失败：${msg}`)
+    }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return
     ElMessage.error(error instanceof Error ? error.message : 'KMZ 航线生成失败')
@@ -431,11 +555,16 @@ async function resolveWorkspaceId () {
   const storedWorkspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)?.trim()
   if (storedWorkspaceId) return storedWorkspaceId
 
-  const platformInfo = await getPlatformInfo()
-  const workspaceId = String(platformInfo.data?.workspace_id || '').trim()
-  if (!workspaceId) throw new Error('未获取到工作空间，请重新登录后再试')
-  localStorage.setItem(ELocalStorageKey.WorkspaceId, workspaceId)
-  return workspaceId
+  try {
+    const platformInfo = await getPlatformInfo()
+    const workspaceId = String(platformInfo?.data?.workspace_id || (platformInfo as any)?.workspace_id || '').trim()
+    if (!workspaceId) throw new Error('未获取到工作空间，请重新登录后再试')
+    localStorage.setItem(ELocalStorageKey.WorkspaceId, workspaceId)
+    return workspaceId
+  } catch (error: any) {
+    if (error?.response?.status === 401) throw new Error('登录已过期，请重新登录后再导入航线')
+    throw new Error(error instanceof Error ? error.message : '获取工作空间失败，请重新登录')
+  }
 }
 function normalizeWaylineState (value: unknown): WaylineState | null {
   if (!value || typeof value !== 'object') return null
@@ -447,6 +576,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
     const camera = point?.camera_params as Partial<WaypointCamera> | undefined
     const captureMode = String(point?.capture_mode || 'visable') as CaptureMode
     if (!point || !camera || !['none', 'visable', 'ir', 'visable,ir'].includes(captureMode)) return null
+    const heading = unifyHeading({ headingTrue: Number(point.headingTrue), camera_params: camera })
     const normalized: Waypoint = {
       point_name: String(point.point_name || `WP_${String(index + 1).padStart(3, '0')}`),
       longitude: Number(point.longitude),
@@ -454,9 +584,9 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
       height: Number(point.height),
       capture_mode: captureMode,
       speed: Number(point.speed ?? 5),
-      headingTrue: Number(point.headingTrue),
+      headingTrue: heading,
       camera_params: {
-        heading: Number(camera.heading ?? 0),
+        heading,
         pitch: Number(camera.pitch ?? -45),
         roll: Number(camera.roll ?? 0),
         focalLength: Number(camera.focalLength ?? 75)
@@ -493,7 +623,8 @@ function buildWaylineRequest (routeName: string, points: Waypoint[]) {
     waypointTurnReq: { waypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', useStraightLine: 1 },
     startActionList: [],
     routePointList: points.map((point, index) => {
-      const heading = normalizeHeading(point.headingTrue)
+      // 统一真实偏航：优先 camera_params.heading
+      const heading = unifyHeading(point)
       const actions: Record<string, unknown>[] = [{ actionIndex: 0, aircraftHeading: heading, aircraftPathMode: 'counterClockwise' }]
       if (point.capture_mode !== 'none') {
         actions.push({
@@ -542,7 +673,7 @@ function validateWaypoints (points: Waypoint[]) {
     if (!Number.isFinite(Number(point.latitude)) || point.latitude < -90 || point.latitude > 90) return `航点 ${index + 1} 纬度无效`
     if (!Number.isFinite(Number(point.height))) return `航点 ${index + 1} 高度无效`
     if (!Number.isFinite(Number(point.speed)) || point.speed <= 0) return `航点 ${index + 1} 速度无效`
-    if (!Number.isFinite(Number(point.headingTrue))) return `航点 ${index + 1} 缺少真实偏航角`
+    if (!Number.isFinite(Number(point.camera_params?.heading))) return `航点 ${index + 1} 缺少偏航角`
     if (point.capture_mode !== 'none' && (!Number.isFinite(Number(point.camera_params.focalLength)) || point.camera_params.focalLength <= 0)) return `航点 ${index + 1} 焦距无效`
   }
   return ''

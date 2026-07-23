@@ -157,7 +157,7 @@ function mapOnePlacemark (
   let pitch = toNumber(placemark.gimbalPitchAngle ?? placemark.gimbal_pitch_angle, NaN)
   let focalLength = NaN
   let captureMode: CaptureMode = 'none'
-  let sceneHeading = NaN
+  let parsedYaw = NaN
 
   const actions = listActions(placemark)
   for (const action of actions) {
@@ -171,7 +171,7 @@ function mapOnePlacemark (
       const f = toNumber(oriented.focalLength ?? oriented.focal_length, NaN)
       const lens = oriented.payloadLensIndex ?? oriented.payload_lens_index ?? oriented.imageFormat
       if (Number.isFinite(yaw)) {
-        sceneHeading = yaw
+        parsedYaw = yaw
         if (!Number.isFinite(headingTrue)) headingTrue = yaw
       }
       const aircraftHeading = toNumber(oriented.aircraftHeading ?? oriented.aircraft_heading, NaN)
@@ -193,7 +193,7 @@ function mapOnePlacemark (
       const gimbal = pickGimbalRotate(param) || {}
       const yaw = toNumber(gimbal.gimbalYawRotateAngle ?? gimbal.gimbal_yaw_rotate_angle, NaN)
       const p = toNumber(gimbal.gimbalPitchRotateAngle ?? gimbal.gimbal_pitch_rotate_angle, NaN)
-      if (Number.isFinite(yaw) && !Number.isFinite(sceneHeading)) sceneHeading = yaw
+      if (Number.isFinite(yaw) && !Number.isFinite(parsedYaw)) parsedYaw = yaw
       if (Number.isFinite(p) && !Number.isFinite(pitch)) pitch = p
       continue
     }
@@ -213,13 +213,11 @@ function mapOnePlacemark (
     }
   }
 
-  if (!Number.isFinite(headingTrue)) headingTrue = Number.isFinite(sceneHeading) ? sceneHeading : 0
-  if (!Number.isFinite(sceneHeading)) sceneHeading = headingTrue
-  if (!Number.isFinite(pitch)) pitch = captureMode === 'none' ? -45 : -45
+  // 统一真实偏航：rotateYaw/aircraft > waypointHeading > oriented/gimbal yaw
+  if (!Number.isFinite(headingTrue)) headingTrue = Number.isFinite(parsedYaw) ? parsedYaw : 0
+  headingTrue = normalizeHeading(headingTrue)
+  if (!Number.isFinite(pitch)) pitch = -45
   if (!Number.isFinite(focalLength)) focalLength = 75
-  if (captureMode === 'none' && Number.isFinite(toNumber(placemark.gimbalPitchAngle, NaN))) {
-    // 仅有云台角、无拍照动作时仍作过渡点
-  }
 
   const idx = toNumber(placemark.index, index)
   const suffix = String(idx + 1).padStart(3, '0')
@@ -231,9 +229,10 @@ function mapOnePlacemark (
     height,
     capture_mode: captureMode,
     speed: Number.isFinite(speed) && speed > 0 ? speed : 5,
-    headingTrue: normalizeHeading(headingTrue),
+    // 兼容字段：与 camera_params.heading 同为真实偏航
+    headingTrue,
     camera_params: {
-      heading: normalizeHeading(sceneHeading),
+      heading: headingTrue,
       pitch: normalizePitch(pitch),
       roll: toNumber(placemark.roll, 0) || 0,
       focalLength: focalLength > 0 ? focalLength : 75
