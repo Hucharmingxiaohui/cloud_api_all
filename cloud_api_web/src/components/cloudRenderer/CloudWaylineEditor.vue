@@ -4,9 +4,13 @@
       <div class="panel-title">
         <div>
           <span class="panel-title__eyebrow">CLOUD WAYLINE</span>
-          <h2>三维航线规划</h2>
+          <h2>{{ editMeta.mode === 'edit' ? '三维航线编辑' : '三维航线规划' }}</h2>
         </div>
         <el-button link type="primary" @click="router.back()">返回</el-button>
+      </div>
+
+      <div v-if="editMeta.mode === 'edit'" class="edit-banner">
+        编辑已有航线<span v-if="editMeta.waylineId"> · {{ editMeta.waylineId }}</span>
       </div>
 
       <div class="route-name-block">
@@ -111,7 +115,8 @@
           <section class="edit-section">
             <h3>姿态与拍摄</h3>
             <div class="form-grid">
-              <label>偏航角 / 航向角 (°)<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359" :step="1" controls-position="right" @change="updateCamera" /></label>
+              <label>真实偏航（下发飞机）<el-input-number :model-value="selectedWaypoint.headingTrue" :precision="1" disabled /></label>
+              <label>场景偏航（画面朝向）<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>俯仰角 (°)<el-input-number v-model="selectedWaypoint.camera_params.pitch" :min="-90" :max="0" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>滚转角 (°)<el-input-number v-model="selectedWaypoint.camera_params.roll" :min="-180" :max="180" :step="1" controls-position="right" @change="updateCamera" /></label>
               <label>35mm 焦距 (mm)<el-input-number v-model="selectedWaypoint.camera_params.focalLength" :min="1" :max="500" :step="1" controls-position="right" @change="updateCamera" /></label>
@@ -123,7 +128,7 @@
             </div>
             <div class="attitude-nudges">
               <div class="attitude-nudge">
-                <span>偏航角</span>
+                <span>场景偏航</span>
                 <el-button @click="nudgeCamera('heading', angleStep)">向左 +</el-button>
                 <el-button @click="nudgeCamera('heading', -angleStep)">向右 -</el-button>
               </div>
@@ -156,11 +161,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import OutdoorRenderer from './OutdoorRenderer.vue'
 import { CloudRendererClient } from './cloudRendererClient'
 import { getCloudRendererConfig } from './cloudRendererConfig'
+import {
+  clearCloudWaylineEditDraft,
+  readCloudWaylineEditDraft,
+  type CloudWaylineDraft
+} from './cloudWaylineMapper'
 import { importSubKmzFile } from '/@/api/wayline'
+import { getPlatformInfo } from '/@/api/manage'
 import { ELocalStorageKey } from '/@/types'
 
 type CaptureMode = 'none' | 'visable' | 'ir' | 'visable,ir'
@@ -172,36 +183,147 @@ interface Waypoint {
   height: number
   capture_mode: CaptureMode
   speed: number
+  headingTrue: number
   camera_params: WaypointCamera
 }
 interface WaylineState { routeName: string; selectedIndex: number; waypoints: Waypoint[] }
 
 const router = useRouter()
+const route = useRoute()
 const waylineClient = new CloudRendererClient()
-const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
 const angleStep = ref(1)
 const buildingKmz = ref(false)
+const editMeta = reactive({ mode: 'create' as 'create' | 'edit', waylineId: '', draftLoaded: false })
+let pendingEditDraft: CloudWaylineDraft | null = null
 let kmzController: AbortController | null = null
 const selectedWaypoint = computed(() => waylineState.waypoints[waylineState.selectedIndex] || null)
 
+bootstrapEditDraft()
+
 const stopSignalListener = waylineClient.onSignalMessage(message => {
+  if (message.type === 'renderer-ready') {
+    flushPendingEditDraft()
+    return
+  }
   if (message.type !== 'wayline-state' || !message.payload) return
-  const payload = normalizeWaylineState(message.payload)
+  applyRemoteWaylineState(message.payload)
+})
+
+function bootstrapEditDraft () {
+  const mode = String(route.query.mode || '')
+  const waylineId = String(route.query.waylineId || '')
+  if (mode !== 'edit') return
+  const draft = readCloudWaylineEditDraft()
+  if (!draft || (waylineId && draft.waylineId && draft.waylineId !== waylineId)) {
+    ElMessage.warning('未找到待编辑航线数据，请从航线管理重新进入三维编辑')
+    return
+  }
+  editMeta.mode = 'edit'
+  editMeta.waylineId = draft.waylineId || waylineId
+  pendingEditDraft = draft
+  applyDraftToLocalState(draft)
+  // 草稿已展示在左侧；session 可清，内存 pending 仍用于 load
+  clearCloudWaylineEditDraft()
+}
+
+function cloneWaypoints (points: CloudWaylineDraft['waypoints'] | Waypoint[]): Waypoint[] {
+  return points.map(point => ({
+    point_name: point.point_name,
+    longitude: point.longitude,
+    latitude: point.latitude,
+    height: point.height,
+    capture_mode: point.capture_mode,
+    speed: point.speed,
+    headingTrue: point.headingTrue,
+    camera_params: { ...point.camera_params }
+  }))
+}
+
+function applyDraftToLocalState (draft: CloudWaylineDraft) {
+  const routeName = normalizeRouteName(draft.routeName || waylineState.routeName)
+  waylineState.routeName = routeName
+  waylineState.selectedIndex = draft.selectedIndex ?? (draft.waypoints.length ? 0 : -1)
+  waylineState.waypoints = cloneWaypoints(draft.waypoints)
+  routeNameInput.value = routeName
+}
+
+/**
+ * 云渲染 wayline-state 同步。
+ * 编辑模式下：空航点状态不能覆盖本地已解析草稿（云渲染尚未实现 load 时会一直推空数组）。
+ */
+function applyRemoteWaylineState (raw: unknown) {
+  const payload = normalizeWaylineState(raw)
   if (!payload) {
+    // 编辑态本地已有点时，忽略无效/空远程状态
+    if (editMeta.mode === 'edit' && waylineState.waypoints.length) {
+      flushPendingEditDraft()
+      return
+    }
     ElMessage.warning('云渲染服务返回了无效的航点状态')
     return
   }
-  waylineState.routeName = payload.routeName || waylineState.routeName
-  waylineState.selectedIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : -1
-  waylineState.waypoints = Array.isArray(payload.waypoints) ? payload.waypoints : []
-  routeNameInput.value = waylineState.routeName
-})
 
-function handleStatusChange (status: string) { statusText.value = status }
+  const remotePoints = Array.isArray(payload.waypoints) ? payload.waypoints : []
+  if (editMeta.mode === 'edit' && remotePoints.length === 0 && waylineState.waypoints.length > 0) {
+    // 保留左侧列表，并重试 load
+    flushPendingEditDraft()
+    return
+  }
+
+  const routeName = normalizeRouteName(payload.routeName || waylineState.routeName)
+  waylineState.routeName = routeName
+  waylineState.selectedIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : -1
+  waylineState.waypoints = remotePoints
+  routeNameInput.value = routeName
+  if (payload.routeName !== routeName) {
+    waylineClient.sendWaylineCommand('set-route-name', { value: routeName })
+  }
+  if (editMeta.mode === 'edit' && remotePoints.length > 0) {
+    editMeta.draftLoaded = true
+    pendingEditDraft = null
+  }
+}
+
+let lastLoadSentAt = 0
+function sendLoadToRenderer (payload: { routeName: string; waylineId?: string; selectedIndex: number; waypoints: Waypoint[] }) {
+  const now = Date.now()
+  if (now - lastLoadSentAt < 1500) return
+  lastLoadSentAt = now
+  waylineClient.sendWaylineCommand('load', payload)
+  waylineClient.sendWaylineCommand('set-route-name', { value: payload.routeName })
+}
+
+function flushPendingEditDraft () {
+  const draft = pendingEditDraft
+  if (draft) {
+    applyDraftToLocalState(draft)
+    if (!editMeta.draftLoaded) {
+      editMeta.draftLoaded = true
+      ElMessage.success(`已载入航线「${draft.routeName}」，共 ${draft.waypoints.length} 个航点`)
+    }
+    pendingEditDraft = null
+  }
+
+  if (editMeta.mode === 'edit' && waylineState.waypoints.length) {
+    sendLoadToRenderer({
+      routeName: waylineState.routeName,
+      waylineId: editMeta.waylineId,
+      selectedIndex: waylineState.selectedIndex,
+      waypoints: waylineState.waypoints
+    })
+  }
+}
+
+function handleStatusChange (status: string) {
+  const prev = statusText.value
+  statusText.value = status
+  // 连接成功（状态清空）时尝试推送编辑草稿
+  if (prev && !status) flushPendingEditDraft()
+}
 function selectWaypoint (index: number) { waylineClient.sendWaylineCommand('select', { index }) }
 function removeWaypoint (index: number) { waylineClient.sendWaylineCommand('remove', { index }) }
 function updateRouteName () {
@@ -291,7 +413,7 @@ async function buildKmz () {
     anchor.click()
     window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 
-    if (!workspaceId) throw new Error('未获取到工作空间，无法导入航线')
+    const workspaceId = await resolveWorkspaceId()
     const fileData = new FormData()
     fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
     const importRes = await importSubKmzFile(workspaceId, fileData)
@@ -304,6 +426,16 @@ async function buildKmz () {
     buildingKmz.value = false
     kmzController = null
   }
+}
+async function resolveWorkspaceId () {
+  const storedWorkspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)?.trim()
+  if (storedWorkspaceId) return storedWorkspaceId
+
+  const platformInfo = await getPlatformInfo()
+  const workspaceId = String(platformInfo.data?.workspace_id || '').trim()
+  if (!workspaceId) throw new Error('未获取到工作空间，请重新登录后再试')
+  localStorage.setItem(ELocalStorageKey.WorkspaceId, workspaceId)
+  return workspaceId
 }
 function normalizeWaylineState (value: unknown): WaylineState | null {
   if (!value || typeof value !== 'object') return null
@@ -322,6 +454,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
       height: Number(point.height),
       capture_mode: captureMode,
       speed: Number(point.speed ?? 5),
+      headingTrue: Number(point.headingTrue),
       camera_params: {
         heading: Number(camera.heading ?? 0),
         pitch: Number(camera.pitch ?? -45),
@@ -329,7 +462,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
         focalLength: Number(camera.focalLength ?? 75)
       }
     }
-    if (![normalized.longitude, normalized.latitude, normalized.height, normalized.speed, normalized.camera_params.heading, normalized.camera_params.pitch, normalized.camera_params.roll, normalized.camera_params.focalLength].every(Number.isFinite)) return null
+    if (![normalized.longitude, normalized.latitude, normalized.height, normalized.speed, normalized.headingTrue, normalized.camera_params.heading, normalized.camera_params.pitch, normalized.camera_params.roll, normalized.camera_params.focalLength].every(Number.isFinite)) return null
     waypoints.push(normalized)
   }
   const selectedIndex = Number(payload.selectedIndex)
@@ -360,7 +493,7 @@ function buildWaylineRequest (routeName: string, points: Waypoint[]) {
     waypointTurnReq: { waypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', useStraightLine: 1 },
     startActionList: [],
     routePointList: points.map((point, index) => {
-      const heading = normalizeHeading(point.camera_params.heading)
+      const heading = normalizeHeading(point.headingTrue)
       const actions: Record<string, unknown>[] = [{ actionIndex: 0, aircraftHeading: heading, aircraftPathMode: 'counterClockwise' }]
       if (point.capture_mode !== 'none') {
         actions.push({
@@ -409,6 +542,7 @@ function validateWaypoints (points: Waypoint[]) {
     if (!Number.isFinite(Number(point.latitude)) || point.latitude < -90 || point.latitude > 90) return `航点 ${index + 1} 纬度无效`
     if (!Number.isFinite(Number(point.height))) return `航点 ${index + 1} 高度无效`
     if (!Number.isFinite(Number(point.speed)) || point.speed <= 0) return `航点 ${index + 1} 速度无效`
+    if (!Number.isFinite(Number(point.headingTrue))) return `航点 ${index + 1} 缺少真实偏航角`
     if (point.capture_mode !== 'none' && (!Number.isFinite(Number(point.camera_params.focalLength)) || point.camera_params.focalLength <= 0)) return `航点 ${index + 1} 焦距无效`
   }
   return ''
@@ -416,6 +550,7 @@ function validateWaypoints (points: Waypoint[]) {
 function normalizeHeading (value: number) { return Math.min(((Number(value) % 360) + 360) % 360, 359) }
 function captureModeLabel (mode: CaptureMode) { return ({ none: '过渡点', visable: '可见光', ir: '红外', 'visable,ir': '可见光 + 红外' } as Record<CaptureMode, string>)[mode] || '可见光' }
 function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s_]+/g, '-') || 'wayline' }
+function normalizeRouteName (name: string) { return String(name).replace(/_/g, '-') }
 function formatCoordinate (value: number) { return Number(value).toFixed(6) }
 function formatNumber (value: number, precision: number) { return Number(value).toFixed(precision) }
 function formatDate (date: Date) {
@@ -443,6 +578,7 @@ onBeforeUnmount(() => {
 .panel-title { display: flex; align-items: flex-start; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
 .panel-title--compact { align-items: center; } .panel-title h2 { margin: 3px 0 0; color: #fff; font-size: 20px; }
 .panel-title__eyebrow { color: #59c9eb; font-size: 10px; letter-spacing: 2px; }
+.edit-banner { margin-top: 12px; padding: 8px 10px; color: #9be7ff; font-size: 12px; border: 1px solid rgba(72, 214, 255, .35); background: rgba(72, 214, 255, .08); }
 .route-name-block { padding: 16px 0; } .route-name-block label, .select-label { display: grid; gap: 7px; color: #91b7ca; font-size: 13px; }
 .section-heading { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; color: #aacddd; }
 .section-heading strong { min-width: 28px; padding: 2px 8px; text-align: center; color: var(--cyan); background: rgba(72, 214, 255, .1); border: 1px solid rgba(72, 214, 255, .28); }
