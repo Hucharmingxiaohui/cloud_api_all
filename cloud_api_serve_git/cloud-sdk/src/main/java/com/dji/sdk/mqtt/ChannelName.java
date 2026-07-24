@@ -167,6 +167,9 @@ public class ChannelName {
 
     // custom drone osd
     public static final String INBOUND_CUSTOM_DRONE_OSD = "inboundCustomDroneOsd";
+    public static final String INBOUND_CUSTOM_DOCK_OSD = "inboundCustomDockOsd";
+    public static final String INBOUND_CUSTOM_HMS = "inboundCustomHms";
+    public static final String INBOUND_CUSTOM_PICTURE = "inboundCustomPicture";
 
     // custom link
     public static final String CUSTOM_INBOUND = "customInbound";
