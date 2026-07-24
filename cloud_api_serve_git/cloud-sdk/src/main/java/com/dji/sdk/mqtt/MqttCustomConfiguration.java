@@ -37,7 +37,11 @@ public class MqttCustomConfiguration {
 
     @Bean
     public MqttPahoMessageDrivenChannelAdapter customMqttInbound() {
-        String[] topics = customInboundTopic.split(",");
+        String[] topics = java.util.Arrays.stream(customInboundTopic.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toArray(String[]::new);
+        log.info("[cq-dock] CUSTOM mqtt subscribe topics: {}", java.util.Arrays.toString(topics));
         MqttPahoMessageDrivenChannelAdapter adapter = new MqttPahoMessageDrivenChannelAdapter(
                 UUID.randomUUID().toString(), customMqttClientFactory, topics);
         DefaultPahoMessageConverter converter = new DefaultPahoMessageConverter();

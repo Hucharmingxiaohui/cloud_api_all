@@ -12,21 +12,21 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 
 @Component
-public class CustomDroneOsdHandler {
+public class CustomDockOsdHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(CustomDroneOsdHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(CustomDockOsdHandler.class);
 
     @Resource
     private CqDockMqttMessageService cqDockMqttMessageService;
 
-    @ServiceActivator(inputChannel = ChannelName.INBOUND_CUSTOM_DRONE_OSD)
+    @ServiceActivator(inputChannel = ChannelName.INBOUND_CUSTOM_DOCK_OSD)
     public void handleMessage(Message<?> message) {
         String topic = message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC, String.class);
         byte[] payload = (byte[]) message.getPayload();
         try {
-            cqDockMqttMessageService.handleDroneOsd(topic, new String(payload));
+            cqDockMqttMessageService.handleDockOsd(topic, new String(payload));
         } catch (Exception e) {
-            log.error("[cq-dock] handle drone osd failed, topic={}, err={}", topic, e.getMessage(), e);
+            log.error("[cq-dock] handle dock osd failed, topic={}, err={}", topic, e.getMessage(), e);
         }
     }
 }

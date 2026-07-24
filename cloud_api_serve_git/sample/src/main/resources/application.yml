@@ -82,16 +82,17 @@ mqtt:
     username: df1560
     password: dfe2k_1500
   CUSTOM:
-    enabled: false
+    enabled: true
     protocol: MQTT
-    # TODO 请配置独立的 EMQX 服务器地址
+    # 重庆电力下级无人机平台 EMQX
     host: 172.20.63.105
     port: 9205
     path: /mqtt
     username: df1560
     password: dfe2k_1500
     # 订阅主题，多个用逗号分隔
-    inbound-topic: /+/+/drone/osd
+    # /{code}/{sn}/drone/osd | /{code}/{sn}/dock/osd | /{code}/{sn}/push/hms | /{code}/push/picture
+    inbound-topic: "/+/+/drone/osd,/+/+/dock/osd,/+/+/push/hms,/+/push/picture"
 
 cloud-sdk:
   mqtt:
@@ -327,6 +328,16 @@ longyuan:
 uavPlatform:
   sender: "UavPatrolSystem"
   stationCode: "Sub_WeiLan"
+
+# 重庆电力下级无人机平台（机场对接 HTTP）
+cq-dock:
+  # TODO 填写下级平台 HTTP 根地址，例如 http://ip:port
+  base-url: "http://127.0.0.1:6789"
+  access-key: ""
+  access-secret: ""
+  assign-task-path: /machineNest/noauth/third/task/assign_task
+  picture-list-path: /machineNest/noauth/third/picture/list
+  task-status-path: /machineNest/noauth/third/task/status
 hebei:
   stationCode: "HDCN"
 

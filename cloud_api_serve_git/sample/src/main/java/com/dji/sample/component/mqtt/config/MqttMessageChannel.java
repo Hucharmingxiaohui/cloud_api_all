@@ -77,6 +77,21 @@ public class MqttMessageChannel {
         return new DirectChannel();
     }
 
+    @Bean(name = ChannelName.INBOUND_CUSTOM_DOCK_OSD)
+    public MessageChannel inboundCustomDockOsdChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean(name = ChannelName.INBOUND_CUSTOM_HMS)
+    public MessageChannel inboundCustomHmsChannel() {
+        return new DirectChannel();
+    }
+
+    @Bean(name = ChannelName.INBOUND_CUSTOM_PICTURE)
+    public MessageChannel inboundCustomPictureChannel() {
+        return new DirectChannel();
+    }
+
     @Bean(name = ChannelName.CUSTOM_INBOUND)
     public MessageChannel customInboundChannel() {
         return new DirectChannel();
