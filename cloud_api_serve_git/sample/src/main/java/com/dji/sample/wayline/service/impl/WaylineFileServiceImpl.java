@@ -193,6 +193,81 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
         }
     }
 
+    @Override
+    public String overwriteKmzFile(MultipartFile file, String workspaceId, String waylineId, String creator) {
+        WaylineFileEntity existing = mapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>()
+                .eq(WaylineFileEntity::getWorkspaceId, workspaceId)
+                .eq(WaylineFileEntity::getWaylineId, waylineId));
+        if (Objects.isNull(existing)) {
+            throw new RuntimeException("The wayline does not exist.");
+        }
+
+        WaylineFileDTO metadata = validKmzFile(file)
+                .orElseThrow(() -> new RuntimeException("The file format is incorrect."));
+        String oldObjectKey = existing.getObjectKey();
+        String newObjectKey = buildVersionedObjectKey(workspaceId, waylineId);
+        metadata.setObjectKey(newObjectKey);
+
+        try {
+            ossService.putObject(OssConfiguration.bucket, newObjectKey, file.getInputStream());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read the replacement wayline file.", e);
+        }
+        if (!isUploadedObjectValid(newObjectKey, metadata.getSign())) {
+            deleteObjectQuietly(newObjectKey);
+            throw new RuntimeException("Failed to upload the replacement wayline file.");
+        }
+
+        existing.setName(metadata.getName());
+        existing.setDroneModelKey(metadata.getDroneModelKey());
+        existing.setPayloadModelKeys(String.join(",", metadata.getPayloadModelKeys()));
+        existing.setTemplateTypes(metadata.getTemplateTypes().stream()
+                .map(String::valueOf)
+                .collect(Collectors.joining(",")));
+        existing.setSign(metadata.getSign());
+        existing.setObjectKey(newObjectKey);
+        existing.setUsername(creator);
+
+        try {
+            if (mapper.updateById(existing) <= 0) {
+                throw new RuntimeException("Failed to overwrite the wayline.");
+            }
+        } catch (RuntimeException e) {
+            deleteObjectQuietly(newObjectKey);
+            throw e;
+        }
+
+        if (!Objects.equals(oldObjectKey, newObjectKey)) {
+            deleteObjectQuietly(oldObjectKey);
+        }
+        return waylineId;
+    }
+
+    private String buildVersionedObjectKey(String workspaceId, String waylineId) {
+        return String.join("/", OssConfiguration.objectDirPrefix, workspaceId, waylineId,
+                UUID.randomUUID() + WAYLINE_FILE_SUFFIX);
+    }
+
+    private boolean isUploadedObjectValid(String objectKey, String expectedSign) {
+        try (InputStream object = ossService.getObject(OssConfiguration.bucket, objectKey)) {
+            return Objects.nonNull(object)
+                    && Objects.equals(expectedSign, DigestUtils.md5DigestAsHex(object));
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    private void deleteObjectQuietly(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return;
+        }
+        try {
+            ossService.deleteObject(OssConfiguration.bucket, objectKey);
+        } catch (RuntimeException ignored) {
+            // Object cleanup must not roll back a database update that already points to a valid replacement.
+        }
+    }
+
     private Optional<WaylineFileDTO> validKmzFile(MultipartFile file) {
         String filename = file.getOriginalFilename();
         if (Objects.nonNull(filename) && !filename.endsWith(WAYLINE_FILE_SUFFIX)) {

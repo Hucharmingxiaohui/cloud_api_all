@@ -82,4 +82,14 @@ public interface IWaylineFileService {
      * @return
      */
     void importKmzFile(MultipartFile file, String workspaceId, String creator);
+
+    /**
+     * Replace an existing KMZ without changing its wayline id.
+     * @param file replacement KMZ
+     * @param workspaceId owning workspace
+     * @param waylineId existing wayline id
+     * @param creator user performing the replacement
+     * @return unchanged wayline id
+     */
+    String overwriteKmzFile(MultipartFile file, String workspaceId, String waylineId, String creator);
 }

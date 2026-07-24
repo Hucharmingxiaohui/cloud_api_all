@@ -169,7 +169,7 @@ import {
   readCloudWaylineEditDraft,
   type CloudWaylineDraft
 } from './cloudWaylineMapper'
-import { deleteWaylineFile, importSubKmzFile } from '/@/api/wayline'
+import { importSubKmzFile, overwriteWaylineFile } from '/@/api/wayline'
 import { getPlatformInfo } from '/@/api/manage'
 import { ELocalStorageKey } from '/@/types'
 
@@ -426,7 +426,7 @@ async function resolveSaveRouteName (currentName: string): Promise<string | null
 
   try {
     await ElMessageBox.confirm(
-      `航线名称「${currentName}」与当前编辑航线相同。\n\n覆盖：删除原航线后导入新文件\n另存为：输入新名称再导入\n取消：不保存`,
+      `航线名称「${currentName}」与当前编辑航线相同。\n\n覆盖：更新当前航线并保留原航线 ID\n另存为：输入新名称再导入\n取消：不保存`,
       '保存航线',
       {
         type: 'warning',
@@ -465,13 +465,11 @@ async function resolveSaveRouteName (currentName: string): Promise<string | null
 }
 
 async function importKmzBlob (workspaceId: string, blob: Blob, fileName: string, overwriteWaylineId?: string) {
-  if (overwriteWaylineId) {
-    const delRes = await deleteWaylineFile(workspaceId, overwriteWaylineId)
-    if (delRes?.code !== 0) throw new Error(delRes?.message || '删除原航线失败，无法覆盖')
-  }
   const fileData = new FormData()
   fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
-  const importRes = await importSubKmzFile(workspaceId, fileData)
+  const importRes = overwriteWaylineId
+    ? await overwriteWaylineFile(workspaceId, overwriteWaylineId, fileData)
+    : await importSubKmzFile(workspaceId, fileData)
   if (importRes?.code !== 0) {
     const msg = String(importRes?.message || '航线导入失败')
     if (/already exists|已存在|filename/i.test(msg)) {

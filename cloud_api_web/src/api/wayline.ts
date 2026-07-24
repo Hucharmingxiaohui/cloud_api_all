@@ -46,6 +46,13 @@ export const deleteWaylineFile = async function (workspaceId: string, waylineId:
   return result.data
 }
 
+// 覆盖航线文件并保留原航线 ID
+export const overwriteWaylineFile = async function (workspaceId: string, waylineId: string, file: FormData): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/waylines/${waylineId}/file`
+  const result = await request.put(url, file)
+  return result.data
+}
+
 // 批量删除航线
 export const batchDeleteWaylineFile = async function (workspaceId: string, data): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/batchDelete`
