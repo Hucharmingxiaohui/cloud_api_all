@@ -79,6 +79,24 @@ public class WaylineFileController implements IHttpWaylineService {
         return HttpResultResponse.success();
     }
 
+    @PutMapping("${url.wayline.prefix}${url.wayline.version}/workspaces/{workspace_id}/waylines/{wayline_id}/file")
+    public HttpResultResponse<String> overwriteWayline(
+            HttpServletRequest request,
+            @PathVariable(name = "workspace_id") String workspaceId,
+            @PathVariable(name = "wayline_id") String waylineId,
+            MultipartFile file) {
+        if (Objects.isNull(file) || file.isEmpty()) {
+            return HttpResultResponse.error("No file received.");
+        }
+        CustomClaim customClaim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
+        if (Objects.isNull(customClaim) || !Objects.equals(workspaceId, customClaim.getWorkspaceId())) {
+            return HttpResultResponse.error("Workspace access denied.");
+        }
+        String unchangedWaylineId = waylineFileService.overwriteKmzFile(
+                file, customClaim.getWorkspaceId(), waylineId, customClaim.getUsername());
+        return HttpResultResponse.success(unchangedWaylineId);
+    }
+
     /**
      * Query the basic data of the wayline file according to the query conditions.
      * The query condition field in pilot is fixed.
