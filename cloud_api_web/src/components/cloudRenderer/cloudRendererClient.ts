@@ -242,8 +242,9 @@ export class CloudRendererClient {
     this.signalListeners.forEach(listener => listener(msg))
 
     if (msg.type === 'renderer-ready') {
-      this.sceneLoading = true
-      this.setStatus('渲染服务已就绪，正在加载模型...')
+      // renderer-ready only means the renderer process is online. Model loading is controlled by
+      // scene-loading messages; do not set sceneLoading here or the overlay may stay forever if
+      // the loading-complete event was already sent before this client connected.
       await this.createPeerAndOffer()
       return
     }
@@ -293,7 +294,8 @@ export class CloudRendererClient {
         video.srcObject = this.mediaStream
         this.playVideo(video)
       })
-      // Video can arrive before 3DGS finishes loading; keep the spinner until scene-loading ends.
+      // Video can arrive before 3DGS finishes loading; keep the spinner only when renderer has
+      // explicitly reported scene-loading=true.
       if (!this.sceneLoading) this.setStatus('')
     }
     this.pc.onicecandidate = event => {
