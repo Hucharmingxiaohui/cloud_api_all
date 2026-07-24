@@ -152,8 +152,8 @@ function clearCanvas () {
   ctx.value.clearRect(0, 0, canvasRef.value.width, canvasRef.value.height)
 }
 
-// 区域颜色池
-const AREA_COLORS = ['#FF6B6B', '#4ADE80', '#60A5FA', '#F59E0B', '#A78BFA', '#EC4899']
+// 区域颜色池 - 荧光高亮色
+const AREA_COLORS = ['#39FF14', '#FF073A', '#00F0FF', '#FFEA00', '#FF00FF', '#FF8C00']
 
 // 绘制所有区域
 function drawAreas () {
@@ -182,44 +182,93 @@ function drawAreas () {
 }
 
 // 绘制区域
-function drawArea (points: Point[], name: string, color: string = '#FF6B6B') {
+function drawArea (points: Point[], name: string, color: string = '#39FF14') {
   if (!ctx.value || points.length !== 4) return
 
-  // 绘制四边形边框
-  ctx.value.strokeStyle = color
-  ctx.value.lineWidth = 2
-  ctx.value.setLineDash([5, 5])
+  const ctx2d = ctx.value
 
-  ctx.value.beginPath()
-  ctx.value.moveTo(points[0].x, points[0].y)
+  // 绘制发光边框（先画较宽低透明度产生光晕）
+  ctx2d.shadowColor = color
+  ctx2d.shadowBlur = 12
+  ctx2d.strokeStyle = color
+  ctx2d.lineWidth = 4
+  ctx2d.setLineDash([6, 4])
+  ctx2d.lineJoin = 'round'
+
+  ctx2d.beginPath()
+  ctx2d.moveTo(points[0].x, points[0].y)
   for (let i = 1; i < points.length; i++) {
-    ctx.value.lineTo(points[i].x, points[i].y)
+    ctx2d.lineTo(points[i].x, points[i].y)
   }
-  ctx.value.closePath()
-  ctx.value.stroke()
+  ctx2d.closePath()
+  ctx2d.stroke()
 
-  // 绘制半透明填充
-  ctx.value.fillStyle = color + '20'
-  ctx.value.fill()
+  // 清除阴影后再画实线边框增强清晰度
+  ctx2d.shadowBlur = 0
+  ctx2d.lineWidth = 2
+  ctx2d.strokeStyle = '#FFFFFF'
+  ctx2d.setLineDash([])
+  ctx2d.stroke()
 
-  // 绘制区域名称
-  ctx.value.fillStyle = color
-  ctx.value.font = 'bold 14px Arial'
-  ctx.value.textBaseline = 'top'
-  ctx.value.fillText(name, points[0].x + 5, points[0].y + 5)
+  // 绘制荧光填充
+  ctx2d.fillStyle = hexToRgba(color, 0.25)
+  ctx2d.fill()
 
-  // 绘制角点
+  // 绘制区域名称（带描边加大号）
+  const labelX = points[0].x + 8
+  const labelY = points[0].y + 8
+  ctx2d.font = 'bold 18px Arial'
+  ctx2d.textBaseline = 'top'
+
+  // 文字描边，增强可读性
+  ctx2d.lineWidth = 4
+  ctx2d.strokeStyle = '#000000'
+  ctx2d.lineJoin = 'round'
+  ctx2d.strokeText(name, labelX, labelY)
+
+  ctx2d.fillStyle = color
+  ctx2d.shadowColor = color
+  ctx2d.shadowBlur = 8
+  ctx2d.fillText(name, labelX, labelY)
+  ctx2d.shadowBlur = 0
+
+  // 绘制角点（菱形）
   points.forEach(p => drawPoint(p.x, p.y, color))
+}
+
+function hexToRgba (hex: string, alpha: number) {
+  const cleaned = hex.replace('#', '')
+  const bigint = parseInt(cleaned, 16)
+  const r = (bigint >> 16) & 255
+  const g = (bigint >> 8) & 255
+  const b = bigint & 255
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 // 绘制顶点标记
 function drawPoint (x: number, y: number, color: string) {
   if (!ctx.value) return
-  const size = 6
+  const size = 8
   const half = size / 2
-  ctx.value.fillStyle = color
-  ctx.value.setLineDash([])
-  ctx.value.fillRect(x - half, y - half, size, size)
+  const ctx2d = ctx.value
+  ctx2d.shadowColor = color
+  ctx2d.shadowBlur = 10
+  ctx2d.fillStyle = color
+  ctx2d.setLineDash([])
+  ctx2d.beginPath()
+  ctx2d.moveTo(x, y - half)
+  ctx2d.lineTo(x + half, y)
+  ctx2d.lineTo(x, y + half)
+  ctx2d.lineTo(x - half, y)
+  ctx2d.closePath()
+  ctx2d.fill()
+  ctx2d.shadowBlur = 0
+
+  // 白色中心点增强对比
+  ctx2d.fillStyle = '#FFFFFF'
+  ctx2d.beginPath()
+  ctx2d.arc(x, y, 2, 0, Math.PI * 2)
+  ctx2d.fill()
 }
 
 // 绘制航线
