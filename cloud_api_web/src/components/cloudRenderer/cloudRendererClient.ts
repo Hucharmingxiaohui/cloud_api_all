@@ -38,6 +38,7 @@ export class CloudRendererClient {
   private sessionBaseURL = ''
   private generation = 0
   private restartPromise: Promise<void> | null = null
+  private sceneLoading = false
 
   private get config () {
     const userConfig = getCloudRendererConfig()
@@ -241,14 +242,31 @@ export class CloudRendererClient {
     this.signalListeners.forEach(listener => listener(msg))
 
     if (msg.type === 'renderer-ready') {
+      this.sceneLoading = true
+      this.setStatus('渲染服务已就绪，正在加载模型...')
       await this.createPeerAndOffer()
+      return
+    }
+
+    if (msg.type === 'scene-loading') {
+      if (msg.error) {
+        this.sceneLoading = false
+        this.setStatus(String(msg.text || '模型加载失败'))
+      } else if (msg.loading) {
+        this.sceneLoading = true
+        this.setStatus(String(msg.text || '正在加载 3DGS 模型...'))
+      } else {
+        this.sceneLoading = false
+        // Hide overlay only after the model is ready.
+        this.setStatus('')
+      }
       return
     }
 
     if (msg.type === 'answer' && msg.sdp && this.pc) {
       await this.pc.setRemoteDescription({ type: 'answer', sdp: msg.sdp })
       await this.flushPendingIceCandidates()
-      this.setStatus('')
+      // Don't clear status here; scene-loading may still be in progress.
       return
     }
 
@@ -275,7 +293,8 @@ export class CloudRendererClient {
         video.srcObject = this.mediaStream
         this.playVideo(video)
       })
-      this.setStatus('')
+      // Video can arrive before 3DGS finishes loading; keep the spinner until scene-loading ends.
+      if (!this.sceneLoading) this.setStatus('')
     }
     this.pc.onicecandidate = event => {
       this.sendSignal({ type: 'ice', candidate: event.candidate })

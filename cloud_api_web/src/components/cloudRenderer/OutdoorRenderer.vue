@@ -10,7 +10,10 @@
     @dblclick="handleDoubleClick"
   >
     <video ref="videoRef" class="cloud-renderer__video" :style="{ objectFit: videoFit }" autoplay muted playsinline></video>
-    <div v-if="statusText" class="cloud-renderer__status">{{ statusText }}</div>
+    <div v-if="statusText" class="cloud-renderer__status">
+      <div class="cloud-renderer__spinner" aria-hidden="true"></div>
+      <div class="cloud-renderer__status-text">{{ statusText }}</div>
+    </div>
     <button v-if="showClearPath" class="cloud-renderer__clear" type="button" @click.stop="clearPath">清除轨迹</button>
   </div>
 </template>
@@ -120,15 +123,42 @@ onBeforeUnmount(() => {
 
 .cloud-renderer__status {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  padding: 10px 18px;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
   color: #dffcff;
+  background: rgba(2, 18, 28, 0.72);
+  border: 0;
+  border-radius: 0;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.cloud-renderer__spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(121, 242, 238, 0.25);
+  border-top-color: #79f2ee;
+  border-radius: 50%;
+  animation: cloud-renderer-spin 0.9s linear infinite;
+}
+
+.cloud-renderer__status-text {
+  max-width: 80%;
+  text-align: center;
+  padding: 8px 14px;
   background: rgba(2, 18, 28, 0.78);
   border: 1px solid rgba(121, 242, 238, 0.6);
   border-radius: 4px;
-  font-size: 14px;
+}
+
+@keyframes cloud-renderer-spin {
+  to { transform: rotate(360deg); }
 }
 
 .cloud-renderer__clear {
