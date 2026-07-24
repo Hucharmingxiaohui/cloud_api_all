@@ -81,8 +81,8 @@ public class FjReportServiceImpl implements FjReportService {
     UniPointMapper2 uniPointMapper2;
     @Autowired
     SysDictDataMapper sysDictDataMapper;
-    @Value("${longyuan.stationName}")
-    private String longyuanStationName;
+    @Value("${windFarm.stationName}")
+    private String windFarmStationName;
     @Value("${solar.stationName}")
     private String solarStationName;
     @Autowired
@@ -686,7 +686,7 @@ public class FjReportServiceImpl implements FjReportService {
         String fanCode = waylineJobEntity.getFanName();
 
         // 风电场名称写死
-        String windFarmName = longyuanStationName;
+        String windFarmName = windFarmStationName;
 
         // 获取缺陷列表
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()

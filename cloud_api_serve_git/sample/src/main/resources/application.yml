@@ -96,7 +96,6 @@ mqtt:
     username: df1560
     password: dfe2k_1500
     # 订阅主题，多个用逗号分隔
-    # /{code}/{sn}/drone/osd | /{code}/{sn}/dock/osd | /{code}/{sn}/push/hms | /{code}/push/picture
     inbound-topic: "/+/+/drone/osd,/+/+/dock/osd,/+/+/push/hms,/+/push/picture"
 
 cloud-sdk:
@@ -125,31 +124,6 @@ url:
     prefix: control
     version: /api/v1
 
-# Tutorial: https://www.alibabacloud.com/help/en/object-storage-service/latest/use-a-temporary-credential-provided-by-sts-to-access-oss
-#oss:
-#  enable: true
-#  provider: ALIYUN # @see com.dji.sample.component.OssConfiguration.model.enums.OssTypeEnum
-#  endpoint: https://oss-cn-hangzhou.aliyuncs.com
-#  expire: 3600
-#  region: cn-hangzhou # cn-hangzhou
-#  role-session-name: cloudApi
-#  role-arn: acs:ram::1545648436482997:role/b612 # acs:ram::123456789:role/stsrole
-#  bucket: test9870
-#  object-dir-prefix: s1
-
-#oss:
-#  enable: true
-#  provider: aws
-#  endpoint: https://s3.us-east-1.amazonaws.com
-#  access-key:
-#  secret-key:
-#  expire: 3600
-#  region: us-east-1
-#  role-session-name: cloudApi
-#  role-arn:
-#  bucket: cloudapi-bucket
-#  object-dir-prefix: wayline
-#
 oss:
   enable: true
   provider: minio
@@ -211,7 +185,7 @@ livestream:
 singlePointUrl: D:\KmzKml\
 #配置生成航线
 createKmzUrl: D:\KmzKml\KMZ
-#上级对接
+#上级巡视对接开关
 switch:
 #  centerNormalTcpEnable: true
 #  centerOtherTcpEnable: true
@@ -222,7 +196,7 @@ switch:
   centerNormalTcpMsgEnable: false
   centerOtherTcpMsgEnable: false
 
-#国网规范对接上级配置
+#国网规范对接上级巡视配置
 centernormal:
   serverIp: 172.20.63.105
   serverPort: 10019
@@ -254,8 +228,7 @@ mybatis-plus:
     hdb: cloud_sample
 
 
-#  巡视
-#FTPS相关配置
+#通用FTPS相关配置（目前没用到）
 ftps:
   ftpIp: 172.20.63.157
   ftpPort: 10012
@@ -264,24 +237,22 @@ ftps:
   #false显式，true隐式
   implicit: true
 
-#视频服务相关配置
+#视频服务相关配置（此项目暂时没用）
 video:
   #配置参数 (udp)
   sipserverPath: http://127.0.0.1:7002
   #录像回放的TCP请求配置参数
   sipserverTcpPath: http://127.0.0.1:7003
 
-#视频任务抓拍分析配置
+#分析服务配置
 vtask:
   enabled: true
   #分析服务地址
   analyseUrl: http://172.20.63.157:20011/picAnalyse
   #本地部署IP（配置的IP要求分析服务能访问到）
   localIp: 172.20.63.157
-other:
-  logFilePath: /dfe-patrol-dog/logs
 
-#本地文件相关配置（没用）
+#本地文件相关配置（此项目暂时没用）
 file:
   #文件url请求头部
   fileUrl: /dog/images/
@@ -309,7 +280,6 @@ fjfile:
 # 分析服务上传ftp相对路径
   recfileNativePath: /recfile_images/
 
-
 wayline:
   build-kmz-url:
     top-wayline: "http://172.20.63.157:5001/top"
@@ -324,12 +294,13 @@ wayline:
   detect-area-gen-url: "http://172.20.63.157:5005/detectArea"
   start-segmentation-url: "http://172.20.63.157:5005/startSegmentation"
   gf-defect_localization-url: "http://172.20.63.157:5005/defectLocalization"
-#  系统编码
-longyuan:
+
+# 风电场配置
+windFarm:
   stationCode: "Sub_WeiLan"
   stationName: "广西蔚蓝风电场"
-uavPlatform:
-  sender: "UavPatrolSystem"
+# 上报场站（用于对接巡视上报的场站编码，可能是变电站也可能是风电场，根据实际情况配置）
+normalStation:
   stationCode: "Sub_WeiLan"
 
 # 重庆电力下级无人机平台（机场对接 HTTP）
@@ -341,9 +312,8 @@ cq-dock:
   assign-task-path: /machineNest/noauth/third/task/assign_task
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
-hebei:
-  stationCode: "HDCN"
 
+#导入巡视点位配置
 importPoint:
 #  D:/importPoint/  /home/importPoint/
   modelfilePath: D:/importPoint/模版.xlsx
@@ -352,26 +322,24 @@ importPoint:
   # 点位编码前缀
   pointCodePrefix: "YIXIA-"
 
-# x86 服务器 SSH 配置
+# x86 服务器 SSH 配置(用于大疆sdk测温）
 remote:
   ssh:
     host: 172.20.63.150
     port: 22
     username: root
     password: dfe@1500   # 建议使用密钥，更安全
-
   # 远程 dji_irp 的绝对路径（与本地保持一致）
   dji_irp:
     path: /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp
 #   测温库路径
     libraryPath : /dji/KmzKml/dji_thermal_sdk_v1.6_20240927/tsdk-core/lib/linux/release_x64:/usr/local/lib64
-
   # 远程临时目录（存放图片和 raw 文件）
   temp:
     dir: /tmp/thermal_temp
 
 ue:
-  switch: true
+  switch: false
   stateUrl: http://172.20.63.106:19922/api/taskStatus
 
 #光伏配置
@@ -381,7 +349,7 @@ solar:
     #  /dji/orthophoto
     upload-dir: D:/orthophoto/
   stationName: "光伏电站"
-
+#点位同步类别控制
 modelSync:
   fanPoints: false
   stationPoints: true

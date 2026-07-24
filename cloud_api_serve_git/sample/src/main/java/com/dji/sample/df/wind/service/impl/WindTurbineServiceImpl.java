@@ -19,8 +19,8 @@ import java.util.*;
 @Transactional
 public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindTurbine> implements WindTurbineService {
 
-    @Value("${longyuan.stationCode}")
-    private String longyuanStationCode;
+    @Value("${windFarm.stationCode}")
+    private String windFarmStationCode;
     @Resource
     private WindTurbineMapper windTurbineMapper;
 
@@ -255,7 +255,7 @@ public class WindTurbineServiceImpl extends ServiceImpl<WindTurbineMapper, WindT
 
         // 设置其他固定字段（根据你的业务需求）
         point.setStationName("龙源风电场");          // 根据实际设置
-        point.setStationCode(longyuanStationCode);        // 根据实际设置
+        point.setStationCode(windFarmStationCode);        // 根据实际设置
         point.setAreaName("风机区域");            // 根据实际设置
         point.setAreaId("A001");                   // 根据实际设置
         point.setBayName("风机间隔");               // 根据实际设置

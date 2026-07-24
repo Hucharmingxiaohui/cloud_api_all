@@ -101,11 +101,8 @@ public class JobControlHandler {
     private final Map<String, String> analyzingTasks = new ConcurrentHashMap<>(); // taskCode -> jobId
     private final Map<String, Long> analysisStartTime = new ConcurrentHashMap<>(); // taskCode -> 开始时间
 
-    @Value("${uavPlatform.sender}")
-    private String sender;
-
-    @Value("${uavPlatform.stationCode}")
-    private String stationCode;
+    @Value("${normalStation.stationCode}")
+    private String normalStationCode;
 
     /**
      * 开始监控任务状态
@@ -446,7 +443,7 @@ public class JobControlHandler {
                 continue;
             }
 
-            PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+            PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
             String destDir = "/" + taskCode;
             DefectEntity defectEntity = defectEntityMapper.selectOne(new LambdaQueryWrapper<DefectEntity>()
                     .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
@@ -515,7 +512,7 @@ public class JobControlHandler {
                 log.info("未查到对应点位-----");
                 continue;
             }
-            PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+            PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
             String destDir = "/" + taskCode;
             String regId=uniPoint.getPointCode()+picType;
             String replace = fileName.replace(".jpeg", "");
@@ -550,7 +547,7 @@ public class JobControlHandler {
             log.info("上报航点航线巡视图片--------: ");
         }
     }
-
+//   上传巡视报告
     public void sendPatrolReportResult(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
         try {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
@@ -559,7 +556,7 @@ public class JobControlHandler {
             DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
             String deviceSn = deviceEntity.getDeviceSn();
             if(planType==1){
-                    PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", stationCode);
+                    PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
                     String destDir = "/" + taskCode;
                     String reportPath ="/home/uav_server/report/"+waylineJobEntity.getName()+".docx";
                     String destName = new File(reportPath).getName();
@@ -660,22 +657,13 @@ public class JobControlHandler {
     private void sendWindTurbineTaskStatus(String taskCode,String taskName,Integer isFinished) {
         Map<String, Object> statusMessage = new HashMap<>();
 
-        statusMessage.put("messageId", "uuid-" + UUID.randomUUID().toString().substring(0, 8));
-        statusMessage.put("timestamp", getCurrentTime());
-        statusMessage.put("sender", sender);
-        statusMessage.put("stationCode",stationCode);
-        statusMessage.put("category", "task");
-        statusMessage.put("action", "status");
-
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
         );
         WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
 
         Map<String, Object> data = new HashMap<>();
-        // 生成任务巡逻ID，格式：stationCode_taskCode_时间戳
-        String taskPatrolledId = String.format("%s_%s_%s",
-                stationCode,taskCode, LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
+
         Integer taskState = waylineJobDTO.getStatus();
         String mappedState = mapTaskStateToCode(taskState);
         // isFinished==1 时进度固定100%，否则取任务实时进度
@@ -687,18 +675,7 @@ public class JobControlHandler {
         }
         // 根据映射后的状态码生成描述文案
         String description = buildTaskDescription(mappedState, progress, waylineJobDTO);
-        data.put("taskPatrolledId", waylineJobEntity.getJobId());
-        data.put("taskName", taskName);
-        data.put("taskCode", taskCode);
-        data.put("taskState", mappedState);
-        data.put("planStartTime", waylineJobDTO.getBeginTime());
-        data.put("startTime",waylineJobDTO.getExecuteTime());
-        data.put("taskProgress", progress + "%");
-        data.put("taskEstimatedTime", calculateEstimatedTime(progress));
-        data.put("description", description);
         statusMessage.put("data", data);
-//      需要改成tcp上报状态
-//        mqttSender.sendToPatrolData(statusMessage);
 
         List<PatrolStatusItem> patrolStatusItems = new ArrayList<>();
         PatrolStatusItem item = new PatrolStatusItem();
@@ -716,7 +693,7 @@ public class JobControlHandler {
 
         PatrolHostCommand commandData = new PatrolHostCommand();
         commandData.addItems(patrolStatusItems);
-        commandData.setSendCode(centerConfig.getStationCode());
+        commandData.setSendCode(normalStationCode);
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
         patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
