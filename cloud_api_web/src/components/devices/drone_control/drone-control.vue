@@ -94,7 +94,8 @@
         </svg>
         <!-- 控制按钮 -->
         <div class="btn-list">
-            <el-button class="btn" @click="onClickFightControl" >{{ flightController ? '释放控制权' : '申请控制权'}}</el-button>
+            <el-button class="btn" :loading="drcChanging" @click="onClickDrc">{{ drcConnected ? '退出 DRC' : '进入 DRC' }}</el-button>
+            <el-button class="btn" :loading="drcChanging" @click="onClickFightControl" >{{ flightController ? '释放控制权' : '申请控制权'}}</el-button>
             <DroneControlPopover
                 :visible="takeoffToPointPopoverData.visible"
                 :loading="takeoffToPointPopoverData.loading"
@@ -461,7 +462,7 @@ import { defineProps, reactive, ref, watch, computed, onMounted, watchEffect } f
 import { Select, message, Button } from 'ant-design-vue'
 import { PayloadInfo, DeviceInfoType, ControlSource, DeviceOsdCamera, DrcStateEnum } from '/@/types/device'
 import { useMyStore } from '/@/store'
-import { postDrcEnter, postDrcExit } from '/@/api/drc'
+import { postDrcEnter, postDrcEnterOnly, postDrcExit } from '/@/api/drc'
 import { useMqtt, DeviceTopicInfo } from '/@/components/g-map/use-mqtt'
 import { DownOutlined, UpOutlined, LeftOutlined, RightOutlined, PauseCircleOutlined, UndoOutlined, RedoOutlined, ArrowUpOutlined, ArrowDownOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { useManualControl, KeyCode } from '/@/components/g-map/use-manual-control'
@@ -648,17 +649,89 @@ const deviceTopicInfo: DeviceTopicInfo = reactive({
 useMqtt(deviceTopicInfo)
 
 // 飞行控制
-// const drcState = computed(() => {
-//   return store.state.deviceState?.dockInfo[props.sn]?.link_osd?.drc_state === DrcStateEnum.CONNECTED
-// })
+const drcState = computed(() => {
+  return store.state.deviceState?.dockInfo[props.sn]?.link_osd?.drc_state === DrcStateEnum.CONNECTED
+})
 const flightController = ref(false)
+const drcConnected = ref(false)
+const drcChanging = ref(false)
+
+watch(drcState, connected => {
+  drcConnected.value = connected
+  if (!connected) {
+    flightController.value = false
+    deviceTopicInfo.subTopic = ''
+    deviceTopicInfo.pubTopic = ''
+  }
+}, { immediate: true })
+
+async function onClickDrc () {
+  if (drcChanging.value) return
+
+  drcChanging.value = true
+  try {
+    if (drcConnected.value) {
+      await exitDrc()
+      return
+    }
+    await enterDrcOnly()
+  } finally {
+    drcChanging.value = false
+  }
+}
+
+async function enterDrcOnly () {
+  try {
+    const { code, data } = await postDrcEnterOnly({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      drcConnected.value = true
+      if (data.sub && data.sub.length > 0) {
+        deviceTopicInfo.subTopic = data.sub[0]
+      }
+      if (data.pub && data.pub.length > 0) {
+        deviceTopicInfo.pubTopic = data.pub[0]
+      }
+      message.success('进入 DRC 成功')
+    }
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || '进入 DRC 失败')
+  }
+}
+
+async function exitDrc () {
+  try {
+    const { code } = await postDrcExit({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      drcConnected.value = false
+      flightController.value = false
+      deviceTopicInfo.subTopic = ''
+      deviceTopicInfo.pubTopic = ''
+      message.success('退出 DRC 成功')
+    }
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || '退出 DRC 失败')
+  }
+}
 
 async function onClickFightControl () {
-  if (flightController.value) {
-    exitFlightCOntrol()
-    return
+  if (drcChanging.value) return
+
+  drcChanging.value = true
+  try {
+    if (flightController.value) {
+      await exitFlightCOntrol()
+      return
+    }
+    await enterFlightControl()
+  } finally {
+    drcChanging.value = false
   }
-  enterFlightControl()
 }
 
 // 进入飞行控制
@@ -669,6 +742,7 @@ async function enterFlightControl () {
       dock_sn: props.sn,
     })
     if (code === 0) {
+      drcConnected.value = true
       flightController.value = true
       if (data.sub && data.sub.length > 0) {
         deviceTopicInfo.subTopic = data.sub[0]
@@ -694,6 +768,7 @@ async function exitFlightCOntrol () {
       dock_sn: props.sn,
     })
     if (code === 0) {
+      drcConnected.value = false
       flightController.value = false
       deviceTopicInfo.subTopic = ''
       deviceTopicInfo.pubTopic = ''

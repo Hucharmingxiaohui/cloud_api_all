@@ -52,6 +52,14 @@ public interface IDrcService {
     JwtAclDTO deviceDrcEnter(String workspaceId, DrcModeParam param);
 
     /**
+     * Make the dock enter drc mode without requesting flight authority.
+     * @param workspaceId
+     * @param param
+     * @return
+     */
+    JwtAclDTO deviceDrcEnterOnly(String workspaceId, DrcModeParam param);
+
+    /**
      * Make the dock exit drc mode.
      * @param workspaceId
      * @param param

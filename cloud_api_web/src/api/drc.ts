@@ -46,6 +46,11 @@ export async function postDrcEnter (body: DrcEnterBody): Promise<IWorkspaceRespo
   return resp.data
 }
 
+export async function postDrcEnterOnly (body: DrcEnterBody): Promise<IWorkspaceResponse<DrcEnterResp>> {
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${workspaceId}/drc/enter-only`, body)
+  return resp.data
+}
+
 export interface DrcExitBody {
   client_id: string
   dock_sn: string

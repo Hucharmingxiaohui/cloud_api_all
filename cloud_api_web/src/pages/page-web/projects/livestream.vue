@@ -13,10 +13,10 @@
         </div> -->
       </div>
       <div class="box-right">
-        <div :title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+        <div v-if="cloudRendererEnabled" title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
         <div style="width: 100%; height: 100%; border: 2px solid white;">
           <TwoDModel v-if="isFlatMap && isMounted" />
-          <OutdoorRenderer v-if="!isFlatMap && isMounted" />
+          <OutdoorRenderer v-if="cloudRendererEnabled && !isFlatMap && isMounted" />
         </div>
         <div v-if="!isFlatMap && livestream.visible" class="liveview">
           <div class="liveview__header">
@@ -52,6 +52,7 @@ import { useRouter } from 'vue-router'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { EDeviceTypeName } from '/@/types'
+import { isCloudRendererEnabled } from '/@/components/cloudRenderer/cloudRendererConfig'
 
 // 重型组件改为异步加载，减少首屏 bundle 体积
 const TwoDModel = defineAsyncComponent(() => import('/@/components/g-map/mapPanel1.vue'))
@@ -69,7 +70,8 @@ const showDockLive = ref<boolean>(false)
 const router = useRouter()
 let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
-const isFlatMap = ref(false) // 是否二维地图
+const cloudRendererEnabled = isCloudRendererEnabled()
+const isFlatMap = ref(!cloudRendererEnabled) // 是否二维地图
 const isMounted = ref(false) // 是否已经完成初始化
 
 // 无人机视频---------------------------------------------------
