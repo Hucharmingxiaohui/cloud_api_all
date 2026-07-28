@@ -329,6 +329,8 @@ cq-dock:
   assign-task-path: /machineNest/noauth/third/task/assign_task
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
+  # EUA图片下载到本地的根目录，Windows示例: D:/Temp/eua-picture，Linux示例: /home/uav_server/eua-picture
+  picture-local-path: D:/Temp/eua-picture
 
 #导入巡视点位配置
 importPoint:

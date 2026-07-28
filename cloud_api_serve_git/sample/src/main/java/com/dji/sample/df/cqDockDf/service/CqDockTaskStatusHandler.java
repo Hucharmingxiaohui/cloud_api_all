@@ -34,6 +34,8 @@ public class CqDockTaskStatusHandler {
     @Autowired
     private CqDockApiService cqDockApiService;
     @Autowired
+    private CqDockPictureReportService cqDockPictureReportService;
+    @Autowired
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
@@ -99,6 +101,10 @@ public class CqDockTaskStatusHandler {
             redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
 
             if (isTerminalEuaStatus(euaStatus)) {
+                if ("1".equals(euaStatus)) {
+//                  任务完成上报图片结果
+                    cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
+                }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);
                 log.info("EUA任务已结束，停止状态监控: taskCode={}, euaTaskId={}, euaStatus={}, state={}",
