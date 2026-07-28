@@ -1,6 +1,6 @@
 
 <template>
-    <div id="cesiumBox" style="width: 100%;height: 100%; position: relative;">
+    <div ref="cesiumBoxRef" style="width: 100%;height: 100%; position: relative;">
         <div style="position: absolute; right: 0; bottom: 0; z-index: 999; margin-right: 30px; margin-bottom: 40px;">
             <el-slider v-model="zoomScale" :min="1" vertical height="150px" :marks="marks" @input="setCameraFocalLength"/>
         </div>
@@ -17,13 +17,16 @@
 
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import * as Cesium from 'cesium'
-import { reactive, onMounted, defineExpose, ref, computed, onBeforeUnmount, watch, defineEmits } from 'vue'
+import { reactive, onMounted, defineExpose, ref, nextTick, defineEmits, onBeforeUnmount } from 'vue'
 import { removeLogo, load3DTilesModels, computeCameraChangeDis } from './cesiumTools'
 import { CreateFrustum } from './CreateFrustum'
 
 const emit = defineEmits()
 
 const viewer = ref(null)
+const cesiumBoxRef = ref(null)
+const isViewerReady = ref(false)
+let pendingTilesetUrl = ''
 
 let animFrameId = null
 
@@ -34,10 +37,18 @@ function startRenderLoop () {
 }
 
 onMounted(() => {
-  initCesiumMap()
-  startRenderLoop()
-  cesium.viewer.camera.changed.addEventListener(() => {
-    updateCameraParameters()
+  nextTick(() => {
+    initCesiumMap()
+    startRenderLoop()
+    cesium.viewer.camera.changed.addEventListener(() => {
+      updateCameraParameters()
+    })
+    isViewerReady.value = true
+    if (pendingTilesetUrl) {
+      const url = pendingTilesetUrl
+      pendingTilesetUrl = ''
+      loadModel(url)
+    }
   })
 })
 
@@ -58,8 +69,12 @@ const cesium = {
 
 // 初始化场景
 function initCesiumMap () {
+  if (!cesiumBoxRef.value) {
+    console.warn('uavCamera: Cesium 容器未挂载')
+    return
+  }
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZmJjODE1Yy1kMjU4LTQyZTgtODAyZC1mNzE2MDNhMmQ3YzUiLCJpZCI6MTk5NzQwLCJpYXQiOjE3MDk2Mjg5Mjh9.GuRbyEbm8FknaFOM34kGm9wCbf2XVjp873h_QD-Vs7A'
-  cesium.viewer = new Cesium.Viewer('cesiumBox', {
+  cesium.viewer = new Cesium.Viewer(cesiumBoxRef.value, {
     useDefaultRenderLoop: false,
     selectionIndicator: true,
     infoBox: false,
@@ -105,11 +120,28 @@ function initCesiumMap () {
   }
   cesium.viewer.scene.postProcessStages.fxaa.enabled = true
   cesium.viewer.scene.debugShowFramesPerSecond = false // 显示帧率
+  cesium.viewer.resize()
 }
 
 // 加载模型
-function loadModel (tilesetUrl) {
-  load3DTilesModels(cesium.viewer, tilesetUrl)
+async function loadModel (tilesetUrl) {
+  if (!tilesetUrl) return
+  if (!isViewerReady.value || !cesium.viewer || cesium.viewer.isDestroyed()) {
+    pendingTilesetUrl = tilesetUrl
+    return
+  }
+  try {
+    cesium.viewer.scene.primitives.removeAll()
+    const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
+    if (!tileset) {
+      console.warn('uavCamera: 小窗模型加载失败', tilesetUrl)
+      return
+    }
+    await cesium.viewer.zoomTo(tileset)
+    cesium.viewer.resize()
+  } catch (error) {
+    console.warn('uavCamera: 小窗模型加载异常', tilesetUrl, error)
+  }
 }
 
 // -----------------------------------------------相机操作--------------------------------------------------

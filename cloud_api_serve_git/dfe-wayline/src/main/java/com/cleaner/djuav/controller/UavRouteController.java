@@ -56,11 +56,15 @@ public class UavRouteController {
 
         org.springframework.core.io.Resource fileResource = new FileSystemResource(p); // 这里用全限定名
         String filename = p.getFileName().toString();
+        String fallbackFilename = filename.replaceAll("[^A-Za-z0-9._-]", "_");
+        if (fallbackFilename.isBlank()) {
+            fallbackFilename = "wayline.kmz";
+        }
         String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + filename + "\"; filename*=UTF-8''" + encoded)
+                        "attachment; filename=\"" + fallbackFilename + "\"; filename*=UTF-8''" + encoded)
                 .contentType(MediaType.parseMediaType("application/vnd.google-earth.kmz"))
                 // 不要调用 contentLength(resource.contentLength())，它会 throws IOException
                 .body(fileResource);  // 泛型将被推断为 org.springframework.core.io.Resource
