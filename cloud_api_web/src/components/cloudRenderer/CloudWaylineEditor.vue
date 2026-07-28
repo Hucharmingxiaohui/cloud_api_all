@@ -1,5 +1,13 @@
 <template>
-  <div class="wayline-editor">
+  <div v-if="!cloudRendererEnabled" class="cloud-disabled">
+    <div class="cloud-disabled__card">
+      <span class="panel-title__eyebrow">CLOUD WAYLINE</span>
+      <h2>当前现场未开启三维云渲染服务</h2>
+      <p>请使用二维航线规划，或联系管理员在云渲染管理中启用室外云渲染。</p>
+      <el-button type="primary" @click="router.back()">返回</el-button>
+    </div>
+  </div>
+  <div v-else class="wayline-editor">
     <aside class="editor-panel editor-panel--left">
       <div class="panel-title">
         <div>
@@ -163,7 +171,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import OutdoorRenderer from './OutdoorRenderer.vue'
 import { CloudRendererClient } from './cloudRendererClient'
-import { getCloudRendererConfig } from './cloudRendererConfig'
+import { getCloudRendererConfig, isCloudRendererEnabled } from './cloudRendererConfig'
 import {
   clearCloudWaylineEditDraft,
   readCloudWaylineEditDraft,
@@ -189,6 +197,7 @@ interface WaylineState { routeName: string; selectedIndex: number; waypoints: Wa
 
 const router = useRouter()
 const route = useRoute()
+const cloudRendererEnabled = isCloudRendererEnabled()
 const waylineClient = new CloudRendererClient()
 const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
@@ -206,16 +215,18 @@ let pendingEditDraft: CloudWaylineDraft | null = null
 let kmzController: AbortController | null = null
 const selectedWaypoint = computed(() => waylineState.waypoints[waylineState.selectedIndex] || null)
 
-bootstrapEditDraft()
+if (cloudRendererEnabled) bootstrapEditDraft()
 
-const stopSignalListener = waylineClient.onSignalMessage(message => {
-  if (message.type === 'renderer-ready') {
-    flushPendingEditDraft()
-    return
-  }
-  if (message.type !== 'wayline-state' || !message.payload) return
-  applyRemoteWaylineState(message.payload)
-})
+const stopSignalListener = cloudRendererEnabled
+  ? waylineClient.onSignalMessage(message => {
+    if (message.type === 'renderer-ready') {
+      flushPendingEditDraft()
+      return
+    }
+    if (message.type !== 'wayline-state' || !message.payload) return
+    applyRemoteWaylineState(message.payload)
+  })
+  : () => {}
 
 function bootstrapEditDraft () {
   const mode = String(route.query.mode || '')
@@ -694,6 +705,28 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
+.cloud-disabled {
+  width: 100%;
+  height: calc(100vh - 100px);
+  min-height: 520px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  color: #dff6ff;
+  background: radial-gradient(circle at 50% 35%, rgba(19, 96, 132, .24), transparent 42%);
+}
+.cloud-disabled__card {
+  width: min(520px, 100%);
+  padding: 42px 36px;
+  box-sizing: border-box;
+  text-align: center;
+  background: rgba(5, 24, 51, .96);
+  border: 1px solid rgba(58, 165, 213, .48);
+  box-shadow: inset 0 0 28px rgba(33, 137, 196, .14), 0 16px 48px rgba(0, 0, 0, .24);
+}
+.cloud-disabled__card h2 { margin: 12px 0; color: #fff; font-size: 22px; }
+.cloud-disabled__card p { margin: 0 0 24px; color: #91b7ca; line-height: 1.8; }
 .wayline-editor {
   --panel-bg: rgba(5, 24, 51, .96);
   --line: rgba(58, 165, 213, .42);

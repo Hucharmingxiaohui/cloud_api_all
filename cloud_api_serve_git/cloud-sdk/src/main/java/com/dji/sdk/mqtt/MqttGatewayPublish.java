@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class MqttGatewayPublish {
 
-    private static final Logger log = LoggerFactory.getLogger(WebSocketMessageSend.class);
+    private static final Logger log = LoggerFactory.getLogger(MqttGatewayPublish.class);
 
     private static final int DEFAULT_QOS = 0;
     public static final int DEFAULT_RETRY_COUNT = 2;

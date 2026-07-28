@@ -8,6 +8,7 @@ const CURRENT_CONFIG = {
   flvURL: 'http://172.20.13.161:9080/live/',  // 视频流地址
   UEPixURL: 'ws://172.20.63.106:901',
   cloudRenderer: {
+    enabled: true,
     baseURL: 'http://127.0.0.1:3000',
     renderer: 'outdoor',
     pointCloudFile: '3dgs/7.1.1.ply',

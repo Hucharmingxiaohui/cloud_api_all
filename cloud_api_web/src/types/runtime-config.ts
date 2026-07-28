@@ -10,6 +10,7 @@ export interface CloudRendererIceServer {
 }
 
 export interface CloudRendererConfig {
+  enabled: boolean
   baseURL: string
   renderer?: 'outdoor' | 'align' | 'wayline'
   pointCloudFile: string

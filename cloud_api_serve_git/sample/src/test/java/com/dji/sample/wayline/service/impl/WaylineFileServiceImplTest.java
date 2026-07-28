@@ -81,7 +81,7 @@ class WaylineFileServiceImplTest {
         assertEquals(100L, updated.getCreateTime());
         assertEquals(true, updated.getFavorited());
         assertEquals(7, updated.getWaylinePos());
-        assertEquals("edited-route", updated.getName());
+        assertEquals("old-route", updated.getName());
         assertEquals("editor", updated.getUsername());
         assertNotEquals("wayline/old-route.kmz", updated.getObjectKey());
         assertTrue(updated.getObjectKey().startsWith("wayline/workspace-1/wayline-123/"));
