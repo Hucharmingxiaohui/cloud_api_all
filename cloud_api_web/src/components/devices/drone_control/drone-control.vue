@@ -94,7 +94,6 @@
         </svg>
         <!-- 控制按钮 -->
         <div class="btn-list">
-            <el-button class="btn" :loading="drcChanging" @click="onClickDrc">{{ drcConnected ? '退出 DRC' : '进入 DRC' }}</el-button>
             <el-button class="btn" :loading="drcChanging" @click="onClickFightControl" >{{ flightController ? '释放控制权' : '申请控制权'}}</el-button>
             <DroneControlPopover
                 :visible="takeoffToPointPopoverData.visible"
@@ -397,7 +396,7 @@
   </div>
 <!-- 海上目标追踪任务：放在“无人机控制/负载控制”下面 -->
 <div class="mission-panel">
-  <div class="box-title">-</div>
+  <div class="box-title">快捷指令</div>
 
   <DroneControlPopover
     :visible="missionParams.visible"
@@ -428,8 +427,7 @@
   <div class="btn-list mission-btns">
     <el-button class="btn" @click="openMissionParam">参数设置</el-button>
     <el-button class="btn" :loading="missionBusy" @click="onOneKeyTakeoff">一键起飞</el-button>
-    <el-button class="btn" :loading="missionBusy" @click="onApproachObserve">-观察</el-button>
-    <el-button class="btn" :loading="missionBusy" @click="onApproachOrbit">-盘旋</el-button>
+    <el-button class="btn drc-link-btn" :loading="drcChanging" @click="onClickDrc">{{ drcConnected ? '关闭 DRC 链路' : '打开 DRC 链路' }}</el-button>
     <el-button class="btn" :loading="missionBusy" type="danger" @click="onEndMission">结束任务</el-button>
   </div>
 
@@ -1662,7 +1660,19 @@ watchEffect(async () => {
     margin-bottom:8px;
   }
   .mission-btns{
-    grid-template-columns: repeat(4, 1fr);
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    column-gap: 16px;
+    row-gap: 10px;
+    margin-left: 0;
+
+    .btn{
+      min-width: 85px;
+    }
+
+    .drc-link-btn{
+      width: 112px;
+    }
   }
   .mission-status{
     margin-top: 6px;

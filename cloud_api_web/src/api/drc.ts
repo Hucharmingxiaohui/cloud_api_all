@@ -3,7 +3,14 @@ import { ELocalStorageKey } from '/@/types'
 
 // DRC 链路
 const DRC_API_PREFIX = '/control/api/v1'
-const workspaceId: string = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
+
+function getWorkspaceId (): string {
+  const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
+  if (!workspaceId) {
+    throw new Error('workspace_id is empty')
+  }
+  return workspaceId
+}
 
 export interface PostDrcBody {
   client_id?: string // token过期时，用于续期则必填
@@ -21,7 +28,7 @@ export interface DrcParams {
 
 // 获取 mqtt 连接认证
 export async function postDrc (body: PostDrcBody): Promise<IWorkspaceResponse<DrcParams>> {
-  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${workspaceId}/drc/connect`, body)
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/connect`, body)
   return resp.data
 }
 
@@ -42,12 +49,12 @@ export interface DrcEnterResp {
 
 // 进入飞行控制 （建立drc连接&获取云控控制权）
 export async function postDrcEnter (body: DrcEnterBody): Promise<IWorkspaceResponse<DrcEnterResp>> {
-  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${workspaceId}/drc/enter`, body)
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/enter`, body)
   return resp.data
 }
 
 export async function postDrcEnterOnly (body: DrcEnterBody): Promise<IWorkspaceResponse<DrcEnterResp>> {
-  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${workspaceId}/drc/enter-only`, body)
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/enter-only`, body)
   return resp.data
 }
 
@@ -58,6 +65,6 @@ export interface DrcExitBody {
 
 // 退出飞行控制 （退出drc连接&退出云控控制权）
 export async function postDrcExit (body: DrcExitBody): Promise<IWorkspaceResponse<null>> {
-  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${workspaceId}/drc/exit`, body)
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/exit`, body)
   return resp.data
 }
