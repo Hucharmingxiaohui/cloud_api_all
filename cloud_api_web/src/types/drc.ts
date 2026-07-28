@@ -5,6 +5,15 @@ export enum DRC_METHOD {
   OSD_INFO_PUSH = 'osd_info_push', // 高频osd信息上报
   HSI_INFO_PUSH = 'hsi_info_push', // 避障信息上报
   DELAY_TIME_INFO_PUSH = 'delay_info_push', // 图传链路延时信息上报
+  INITIAL_STATE_SUBSCRIBE = 'drc_initial_state_subscribe',
+  PSDK_STATE_INFO = 'drc_psdk_state_info',
+  SPEAKER_TTS_SET = 'drc_speaker_tts_set',
+  SPEAKER_PLAY_MODE_SET = 'drc_speaker_play_mode_set',
+  SPEAKER_PLAY_VOLUME_SET = 'drc_speaker_play_volume_set',
+  SPEAKER_TTS_PLAY_START = 'drc_speaker_tts_play_start',
+  SPEAKER_PLAY_STOP = 'drc_speaker_play_stop',
+  SPEAKER_REPLAY = 'drc_speaker_replay',
+  SPEAKER_PLAY_PROGRESS = 'drc_speaker_play_progress',
 }
 
 // 手动控制

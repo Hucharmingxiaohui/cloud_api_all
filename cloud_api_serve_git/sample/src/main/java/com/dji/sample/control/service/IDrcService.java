@@ -52,9 +52,25 @@ public interface IDrcService {
     JwtAclDTO deviceDrcEnter(String workspaceId, DrcModeParam param);
 
     /**
+     * Make the dock enter DRC mode for payload speaker control only.
+     * This must not seize flight authority or require the drone to be airborne.
+     * @param workspaceId
+     * @param param
+     * @return
+     */
+    JwtAclDTO deviceSpeakerDrcEnter(String workspaceId, DrcModeParam param);
+
+    /**
      * Make the dock exit drc mode.
      * @param workspaceId
      * @param param
      */
     void deviceDrcExit(String workspaceId, DrcModeParam param);
+
+    /**
+     * Exit speaker-only DRC mode.
+     * @param workspaceId
+     * @param param
+     */
+    void deviceSpeakerDrcExit(String workspaceId, DrcModeParam param);
 }

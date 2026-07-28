@@ -15,7 +15,7 @@
                     <div class="box s1">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_A)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-10"
                     >
@@ -25,7 +25,7 @@
                     <div class="box s2">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_W)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-11"
                     >
@@ -35,7 +35,7 @@
                     <div class="box s3">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_D)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-12"
                     >
@@ -45,7 +45,7 @@
                     <div class="box s4">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_S)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-13"
                     >
@@ -65,22 +65,22 @@
                 </div>
             </div>
             <div class="flex-center">
-                <el-button class ='box-btn' style="top:-140px;left: -88px;" @mousedown="onMouseDown(KeyCode.KEY_Q)" @onmouseup="onMouseUp">
+                <el-button class ='box-btn' style="top:-140px;left: -88px;" @mousedown="onMouseDown(KeyCode.KEY_Q)" @mouseup="onMouseUp">
                     <span class="iconfont icon-icon-test" ></span>
                 </el-button>
             </div>
             <div class="flex-center">
-                <el-button class ='box-btn' style="top:-170px;left: 88px;" @mousedown="onMouseDown(KeyCode.KEY_E)" @onmouseup="onMouseUp">
+                <el-button class ='box-btn' style="top:-170px;left: 88px;" @mousedown="onMouseDown(KeyCode.KEY_E)" @mouseup="onMouseUp">
                     <span class="iconfont icon-icon-test1" ></span>
                 </el-button>
             </div>
             <div class="flex-center">
-                <el-button class ='box-btn' style="top:-160px;left: -88px;" @mousedown="onMouseDown(KeyCode.ARROW_UP)" @onmouseup="onMouseUp">
+                <el-button class ='box-btn' style="top:-160px;left: -88px;" @mousedown="onMouseDown(KeyCode.ARROW_UP)" @mouseup="onMouseUp">
                     <span class="iconfont icon-xiangshang4" ></span>
                 </el-button>
             </div>
             <div class="flex-center">
-                <el-button class ='box-btn' style="top:-190px;left: 88px;" @mousedown="onMouseDown(KeyCode.ARROW_DOWN)" @onmouseup="onMouseUp">
+                <el-button class ='box-btn' style="top:-190px;left: 88px;" @mousedown="onMouseDown(KeyCode.ARROW_DOWN)" @mouseup="onMouseUp">
                     <span class="iconfont icon-xiangxia4" ></span>
                 </el-button>
             </div>
@@ -224,7 +224,7 @@
                     <div class="box s1">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_A)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-10"
                     >
@@ -234,7 +234,7 @@
                     <div class="box s2">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_W)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-11"
                     >
@@ -244,7 +244,7 @@
                     <div class="box s3">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_D)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-12"
                     >
@@ -254,7 +254,7 @@
                     <div class="box s4">
                     <div
                         @mousedown="onMouseDown(KeyCode.KEY_S)"
-                        @onmouseup="onMouseUp"
+                        @mouseup="onMouseUp"
                         class="arrow"
                         id="id-13"
                     >
@@ -394,6 +394,13 @@
         </div>
     </div>
   </div>
+  <As1SpeakerPanel
+    :device-topic-info="deviceTopicInfo"
+    :mqtt-hooks="mqttHooks"
+    :drc-loading="drcLoading"
+    :on-enter-drc="enterSpeakerDrc"
+    :on-exit-drc="exitSpeakerDrc"
+  />
 <!-- 海上目标追踪任务：放在“无人机控制/负载控制”下面 -->
 <div class="mission-panel">
   <div class="box-title">-</div>
@@ -461,7 +468,7 @@ import { defineProps, reactive, ref, watch, computed, onMounted, watchEffect } f
 import { Select, message, Button } from 'ant-design-vue'
 import { PayloadInfo, DeviceInfoType, ControlSource, DeviceOsdCamera, DrcStateEnum } from '/@/types/device'
 import { useMyStore } from '/@/store'
-import { postDrcEnter, postDrcExit } from '/@/api/drc'
+import { postDrcEnter, postDrcExit, postSpeakerDrcEnter, postSpeakerDrcExit } from '/@/api/drc'
 import { useMqtt, DeviceTopicInfo } from '/@/components/g-map/use-mqtt'
 import { DownOutlined, UpOutlined, LeftOutlined, RightOutlined, PauseCircleOutlined, UndoOutlined, RedoOutlined, ArrowUpOutlined, ArrowDownOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { useManualControl, KeyCode } from '/@/components/g-map/use-manual-control'
@@ -474,6 +481,7 @@ import {
   ECommanderModeLostAction, ECommanderFlightMode
 } from '/@/api/drone-control/drone'
 import { useDroneControl } from '/@/components/g-map/use-drone-control'
+import As1SpeakerPanel from '/@/components/devices/speaker/As1SpeakerPanel.vue'
 import {
   GimbalResetMode, GimbalResetModeOptions, LostControlActionInCommandFLightOptions, WaylineLostControlActionInCommandFlightOptions,
   RthModeInCommandFlightOptions, CommanderModeLostActionInCommandFlightOptions, CommanderFlightModeInCommandFlightOptions
@@ -645,13 +653,14 @@ const deviceTopicInfo: DeviceTopicInfo = reactive({
   subTopic: ''
 })
 
-useMqtt(deviceTopicInfo)
+const mqttHooks = useMqtt(deviceTopicInfo)
 
 // 飞行控制
 // const drcState = computed(() => {
 //   return store.state.deviceState?.dockInfo[props.sn]?.link_osd?.drc_state === DrcStateEnum.CONNECTED
 // })
 const flightController = ref(false)
+const drcLoading = ref(false)
 
 async function onClickFightControl () {
   if (flightController.value) {
@@ -663,8 +672,14 @@ async function onClickFightControl () {
 
 // 进入飞行控制
 async function enterFlightControl () {
+  if (drcLoading.value) return false
+  if (!clientId.value) {
+    message.error('MQTT 临时凭证未就绪，请刷新页面或确认 /drc/connect 成功')
+    return false
+  }
+  drcLoading.value = true
   try {
-    const { code, data } = await postDrcEnter({
+    const { code, data, message: msg } = await postDrcEnter({
       client_id: clientId.value,
       dock_sn: props.sn,
     })
@@ -681,15 +696,24 @@ async function enterFlightControl () {
         await postFlightAuth(props.sn)
       }
       message.success('Get flight control successfully')
+      return true
     }
+    message.error(msg || `建立 DRC 链路失败，错误码：${code}`)
+    return false
   } catch (error: any) {
+    message.error(error?.message || '建立 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
   }
 }
 
 // 退出飞行控制
 async function exitFlightCOntrol () {
+  if (drcLoading.value) return false
+  drcLoading.value = true
   try {
-    const { code } = await postDrcExit({
+    const { code, message: msg } = await postDrcExit({
       client_id: clientId.value,
       dock_sn: props.sn,
     })
@@ -698,8 +722,71 @@ async function exitFlightCOntrol () {
       deviceTopicInfo.subTopic = ''
       deviceTopicInfo.pubTopic = ''
       message.success('Exit flight control')
+      return true
     }
+    message.error(msg || `关闭 DRC 链路失败，错误码：${code}`)
+    return false
   } catch (error: any) {
+    message.error(error?.message || '关闭 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
+  }
+}
+
+async function enterSpeakerDrc () {
+  if (drcLoading.value) return false
+  if (!clientId.value) {
+    message.error('MQTT 临时凭证未就绪，请刷新页面或确认 /drc/connect 成功')
+    return false
+  }
+  drcLoading.value = true
+  try {
+    const { code, data, message: msg } = await postSpeakerDrcEnter({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      if (data.sub && data.sub.length > 0) {
+        deviceTopicInfo.subTopic = data.sub[0]
+      }
+      if (data.pub && data.pub.length > 0) {
+        deviceTopicInfo.pubTopic = data.pub[0]
+      }
+      message.success('AS1 喊话器 DRC 链路已建立')
+      return true
+    }
+    message.error(msg || `建立 AS1 DRC 链路失败，错误码：${code}`)
+    return false
+  } catch (error: any) {
+    message.error(error?.message || '建立 AS1 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
+  }
+}
+
+async function exitSpeakerDrc () {
+  if (drcLoading.value) return false
+  drcLoading.value = true
+  try {
+    const { code, message: msg } = await postSpeakerDrcExit({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      deviceTopicInfo.subTopic = ''
+      deviceTopicInfo.pubTopic = ''
+      message.success('AS1 喊话器 DRC 链路已关闭')
+      return true
+    }
+    message.error(msg || `关闭 AS1 DRC 链路失败，错误码：${code}`)
+    return false
+  } catch (error: any) {
+    message.error(error?.message || '关闭 AS1 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
   }
 }
 
@@ -710,7 +797,7 @@ const {
   handleKeyup,
   handleEmergencyStop,
   resetControlState,
-} = useManualControl(deviceTopicInfo, flightController)
+} = useManualControl(deviceTopicInfo, flightController, mqttHooks)
 
 function onMouseDown (type: KeyCode) {
   handleKeyup(type)
@@ -803,9 +890,15 @@ const {
 } = usePayloadControl()
 
 async function onAuthPayload () {
+  if (!payloadSelectInfo.payloadIndex) {
+    message.error('未识别到可控制的负载，请确认无人机负载状态已上报')
+    return
+  }
   const result = await authPayload(props.sn, payloadSelectInfo.payloadIndex)
   if (result) {
     payloadControlSource.value = ControlSource.A
+  } else {
+    message.error('获取负载控制权失败，请检查无人机在线状态或控制权占用情况')
   }
 }
 
