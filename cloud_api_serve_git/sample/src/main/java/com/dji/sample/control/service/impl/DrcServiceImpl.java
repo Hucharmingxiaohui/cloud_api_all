@@ -123,7 +123,7 @@ public class DrcServiceImpl implements IDrcService {
         }
     }
 
-    private void checkDrcModeCondition(String workspaceId, String dockSn, boolean requestFlightAuthority) {
+    private void checkDrcModeCondition(String workspaceId, String dockSn) {
         Optional<EventsReceiver<FlighttaskProgress>> runningOpt = waylineRedisService.getRunningWaylineJob(dockSn);
         if (runningOpt.isPresent() && WaylineJobStatusEnum.IN_PROGRESS == waylineJobService.getWaylineState(dockSn)) {
             flighttaskService.updateJobStatus(workspaceId, runningOpt.get().getBid(),
@@ -141,26 +141,14 @@ public class DrcServiceImpl implements IDrcService {
             throw new RuntimeException("The current state of the dock does not support entering command flight mode.");
         }
 
-        if (requestFlightAuthority) {
-            HttpResultResponse result = controlService.seizeAuthority(dockSn, DroneAuthorityEnum.FLIGHT, null);
-            if (HttpResultResponse.CODE_SUCCESS != result.getCode()) {
-                throw new IllegalArgumentException(result.getMessage());
-            }
+        HttpResultResponse result = controlService.seizeAuthority(dockSn, DroneAuthorityEnum.FLIGHT, null);
+        if (HttpResultResponse.CODE_SUCCESS != result.getCode()) {
+            throw new IllegalArgumentException(result.getMessage());
         }
-
     }
 
     @Override
     public JwtAclDTO deviceDrcEnter(String workspaceId, DrcModeParam param) {
-        return enterDrcMode(workspaceId, param, true);
-    }
-
-    @Override
-    public JwtAclDTO deviceDrcEnterOnly(String workspaceId, DrcModeParam param) {
-        return enterDrcMode(workspaceId, param, false);
-    }
-
-    private JwtAclDTO enterDrcMode(String workspaceId, DrcModeParam param, boolean requestFlightAuthority) {
         String topic = TopicConst.THING_MODEL_PRE + TopicConst.PRODUCT + param.getDockSn() + TopicConst.DRC;
         String pubTopic = topic + TopicConst.DOWN;
         String subTopic = topic + TopicConst.UP;
@@ -172,7 +160,7 @@ public class DrcServiceImpl implements IDrcService {
             return JwtAclDTO.builder().sub(List.of(subTopic)).pub(List.of(pubTopic)).build();
         }
 
-        checkDrcModeCondition(workspaceId, param.getDockSn(), requestFlightAuthority);
+        checkDrcModeCondition(workspaceId, param.getDockSn());
 
         TopicServicesResponse<ServicesReplyData> reply = abstractControlService.drcModeEnter(
                 SDKManager.getDeviceSDK(param.getDockSn()),
