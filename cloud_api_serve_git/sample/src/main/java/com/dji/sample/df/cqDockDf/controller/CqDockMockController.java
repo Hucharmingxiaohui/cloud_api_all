@@ -73,7 +73,7 @@ public class CqDockMockController {
 
         JSONObject data = new JSONObject();
         data.put("taskId", request.getTaskId());
-        data.put("status", "2");
+        data.put("status", "1");
         return success(data, "任务状态查询成功(mock)");
     }
 

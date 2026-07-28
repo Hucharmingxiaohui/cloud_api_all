@@ -12,6 +12,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.dto.CqAssignTaskRequest;
 import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
 import com.dji.sample.df.cqDockDf.service.CqDockApiService;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskStatusHandler;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
@@ -51,6 +52,8 @@ public class CenterTaskHandler {
     private CqDockApiService cqDockApiService;
     @Autowired
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
+    @Autowired
+    private CqDockTaskStatusHandler cqDockTaskStatusHandler;
 
     // 使用有序集合存储定时任务，score为执行时间戳
     private static final String TASK_SCHEDULE_ZSET = "task_schedule:zset";
@@ -170,7 +173,8 @@ public class CenterTaskHandler {
         String singleDeviceId = taskDetail.get("deviceId");
         String taskName = taskDetail.get("taskName");
         String planType = taskDetail.get("planType");
-        int result = executeTask(planType, singleDeviceId, taskCode, taskName);
+        String fixedStartTime = taskDetail.get("fixedStartTime");
+        int result = executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
 //      执行成功了才加入监控；EUA任务由下级平台执行，不复用本地航线任务监控。
         if (result == 0) {
             if ("5".equals(planType)) {
@@ -206,7 +210,7 @@ public class CenterTaskHandler {
     /**
      * 执行任务
      */
-    private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
+    private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName, String fixedStartTime) {
         try {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
 //          间隔航线多对一可以，一对多不可以
@@ -215,7 +219,7 @@ public class CenterTaskHandler {
             }else if ("1".equals(planType)){
                 return executeFanTask(singleDeviceId, taskCode, taskName);
             }else if ("5".equals(planType)){
-                return executeCqDockTask(singleDeviceId, taskCode, taskName);
+                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
             }
             return -1;
         } catch (Exception e) {
@@ -265,7 +269,7 @@ public class CenterTaskHandler {
     /**
      * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
      */
-    private int executeCqDockTask(String bayId, String taskCode, String taskName) {
+    private int executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
         String routeId = resolveCqDockRouteId(bayId);
         if (!StringUtils.hasText(routeId)) {
             log.error("EUA定时任务执行失败，未在df_uni_point中匹配到航线: taskCode={}, bayId={}", taskCode, bayId);
@@ -287,6 +291,7 @@ public class CenterTaskHandler {
                 response == null ? null : response.getRawBody(), success);
         if (success) {
             log.info("EUA定时任务下发成功: taskCode={}, bayId={}, routeId={}, taskId={}", taskCode, bayId, routeId, euaTaskId);
+            cqDockTaskStatusHandler.startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime);
             return 0;
         }
         log.error("EUA定时任务下发失败: taskCode={}, bayId={}, routeId={}, code={}, msg={}",
