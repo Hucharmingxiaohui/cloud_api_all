@@ -14,6 +14,9 @@
           </div>
 
           <el-form label-position="top" class="settings-form">
+            <el-form-item label="启用室外云渲染">
+              <el-switch v-model="form.enabled" active-text="已启用" inactive-text="未启用" />
+            </el-form-item>
             <el-form-item label="云渲染服务地址">
               <el-input v-model="form.baseURL" placeholder="http://127.0.0.1:3000" />
             </el-form-item>
@@ -22,7 +25,7 @@
                 <el-select v-model="form.pointCloudFile" filterable allow-create default-first-option placeholder="选择 3DGS 文件">
                   <el-option v-for="file in pointClouds" :key="file" :label="file" :value="file" />
                 </el-select>
-                <el-button :loading="loadingResources" @click="loadResources">读取文件</el-button>
+                <el-button :loading="loadingResources" :disabled="!form.enabled" @click="loadResources">读取文件</el-button>
               </div>
             </el-form-item>
             <el-form-item label="配准使用的 3DGS 文件">
@@ -47,7 +50,7 @@
           </el-form>
 
           <div class="actions">
-            <el-button type="primary" :loading="testing" @click="testConnection">测试连接</el-button>
+            <el-button type="primary" :loading="testing" :disabled="!form.enabled" @click="testConnection">测试连接</el-button>
             <el-button type="success" :loading="saving" @click="saveOutdoor">保存并重连</el-button>
             <el-button @click="resetConfig">恢复部署配置</el-button>
           </div>
@@ -233,7 +236,14 @@ async function testConnection () {
 async function saveOutdoor () {
   saving.value = true
   try {
-    saveCloudRendererConfig(buildConfig('outdoor'))
+    const config = buildConfig('outdoor')
+    saveCloudRendererConfig(config)
+    if (!config.enabled) {
+      cloudRendererClient.close()
+      connectionStatus.value = '未启用'
+      ElMessage.success('室外云渲染已关闭')
+      return
+    }
     await cloudRendererClient.restart('outdoor')
     connectionStatus.value = '已重连'
     ElMessage.success('配置已保存并重连云渲染')
@@ -252,6 +262,12 @@ async function resetConfig () {
   turnServer.username = server?.username || ''
   turnServer.credential = server?.credential || ''
   try {
+    if (!form.enabled) {
+      cloudRendererClient.close()
+      connectionStatus.value = '未启用'
+      ElMessage.success('已恢复部署配置，室外云渲染未启用')
+      return
+    }
     await cloudRendererClient.restart('outdoor')
     ElMessage.success('已恢复部署配置并重连')
   } catch (error) {

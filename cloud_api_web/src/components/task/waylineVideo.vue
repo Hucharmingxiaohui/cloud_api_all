@@ -20,9 +20,9 @@
                 </div>
 
                 <div class="map-section">
-                    <div title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
+                    <div v-if="cloudRendererEnabled" title="地图切换" class="map-switch" @click="isFlatMap = !isFlatMap"><el-icon><Switch /></el-icon></div>
                     <div class="map-renderer-box">
-                       <OutdoorRenderer v-if="!isFlatMap && isMounted" />
+                       <OutdoorRenderer v-if="cloudRendererEnabled && !isFlatMap && isMounted" />
                        <waylinePanel v-if="isFlatMap && isMounted" />
                     </div>
 
@@ -111,8 +111,10 @@ import deviceState from '/@/components/devices/drone_control/device_state.vue'
 import droneSetting from '/@/components/devices/drone_control/dock-setting.vue'
 import DockControlPanel from '/@/components/devices/drone_control/dock-control.vue'
 import OutdoorRenderer from '/@/components/cloudRenderer/OutdoorRenderer.vue'
+import { isCloudRendererEnabled } from '/@/components/cloudRenderer/cloudRendererConfig'
 
-const isFlatMap = ref(false) // 是否二维地图
+const cloudRendererEnabled = isCloudRendererEnabled()
+const isFlatMap = ref(!cloudRendererEnabled) // 是否二维地图
 const isMounted = ref(false) // 是否已经完成初始化
 
 const body = {

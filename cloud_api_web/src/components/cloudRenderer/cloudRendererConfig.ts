@@ -4,6 +4,7 @@ import type { CloudRendererConfig } from '/@/types/runtime-config'
 export const CLOUD_RENDERER_CONFIG_STORAGE_KEY = 'cloud-renderer-config'
 
 export const DEFAULT_CLOUD_RENDERER_CONFIG: CloudRendererConfig = {
+  enabled: true,
   baseURL: 'http://127.0.0.1:3000',
   renderer: 'outdoor',
   pointCloudFile: '3dgs/7.1.1.ply',
@@ -40,6 +41,10 @@ export function getCloudRendererConfig (): CloudRendererConfig {
     },
     iceServers: local.iceServers || deployment.iceServers || DEFAULT_CLOUD_RENDERER_CONFIG.iceServers
   }
+}
+
+export function isCloudRendererEnabled () {
+  return getCloudRendererConfig().enabled !== false
 }
 
 export function saveCloudRendererConfig (config: CloudRendererConfig) {

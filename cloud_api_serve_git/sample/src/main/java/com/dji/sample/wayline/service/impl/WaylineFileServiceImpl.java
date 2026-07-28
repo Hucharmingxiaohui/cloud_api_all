@@ -202,30 +202,30 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
             throw new RuntimeException("The wayline does not exist.");
         }
 
-        WaylineFileDTO metadata = validKmzFile(file)
-                .orElseThrow(() -> new RuntimeException("The file format is incorrect."));
         String oldObjectKey = existing.getObjectKey();
         String newObjectKey = buildVersionedObjectKey(workspaceId, waylineId);
-        metadata.setObjectKey(newObjectKey);
 
         try {
             ossService.putObject(OssConfiguration.bucket, newObjectKey, file.getInputStream());
         } catch (IOException e) {
             throw new RuntimeException("Failed to read the replacement wayline file.", e);
         }
-        if (!isUploadedObjectValid(newObjectKey, metadata.getSign())) {
+
+        String sign;
+        try {
+            sign = DigestUtils.md5DigestAsHex(file.getInputStream());
+        } catch (IOException e) {
+            deleteObjectQuietly(newObjectKey);
+            throw new RuntimeException("Failed to compute the replacement wayline file sign.", e);
+        }
+
+        if (!isUploadedObjectValid(newObjectKey, sign)) {
             deleteObjectQuietly(newObjectKey);
             throw new RuntimeException("Failed to upload the replacement wayline file.");
         }
 
-        existing.setName(metadata.getName());
-        existing.setDroneModelKey(metadata.getDroneModelKey());
-        existing.setPayloadModelKeys(String.join(",", metadata.getPayloadModelKeys()));
-        existing.setTemplateTypes(metadata.getTemplateTypes().stream()
-                .map(String::valueOf)
-                .collect(Collectors.joining(",")));
-        existing.setSign(metadata.getSign());
         existing.setObjectKey(newObjectKey);
+        existing.setSign(sign);
         existing.setUsername(creator);
 
         try {
