@@ -118,6 +118,7 @@ cloud-sdk:
     enabled: true
     # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
     inbound-topic: sys/product/+/status,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
+    default-log-ignore-methods: release_terminal_control_area
 
 url:
   manage:
@@ -206,6 +207,10 @@ switch:
   centerOtherTcpEnable: false
   centerNormalTcpMsgEnable: false
   centerOtherTcpMsgEnable: false
+#  centerNormalTcpEnable: true
+#  centerOtherTcpEnable: true
+#  centerNormalTcpMsgEnable: true
+#  centerOtherTcpMsgEnable: true
   # 上级任务下发时，deviceLevel=1(间隔)是否转发到重庆电力下级EUA平台
   centerCqDockTaskEnable: true
 

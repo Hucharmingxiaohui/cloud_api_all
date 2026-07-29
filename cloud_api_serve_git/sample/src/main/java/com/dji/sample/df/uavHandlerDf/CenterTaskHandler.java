@@ -69,8 +69,9 @@ public class CenterTaskHandler {
             Date scheduledTime = sdf.parse(fixedStartTime);
             long executeTimestamp = scheduledTime.getTime();
 
-            // 1. 将任务加入有序集合，score为执行时间戳
-            redisUtils.sSet(TASK_SCHEDULE_ZSET, taskCode + ":" + executeTimestamp);
+            // 1. 将任务加入集合，成员中携带执行时间戳
+            String taskInfo = taskCode + ":" + executeTimestamp;
+            redisUtils.sSet(TASK_SCHEDULE_ZSET, taskInfo);
 
             // 2. 存储任务详情到Hash
             Map<String, String> taskDetail = new HashMap<>();
@@ -90,7 +91,8 @@ public class CenterTaskHandler {
                 redisUtils.expire(TASK_DETAIL_HASH + ":" + taskCode, expireSeconds);
             }
 
-            log.info("添加定时任务: {}, 任务类型: {}, 执行时间: {}", taskCode, planType, fixedStartTime);
+            log.info("添加定时任务: {}, 任务类型: {}, 执行时间: {}, executeTimestamp={}, taskInfo={}",
+                    taskCode, planType, fixedStartTime, executeTimestamp, taskInfo);
 
         } catch (Exception e) {
             log.error("添加定时任务失败", e);
@@ -109,6 +111,7 @@ public class CenterTaskHandler {
             // 3. 获取所有任务（这里只能获取全部，因为没有keys方法）
             // 注意：这可能效率不高，如果任务多的话
             Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
+            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}", currentTime, allTasks == null ? 0 : allTasks.size());
             if (allTasks == null || allTasks.isEmpty()) {
                 return;
             }
@@ -135,21 +138,28 @@ public class CenterTaskHandler {
 
         String taskInfo = taskObj.toString();
         String[] parts = taskInfo.split(":");
-        if (parts.length < 2) return;
+        if (parts.length < 2) {
+            log.warn("定时任务格式不正确: {}", taskInfo);
+            return;
+        }
 
         String taskCode = parts[0];
         long executeTimestamp = Long.parseLong(parts[1]);
 
         // 检查是否到执行时间
         if (currentTime < executeTimestamp) {
+            log.info("定时任务未到执行时间: taskCode={}, executeTimestamp={}, remainingMs={}",
+                    taskCode, executeTimestamp, executeTimestamp - currentTime);
             return;
         }
 
         // 获取任务详情
         Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
         if (detailMap == null || detailMap.isEmpty()) {
+            log.warn("定时任务详情不存在，移除任务: taskCode={}, taskInfo={}", taskCode, taskInfo);
             // 删除无效任务
             redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
+        log.info("定时任务处理结束并移除待执行集合: taskCode={}, taskInfo={}", taskCode, taskInfo);
             return;
         }
 
@@ -158,6 +168,7 @@ public class CenterTaskHandler {
 
         String status = taskDetail.get("status");
         if (!"waiting".equals(status)) {
+            log.info("定时任务状态不是waiting，跳过: taskCode={}, status={}", taskCode, status);
             return;
         }
 
@@ -177,6 +188,7 @@ public class CenterTaskHandler {
         int result = executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
 //      执行成功了才加入监控；EUA任务由下级平台执行，不复用本地航线任务监控。
         if (result == 0) {
+            updateTaskStatus(taskCode, taskDetail, "success", result, null);
             if ("5".equals(planType)) {
                 log.info("EUA定时任务已完成下发，无需启动本地任务监控: {}", taskCode);
             } else {
@@ -188,10 +200,14 @@ public class CenterTaskHandler {
                 // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
                 JobControlHandler.startMonitoringTask(taskCode, taskName);
             }
+        } else {
+            updateTaskStatus(taskCode, taskDetail, "failed", result, "任务执行返回失败");
+            log.error("定时任务执行失败: taskCode={}, planType={}, deviceId={}, result={}", taskCode, planType, singleDeviceId, result);
         }
 
         // 从有序集合中移除已执行任务
         redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
+        log.info("定时任务处理结束并移除待执行集合: taskCode={}, taskInfo={}", taskCode, taskInfo);
     }
 
     /**
@@ -207,10 +223,24 @@ public class CenterTaskHandler {
         return taskDetail;
     }
 
+    private void updateTaskStatus(String taskCode, Map<String, String> taskDetail, String status, int resultCode, String errorMsg) {
+        taskDetail.put("status", status);
+        taskDetail.put("resultCode", String.valueOf(resultCode));
+        taskDetail.put("finishTime", String.valueOf(System.currentTimeMillis()));
+        if (StringUtils.hasText(errorMsg)) {
+            taskDetail.put("errorMsg", errorMsg);
+        } else {
+            taskDetail.remove("errorMsg");
+        }
+        redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
+    }
+
     /**
      * 执行任务
      */
     private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName, String fixedStartTime) {
+        log.info("开始执行定时任务分发: taskCode={}, planType={}, deviceId={}, taskName={}, fixedStartTime={}",
+                taskCode, planType, singleDeviceId, taskName, fixedStartTime);
         try {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
 //          间隔航线多对一可以，一对多不可以
@@ -270,7 +300,10 @@ public class CenterTaskHandler {
      * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
      */
     private int executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
+        log.info("开始执行EUA定时任务: taskCode={}, bayId={}, taskName={}, fixedStartTime={}",
+                taskCode, bayId, taskName, fixedStartTime);
         String routeId = resolveCqDockRouteId(bayId);
+        log.info("EUA定时任务匹配航线: taskCode={}, bayId={}, routeId={}", taskCode, bayId, routeId);
         if (!StringUtils.hasText(routeId)) {
             log.error("EUA定时任务执行失败，未在df_uni_point中匹配到航线: taskCode={}, bayId={}", taskCode, bayId);
             saveCqDockTaskRecord(taskCode, taskName, bayId, null, null, null, "未在df_uni_point中匹配到航线", null, false);
@@ -282,7 +315,12 @@ public class CenterTaskHandler {
         request.setBusinessId(taskCode);
         request.setRouteId(routeId);
         // todo EUA接口当前只需要任务名称、业务ID和航线ID，deviceIdList根据实际情况补充，到定时时间后再真正调用下级下发
+        log.info("EUA定时任务准备调用下级任务下发: taskCode={}, bayId={}, routeId={}, request={}",
+                taskCode, bayId, routeId, JSONObject.toJSONString(request));
         CqApiResponse response = cqDockApiService.assignTask(request);
+        log.info("EUA定时任务下级接口返回: taskCode={}, code={}, success={}, msg={}",
+                taskCode, response == null ? null : response.getCode(),
+                response == null ? null : response.getSuccess(), response == null ? null : response.getMsg());
         boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
         String euaTaskId = extractEuaTaskId(response);
         saveCqDockTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId,
