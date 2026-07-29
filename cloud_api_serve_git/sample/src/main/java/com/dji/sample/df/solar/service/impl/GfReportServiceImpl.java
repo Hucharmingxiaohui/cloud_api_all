@@ -76,7 +76,7 @@ public class GfReportServiceImpl implements GfReportService {
             String requestBody = objectMapper.writeValueAsString(request);
             objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
             HttpRequest httpRequest = HttpRequest.newBuilder()
-//                    todo 需改
+//                    需改
                     .uri(URI.create(waylineUrlConfig.getGfDefectLocalizationUrl()))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(requestBody))

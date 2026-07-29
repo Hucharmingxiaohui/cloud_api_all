@@ -140,7 +140,7 @@ public class ControlService2Impl implements IControlService2 {
     }
 
     private void checkFlyToCondition(String dockSn) {
-        // TODO 设备固件版本不兼容情况
+        //  设备固件版本不兼容情况
         Optional<DeviceDTO> dockOpt = deviceRedisService.getDeviceOnline(dockSn);
         if (dockOpt.isEmpty()) {
             throw new RuntimeException("The dock is offline, please restart the dock.");

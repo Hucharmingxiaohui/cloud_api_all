@@ -635,7 +635,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     }
 
     // 停机巡检
-//  todo 停机巡检也得空中下发航线，需验证是否照片存入minio
+//   停机巡检也得空中下发航线，需验证是否照片存入minio
     public void stopWayline(String name, Double yaw,String value) {
 //      风机名为获取
         WindTurbine windTurbine = windTurbineService.selectByName(name);

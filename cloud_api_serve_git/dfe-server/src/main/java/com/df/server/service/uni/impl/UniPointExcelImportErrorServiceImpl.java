@@ -761,7 +761,7 @@ public class UniPointExcelImportErrorServiceImpl extends ServiceImpl<UniPointExc
     private Collection<? extends UniPointExcelImportErrorEntity> checkPhase(UniPointImportExcel point) {
         List<UniPointExcelImportErrorEntity> errors = new ArrayList<>();
         String phase = point.getPhase();
-        // todo 相位好像可以为空
+        //  相位好像可以为空
         if (StringUtils.isBlank(phase)) {
             return errors;
         }
@@ -856,7 +856,7 @@ public class UniPointExcelImportErrorServiceImpl extends ServiceImpl<UniPointExc
     private Collection<? extends UniPointExcelImportErrorEntity> checkMeterType(UniPointImportExcel point) {
         List<UniPointExcelImportErrorEntity> errors = new ArrayList<>();
         String meterType = point.getMeterType();
-        // todo 表计类型可以不填
+        //  表计类型可以不填
         if (StringUtils.isBlank(meterType)) {
             return errors;
         }
