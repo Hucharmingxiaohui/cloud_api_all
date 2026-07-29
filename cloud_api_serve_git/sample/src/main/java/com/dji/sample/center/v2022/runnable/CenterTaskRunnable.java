@@ -106,7 +106,6 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
                     if (isCqDockTaskEnabled()) {
-//                      todo 需确定EUA平台是否支持定时任务(大概率不支持)
                         // EUA平台任务同样复用原有Redis定时任务，到fixedStartTime后再调用下级下发接口。
                         centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
                         return;

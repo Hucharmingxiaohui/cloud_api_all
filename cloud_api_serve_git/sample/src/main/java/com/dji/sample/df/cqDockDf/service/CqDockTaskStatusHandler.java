@@ -101,8 +101,9 @@ public class CqDockTaskStatusHandler {
             redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
 
             if (isTerminalEuaStatus(euaStatus)) {
-                if ("1".equals(euaStatus)) {
-//                  任务完成上报图片结果
+                if ("7".equals(euaStatus)) {
+                    // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
+//                  todo 后续需让EUA平台规定7为图片上传结束标志
                     cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);
@@ -154,8 +155,11 @@ public class CqDockTaskStatusHandler {
         if ("0".equals(value)) {
             return "5";
         }
-        if ("1".equals(value)) {
+        if ("7".equals(value)) {
             return "1";
+        }
+        if ("1".equals(value)) {
+            return "2";
         }
         if ("2".equals(value)) {
             return "2";
@@ -180,7 +184,7 @@ public class CqDockTaskStatusHandler {
             return false;
         }
         String value = status.trim();
-        return "1".equals(value) || "3".equals(value) || "6".equals(value);
+        return "7".equals(value) || "3".equals(value) || "6".equals(value);
     }
 
     private void sendTaskStatus(String taskCode, String taskName, String euaTaskId, String mappedState,

@@ -6,6 +6,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
@@ -93,6 +94,14 @@ public class CenterTaskHandler {
 
             log.info("添加定时任务: {}, 任务类型: {}, 执行时间: {}, executeTimestamp={}, taskInfo={}",
                     taskCode, planType, fixedStartTime, executeTimestamp, taskInfo);
+            Set<Object> currentTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
+            // 用于排查待执行集合被TTL或其他实例提前清空的问题。
+            log.info("定时任务Redis写入后状态: scheduleKey={}, scheduleTtlSeconds={}, detailKey={}, detailTtlSeconds={}, taskCount={}",
+                    TASK_SCHEDULE_ZSET,
+                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
+                    TASK_DETAIL_HASH + ":" + taskCode,
+                    RedisOpsUtils.getExpire(TASK_DETAIL_HASH + ":" + taskCode),
+                    currentTasks == null ? 0 : currentTasks.size());
 
         } catch (Exception e) {
             log.error("添加定时任务失败", e);
@@ -111,7 +120,12 @@ public class CenterTaskHandler {
             // 3. 获取所有任务（这里只能获取全部，因为没有keys方法）
             // 注意：这可能效率不高，如果任务多的话
             Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
-            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}", currentTime, allTasks == null ? 0 : allTasks.size());
+            // 同时打印待执行集合TTL，便于判断任务突然消失是否由key过期导致。
+            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
+                    currentTime,
+                    allTasks == null ? 0 : allTasks.size(),
+                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
+                    RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
             if (allTasks == null || allTasks.isEmpty()) {
                 return;
             }
@@ -156,7 +170,12 @@ public class CenterTaskHandler {
         // 获取任务详情
         Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
         if (detailMap == null || detailMap.isEmpty()) {
-            log.warn("定时任务详情不存在，移除任务: taskCode={}, taskInfo={}", taskCode, taskInfo);
+            log.warn("定时任务详情不存在，移除任务: taskCode={}, taskInfo={}, detailKey={}, detailTtlSeconds={}, scheduleTtlSeconds={}",
+                    taskCode,
+                    taskInfo,
+                    TASK_DETAIL_HASH + ":" + taskCode,
+                    RedisOpsUtils.getExpire(TASK_DETAIL_HASH + ":" + taskCode),
+                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET));
             // 删除无效任务
             redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
         log.info("定时任务处理结束并移除待执行集合: taskCode={}, taskInfo={}", taskCode, taskInfo);
