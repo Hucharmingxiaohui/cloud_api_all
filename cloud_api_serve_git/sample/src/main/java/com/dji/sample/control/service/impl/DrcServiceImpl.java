@@ -123,7 +123,7 @@ public class DrcServiceImpl implements IDrcService {
         }
     }
 
-    private void checkDrcModeCondition(String workspaceId, String dockSn, boolean requestFlightAuthority) {
+    private void checkDrcModeCondition(String workspaceId, String dockSn) {
         Optional<EventsReceiver<FlighttaskProgress>> runningOpt = waylineRedisService.getRunningWaylineJob(dockSn);
         if (runningOpt.isPresent() && WaylineJobStatusEnum.IN_PROGRESS == waylineJobService.getWaylineState(dockSn)) {
             flighttaskService.updateJobStatus(workspaceId, runningOpt.get().getBid(),
@@ -141,26 +141,14 @@ public class DrcServiceImpl implements IDrcService {
             throw new RuntimeException("The current state of the dock does not support entering command flight mode.");
         }
 
-        if (requestFlightAuthority) {
-            HttpResultResponse result = controlService.seizeAuthority(dockSn, DroneAuthorityEnum.FLIGHT, null);
-            if (HttpResultResponse.CODE_SUCCESS != result.getCode()) {
-                throw new IllegalArgumentException(result.getMessage());
-            }
+        HttpResultResponse result = controlService.seizeAuthority(dockSn, DroneAuthorityEnum.FLIGHT, null);
+        if (HttpResultResponse.CODE_SUCCESS != result.getCode()) {
+            throw new IllegalArgumentException(result.getMessage());
         }
-
     }
 
     @Override
     public JwtAclDTO deviceDrcEnter(String workspaceId, DrcModeParam param) {
-        return enterDrcMode(workspaceId, param, true);
-    }
-
-    @Override
-    public JwtAclDTO deviceDrcEnterOnly(String workspaceId, DrcModeParam param) {
-        return enterDrcMode(workspaceId, param, false);
-    }
-
-    private JwtAclDTO enterDrcMode(String workspaceId, DrcModeParam param, boolean requestFlightAuthority) {
         String topic = TopicConst.THING_MODEL_PRE + TopicConst.PRODUCT + param.getDockSn() + TopicConst.DRC;
         String pubTopic = topic + TopicConst.DOWN;
         String subTopic = topic + TopicConst.UP;
@@ -172,7 +160,7 @@ public class DrcServiceImpl implements IDrcService {
             return JwtAclDTO.builder().sub(List.of(subTopic)).pub(List.of(pubTopic)).build();
         }
 
-        checkDrcModeCondition(workspaceId, param.getDockSn(), requestFlightAuthority);
+        checkDrcModeCondition(workspaceId, param.getDockSn());
 
         TopicServicesResponse<ServicesReplyData> reply = abstractControlService.drcModeEnter(
                 SDKManager.getDeviceSDK(param.getDockSn()),
@@ -188,6 +176,42 @@ public class DrcServiceImpl implements IDrcService {
         if (!reply.getData().getResult().isSuccess()) {
             throw new RuntimeException("SN: " + param.getDockSn() + "; Error:" + reply.getData().getResult() +
                     "; Failed to enter command flight control mode, please try again later!");
+        }
+
+        refreshAcl(param.getDockSn(), param.getClientId(), pubTopic, subTopic);
+        return JwtAclDTO.builder().sub(List.of(subTopic)).pub(List.of(pubTopic)).build();
+    }
+
+    @Override
+    public JwtAclDTO deviceSpeakerDrcEnter(String workspaceId, DrcModeParam param) {
+        String topic = TopicConst.THING_MODEL_PRE + TopicConst.PRODUCT + param.getDockSn() + TopicConst.DRC;
+        String pubTopic = topic + TopicConst.DOWN;
+        String subTopic = topic + TopicConst.UP;
+
+        if (deviceService.checkDockDrcMode(param.getDockSn())
+                && param.getClientId().equals(this.getDrcModeInRedis(param.getDockSn()))) {
+            refreshAcl(param.getDockSn(), param.getClientId(), pubTopic, subTopic);
+            return JwtAclDTO.builder().sub(List.of(subTopic)).pub(List.of(pubTopic)).build();
+        }
+
+        if (deviceRedisService.getDeviceOnline(param.getDockSn()).isEmpty()) {
+            throw new RuntimeException("The dock is offline and cannot enter speaker DRC mode.");
+        }
+
+        TopicServicesResponse<ServicesReplyData> reply = abstractControlService.drcModeEnter(
+                SDKManager.getDeviceSDK(param.getDockSn()),
+                new DrcModeEnterRequest()
+                        .setMqttBroker(MqttPropertyConfiguration.getMqttBrokerWithDrc(param.getDockSn() + "-speaker-" + System.currentTimeMillis(), param.getDockSn(),
+                                RedisConst.DRC_MODE_ALIVE_SECOND.longValue(),
+                                Map.of(MapKeyConst.ACL, objectMapper.convertValue(JwtAclDTO.builder()
+                                        .pub(List.of(subTopic))
+                                        .sub(List.of(pubTopic))
+                                        .build(), new TypeReference<Map<String, ?>>() {}))))
+                        .setHsiFrequency(1).setOsdFrequency(1));
+
+        if (!reply.getData().getResult().isSuccess()) {
+            throw new RuntimeException("SN: " + param.getDockSn() + "; Error:" + reply.getData().getResult() +
+                    "; Failed to enter speaker DRC mode, please try again later!");
         }
 
         refreshAcl(param.getDockSn(), param.getClientId(), pubTopic, subTopic);
@@ -220,6 +244,21 @@ public class DrcServiceImpl implements IDrcService {
         String jobId = waylineRedisService.getPausedWaylineJobId(param.getDockSn());
         if (StringUtils.hasText(jobId)) {
             flighttaskService.updateJobStatus(workspaceId, jobId, UpdateJobParam.builder().status(WaylineTaskStatusEnum.RESUME).build());
+        }
+
+        this.delDrcModeInRedis(param.getDockSn());
+        RedisOpsUtils.del(RedisConst.MQTT_ACL_PREFIX + param.getClientId());
+    }
+
+    @Override
+    public void deviceSpeakerDrcExit(String workspaceId, DrcModeParam param) {
+        if (deviceService.checkDockDrcMode(param.getDockSn())) {
+            TopicServicesResponse<ServicesReplyData> reply =
+                    abstractControlService.drcModeExit(SDKManager.getDeviceSDK(param.getDockSn()));
+            if (!reply.getData().getResult().isSuccess()) {
+                throw new RuntimeException("SN: " + param.getDockSn() + "; Error:" +
+                        reply.getData().getResult() + "; Failed to exit speaker DRC mode, please try again later!");
+            }
         }
 
         this.delDrcModeInRedis(param.getDockSn());

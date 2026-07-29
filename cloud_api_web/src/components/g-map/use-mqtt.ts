@@ -21,6 +21,10 @@ export interface DeviceTopicInfo{
   subTopic: string
 }
 
+export interface DrcMqttPublisher {
+  publishMqtt: (topic: string, body: object, opts?: IClientPublishOptions) => void
+}
+
 type MessageMqtt = (topic: string, payload: Buffer, packet: IPublishPacket) => void | Promise<void>
 
 export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
@@ -54,18 +58,8 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
     if (cacheSubscribeArr.findIndex(item => item.topic === message?.topic) !== -1) {
       const payloadStr = new TextDecoder('utf-8').decode(message?.payload)
       const payloadObj = JSON.parse(payloadStr)
-      switch (payloadObj?.method) {
-        case DRC_METHOD.HEART_BEAT:
-          break
-        case DRC_METHOD.DELAY_TIME_INFO_PUSH:
-        case DRC_METHOD.HSI_INFO_PUSH:
-        case DRC_METHOD.OSD_INFO_PUSH:
-        case DRC_METHOD.DRONE_CONTROL:
-        case DRC_METHOD.DRONE_EMERGENCY_STOP:
-          EventBus.emit('droneControlMqttInfo', payloadObj)
-          break
-        default:
-          break
+      if (payloadObj?.method !== DRC_METHOD.HEART_BEAT) {
+        EventBus.emit('droneControlMqttInfo', payloadObj)
       }
     }
   }
@@ -90,11 +84,13 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
   // 监听云控控制权
   watch(() => deviceTopicInfo, (val, oldVal) => {
     if (val.subTopic !== '') {
+      unsubscribeDrc()
       // 1.订阅topic
       subscribeMqtt(deviceTopicInfo.subTopic)
       // 2.发心跳
       publishDrcPing(deviceTopicInfo.sn)
     } else {
+      unsubscribeDrc()
       clearInterval(state.heartState.get(deviceTopicInfo.sn)?.pingInterval)
       state.heartState.delete(deviceTopicInfo.sn)
       heartBeatSeq.value = 0
@@ -102,6 +98,7 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
   }, { immediate: true, deep: true })
 
   function publishDrcPing (sn: string) {
+    clearInterval(state.heartState.get(sn)?.pingInterval)
     const body = {
       method: DRC_METHOD.HEART_BEAT,
       data: {
@@ -123,6 +120,8 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
 
   onUnmounted(() => {
     unsubscribeDrc()
+    state.heartState.forEach(item => clearInterval(item.pingInterval))
+    state.heartState.clear()
     heartBeatSeq.value = 0
   })
 

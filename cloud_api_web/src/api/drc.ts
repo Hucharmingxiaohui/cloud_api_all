@@ -58,6 +58,12 @@ export async function postDrcEnterOnly (body: DrcEnterBody): Promise<IWorkspaceR
   return resp.data
 }
 
+// 进入喊话器 DRC 链路：仅用于 AS1/负载消息，不申请飞行控制权
+export async function postSpeakerDrcEnter (body: DrcEnterBody): Promise<IWorkspaceResponse<DrcEnterResp>> {
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/speaker/enter`, body)
+  return resp.data
+}
+
 export interface DrcExitBody {
   client_id: string
   dock_sn: string
@@ -66,5 +72,11 @@ export interface DrcExitBody {
 // 退出飞行控制 （退出drc连接&退出云控控制权）
 export async function postDrcExit (body: DrcExitBody): Promise<IWorkspaceResponse<null>> {
   const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/exit`, body)
+  return resp.data
+}
+
+// 退出喊话器 DRC 链路
+export async function postSpeakerDrcExit (body: DrcExitBody): Promise<IWorkspaceResponse<null>> {
+  const resp = await request.post(`${DRC_API_PREFIX}/workspaces/${getWorkspaceId()}/drc/speaker/exit`, body)
   return resp.data
 }

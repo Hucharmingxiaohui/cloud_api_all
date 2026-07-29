@@ -9,10 +9,7 @@ import {
   DRC_METHOD,
   DroneControlProtocol,
 } from '/@/types/drc'
-import {
-  useMqtt,
-  DeviceTopicInfo
-} from './use-mqtt'
+import { DeviceTopicInfo, DrcMqttPublisher } from './use-mqtt'
 
 let myInterval: any
 
@@ -27,9 +24,12 @@ export enum KeyCode {
   ARROW_DOWN = 'ArrowDown',
 }
 
-export function useManualControl (deviceTopicInfo: DeviceTopicInfo, isCurrentFlightController: Ref<boolean>) {
+export function useManualControl (
+  deviceTopicInfo: DeviceTopicInfo,
+  isCurrentFlightController: Ref<boolean>,
+  mqttHooks: DrcMqttPublisher
+) {
   const activeCodeKey = ref(null) as Ref<KeyCode | null>
-  const mqttHooks = useMqtt(deviceTopicInfo)
   let seq = 0
   function handlePublish (params: DroneControlProtocol) {
     const body = {

@@ -2,10 +2,17 @@ package com.dji.sample.df.uavHandlerDf;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.alibaba.fastjson.JSONObject;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.common.model.CustomClaim;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
+import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
+import com.dji.sample.df.cqDockDf.model.dto.CqAssignTaskRequest;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockApiService;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskStatusHandler;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
@@ -16,12 +23,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Component
@@ -39,6 +48,12 @@ public class CenterTaskHandler {
     private IWaylineJobMapper waylineJobMapper;
     @Autowired
     UniPointMapper2 uniPointMapper2;
+    @Autowired
+    private CqDockApiService cqDockApiService;
+    @Autowired
+    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
+    @Autowired
+    private CqDockTaskStatusHandler cqDockTaskStatusHandler;
 
     // 使用有序集合存储定时任务，score为执行时间戳
     private static final String TASK_SCHEDULE_ZSET = "task_schedule:zset";
@@ -61,6 +76,7 @@ public class CenterTaskHandler {
             Map<String, String> taskDetail = new HashMap<>();
             taskDetail.put("deviceId", deviceId);
             taskDetail.put("planType", String.valueOf(planType));
+            taskDetail.put("taskCode", taskCode);
             taskDetail.put("taskName", taskName);
             taskDetail.put("fixedStartTime", fixedStartTime);
             taskDetail.put("executeTimestamp", String.valueOf(executeTimestamp));
@@ -74,7 +90,7 @@ public class CenterTaskHandler {
                 redisUtils.expire(TASK_DETAIL_HASH + ":" + taskCode, expireSeconds);
             }
 
-            log.info("添加定时任务: {}, 执行时间: {}", taskCode, fixedStartTime);
+            log.info("添加定时任务: {}, 任务类型: {}, 执行时间: {}", taskCode, planType, fixedStartTime);
 
         } catch (Exception e) {
             log.error("添加定时任务失败", e);
@@ -157,16 +173,21 @@ public class CenterTaskHandler {
         String singleDeviceId = taskDetail.get("deviceId");
         String taskName = taskDetail.get("taskName");
         String planType = taskDetail.get("planType");
-        int result = executeTask(planType, singleDeviceId, taskCode, taskName);
-//      执行成功了才加入监控
+        String fixedStartTime = taskDetail.get("fixedStartTime");
+        int result = executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
+//      执行成功了才加入监控；EUA任务由下级平台执行，不复用本地航线任务监控。
         if (result == 0) {
-            redisUtils.set("isCenterTask","1");
+            if ("5".equals(planType)) {
+                log.info("EUA定时任务已完成下发，无需启动本地任务监控: {}", taskCode);
+            } else {
+                redisUtils.set("isCenterTask","1");
 
-            WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                    .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
-            );
-            // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
-            JobControlHandler.startMonitoringTask(taskCode, taskName);
+                WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                        .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
+                );
+                // 1. 启动状态监控（反而要加监控覆盖掉默认的状态监控）
+                JobControlHandler.startMonitoringTask(taskCode, taskName);
+            }
         }
 
         // 从有序集合中移除已执行任务
@@ -189,7 +210,7 @@ public class CenterTaskHandler {
     /**
      * 执行任务
      */
-    private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName) {
+    private int executeTask(String planType,String singleDeviceId,String taskCode,String taskName, String fixedStartTime) {
         try {
 //          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
 //          间隔航线多对一可以，一对多不可以
@@ -197,6 +218,8 @@ public class CenterTaskHandler {
                 return executeNormalTask(singleDeviceId, taskName);
             }else if ("1".equals(planType)){
                 return executeFanTask(singleDeviceId, taskCode, taskName);
+            }else if ("5".equals(planType)){
+                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
             }
             return -1;
         } catch (Exception e) {
@@ -241,6 +264,88 @@ public class CenterTaskHandler {
         pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
         redisUtils.set("taskCode",taskCode);
         return dispatchExpressPlan(pubWaylineJobPlanDfEntity);
+    }
+
+    /**
+     * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
+     */
+    private int executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
+        String routeId = resolveCqDockRouteId(bayId);
+        if (!StringUtils.hasText(routeId)) {
+            log.error("EUA定时任务执行失败，未在df_uni_point中匹配到航线: taskCode={}, bayId={}", taskCode, bayId);
+            saveCqDockTaskRecord(taskCode, taskName, bayId, null, null, null, "未在df_uni_point中匹配到航线", null, false);
+            return -1;
+        }
+
+        CqAssignTaskRequest request = new CqAssignTaskRequest();
+        request.setTaskName(taskName);
+        request.setBusinessId(taskCode);
+        request.setRouteId(routeId);
+        // todo EUA接口当前只需要任务名称、业务ID和航线ID，deviceIdList根据实际情况补充，到定时时间后再真正调用下级下发
+        CqApiResponse response = cqDockApiService.assignTask(request);
+        boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
+        String euaTaskId = extractEuaTaskId(response);
+        saveCqDockTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId,
+                response == null ? null : response.getCode(),
+                response == null ? "EUA接口无响应" : response.getMsg(),
+                response == null ? null : response.getRawBody(), success);
+        if (success) {
+            log.info("EUA定时任务下发成功: taskCode={}, bayId={}, routeId={}, taskId={}", taskCode, bayId, routeId, euaTaskId);
+            cqDockTaskStatusHandler.startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime);
+            return 0;
+        }
+        log.error("EUA定时任务下发失败: taskCode={}, bayId={}, routeId={}, code={}, msg={}",
+                taskCode, bayId, routeId, response == null ? null : response.getCode(),
+                response == null ? "EUA接口无响应" : response.getMsg());
+        return -1;
+    }
+
+    /**
+     * 通过上级间隔ID查询df_uni_point，按一个间隔对应一个航线的规则获取EUA routeId。
+     */
+    private String resolveCqDockRouteId(String bayId) {
+        if (!StringUtils.hasText(bayId)) {
+            return null;
+        }
+        return uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()
+                        .eq(UniPoint::getBayId, bayId)
+                        .isNotNull(UniPoint::getWaylineId))
+                .stream()
+                .map(UniPoint::getWaylineId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String extractEuaTaskId(CqApiResponse response) {
+        if (response == null || response.getData() == null) {
+            return null;
+        }
+        JSONObject data = response.getData();
+        return data.getString("taskId");
+    }
+
+    /**
+     * 保存上级业务ID与EUA任务ID映射，后续任务状态、结果查询通过该记录关联。
+     */
+    private void saveCqDockTaskRecord(String taskCode, String taskName, String bayId, String routeId,
+                                      String euaTaskId, Integer responseCode, String responseMsg,
+                                      String rawResponse, boolean success) {
+        CqDockTaskRecordEntity record = new CqDockTaskRecordEntity();
+        record.setBusinessId(taskCode);
+        record.setTaskName(taskName);
+        record.setBayId(bayId);
+        record.setRouteId(routeId);
+        record.setEuaTaskId(euaTaskId);
+        record.setResponseCode(responseCode);
+        record.setResponseMsg(responseMsg);
+        record.setSuccess(success ? 1 : 0);
+        record.setRawResponse(rawResponse);
+        Date now = new Date();
+        record.setCreateTime(now);
+        record.setUpdateTime(now);
+        cqDockTaskRecordMapper.insert(record);
     }
 
     /**

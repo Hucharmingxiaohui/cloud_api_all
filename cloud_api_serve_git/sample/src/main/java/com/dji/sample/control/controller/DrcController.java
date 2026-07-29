@@ -44,9 +44,9 @@ public class DrcController {
         return HttpResultResponse.success(acl);
     }
 
-    @PostMapping("/workspaces/{workspace_id}/drc/enter-only")
-    public HttpResultResponse drcEnterOnly(@PathVariable("workspace_id") String workspaceId, @Valid @RequestBody DrcModeParam param) {
-        JwtAclDTO acl = drcService.deviceDrcEnterOnly(workspaceId, param);
+    @PostMapping("/workspaces/{workspace_id}/drc/speaker/enter")
+    public HttpResultResponse speakerDrcEnter(@PathVariable("workspace_id") String workspaceId, @Valid @RequestBody DrcModeParam param) {
+        JwtAclDTO acl = drcService.deviceSpeakerDrcEnter(workspaceId, param);
 
         return HttpResultResponse.success(acl);
     }
@@ -54,6 +54,13 @@ public class DrcController {
     @PostMapping("/workspaces/{workspace_id}/drc/exit")
     public HttpResultResponse drcExit(@PathVariable("workspace_id") String workspaceId, @Valid @RequestBody DrcModeParam param) {
         drcService.deviceDrcExit(workspaceId, param);
+
+        return HttpResultResponse.success();
+    }
+
+    @PostMapping("/workspaces/{workspace_id}/drc/speaker/exit")
+    public HttpResultResponse speakerDrcExit(@PathVariable("workspace_id") String workspaceId, @Valid @RequestBody DrcModeParam param) {
+        drcService.deviceSpeakerDrcExit(workspaceId, param);
 
         return HttpResultResponse.success();
     }

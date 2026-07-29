@@ -1,6 +1,7 @@
 package com.dji.sample.center.v2022.runnable;
 
 import com.dji.sample.center.app.AppContext;
+import com.dji.sample.center.config.SwitchConfig;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommandItem;
@@ -30,6 +31,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     private WindTurbineMapper windTurbineMapper = AppContext.getBean(WindTurbineMapper.class);
     private CenterTaskHandler centerTaskHandler = AppContext.getBean(CenterTaskHandler.class);
     private UniPointMapper2 uniPointMapper2 = AppContext.getBean(UniPointMapper2.class);
+    private SwitchConfig switchConfig = AppContext.getBean(SwitchConfig.class);
 
     public CenterTaskRunnable(CenterProtocolData protocolData) {
         super(protocolData);
@@ -67,6 +69,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
        log.info("开始处理下发任务");
 //      需要区分普通任务和风机任务
 //      暂定风机任务设备层级设备id匹配风机；普通任务间隔层级间隔id匹配航线
+//      todo 对接第三方无人机平台下发任务，暂定先只能安间隔下发，根据配置开关位区分和普通航线任务的逻辑
         String taskCode = taskCommandItem.getTask_code();
         String taskName = taskCommandItem.getTask_name();
         int deviceLevel = taskCommandItem.getDevice_level();
@@ -102,6 +105,12 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
+                    if (isCqDockTaskEnabled()) {
+//                      todo 需确定EUA平台是否支持定时任务
+                        // EUA平台任务同样复用原有Redis定时任务，到fixedStartTime后再调用下级下发接口。
+                        centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
+                        return;
+                    }
                     // 存入定时任务
                     centerTaskHandler.addScheduledTask(0,taskCode, fixedStartTime,
                             bayId, taskName);
@@ -111,6 +120,16 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
         } catch (Exception e) {
             log.error("任务处理失败", e);
         }
+    }
+
+
+
+    /**
+     * 是否开启上级间隔任务转重庆EUA平台；支持true/1两种配置值。
+     */
+    private boolean isCqDockTaskEnabled() {
+        String enable = switchConfig.getCenterCqDockTaskEnable();
+        return "true".equalsIgnoreCase(enable) || "1".equals(enable);
     }
 
     /**

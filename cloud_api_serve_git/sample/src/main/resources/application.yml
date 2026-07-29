@@ -1,6 +1,21 @@
 server:
   port: 6789
   base-url: "http://127.0.0.1:6789"
+  tomcat:
+    # 增加连接超时时间（单位：毫秒）
+    connection-timeout: 300000  # 5分钟
+    # 增加Keep-Alive超时
+    keep-alive-timeout: 300000
+    # 增加最大连接数
+    max-connections: 10000
+    # 增加最大线程数
+    max-threads: 200
+    # 增加HTTP头部大小
+    max-http-header-size: 65536
+    # 增加响应缓冲区大小
+    max-swallow-size: 104857600  # 100MB
+    # 允许关闭连接时跳过异常
+    skip-exceptions-on-close: true
 spring:
   main:
     allow-bean-definition-overriding: true
@@ -187,14 +202,12 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级巡视对接开关
 switch:
-#  centerNormalTcpEnable: true
-#  centerOtherTcpEnable: true
-#  centerNormalTcpMsgEnable: true
-#  centerOtherTcpMsgEnable: true
   centerNormalTcpEnable: false
   centerOtherTcpEnable: false
   centerNormalTcpMsgEnable: false
   centerOtherTcpMsgEnable: false
+  # 上级任务下发时，deviceLevel=1(间隔)是否转发到重庆电力下级EUA平台
+  centerCqDockTaskEnable: true
 
 #国网规范对接上级巡视配置
 centernormal:
@@ -312,6 +325,8 @@ cq-dock:
   assign-task-path: /machineNest/noauth/third/task/assign_task
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
+  # EUA图片下载到本地的根目录，Windows示例: D:/Temp/eua-picture，Linux示例: /home/uav_server/eua-picture
+  picture-local-path: D:/Temp/eua-picture
 
 #导入巡视点位配置
 importPoint:
