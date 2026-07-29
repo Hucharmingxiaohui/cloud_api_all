@@ -1,0 +1,87 @@
+[
+  {
+    "label": "cesiumlab_out",
+    "value": "cesiumlab_out",
+    "url": "/model/cesiumlab_out/tileset.json"
+  },
+  {
+    "label": "dfelanqiuchang",
+    "value": "dfelanqiuchang",
+    "url": "/model/dfelanqiuchang/tileset.json"
+  },
+  {
+    "label": "las250902003",
+    "value": "las250902003",
+    "url": "/model/las250902003/tileset.json"
+  },
+  {
+    "label": "Model",
+    "value": "Model",
+    "url": "/model/Model/Model.json"
+  },
+  {
+    "label": "out4",
+    "value": "out4",
+    "url": "/model/out4/tileset.json"
+  },
+  {
+    "label": "qingxie_2_1",
+    "value": "qingxie_2_1",
+    "url": "/model/qingxie_2_1/tileset.json"
+  },
+  {
+    "label": "qingxie_2_2",
+    "value": "qingxie_2_2",
+    "url": "/model/qingxie_2_2/tileset.json"
+  },
+  {
+    "label": "qingxie_2_3",
+    "value": "qingxie_2_3",
+    "url": "/model/qingxie_2_3/tileset.json"
+  },
+  {
+    "label": "qingxie1",
+    "value": "qingxie1",
+    "url": "/model/qingxie1/tileset.json"
+  },
+  {
+    "label": "qingxie2",
+    "value": "qingxie2",
+    "url": "/model/qingxie2/tileset.json"
+  },
+  {
+    "label": "qingxie3",
+    "value": "qingxie3",
+    "url": "/model/qingxie3/tileset.json"
+  },
+  {
+    "label": "qingxie4",
+    "value": "qingxie4",
+    "url": "/model/qingxie4/tileset.json"
+  },
+  {
+    "label": "qingxie6",
+    "value": "qingxie6",
+    "url": "/model/qingxie6/tileset.json"
+  },
+  {
+    "label": "Scene",
+    "value": "Scene",
+    "url": "/model/Scene/Production_5.json"
+  },
+  {
+    "label": "Scene_solar",
+    "value": "Scene_solar",
+    "url": "/model/Scene_solar/solar_1.json"
+  },
+  {
+    "label": "solarqingxie_1",
+    "value": "solarqingxie_1",
+    "url": "/model/solarqingxie_1/Scene/solarqingxie_1.json"
+  },
+  {
+    "label": "solarqingxie_1_egm96_test",
+    "value": "solarqingxie_1_egm96_test",
+    "url": "/model/solarqingxie_1_egm96_test/Scene/solarqingxie_1.json"
+  }
+]

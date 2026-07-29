@@ -81,7 +81,6 @@
                 </div>
                 <div class="item"><el-button class="btn" @click="handleConfirm" >确认航点</el-button></div>
                 <div class="item"><el-button class="btn" @click="clearDraw" >清空</el-button></div>
-                <div class="item"><el-button class="btn" @click="handleplanning" >路径规划</el-button></div>
                 <div class="item"><el-button class="btn" @click="handlegenerate" >生成航线</el-button></div>
                 <!-- <div class="item"><el-button class="btn">查看航线</el-button></div>
                 <div class="item"><el-button class="btn">一键执飞</el-button></div> -->
@@ -95,17 +94,17 @@
                   <!-- <el-table-column type="selection" width="55" /> -->
                   <el-table-column label="序号" align='center' width="40" type="index">
                   </el-table-column>
-                  <el-table-column label="经度" show-overflow-tooltip="true">
+                  <el-table-column label="经度" :show-overflow-tooltip="true">
                     <template #default="scope">
                       <div>{{ scope.row.lat }}</div>
                     </template>
                   </el-table-column>
-                  <el-table-column label="纬度" show-overflow-tooltip="true">
+                  <el-table-column label="纬度" :show-overflow-tooltip="true">
                     <template #default="scope">
                       <div>{{ scope.row.lon }}</div>
                     </template>
                   </el-table-column>
-                  <el-table-column label="高度" show-overflow-tooltip="true">
+                  <el-table-column label="高度" :show-overflow-tooltip="true">
                     <template #default="scope">
                       <div>{{ scope.row.height }}</div>
                     </template>
@@ -363,6 +362,9 @@ const childMap = ref()
 const colorData = ref([])
 const positionProperty = null
 const rotationAngle = 0
+let currentTileset = null
+let baseImageryLayer = null
+let renderPaused = false
 const infoText = reactive({
   longitude: null,
   latitude: null,
@@ -381,6 +383,26 @@ const captureOptions = [
 ]
 
 const waypointSpeed = ref(5)
+
+function withTimeout (promise, timeoutMs, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => {
+      window.setTimeout(() => {
+        console.warn(timeoutMessage)
+        resolve(null)
+      }, timeoutMs)
+    })
+  ])
+}
+
+function pauseMainRender () {
+  renderPaused = true
+}
+
+function resumeMainRender () {
+  renderPaused = false
+}
 
 // =--------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -467,15 +489,42 @@ const body = {
   page_size: 10
 }
 const modelInfo = ref()
-function GetModels () {
+async function GetModels () {
+  try {
+    const res = await axios.get('/model/models.json')
+    const list = Array.isArray(res.data) ? res.data : []
+    const models = list
+      .filter(item => item?.url && item?.value)
+      .map(item => ({
+        label: item.label || item.value,
+        value: item.value,
+        url: item.url
+      }))
+
+    if (models.length > 0) {
+      modelInfo.value = models
+      model_list.value = models.map(item => ({
+        label: item.label,
+        value: item.value
+      }))
+      return
+    }
+  } catch (err) {
+    console.warn('读取本地模型清单失败，尝试后台模型接口:', err)
+  }
+
   getAllModels(body).then(res => {
     if (res.code !== 0) {
       return
     }
-    modelInfo.value = res.data.list
-    model_list.value = res.data.list.map(item => ({
+    modelInfo.value = res.data.list.map(item => ({
       label: item.model_name,
-      value: item.model_id
+      value: item.model_id,
+      url: `/${item.file_path}/${item.json_name}`
+    }))
+    model_list.value = modelInfo.value.map(item => ({
+      label: item.label,
+      value: item.value
     }))
   }).catch(err => {
     console.warn('获取模型列表失败:', err)
@@ -487,24 +536,64 @@ function GetModels () {
  * @param val
  */
 async function selectModel (val) {
-  const modelData = modelInfo.value?.find((item) => item.model_id === val)
+  const modelData = modelInfo.value?.find((item) => item.value === val)
   if (!modelData) {
     ElMessage.warning('未找到模型信息')
     return
   }
-  const tilesetUrl = `/${modelData.file_path}/${modelData.json_name}`
+  const tilesetUrl = modelData.url
+  const previousTileset = currentTileset
+  const previousBaseLayerVisible = baseImageryLayer?.show
 
   // const tilesetUrl = '/model/Scene/Production_5.json'
 
   // load3DTiles(tilesetUrl)
-  cesium.viewer.scene.primitives.removeAll()// 先清空场景
-  const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
-  if (tileset) {
-    cesium.viewer.zoomTo(tileset)
-  } else {
-    ElMessage.error('模型加载失败')
+  const loadingMessage = ElMessage({
+    message: '模型加载中...',
+    type: 'info',
+    duration: 0
+  })
+  try {
+    pauseMainRender()
+    childMap.value?.pauseRender?.()
+    if (baseImageryLayer) {
+      baseImageryLayer.show = false
+      cesium.viewer.scene.requestRender()
+    }
+    const tileset = await withTimeout(load3DTilesModels(cesium.viewer, tilesetUrl), 10000, `主视图模型加载超时: ${tilesetUrl}`)
+    if (!tileset) {
+      ElMessage.error('主视图模型加载失败或超时')
+      return
+    }
+
+    if (previousTileset && previousTileset !== tileset) {
+      cesium.viewer.scene.primitives.remove(previousTileset)
+    }
+    currentTileset = tileset
+    await withTimeout(cesium.viewer.zoomTo(tileset), 5000, `主视图模型定位超时: ${tilesetUrl}`)
+    cesium.viewer.scene.requestRender()
+
+    if (childMap.value?.loadModel) {
+      const childLoaded = await withTimeout(childMap.value.loadModel(tilesetUrl), 10000, `右侧小窗模型加载超时: ${tilesetUrl}`)
+      if (!childLoaded) {
+        ElMessage.warning('主视图已切换，右侧小窗模型加载失败或超时')
+        return
+      }
+    }
+
+    ElMessage.success('模型切换成功')
+  } catch (error) {
+    console.error('模型切换失败:', tilesetUrl, error)
+    ElMessage.error('模型切换失败')
+  } finally {
+    if (baseImageryLayer && previousBaseLayerVisible !== undefined) {
+      baseImageryLayer.show = previousBaseLayerVisible
+      cesium.viewer.scene.requestRender()
+    }
+    childMap.value?.resumeRender?.()
+    resumeMainRender()
+    loadingMessage.close()
   }
-  childMap.value?.loadModel(tilesetUrl)
 }
 // -------------------------------------------------------------------------------------场景初始化-----------------------------------------------------------------------------------------
 const voxel = null
@@ -543,6 +632,7 @@ async function init () {
 // }
 function initCesium () {
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3ZmJjODE1Yy1kMjU4LTQyZTgtODAyZC1mNzE2MDNhMmQ3YzUiLCJpZCI6MTk5NzQwLCJpYXQiOjE3MDk2Mjg5Mjh9.GuRbyEbm8FknaFOM34kGm9wCbf2XVjp873h_QD-Vs7A'
+  Cesium.RequestScheduler.maximumRequestsPerServer = Math.max(Cesium.RequestScheduler.maximumRequestsPerServer, 18)
   cesium.viewer = new Cesium.Viewer('cesiumContainer', {
     useDefaultRenderLoop: false,
     selectionIndicator: false,
@@ -586,7 +676,7 @@ function initCesium () {
     maximumLevel: 18,
     tilingScheme: new AmapMercatorTilingScheme() // 使用自定义 TilingScheme
   })
-  const layer = cesium.viewer.imageryLayers.addImageryProvider(imageryProvider)
+  baseImageryLayer = cesium.viewer.imageryLayers.addImageryProvider(imageryProvider)
   // 在线高德地图纠偏 gcj02 => wgs84
   // cesium.viewer.imageryLayers.addImageryProvider(new AMapImageryProvider({
   //   style: 'img',
@@ -603,24 +693,29 @@ function initCesium () {
 }
 function startRenderLoop () {
   if (!cesium.viewer || cesium.viewer.isDestroyed()) return
-  cesium.viewer.render()
+  if (!renderPaused) {
+    cesium.viewer.render()
+  }
   animationFrameId = requestAnimationFrame(startRenderLoop)
 }
 //  -------------------------------------------------------------------------------------模型加载-----------------------------------------------------------------------------------------
 // 加载3DTiles模型
 async function load3DTiles () {
   // const tilesetUrl = 'http://172.20.63.157:9000/models/dfelanqiuchang/tileset.json'
-  const tilesetUrl = '/model/dfelanqiuchang/tileset.json' // '/model/Scene/Production_5.json'
-
+  // const tilesetUrl = '/model/dfelanqiuchang/tileset.json' // '/model/Scene/Production_5.json'
+  const tilesetUrl = '/model/solarqingxie_1_egm96_test/Scene/solarqingxie_1.json'
   const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
   if (tileset) {
+    currentTileset = tileset
     console.log('3DMapPanel: 3D模型加载成功', tileset.boundingSphere)
-    cesium.viewer.zoomTo(tileset)
+    await withTimeout(cesium.viewer.zoomTo(tileset), 5000, `默认模型定位超时: ${tilesetUrl}`)
   } else {
     console.error('3DMapPanel: 3D模型加载失败', tilesetUrl)
     ElMessage.error('默认三维模型加载失败')
   }
-  childMap.value?.loadModel(tilesetUrl)
+  if (childMap.value?.loadModel) {
+    await withTimeout(childMap.value.loadModel(tilesetUrl), 10000, `右侧小窗默认模型加载超时: ${tilesetUrl}`)
+  }
   return tileset
 }
 

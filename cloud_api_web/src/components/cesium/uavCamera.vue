@@ -29,11 +29,23 @@ const isViewerReady = ref(false)
 let pendingTilesetUrl = ''
 
 let animFrameId = null
+let currentTileset = null
+let renderPaused = false
 
 function startRenderLoop () {
   if (!cesium.viewer || cesium.viewer.isDestroyed()) return
-  cesium.viewer.render()
+  if (!renderPaused) {
+    cesium.viewer.render()
+  }
   animFrameId = requestAnimationFrame(startRenderLoop)
+}
+
+function pauseRender () {
+  renderPaused = true
+}
+
+function resumeRender () {
+  renderPaused = false
 }
 
 onMounted(() => {
@@ -125,22 +137,29 @@ function initCesiumMap () {
 
 // 加载模型
 async function loadModel (tilesetUrl) {
-  if (!tilesetUrl) return
+  if (!tilesetUrl) return false
   if (!isViewerReady.value || !cesium.viewer || cesium.viewer.isDestroyed()) {
     pendingTilesetUrl = tilesetUrl
-    return
+    return false
   }
+  const previousTileset = currentTileset
   try {
-    cesium.viewer.scene.primitives.removeAll()
     const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
     if (!tileset) {
       console.warn('uavCamera: 小窗模型加载失败', tilesetUrl)
-      return
+      return false
     }
+    if (previousTileset && previousTileset !== tileset) {
+      cesium.viewer.scene.primitives.remove(previousTileset)
+    }
+    currentTileset = tileset
     await cesium.viewer.zoomTo(tileset)
     cesium.viewer.resize()
+    cesium.viewer.scene.requestRender()
+    return true
   } catch (error) {
     console.warn('uavCamera: 小窗模型加载异常', tilesetUrl, error)
+    return false
   }
 }
 
@@ -302,6 +321,8 @@ function updateCameraParameters () {
 // 暴露方法给父组件
 defineExpose({
   loadModel,
+  pauseRender,
+  resumeRender,
   setCamera,
   // setFocalLength,
   viewer: cesium.viewer,
