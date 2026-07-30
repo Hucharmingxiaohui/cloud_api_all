@@ -1,7 +1,9 @@
 package com.dji.sample.center.v2022.runnable;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.app.AppContext;
 import com.dji.sample.center.config.SwitchConfig;
+import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.dao.UniPointMapper2;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommandItem;
@@ -11,6 +13,7 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylinePointDfMapper;
 import com.dji.sample.df.manageDf.dao.IUniTaskPlanMapper;
+import com.dji.sample.df.manageDf.model.entity.UniTaskPlanEntity;
 import com.dji.sample.df.wind.dao.WindTurbineMapper;
 import com.dji.sample.df.wind.model.entity.WindTurbine;
 import com.dji.sample.df.uavHandlerDf.CenterTaskHandler;
@@ -75,6 +78,8 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
         int deviceLevel = taskCommandItem.getDevice_level();
         String deviceList = taskCommandItem.getDevice_list();
         String fixedStartTime = taskCommandItem.getFixed_start_time();
+//      上级下发定时任务存表，方便上级立即执行去查询
+        saveOrUpdateTaskPlan(taskCommandItem, sub_code);
         try {
             // 1. 检查设备层级和列表
             if (deviceLevel == 2) {
@@ -122,6 +127,48 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     }
 
 
+
+    private void saveOrUpdateTaskPlan(CenterTaskCommandItem taskCommandItem, String subCode) {
+        UniTaskPlanEntity entity = iUniTaskPlanMapper.selectOne(
+                new LambdaQueryWrapper<UniTaskPlanEntity>()
+                        .eq(UniTaskPlanEntity::getSubCode, subCode)
+                        .eq(UniTaskPlanEntity::getPlanNo, taskCommandItem.getTask_code())
+        );
+        if (entity == null) {
+            entity = new UniTaskPlanEntity();
+            entity.setSubCode(subCode);
+            entity.setPlanNo(taskCommandItem.getTask_code());
+        }
+        entity.setPlanName(taskCommandItem.getTask_name());
+        entity.setTaskType(parseInteger(taskCommandItem.getType()));
+        entity.setFixedStartTime(DateUtils.parseDate(taskCommandItem.getFixed_start_time()));
+        entity.setDeviceLevel(taskCommandItem.getDevice_level());
+        entity.setDeviceList(taskCommandItem.getDevice_list());
+        entity.setIsenable(parseInteger(taskCommandItem.getIsenable(), 0));
+        entity.setCreator(taskCommandItem.getCreator());
+        entity.setCreateTime(DateUtils.parseDate(taskCommandItem.getCreate_time()));
+        entity.setExecuteType(taskCommandItem.getFixed_start_time() == null || taskCommandItem.getFixed_start_time().isEmpty() ? 3 : 2);
+        entity.setPriority(parseInteger(taskCommandItem.getPriority()));
+        if (entity.getId() == null) {
+            iUniTaskPlanMapper.insert(entity);
+        } else {
+            iUniTaskPlanMapper.updateById(entity);
+        }
+        log.info("上级任务下发已保存任务方案: taskCode={}, taskName={}, subCode={}, deviceLevel={}, deviceList={}, fixedStartTime={}",
+                taskCommandItem.getTask_code(), taskCommandItem.getTask_name(), subCode,
+                taskCommandItem.getDevice_level(), taskCommandItem.getDevice_list(), taskCommandItem.getFixed_start_time());
+    }
+
+    private Integer parseInteger(String value) {
+        return parseInteger(value, null);
+    }
+
+    private Integer parseInteger(String value, Integer defaultValue) {
+        if (value == null || value.isEmpty()) {
+            return defaultValue;
+        }
+        return Integer.valueOf(value);
+    }
 
     /**
      * 是否开启上级间隔任务转重庆EUA平台；支持true/1两种配置值。

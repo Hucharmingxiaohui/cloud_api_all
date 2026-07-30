@@ -207,9 +207,14 @@ public class CqDockTaskStatusHandler {
         commandData.setSendCode(centerConfig.getStationCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
-        patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
-        log.info("上报EUA任务状态: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
-                taskCode, euaTaskId, euaStatus, mappedState, progress);
+        boolean sendSuccess = patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
+        if (sendSuccess) {
+            log.info("上报EUA任务状态成功: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
+                    taskCode, euaTaskId, euaStatus, mappedState, progress);
+        } else {
+            log.warn("上报EUA任务状态失败，TCP可能未连接: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
+                    taskCode, euaTaskId, euaStatus, mappedState, progress);
+        }
     }
 
     private String buildDescription(String mappedState, int progress, String euaStatus) {

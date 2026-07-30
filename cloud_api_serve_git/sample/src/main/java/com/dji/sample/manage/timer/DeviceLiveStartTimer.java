@@ -1,6 +1,5 @@
 package com.dji.sample.manage.timer;
 
-import com.alibaba.fastjson.JSONObject;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.LiveTypeDTO;
 import com.dji.sample.manage.service.IDeviceService;
@@ -16,8 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
-import java.net.URI;
 import java.util.List;
 
 @Component
@@ -41,11 +40,14 @@ public class DeviceLiveStartTimer {
         try {
             PaginationData<DeviceDTO> boundDevicesWithDomain = deviceService.getBoundDevicesWithDomain("e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 10L, 3);
             List<DeviceDTO> list = boundDevicesWithDomain.getList();
+            log.info("定时直播查询到绑定机巢数量: {}", list == null ? 0 : list.size());
             for (DeviceDTO device : list) {
-                if(device.getStatus()){
+                log.info("定时直播设备状态: dockSn={}, dockOnline={}, childSn={}, childOnline={}",
+                        device.getDeviceSn(), device.getStatus(), device.getChildDeviceSn(),
+                        device.getChildren() == null ? null : device.getChildren().getStatus());
+                if(Boolean.TRUE.equals(device.getStatus())){
                     log.info("开启机巢直播---");
 //                  开启机巢直播
-                    JSONObject jsonObject = new JSONObject();
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
                     liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
                     VideoId videoId = new VideoId();
@@ -60,14 +62,14 @@ public class DeviceLiveStartTimer {
                     liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
                     HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
                 }
-//                if(device.getChildren().getStatus()){
+                DeviceDTO child = device.getChildren();
+                if (child != null && Boolean.TRUE.equals(child.getStatus()) && StringUtils.hasText(child.getDeviceSn())) {
                     log.info("开启无人机直播---");
 //                  开启无人机直播
-                    JSONObject jsonObject = new JSONObject();
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
                     liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
                     VideoId videoId = new VideoId();
-                    videoId.setDroneSn(device.getChildDeviceSn());
+                    videoId.setDroneSn(child.getDeviceSn());
                     PayloadIndex payloadIndex = new PayloadIndex();
                     payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
                     payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
@@ -77,7 +79,7 @@ public class DeviceLiveStartTimer {
                     liveTypeDTO.setVideoId(videoId);
                     liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
                     HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
-//                }
+                }
 
             }
         } catch (Exception e) {

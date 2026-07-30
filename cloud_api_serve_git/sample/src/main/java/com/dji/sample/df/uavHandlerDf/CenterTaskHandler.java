@@ -253,6 +253,75 @@ public class CenterTaskHandler {
         }
         redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
     }
+//  立即执行后取消redis上级定时任务
+    public void cancelScheduledTaskAfterImmediateExecution(String taskCode) {
+        Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
+        int removed = 0;
+        if (allTasks != null) {
+            for (Object taskObj : allTasks) {
+                if (taskObj == null) {
+                    continue;
+                }
+                String taskInfo = taskObj.toString();
+                if (taskInfo.startsWith(taskCode + ":")) {
+                    redisUtils.remove(TASK_SCHEDULE_ZSET, taskInfo);
+                    removed++;
+                    log.info("立即执行成功后移除原定时任务: taskCode={}, taskInfo={}", taskCode, taskInfo);
+                }
+            }
+        }
+
+        Map<Object, Object> detailMap = redisUtils.getHashEntries(TASK_DETAIL_HASH + ":" + taskCode);
+        if (detailMap != null && !detailMap.isEmpty()) {
+            Map<String, String> taskDetail = convertToStringMap(detailMap);
+            taskDetail.put("status", "immediate_executed");
+            taskDetail.put("resultCode", "0");
+            taskDetail.put("finishTime", String.valueOf(System.currentTimeMillis()));
+            taskDetail.put("errorMsg", "立即执行成功，原定时任务已取消");
+            redisUtils.add(TASK_DETAIL_HASH + ":" + taskCode, taskDetail);
+        }
+        log.info("立即执行成功后取消定时任务完成: taskCode={}, removedCount={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
+                taskCode, removed, RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET), RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
+    }
+
+    /**
+     * 立即执行上级任务，复用定时任务到点后的真实执行逻辑。
+     */
+    public TaskExecutionResult executeImmediateTask(Integer planType, String deviceId, String taskCode, String taskName) {
+        String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        String planTypeText = String.valueOf(planType);
+        log.info("开始执行上级立即任务: taskCode={}, planType={}, deviceId={}, taskName={}",
+                taskCode, planTypeText, deviceId, taskName);
+        TaskExecutionResult result = executeTaskForImmediate(planTypeText, deviceId, taskCode, taskName, fixedStartTime);
+        if (result.isSuccess()) {
+            if ("5".equals(planTypeText)) {
+                log.info("EUA立即任务已完成下发，无需启动本地任务监控: taskCode={}, actualTaskId={}", taskCode, result.getTaskId());
+            } else {
+                redisUtils.set("isCenterTask", "1");
+                JobControlHandler.startMonitoringTask(result.getTaskId(), taskName);
+            }
+        } else {
+            log.error("上级立即任务执行失败: taskCode={}, planType={}, deviceId={}, result={}",
+                    taskCode, planTypeText, deviceId, result.getCode());
+        }
+        return result;
+    }
+
+    private TaskExecutionResult executeTaskForImmediate(String planType, String singleDeviceId, String taskCode, String taskName, String fixedStartTime) {
+        try {
+            if ("0".equals(planType)) {
+                return executeNormalTaskResult(singleDeviceId, taskName);
+            } else if ("1".equals(planType)) {
+                return executeFanTaskResult(singleDeviceId, taskCode, taskName);
+            } else if ("5".equals(planType)) {
+                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
+            }
+            return TaskExecutionResult.failed();
+        } catch (Exception e) {
+            log.error("立即任务执行异常", e);
+            return TaskExecutionResult.failed();
+        }
+    }
 
     /**
      * 执行任务
@@ -261,14 +330,12 @@ public class CenterTaskHandler {
         log.info("开始执行定时任务分发: taskCode={}, planType={}, deviceId={}, taskName={}, fixedStartTime={}",
                 taskCode, planType, singleDeviceId, taskName, fixedStartTime);
         try {
-//          分风机任务和普通任务，0普通1风机，0传间隔id 1传设备id
-//          间隔航线多对一可以，一对多不可以
             if("0".equals(planType)){
                 return executeNormalTask(singleDeviceId, taskName);
             }else if ("1".equals(planType)){
                 return executeFanTask(singleDeviceId, taskCode, taskName);
             }else if ("5".equals(planType)){
-                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
+                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime).getCode();
             }
             return -1;
         } catch (Exception e) {
@@ -278,9 +345,9 @@ public class CenterTaskHandler {
     }
 
     /**
-     * 执行普通任务（planType=0，传入间隔id）
+     * 执行航点航线任务（planType=0，传入间隔id）
      */
-    private int executeNormalTask(String singleDeviceId, String taskName) throws SQLException {
+    private TaskExecutionResult executeNormalTaskResult(String singleDeviceId, String taskName) throws SQLException {
         UniPoint uniPoint = uniPointMapper2.selectOne(
                 new QueryWrapper<UniPoint>()
                         .eq("bay_id", singleDeviceId)
@@ -295,13 +362,17 @@ public class CenterTaskHandler {
                 .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
                 .last("LIMIT 1"));
         pubWaylineJobPlanDfEntity.setName(taskName);
-        return dispatchExpressPlan(pubWaylineJobPlanDfEntity);
+        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity);
+    }
+
+    private int executeNormalTask(String singleDeviceId, String taskName) throws SQLException {
+        return executeNormalTaskResult(singleDeviceId, taskName).getCode();
     }
 
     /**
      * 执行风机任务（planType=1，传入设备id）
      */
-    private int executeFanTask(String singleDeviceId, String taskCode, String taskName) throws SQLException {
+    private TaskExecutionResult executeFanTaskResult(String singleDeviceId, String taskCode, String taskName) throws SQLException {
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanType, 1)
                 .eq(PubWaylineJobPlanDfEntity::getFanId, singleDeviceId)
@@ -312,13 +383,17 @@ public class CenterTaskHandler {
         fanName = fanName.replace("#", "");
         pubWaylineJobPlanDfEntity.setName(fanName+"-"+taskName);
         redisUtils.set("taskCode",taskCode);
-        return dispatchExpressPlan(pubWaylineJobPlanDfEntity);
+        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity);
+    }
+
+    private int executeFanTask(String singleDeviceId, String taskCode, String taskName) throws SQLException {
+        return executeFanTaskResult(singleDeviceId, taskCode, taskName).getCode();
     }
 
     /**
      * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
      */
-    private int executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
+    private TaskExecutionResult executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
         log.info("开始执行EUA定时任务: taskCode={}, bayId={}, taskName={}, fixedStartTime={}",
                 taskCode, bayId, taskName, fixedStartTime);
         String routeId = resolveCqDockRouteId(bayId);
@@ -326,7 +401,7 @@ public class CenterTaskHandler {
         if (!StringUtils.hasText(routeId)) {
             log.error("EUA定时任务执行失败，未在df_uni_point中匹配到航线: taskCode={}, bayId={}", taskCode, bayId);
             saveCqDockTaskRecord(taskCode, taskName, bayId, null, null, null, "未在df_uni_point中匹配到航线", null, false);
-            return -1;
+            return TaskExecutionResult.failed();
         }
 
         CqAssignTaskRequest request = new CqAssignTaskRequest();
@@ -349,12 +424,12 @@ public class CenterTaskHandler {
         if (success) {
             log.info("EUA定时任务下发成功: taskCode={}, bayId={}, routeId={}, taskId={}", taskCode, bayId, routeId, euaTaskId);
             cqDockTaskStatusHandler.startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime);
-            return 0;
+            return TaskExecutionResult.success(euaTaskId);
         }
         log.error("EUA定时任务下发失败: taskCode={}, bayId={}, routeId={}, code={}, msg={}",
                 taskCode, bayId, routeId, response == null ? null : response.getCode(),
                 response == null ? "EUA接口无响应" : response.getMsg());
-        return -1;
+        return TaskExecutionResult.failed();
     }
 
     /**
@@ -403,6 +478,20 @@ public class CenterTaskHandler {
         record.setCreateTime(now);
         record.setUpdateTime(now);
         cqDockTaskRecordMapper.insert(record);
+    }
+
+    private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+        CustomClaim customClaim = new CustomClaim();
+        customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
+        customClaim.setUsername("adminPC");
+        HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+        String jobId = httpResultResponse == null ? null : httpResultResponse.getMessage();
+        if (httpResultResponse != null && httpResultResponse.getCode() == 0) {
+            log.info("成功执行上级任务: jobId={}", jobId);
+            return TaskExecutionResult.success(jobId);
+        }
+        log.info("执行上级任务失败: code={}, msg={}", httpResultResponse == null ? null : httpResultResponse.getCode(), jobId);
+        return TaskExecutionResult.failed();
     }
 
     /**
@@ -461,6 +550,36 @@ public class CenterTaskHandler {
 
         } catch (Exception e) {
             log.error("清理过期任务失败", e);
+        }
+    }
+
+    public static class TaskExecutionResult {
+        private final int code;
+        private final String taskId;
+
+        private TaskExecutionResult(int code, String taskId) {
+            this.code = code;
+            this.taskId = taskId;
+        }
+
+        public static TaskExecutionResult success(String taskId) {
+            return new TaskExecutionResult(0, taskId);
+        }
+
+        public static TaskExecutionResult failed() {
+            return new TaskExecutionResult(-1, null);
+        }
+
+        public boolean isSuccess() {
+            return code == 0;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public String getTaskId() {
+            return taskId;
         }
     }
 }
