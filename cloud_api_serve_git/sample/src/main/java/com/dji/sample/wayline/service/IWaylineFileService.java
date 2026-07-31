@@ -27,6 +27,15 @@ public interface IWaylineFileService {
     PaginationData<GetWaylineListResponse> getWaylinesByParam(String workspaceId, GetWaylineListRequest param);
 
     /**
+     * Perform paging queries based on query parameters and wayline id.
+     * @param workspaceId
+     * @param param
+     * @param waylineId
+     * @return
+     */
+    PaginationData<GetWaylineListResponse> getWaylinesByParam(String workspaceId, GetWaylineListRequest param, String waylineId);
+
+    /**
      * Query the information of this wayline file according to the wayline file id.
      * @param workspaceId
      * @param waylineId

@@ -9,9 +9,18 @@ const HTTP_PREFIX2 = '/mqtt/v1'
 const HTTP_PREFIX3 = '/pub/api/v1'
 
 // 获取航线
-export const getWaylineFiles = async function (wid: string, body: {}): Promise<IWorkspaceResponse<any>> {
-  console.log('fanhui', body)
-  const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines?order_by=${body.order_by}&page=${body.page}&page_size=${body.page_size}&key=${body.name}`
+export const getWaylineFiles = async function (wid: string, body: any): Promise<IWorkspaceResponse<any>> {
+  const params = new URLSearchParams()
+  params.append('order_by', body.order_by || 'update_time desc')
+  params.append('page', String(body.page || 1))
+  params.append('page_size', String(body.page_size || 10))
+  if (body.name) {
+    params.append('key', body.name)
+  }
+  if (body.waylineId) {
+    params.append('wayline_id', body.waylineId)
+  }
+  const url = `${HTTP_PREFIX}/workspaces/${wid}/waylines?${params.toString()}`
   const result = await request.get(url)
   return result.data
 }
@@ -22,6 +31,13 @@ export const searchWaylineFiles = async function (wid: string, body: {}): Promis
   const result = await request.get(url)
   return result.data
 }
+// 获取航线详情
+export const getWaylineDetail = async function (workspaceId: string, waylineId: string): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/waylines/${waylineId}/detail`
+  const result = await request.get(url)
+  return result.data
+}
+
 // 下载航线
 export const downloadWaylineFile = async function (workspaceId: string, waylineId: string): Promise<any> {
   const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/waylines/${waylineId}/url`

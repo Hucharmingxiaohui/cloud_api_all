@@ -49,7 +49,7 @@ public class DeviceLiveStartTimer {
                     log.info("开启机巢直播---");
 //                  开启机巢直播
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                    liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+                    liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
                     VideoId videoId = new VideoId();
                     videoId.setDroneSn(device.getDeviceSn());
                     PayloadIndex payloadIndex = new PayloadIndex();
@@ -68,7 +68,7 @@ public class DeviceLiveStartTimer {
                         log.info("开启无人机直播---");
 //                      开启无人机直播
                         LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                        liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+                        liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
                         VideoId videoId = new VideoId();
                         videoId.setDroneSn(child.getDeviceSn());
                         PayloadIndex payloadIndex = new PayloadIndex();

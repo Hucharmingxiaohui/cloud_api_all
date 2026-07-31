@@ -98,6 +98,16 @@
               {{ scope.row.pic_type === 0? '可见光':'红外' }}
             </template>
           </el-table-column>
+          <el-table-column label="操作" align="center" width="120">
+            <template #default="scope">
+              <el-button
+                link
+                type="primary"
+                :loading="waylineDetailLoading === scope.row.wayline_id"
+                @click="showWaylineDetail(scope.row)"
+              >航线详情</el-button>
+            </template>
+          </el-table-column>
 
           <!-- <el-table-column label="操作" width="150">
             <template #default="scope">
@@ -121,6 +131,20 @@
         >
         </el-pagination>
       </div>
+      <el-dialog
+        v-model="waylineDetailVisible"
+        title="航线详情"
+        width="520px"
+      >
+        <div v-if="waylineDetail" class="wayline-detail">
+          <div class="detail-row"><span>航线ID：</span>{{ waylineDetail.id }}</div>
+          <div class="detail-row"><span>航线名称：</span>{{ waylineDetail.name || '-' }}</div>
+          <div class="detail-row"><span>更新时间：</span>{{ formatTime(waylineDetail.update_time) }}</div>
+          <div class="detail-row"><span>无人机：</span>{{ DEVICE_NAME[waylineDetail.drone_model_key] || waylineDetail.drone_model_key || '-' }}</div>
+          <div class="detail-row"><span>相机：</span>{{ formatPayloadNames(waylineDetail.payload_model_keys) }}</div>
+          <div class="detail-row"><span>创建人：</span>{{ waylineDetail.user_name || '-' }}</div>
+        </div>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -131,6 +155,10 @@ import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/i
 import { downloadFile } from '/@/utils/common'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
 import { getPointList, deletePointListapi, importPointList, exportPointTemplate } from '/@/api/points'
+import { getWaylineDetail } from '/@/api/wayline'
+import { ELocalStorageKey } from '/@/types'
+import { DEVICE_NAME } from '/@/types/device'
+import { WaylineFile } from '/@/types/wayline'
 
 // 表单
 const queryForm = reactive({
@@ -161,6 +189,10 @@ const fileList = ref<FileItem[]>([])
 const tableData = ref([])
 
 const selectRows = ref([])
+const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
+const waylineDetailVisible = ref(false)
+const waylineDetailLoading = ref('')
+const waylineDetail = ref<WaylineFile | null>(null)
 
 onMounted(() => {
   getPoinntList()
@@ -185,7 +217,44 @@ function getPoinntList () {
 function handleRest () {
   queryForm.pointName = ''
   queryForm.id = ''
+  queryForm.picType = ''
+  queryForm.waylineId = ''
   getPoinntList()
+}
+
+async function showWaylineDetail (row) {
+  const waylineId = row?.wayline_id
+  if (!waylineId) {
+    ElMessage.warning('当前点位未关联航线')
+    return
+  }
+  if (!workspaceId) {
+    ElMessage.warning('未获取到工作空间信息')
+    return
+  }
+  waylineDetailLoading.value = waylineId
+  try {
+    const res = await getWaylineDetail(workspaceId, waylineId)
+    if (res.code !== 0 || !res.data) {
+      ElMessage.warning('未查询到关联航线')
+      return
+    }
+    waylineDetail.value = res.data
+    waylineDetailVisible.value = true
+  } finally {
+    waylineDetailLoading.value = ''
+  }
+}
+
+function formatTime (time?: number) {
+  return time ? new Date(time).toLocaleString() : '-'
+}
+
+function formatPayloadNames (payloadKeys?: string[]) {
+  if (!payloadKeys || payloadKeys.length === 0) {
+    return '-'
+  }
+  return payloadKeys.map(key => DEVICE_NAME[key] || key).join('、')
 }
 
 /**

@@ -161,7 +161,7 @@ public class SDKDeviceService extends AbstractDeviceService {
     @Override
     public void osdDock(TopicOsdRequest<OsdDock> request, MessageHeaders headers) {
         String from = request.getFrom();
-        log.debug("Received dock OSD. dockSn={}", from);
+//        log.debug("Received dock OSD. dockSn={}", from);
         Optional<DeviceDTO> deviceOpt = deviceRedisService.getDeviceOnline(from);
         if (deviceOpt.isEmpty() || !StringUtils.hasText(deviceOpt.get().getWorkspaceId())) {
             deviceOpt = deviceService.getDeviceBySn(from);
@@ -274,7 +274,7 @@ public class SDKDeviceService extends AbstractDeviceService {
     @Override
     public void osdDockDrone(TopicOsdRequest<OsdDockDrone> request, MessageHeaders headers) {
         String from = request.getFrom();
-        log.debug("Received dock drone OSD. droneSn={}", from);
+//        log.debug("Received dock drone OSD. droneSn={}", from);
         Optional<DeviceDTO> deviceOpt = deviceRedisService.getDeviceOnline(from);
         if (deviceOpt.isEmpty()) {
             deviceOpt = deviceService.getDeviceBySn(from);
@@ -310,7 +310,7 @@ public class SDKDeviceService extends AbstractDeviceService {
             abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockSN));
             log.info("电量已小于30%触发返航");
         }
-        log.info("进入无人机osd上报---");
+//        log.info("进入无人机osd上报---");
 //       ===== 直播开启逻辑改造开始 =====
         String droneSn = device.getDeviceSn();
         String lastLiveKey = "live:last_attempt:" + droneSn;
@@ -336,7 +336,7 @@ public class SDKDeviceService extends AbstractDeviceService {
 
             log.info("开启无人机直播---");
             LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-            liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+            liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
             VideoId videoId = new VideoId();
             videoId.setDroneSn(droneSn);
             PayloadIndex payloadIndex = new PayloadIndex();
@@ -359,7 +359,7 @@ public class SDKDeviceService extends AbstractDeviceService {
                         droneSn, httpResultResponse.getCode(), httpResultResponse.getMessage());
             }
         } else {
-            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
+//            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
         }
         // ===== 直播开启逻辑改造结束 =====
 
