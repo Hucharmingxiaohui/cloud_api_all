@@ -16,6 +16,13 @@
         @click="select(EDeviceTypeName.Gateway)">
         <span style="margin-left: 5px; font-size: 14px;">遥控器</span>
       </el-button>
+      <el-popconfirm width="240" confirm-button-text="确定" cancel-button-text="取消" icon-color="#626AEF" title="确定手动注册当前机场和无人机吗？" @confirm="manualRepairDeviceOnline">
+        <template #reference>
+          <el-button class="new_btn" type="primary" style="margin-left: 10px; width: 120px;">
+            <span style="font-size: 14px;">手动注册</span>
+          </el-button>
+        </template>
+      </el-popconfirm>
     </div>
 
   </div>
@@ -165,7 +172,7 @@
 import { ColumnProps, TableState } from 'ant-design-vue/lib/table/interface'
 import { h, onMounted, reactive, ref, UnwrapRef } from 'vue'
 import { IPage } from '/@/api/http/type'
-import { BindBody, bindDevice, getBindingDevices, unbindDevice, updateDevice } from '/@/api/manage'
+import { BindBody, bindDevice, getBindingDevices, repairDeviceOnline, unbindDevice, updateDevice } from '/@/api/manage'
 import { EDeviceTypeName, ELocalStorageKey } from '/@/types'
 import { EditOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, FileSearchOutlined, CloudServerOutlined } from '@ant-design/icons-vue'
 import { Device, DeviceFirmwareStatusEnum } from '/@/types/device'
@@ -401,6 +408,23 @@ const hmsVisible = ref<boolean>(false)
 function showHms (dock: Device) {
   hmsVisible.value = true
   currentDevice.value = dock
+}
+
+function manualRepairDeviceOnline () {
+  const dock = data.device.find((item: Device) => item.domain === EDeviceTypeName.Dock)
+  if (!dock) {
+    message.warning('请先切换到机场列表，并确认存在机场设备')
+    return
+  }
+  const child = Array.isArray(dock.children) ? dock.children[0] : undefined
+  repairDeviceOnline(workspaceId, dock.device_sn, child?.device_sn).then(res => {
+    if (res.code !== 0) {
+      message.error(res.message || '手动注册失败')
+      return
+    }
+    message.success('手动注册成功')
+    getDevices(current.value[0], true)
+  })
 }
 
 onMounted(() => {

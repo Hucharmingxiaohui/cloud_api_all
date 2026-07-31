@@ -77,19 +77,21 @@ public class CenterMsgPushHandler {
     /**
      * J.6.8 巡视设备异常告警
      */
-    public void pushDeviceAlarm(List<UavDeviceAlarmItem> list) {
+    public boolean pushDeviceAlarm(List<UavDeviceAlarmItem> list) {
         if (!isConnectCenter()) {
             log.info("当前主站连接异常，巡视设备异常告警上送失败");
-            return;
+            return false;
         }
-        if (list != null && list.size() > 0) {
-            PatrolHostCommand commandData = new PatrolHostCommand();
-            commandData.addItems(list);
-            commandData.setSendCode(centerNormalConfig.getServerCode());
-            commandData.setReceiveCode(centerNormalConfig.getStationCode());
-            commandData.setType("5");
-            patrolHostSocketClient.sendCommand(commandData, UavHostRunDataItem.class);
+        if (list == null || list.size() == 0) {
+            log.info("巡视设备异常告警上送失败，告警列表为空");
+            return false;
         }
+        PatrolHostCommand commandData = new PatrolHostCommand();
+        commandData.addItems(list);
+        commandData.setSendCode(centerNormalConfig.getServerCode());
+        commandData.setReceiveCode(centerNormalConfig.getStationCode());
+        commandData.setType("5");
+        return patrolHostSocketClient.sendCommand(commandData, UavDeviceAlarmItem.class);
     }
 
 
