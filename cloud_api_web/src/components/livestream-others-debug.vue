@@ -22,6 +22,7 @@ import { useMyStore } from '/@/store'
 import jswebrtc from '/@/vendors/jswebrtc.min.js'
 import srs from '/@/vendors/srs.sdk.js'
 import flvjs from 'flv.js'
+import { resolveLiveVideoSource } from '/@/components/livestream/use-live-video-source'
 const store = useMyStore()
 const props = defineProps<{
   sn: string,
@@ -59,7 +60,7 @@ const lensOption: SelectOption[] = [
 const osdVisible = computed(() => {
   return store.state.osdVisible || { sn: '' }
 })
-const device_sn = ref(osdVisible.value.sn)
+const device_sn = ref(props.sn)
 const videowebrtc = ref(null)
 const livestreamSource = ref()
 const droneList = ref()
@@ -83,10 +84,20 @@ const flvURL = ref()
 cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
+let retryTimer: number | undefined
 
 const isPlay = ref(false)
 const isStartSteam = ref(false)
 onMounted(() => {
+  getcameraInfo()
+})
+
+watch(() => props.sn, sn => {
+  if (!sn || sn === device_sn.value) return
+  destroyFlv()
+  device_sn.value = sn
+  isStartSteam.value = false
+  isPlay.value = false
   getcameraInfo()
 })
 
@@ -98,22 +109,23 @@ const liveURL = config.rtcURL
 livetypeSelected.value = 4
 claritySelected.value = 2
 async function getcameraInfo () {
-  await getLiveCapacity({})
-    .then(res => {
-      if (res.code !== 0) {
-        isPlay.value = false
-        return
-      }
-      const cameraData = res.data.find(item => item.sn === device_sn.value)
-      if (!cameraData) {
-        isPlay.value = false
-        return
-      }
-      droneSelected.value = cameraData.sn
-      cameraSelected.value = cameraData.cameras_list[0].index
-      videoId.value = droneSelected.value + '/' + cameraSelected.value + '/' + (videoSelected.value || nonSwitchable + '-0')
-      getLiveHttp()
-    })
+  const source = await resolveLiveVideoSource({
+    role: 'drone',
+    sn: props.sn,
+    deviceInfo: props.deviceInfo,
+    flvBaseUrl: config.flvURL
+  })
+  if (!source) return
+  device_sn.value = source.deviceSn
+  droneSelected.value = source.deviceSn
+  cameraSelected.value = source.cameraIndex
+  videoId.value = source.videoId
+  flvURL.value = source.flvUrl
+  console.log('[drone-live] direct flv url', flvURL.value)
+  nextTick(() => {
+    initFlv()
+  })
+  getLiveHttp()
 }
 
 /* 请求后端获取视频流地址
@@ -121,6 +133,8 @@ async function getcameraInfo () {
 */
 async function getLiveHttp () {
   try {
+    if (!videoId.value || !device_sn.value) return
+    console.log('[drone-live] start', { sn: device_sn.value, videoId: videoId.value })
     await startLivestream({
       url: liveURL,
       video_id: videoId.value,
@@ -138,11 +152,16 @@ async function getLiveHttp () {
         const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
         const flvFileName = streamName + '.flv'
         flvURL.value = getImageUrl(config.flvURL, flvFileName)
+        console.log('[drone-live] flv url', flvURL.value)
+        nextTick(() => {
+          initFlv()
+        })
       }
       if (res.code === 513003) {
         // onStop()
         isPlay.value = true
         flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+        console.log('[drone-live] fallback flv url', flvURL.value)
         nextTick(() => {
           console.log('初始化备用flv播放器...')
           initFlv()
@@ -156,6 +175,15 @@ async function getLiveHttp () {
     isStartSteam.value = false
     isPlay.value = false
   }
+}
+
+function destroyFlv () {
+  if (!flvPlayer.value) return
+  flvPlayer.value.pause()
+  flvPlayer.value.unload()
+  flvPlayer.value.detachMediaElement()
+  flvPlayer.value.destroy()
+  flvPlayer.value = null
 }
 
 /* 请求后端停止推流
@@ -181,9 +209,14 @@ const onStop = () => {
  */
 function initFlv () {
   videoRef.value = document.getElementById('videoElement') as HTMLVideoElement
+  if (!videoRef.value || !flvURL.value) {
+    retryTimer = window.setTimeout(initFlv, 1000)
+    return
+  }
   if (videoRef.value) {
     if (flvjs.isSupported()) {
       try {
+        destroyFlv()
         flvPlayer.value = flvjs.createPlayer({
           type: 'flv',
           // url: 'http://127.0.0.1:80/live?port=1935&app=live&stream=test',
@@ -204,24 +237,21 @@ function initFlv () {
           // fit: 'fill'
         })
         flvPlayer.value.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+          console.warn('[drone-live] flv error', errorType, errorDetail, errorInfo)
           if (flvPlayer.value) {
-            flvPlayer.value.pause()
-            flvPlayer.value.unload()
-            flvPlayer.value.detachMediaElement()
-            flvPlayer.value.destroy()
-            flvPlayer.value = null
-            initFlv() // 重新调用 initFlv 函数重新创建播放器
+            destroyFlv()
+            retryTimer = window.setTimeout(initFlv, 1500)
           }
         })
         if (flvPlayer.value) {
           flvPlayer.value.attachMediaElement(videoRef.value)
           flvPlayer.value.load()
           if (videoRef.value.readyState >= 2) {
-            flvPlayer.value.play()
+            flvPlayer.value.play().catch(() => {})
           } else {
             videoRef.value.addEventListener('loadedmetadata', () => {
-              flvPlayer.value.play()
-            })
+              flvPlayer.value?.play().catch(() => {})
+            }, { once: true })
           }
         }
         isPlay.value = true
@@ -250,11 +280,8 @@ const onPause = () => flvPlayer.value.pause()
  * 销毁
  */
 const destory = () => {
-  flvPlayer.value.pause()
-  flvPlayer.value.unload()
-  flvPlayer.value.detachMediaElement()
-  flvPlayer.value.destroy()
-  flvPlayer.value = null
+  if (retryTimer) window.clearTimeout(retryTimer)
+  destroyFlv()
 }
 onUnmounted(() => {
   // onStop()
@@ -267,7 +294,7 @@ watch(() => props.deviceInfo, (value) => {
   if (value.device && !isPlay.value) {
     isPlay.value = true
     console.log('开始执行')
-    device_sn.value = osdVisible.value.sn
+    device_sn.value = props.sn
     if (!isStartSteam.value) {
       getcameraInfo()
     }

@@ -117,7 +117,7 @@ cloud-sdk:
   mqtt:
     enabled: true
     # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
-    inbound-topic: sys/product/+/status,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
+    inbound-topic: sys/product/+/status,thing/product/+/osd,thing/product/+/state,thing/product/+/events,thing/product/+/services_reply,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
 
 url:
   manage:
@@ -202,14 +202,14 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级巡视对接开关
 switch:
-  centerNormalTcpEnable: true
-  centerOtherTcpEnable: true
-  centerNormalTcpMsgEnable: true
-  centerOtherTcpMsgEnable: true
-#  centerNormalTcpEnable: false
-#  centerOtherTcpEnable: false
-#  centerNormalTcpMsgEnable: false
-#  centerOtherTcpMsgEnable: false
+#  centerNormalTcpEnable: true
+#  centerOtherTcpEnable: true
+#  centerNormalTcpMsgEnable: true
+#  centerOtherTcpMsgEnable: true
+  centerNormalTcpEnable: false
+  centerOtherTcpEnable: false
+  centerNormalTcpMsgEnable: false
+  centerOtherTcpMsgEnable: false
   # 上级任务下发时，deviceLevel=1(间隔)是否转发到重庆电力下级EUA平台
   centerCqDockTaskEnable: true
 

@@ -72,6 +72,21 @@ export interface SpeakerProgressData extends Partial<As1State> {
   }
 }
 
+export interface SpeakerAudioProgressData {
+  result?: number
+  output?: {
+    psdk_index?: number
+    status?: 'failed' | 'in_progress' | 'ok' | 'success'
+    md5?: string
+    progress?: {
+      percent?: number
+      step_key?: string
+      [key: string]: unknown
+    }
+    [key: string]: unknown
+  }
+}
+
 export const SPEAKER_PROGRESS_STATUS_TEXT: Record<string, string> = {
   failed: '播放失败',
   in_progress: '处理中',
@@ -94,6 +109,25 @@ export const SPEAKER_STEP_TEXT: Record<string, string> = {
   tts_processing: '正在合成语音',
   upload: '正在传输内容',
   play: '正在播放',
+}
+
+export const SPEAKER_AUDIO_METHOD = {
+  PLAY_START: 'speaker_audio_play_start',
+  PLAY_PROGRESS: 'speaker_audio_play_start_progress',
+  PLAY_VOLUME_SET: 'speaker_play_volume_set',
+  PLAY_MODE_SET: 'speaker_play_mode_set',
+  PLAY_STOP: 'speaker_play_stop',
+  REPLAY: 'speaker_replay',
+} as const
+
+export function buildSpeakerServiceCommand (method: string, data: Record<string, unknown>) {
+  return {
+    bid: crypto.randomUUID(),
+    data,
+    method,
+    tid: crypto.randomUUID(),
+    timestamp: Date.now(),
+  }
 }
 
 const ERROR_TEXT: Record<number, string> = {
