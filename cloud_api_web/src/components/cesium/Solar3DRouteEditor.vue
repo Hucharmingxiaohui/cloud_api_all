@@ -773,8 +773,8 @@ function startRenderLoop () {
 //  -------------------------------------------------------------------------------------模型加载-----------------------------------------------------------------------------------------
 // 加载3DTiles模型
 async function load3DTiles () {
-  const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
-  // const tilesetUrl = '/model/solarqingxie_1/Scene/solarqingxie_1.json'
+  // const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
+  const tilesetUrl = '/model/solarqingxie_1/Scene/solarqingxie_1.json'
   const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
   if (tileset) {
     console.log('Solar3DRouteEditor: 3D模型加载成功', tileset.boundingSphere)
@@ -1113,6 +1113,7 @@ function setupClickEvent () {
         ElMessage.error('请取消选中')
         return
       }
+      clearEditSelectionBeforeDrawing()
       // isDragging.value = true
       // 单击获取坐标点
       const coordinate = getCartesianCoordinate(event.position)
@@ -1170,6 +1171,15 @@ function cancelDragging () {
   isDragging.value = false
   isAllowDrawing.value = true
   selectedEntity = null
+}
+
+function clearEditSelectionBeforeDrawing () {
+  if (ischangecamera.value) exitCameraEditMode()
+  isDragging.value = false
+  isAllowDrawing.value = true
+  selectedEntity = null
+  previousPosition = null
+  contextMenu.value?.hideContextMenu()
 }
 
 // 移动点的方法，根据方向调整点的位置

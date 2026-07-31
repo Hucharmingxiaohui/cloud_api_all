@@ -94,7 +94,7 @@
         </svg>
         <!-- 控制按钮 -->
         <div class="btn-list">
-            <el-button class="btn" @click="onClickFightControl" >{{ flightController ? '释放控制权' : '申请控制权'}}</el-button>
+            <el-button class="btn" :loading="drcLoading" @click="onClickFightControl" >{{ flightController ? '释放控制权' : '申请控制权'}}</el-button>
             <DroneControlPopover
                 :visible="takeoffToPointPopoverData.visible"
                 :loading="takeoffToPointPopoverData.loading"
@@ -403,7 +403,7 @@
   />
 <!-- 海上目标追踪任务：放在“无人机控制/负载控制”下面 -->
 <div class="mission-panel">
-  <div class="box-title">-</div>
+  <div class="box-title">快捷指令</div>
 
   <DroneControlPopover
     :visible="missionParams.visible"
@@ -434,8 +434,7 @@
   <div class="btn-list mission-btns">
     <el-button class="btn" @click="openMissionParam">参数设置</el-button>
     <el-button class="btn" :loading="missionBusy" @click="onOneKeyTakeoff">一键起飞</el-button>
-    <el-button class="btn" :loading="missionBusy" @click="onApproachObserve">-观察</el-button>
-    <el-button class="btn" :loading="missionBusy" @click="onApproachOrbit">-盘旋</el-button>
+    <el-button class="btn drc-link-btn" :loading="drcLoading" @click="onClickDrc">{{ drcConnected ? '关闭 DRC 链路' : '打开 DRC 链路' }}</el-button>
     <el-button class="btn" :loading="missionBusy" type="danger" @click="onEndMission">结束任务</el-button>
   </div>
 
@@ -468,7 +467,7 @@ import { defineProps, reactive, ref, watch, computed, onMounted, watchEffect } f
 import { Select, message, Button } from 'ant-design-vue'
 import { PayloadInfo, DeviceInfoType, ControlSource, DeviceOsdCamera, DrcStateEnum } from '/@/types/device'
 import { useMyStore } from '/@/store'
-import { postDrcEnter, postDrcExit, postSpeakerDrcEnter, postSpeakerDrcExit } from '/@/api/drc'
+import { postDrcEnter, postDrcEnterOnly, postDrcExit, postSpeakerDrcEnter, postSpeakerDrcExit } from '/@/api/drc'
 import { useMqtt, DeviceTopicInfo } from '/@/components/g-map/use-mqtt'
 import { DownOutlined, UpOutlined, LeftOutlined, RightOutlined, PauseCircleOutlined, UndoOutlined, RedoOutlined, ArrowUpOutlined, ArrowDownOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { useManualControl, KeyCode } from '/@/components/g-map/use-manual-control'
@@ -660,7 +659,18 @@ const mqttHooks = useMqtt(deviceTopicInfo)
 //   return store.state.deviceState?.dockInfo[props.sn]?.link_osd?.drc_state === DrcStateEnum.CONNECTED
 // })
 const flightController = ref(false)
+const drcConnected = ref(false)
 const drcLoading = ref(false)
+
+watch(() => [deviceTopicInfo.pubTopic, deviceTopicInfo.subTopic], ([pubTopic, subTopic]) => {
+  drcConnected.value = Boolean(pubTopic && subTopic)
+})
+
+async function onClickDrc () {
+  if (drcLoading.value) return false
+  if (drcConnected.value) return exitDrcOnly()
+  return enterDrcOnly()
+}
 
 async function onClickFightControl () {
   if (flightController.value) {
@@ -728,6 +738,65 @@ async function exitFlightCOntrol () {
     return false
   } catch (error: any) {
     message.error(error?.message || '关闭 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
+  }
+}
+
+async function enterDrcOnly () {
+  if (drcLoading.value) return false
+  if (!clientId.value) {
+    message.error('MQTT 临时凭证未就绪，请刷新页面或确认 /drc/connect 成功')
+    return false
+  }
+  drcLoading.value = true
+  try {
+    const { code, data, message: msg } = await postDrcEnterOnly({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      drcConnected.value = true
+      if (data.sub && data.sub.length > 0) {
+        deviceTopicInfo.subTopic = data.sub[0]
+      }
+      if (data.pub && data.pub.length > 0) {
+        deviceTopicInfo.pubTopic = data.pub[0]
+      }
+      message.success('DRC 链路已打开')
+      return true
+    }
+    message.error(msg || `打开 DRC 链路失败，错误码：${code}`)
+    return false
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || error?.message || '打开 DRC 链路异常')
+    return false
+  } finally {
+    drcLoading.value = false
+  }
+}
+
+async function exitDrcOnly () {
+  if (drcLoading.value) return false
+  drcLoading.value = true
+  try {
+    const { code, message: msg } = await postDrcExit({
+      client_id: clientId.value,
+      dock_sn: props.sn,
+    })
+    if (code === 0) {
+      drcConnected.value = false
+      flightController.value = false
+      deviceTopicInfo.subTopic = ''
+      deviceTopicInfo.pubTopic = ''
+      message.success('DRC 链路已关闭')
+      return true
+    }
+    message.error(msg || `关闭 DRC 链路失败，错误码：${code}`)
+    return false
+  } catch (error: any) {
+    message.error(error?.response?.data?.message || error?.message || '关闭 DRC 链路异常')
     return false
   } finally {
     drcLoading.value = false
@@ -1680,7 +1749,19 @@ watchEffect(async () => {
     margin-bottom:8px;
   }
   .mission-btns{
-    grid-template-columns: repeat(4, 1fr);
+    display: grid;
+    grid-template-columns: repeat(4, max-content);
+    column-gap: 16px;
+    row-gap: 10px;
+    margin-left: 0;
+
+    .btn{
+      min-width: 85px;
+    }
+
+    .drc-link-btn{
+      width: 112px;
+    }
   }
   .mission-status{
     margin-top: 6px;

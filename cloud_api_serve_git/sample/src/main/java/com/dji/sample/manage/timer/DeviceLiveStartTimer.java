@@ -40,8 +40,12 @@ public class DeviceLiveStartTimer {
         try {
             PaginationData<DeviceDTO> boundDevicesWithDomain = deviceService.getBoundDevicesWithDomain("e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 10L, 3);
             List<DeviceDTO> list = boundDevicesWithDomain.getList();
+            log.info("定时直播查询到绑定机巢数量: {}", list == null ? 0 : list.size());
             for (DeviceDTO device : list) {
-                if(device.getStatus()){
+                log.info("定时直播设备状态: dockSn={}, dockOnline={}, childSn={}, childOnline={}",
+                        device.getDeviceSn(), device.getStatus(), device.getChildDeviceSn(),
+                        device.getChildren() == null ? null : device.getChildren().getStatus());
+                if(Boolean.TRUE.equals(device.getStatus())){
                     log.info("开启机巢直播---");
 //                  开启机巢直播
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
@@ -59,12 +63,14 @@ public class DeviceLiveStartTimer {
                     startLiveWithRecovery(liveTypeDTO, "机巢", device.getDeviceSn());
                 }
                 if (StringUtils.hasText(device.getChildDeviceSn())) {
+                DeviceDTO child = device.getChildren();
+                if (child != null && Boolean.TRUE.equals(child.getStatus()) && StringUtils.hasText(child.getDeviceSn())) {
                     log.info("开启无人机直播---");
 //                  开启无人机直播
                     LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
                     liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
                     VideoId videoId = new VideoId();
-                    videoId.setDroneSn(device.getChildDeviceSn());
+                    videoId.setDroneSn(child.getDeviceSn());
                     PayloadIndex payloadIndex = new PayloadIndex();
                     payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
                     payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
@@ -74,6 +80,8 @@ public class DeviceLiveStartTimer {
                     liveTypeDTO.setVideoId(videoId);
                     liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
                     startLiveWithRecovery(liveTypeDTO, "无人机", device.getChildDeviceSn());
+                }
+                    HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
                 }
 
             }

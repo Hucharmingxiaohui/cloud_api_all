@@ -63,11 +63,11 @@
                       </div>
                     </div>
                   </div>
-                  <div style="flex-grow: 1;  border-left: 2px solid black; padding-left: 10px;">
-                      <div style="display: flex; align-items: center; justify-content: flex-start;color: aliceblue; height: 50px; border-bottom: 2px solid black;">
-                        <span style="margin-right: 10px;">高度:</span>
-                        <div style=" width: 20px; height: 20px; border-radius: 50%; border: 1px solid blue;color: aliceblue; text-align: center;line-height: 20px; font-size: 16px; cursor: pointer;" @click="movePoint('5')" >↑</div>
-                        <div style=" width: 20px; height: 20px; border-radius: 50%; border: 1px solid blue;color: aliceblue; text-align: center;line-height: 20px; font-size: 16px;cursor: pointer;" @click="movePoint('6')">↓</div>
+                  <div style="flex-grow: 1; border-left: 2px solid rgba(54, 151, 255, .45); padding-left: 14px;">
+                      <div class="height-adjust-row">
+                        <span class="height-label">高度</span>
+                        <div class="height-btn up" @click="movePoint('5')" >↑</div>
+                        <div class="height-btn down" @click="movePoint('6')">↓</div>
                       </div>
                       <div style="display: flex; align-items: center; justify-content: flex-start;color: aliceblue; height: 50px; border-bottom: 2px solid black;">
                         <span style="margin-right: 10px;"> 选中状态:</span>
@@ -91,7 +91,7 @@
         <div class="box2">
             <div class="logs-title" style="color: aliceblue;">点位绘制</div>
             <div style="width: 100%; margin-top: 30px;">
-              <el-table :data="PointsData" stripe>
+              <el-table :data="PointsData" stripe highlight-current-row @row-click="selectWaypointFromRow">
                   <!-- <el-table-column type="selection" width="55" /> -->
                   <el-table-column label="序号" align='center' width="40" type="index">
                   </el-table-column>
@@ -245,17 +245,19 @@
   <span style="margin-left:4px;">m/s</span></div>
 
 <div class="camera-info-container">
-  <div class="info-title">云台参数</div>
+  <div class="info-title">
+    <span>云台参数</span>
+    <em>{{ ischangecamera ? '编辑中' : '未选中航点' }}</em>
+  </div>
   <div class="info-grid">
-    <div class="info-item">经度: <span>{{ cameraParams.longitude }}</span></div>
-    <div class="info-item">纬度: <span>{{ cameraParams.latitude }}</span></div>
-    <div class="info-item">高度: <span>{{ cameraParams.height }}</span></div>
-    <div class="info-item">航向角: <span>{{ cameraParams.heading }}</span>°</div>
-    <div class="info-item">焦距: <span>{{ cameraParams.equivalentFocalLength }}</span></div>
-
-    <div class="info-item">俯仰角<span>{{ cameraParams.pitch }}</span>°</div>
-    <div class="info-item">fov: <span>{{ cameraParams.fov }}</span></div>
-    <div class="info-item">翻滚角: <span>{{ cameraParams.roll }}</span>°</div>
+    <div class="info-card wide"><label>经度</label><span>{{ Number(cameraParams.longitude || 0).toFixed(7) }}</span></div>
+    <div class="info-card wide"><label>纬度</label><span>{{ Number(cameraParams.latitude || 0).toFixed(7) }}</span></div>
+    <div class="info-card"><label>高度</label><span>{{ Number(cameraParams.height || 0).toFixed(2) }} m</span></div>
+    <div class="info-card"><label>航向角</label><span>{{ Number(cameraParams.heading || 0).toFixed(1) }}°</span></div>
+    <div class="info-card"><label>俯仰角</label><span>{{ Number(cameraParams.pitch || 0).toFixed(1) }}°</span></div>
+    <div class="info-card"><label>翻滚角</label><span>{{ Number(cameraParams.roll || 0).toFixed(1) }}°</span></div>
+    <div class="info-card"><label>等效焦距</label><span>{{ Number(cameraParams.equivalentFocalLength || 0).toFixed(1) }} mm</span></div>
+    <div class="info-card"><label>FOV</label><span>{{ Number(cameraParams.fov || 0).toFixed(3) }}</span></div>
 
   </div>
 </div>
@@ -300,10 +302,10 @@ import { message } from 'ant-design-vue'
 import UavCamera from './uavCamera.vue'
 import labelBg from '/@/assets/v4/label_bg.png'
 import waypointBg from '/@/assets/v4/waypoint.png'
+import { buildAndDownloadWaylineKmz } from '../cloudRenderer/cloudWaylineKmz'
 
 // Vue 组件中的方法 xtj 2025/7/31
 
-import { generateWaylineRequest } from './kmzRequest'
 import Camera from '/@/pages/page-web/projects/camera.vue'
 import { loadVoxel, checkAndInsertAvoidanceBetweenTwoPoints } from '/src/utils/voxelNav'// 航线规划 体素检测
 
@@ -475,6 +477,8 @@ function GetModels () {
       label: item.model_name,
       value: item.model_id
     }))
+  }).catch(err => {
+    console.warn('获取模型列表失败:', err)
   })
 }
 
@@ -482,16 +486,25 @@ function GetModels () {
  * 选择事件，查询模型
  * @param val
  */
-function selectModel (val) {
-  const modelData = modelInfo.value.find((item) => item.model_id === val)
+async function selectModel (val) {
+  const modelData = modelInfo.value?.find((item) => item.model_id === val)
+  if (!modelData) {
+    ElMessage.warning('未找到模型信息')
+    return
+  }
   const tilesetUrl = `/${modelData.file_path}/${modelData.json_name}`
 
   // const tilesetUrl = '/model/Scene/Production_5.json'
 
   // load3DTiles(tilesetUrl)
   cesium.viewer.scene.primitives.removeAll()// 先清空场景
-  load3DTilesModels(cesium.viewer, tilesetUrl)
-  childMap.value.loadModel(tilesetUrl)
+  const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
+  if (tileset) {
+    cesium.viewer.zoomTo(tileset)
+  } else {
+    ElMessage.error('模型加载失败')
+  }
+  childMap.value?.loadModel(tilesetUrl)
 }
 // -------------------------------------------------------------------------------------场景初始化-----------------------------------------------------------------------------------------
 const voxel = null
@@ -518,10 +531,10 @@ onBeforeUnmount(() => {
   document.removeEventListener('contextmenu', handleRightClick)
 })
 
-function init () {
+async function init () {
   initCesium()
   startRenderLoop()
-  load3DTiles()
+  await load3DTiles()
   setupClickEvent()
 }
 // function removeLogo (viewer) {
@@ -595,12 +608,20 @@ function startRenderLoop () {
 }
 //  -------------------------------------------------------------------------------------模型加载-----------------------------------------------------------------------------------------
 // 加载3DTiles模型
-function load3DTiles () {
+async function load3DTiles () {
   // const tilesetUrl = 'http://172.20.63.157:9000/models/dfelanqiuchang/tileset.json'
   const tilesetUrl = '/model/dfelanqiuchang/tileset.json' // '/model/Scene/Production_5.json'
 
-  load3DTilesModels(cesium.viewer, tilesetUrl)
-  childMap.value.loadModel(tilesetUrl)
+  const tileset = await load3DTilesModels(cesium.viewer, tilesetUrl)
+  if (tileset) {
+    console.log('3DMapPanel: 3D模型加载成功', tileset.boundingSphere)
+    cesium.viewer.zoomTo(tileset)
+  } else {
+    console.error('3DMapPanel: 3D模型加载失败', tilesetUrl)
+    ElMessage.error('默认三维模型加载失败')
+  }
+  childMap.value?.loadModel(tilesetUrl)
+  return tileset
 }
 
 // 加载glft模型
@@ -902,7 +923,6 @@ const ischangecamera = ref(false)
 const options = ref([
   { name: '移动', action: prevPage, shortcut: '', shortcutKey: 'alt + arrowup' },
   { name: '删除', action: nextPage, shortcut: '', shortcutKey: 'alt + arrowdown' },
-  { name: '编辑', action: changeCameraViwer, shortcut: '', shortcutKey: 'alt + arrowdown' },
 ])
 const contextMenu = ref(null)
 let selectedEntity = null // 当前选中的点实体
@@ -914,14 +934,21 @@ function setupClickEvent () {
   const isDrawing = false // 新增标志位，表示是否在绘制
   const handlePoint = new Cesium.ScreenSpaceEventHandler(cesium.viewer.scene.canvas)
 
-  // 单击事件：绘制新点
+  // 单击事件：点中航点直接编辑；点中模型空位则绘制新点
   handlePoint.setInputAction(function (event) {
     clearTimeout(timer)
     timer = window.setTimeout(function () {
+      const pickedObject = cesium.viewer.scene.pick(event.position)
+      if (Cesium.defined(pickedObject) && pickedObject.id && isWaypointEntity(pickedObject.id)) {
+        selectWaypointEntity(pickedObject.id)
+        return
+      }
+
       if (isDragging.value) {
         ElMessage.error('请取消选中')
         return
       }
+      clearEditSelectionBeforeDrawing()
       // isDragging.value = true
       // 单击获取坐标点
       const coordinate = getCartesianCoordinate(event.position)
@@ -939,6 +966,7 @@ function setupClickEvent () {
           height: coordinate.altitude.toFixed(14)
         }
         PointsData.value.push(node)
+        selectWaypointEntity(Entity)
       }
     }, 200)
     // handleConfirm()
@@ -948,20 +976,51 @@ function setupClickEvent () {
   // 右键点击事件
   handlePoint.setInputAction(function (event) {
     const pickedObject = cesium.viewer.scene.pick(event.position)
-    if (Cesium.defined(pickedObject) && pickedObject.id) {
-      selectedEntity = pickedObject.id // 获取选中的点实体
-      previousPosition = selectedEntity.position.getValue(Cesium.JulianDate.now()) // 记录当前位置
+    if (Cesium.defined(pickedObject) && pickedObject.id && isWaypointEntity(pickedObject.id)) {
+      selectWaypointEntity(pickedObject.id)
+      handleRightClick(event)
     } else {
-      selectedEntity = null
+      contextMenu.value?.hideContextMenu()
     }
   }, Cesium.ScreenSpaceEventType.RIGHT_CLICK)
+}
+
+function isWaypointEntity (entity) {
+  return !!entity?.id && PointsData.value.some(item => item.id === entity.id)
+}
+
+function selectWaypointEntity (entity) {
+  if (!entity?.id) return
+  selectedEntity = entity
+  previousPosition = selectedEntity.position?.getValue(Cesium.JulianDate.now()) || null
+  enterCameraEditMode()
+}
+
+function selectWaypointFromRow (row) {
+  const entity = cesium.viewer.entities.getById(row.id)
+  if (!entity) {
+    ElMessage.warning('未找到对应航点实体')
+    return
+  }
+  selectWaypointEntity(entity)
+  const position = entity.position?.getValue(Cesium.JulianDate.now())
+  if (position) cesium.viewer.flyTo(entity)
 }
 
 // 取消拖动
 function cancelDragging () {
   isDragging.value = false
   isAllowDrawing.value = true
+  contextMenu.value?.hideContextMenu()
+}
+
+function clearEditSelectionBeforeDrawing () {
+  if (ischangecamera.value) exitCameraEditMode()
+  isDragging.value = false
+  isAllowDrawing.value = true
   selectedEntity = null
+  previousPosition = null
+  contextMenu.value?.hideContextMenu()
 }
 
 // 移动点的方法，根据方向调整点的位置
@@ -1008,29 +1067,32 @@ function movePoint (val) {
     node.lat = Cesium.Math.toDegrees(newCartographic.latitude).toFixed(14)
     node.height = newCartographic.height.toFixed(14)
   }
+  syncParamsFromSelected()
+  changeModels()
 }
 
 // 3. 右键点击事件 显示菜单
 function handleRightClick (event) {
-  event.preventDefault() // 阻止默认的右键菜单
+  event.preventDefault?.() // 阻止默认的右键菜单
   if (selectedEntity != null) {
-    if (!ischangecamera.value) {
-      options.value = [
-        { name: '移动', action: prevPage, shortcut: '', shortcutKey: 'alt + arrowup' },
-        { name: '删除', action: nextPage, shortcut: '', shortcutKey: 'alt + arrowdown' },
-        { name: '编辑', action: changeCameraViwer, shortcut: '', shortcutKey: 'alt + arrowdown' },
-      ]
-      contextMenu.value.showContextMenu(event)
-    } else {
-      options.value = [
-      //  { name: '移动', action: prevPage, shortcut: '', shortcutKey: 'alt + arrowup' },
-      //  { name: '删除', action: nextPage, shortcut: '', shortcutKey: 'alt + arrowdown' },
-        { name: '取消编辑', action: changeCameraViwer, shortcut: '', shortcutKey: 'alt + arrowdown' },
-      ]
-      contextMenu.value.showContextMenu(event)
-    }
+    options.value = [
+      { name: '移动', action: prevPage, shortcut: '', shortcutKey: 'alt + arrowup' },
+      { name: '删除', action: nextPage, shortcut: '', shortcutKey: 'alt + arrowdown' },
+      { name: '取消选中', action: exitCameraEditMode, shortcut: '', shortcutKey: 'esc' },
+    ]
+    contextMenu.value?.showContextMenu(toContextMenuEvent(event))
   } else {
-    contextMenu.value.hideContextMenu()
+    contextMenu.value?.hideContextMenu()
+  }
+}
+
+function toContextMenuEvent (event) {
+  if (typeof event.clientX === 'number' && typeof event.clientY === 'number') return event
+  const position = event.position || event.endPosition || { x: 0, y: 0 }
+  const rect = cesium.viewer.scene.canvas.getBoundingClientRect()
+  return {
+    clientX: rect.left + Number(position.x || 0),
+    clientY: rect.top + Number(position.y || 0)
   }
 }
 
@@ -1084,7 +1146,7 @@ function nextPage () {
 
   // 5) 收尾
   isAllowDrawing.value = true
-  selectedEntity = null
+  exitCameraEditMode()
 }
 
 // 编辑点位的视角
@@ -1094,26 +1156,40 @@ const value1 = ref(90)
 const value2 = ref(-90)
 const value3 = ref(0)
 const value4 = ref(4) // 默认焦距值 4mm
-function changeCameraViwer () { // 进入编辑模式
-  // changeModels()// 先更新参数
-  if (!ischangecamera.value) {
-    const currentPosition = selectedEntity.position.getValue(Cesium.JulianDate.now())
-    const Entity = loadGltf(currentPosition)
-    airplaneEntity = Entity
-    ischangecamera.value = true
-    pyramisPrimitive = createPyramis(cesium.viewer, pyramisPrimitive, currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value), cameraParams.value.fov)
-    childMap.value.setCamera(currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value))
-    // 进入编辑后立即同步一次
-    syncParamsFromSelected()
-    loadCaptureModeForSelected()
-    loadWaypointSpeedForSelected()
-  } else {
-    removeGltfModel(cesium.viewer, airplaneEntity)
-    removePyramis(cesium.viewer, pyramisPrimitive)
-    ischangecamera.value = false
-    airplaneEntity = null
-    pyramisPrimitive = null
-  }
+function changeCameraViwer () {
+  if (ischangecamera.value) exitCameraEditMode()
+  else enterCameraEditMode()
+}
+
+function enterCameraEditMode () {
+  if (!selectedEntity) return
+  if (airplaneEntity) removeGltfModel(cesium.viewer, airplaneEntity)
+  if (pyramisPrimitive) removePyramis(cesium.viewer, pyramisPrimitive)
+
+  syncParamsFromSelected()
+  loadCaptureModeForSelected()
+  loadWaypointSpeedForSelected()
+  value1.value = Number(cameraParams.value.heading || value1.value)
+  value2.value = Number(cameraParams.value.pitch || value2.value)
+  value3.value = Number(cameraParams.value.roll || value3.value)
+
+  const currentPosition = selectedEntity.position.getValue(Cesium.JulianDate.now())
+  airplaneEntity = loadGltf(currentPosition)
+  ischangecamera.value = true
+  pyramisPrimitive = createPyramis(cesium.viewer, pyramisPrimitive, currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value), cameraParams.value.fov)
+  childMap.value?.setCamera(currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value))
+}
+
+function exitCameraEditMode () {
+  if (airplaneEntity) removeGltfModel(cesium.viewer, airplaneEntity)
+  if (pyramisPrimitive) removePyramis(cesium.viewer, pyramisPrimitive)
+  ischangecamera.value = false
+  isDragging.value = false
+  selectedEntity = null
+  previousPosition = null
+  airplaneEntity = null
+  pyramisPrimitive = null
+  contextMenu.value?.hideContextMenu()
 }
 
 function syncParamsFromSelected () {
@@ -1124,10 +1200,18 @@ function syncParamsFromSelected () {
   cameraParams.value.latitude = +Cesium.Math.toDegrees(c.latitude).toFixed(14)
   cameraParams.value.height = +c.height.toFixed(14)
 
-  // 用当前滑条值当作初始姿态
-  cameraParams.value.heading = Math.round(value1.value)
-  cameraParams.value.pitch = Math.round(value2.value)
-  cameraParams.value.roll = Math.round(value3.value)
+  try {
+    const arr = JSON.parse(sessionStorage.getItem('waypointsData')) || []
+    const wp = arr.find(w => w.point_name === selectedEntity.id)
+    cameraParams.value.heading = Math.round(Number(wp?.camera_params?.heading ?? value1.value))
+    cameraParams.value.pitch = Math.round(Number(wp?.camera_params?.pitch ?? value2.value))
+    cameraParams.value.roll = Math.round(Number(wp?.camera_params?.roll ?? value3.value))
+    cameraParams.value.equivalentFocalLength = Number(wp?.camera_params?.focalLength ?? cameraParams.value.equivalentFocalLength)
+  } catch {
+    cameraParams.value.heading = Math.round(value1.value)
+    cameraParams.value.pitch = Math.round(value2.value)
+    cameraParams.value.roll = Math.round(value3.value)
+  }
 }
 
 function loadCaptureModeForSelected () {
@@ -1155,7 +1239,10 @@ function changeModels () {
   const currentPosition = selectedEntity.position.getValue(Cesium.JulianDate.now())
   pyramisPrimitive = createPyramis(cesium.viewer, pyramisPrimitive, currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value), cameraParams.value.fov)
   updateOrientation(airplaneEntity, currentPosition, 0.2, 0, 0, 0, Math.round(value1.value) - 90, 0, 0)
-  childMap.value.setCamera(currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value))
+  childMap.value?.setCamera(currentPosition, Math.round(value1.value), Math.round(value2.value), Math.round(value3.value))
+  cameraParams.value.heading = Math.round(value1.value)
+  cameraParams.value.pitch = Math.round(value2.value)
+  cameraParams.value.roll = Math.round(value3.value)
 }
 
 watch(() => cameraParams.value.fov, (nv) => { // 监听fov缩放视锥体大小
@@ -1313,13 +1400,16 @@ async function handlegenerate () {
       return
     }
 
-    const data = await generateWaylineRequest(waypointsData, name)
+    const data = await buildAndDownloadWaylineKmz({
+      routeName: name,
+      waypoints: waypointsData
+    })
 
-    ElMessage.success('航线生成成功！')
+    ElMessage.success('KMZ 航线已生成、下载并导入成功')
     console.log('生成的航线数据:', data)
   } catch (error) {
     console.error('生成航线失败的错误:', error)
-    ElMessage.error('生成航线失败')
+    ElMessage.error(error instanceof Error ? error.message : '生成航线失败')
   }
 }
 
@@ -1490,6 +1580,57 @@ function createOrUpdateFlowArrowRoute (positions) {
     margin-top: -51px;
   }
 }
+
+.height-adjust-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 58px;
+  color: #eaf7ff;
+  border-bottom: 1px solid rgba(92, 170, 255, .35);
+}
+
+.height-label {
+  min-width: 42px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.height-btn {
+  width: 38px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(97, 197, 255, .9);
+  background: linear-gradient(180deg, rgba(30, 141, 255, .38), rgba(8, 53, 130, .72));
+  box-shadow: inset 0 0 14px rgba(71, 185, 255, .42), 0 0 10px rgba(38, 150, 255, .22);
+  color: #eaffff;
+  line-height: 32px;
+  text-align: center;
+  font-size: 21px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+
+.height-btn:hover {
+  transform: translateY(-1px);
+  border-color: #b9f6ff;
+  box-shadow: inset 0 0 16px rgba(90, 215, 255, .62), 0 0 16px rgba(43, 174, 255, .45);
+}
+
+.height-btn:active {
+  transform: translateY(1px) scale(.98);
+}
+
+.height-btn.up {
+  color: #98f4ff;
+}
+
+.height-btn.down {
+  color: #c3d8ff;
+}
+
 .container{
   display: flex;
   width: 100%;
@@ -1581,6 +1722,8 @@ function createOrUpdateFlowArrowRoute (positions) {
     padding: 10px;
     position: relative;
     flex-grow: 1;
+    min-height: 0;
+    overflow: auto;
 
     // width: 100%;
     background-color: #0f327fa0;
@@ -1659,6 +1802,8 @@ function createOrUpdateFlowArrowRoute (positions) {
 .right{
   width: 400px;
   background: #0a2257;
+  overflow-y: auto;
+  overflow-x: hidden;
   .camera-box{
     margin: 10px 20px 10px 10px;
     width: 390px;
@@ -1732,25 +1877,88 @@ function createOrUpdateFlowArrowRoute (positions) {
 }
 //----------------------------------------------xtj
 .camera-info-container {
-  margin: 12px;
-  font-size: 13px;       /* 字体小一点 */
-  color: #f0f0f0;
+  margin: 14px 16px;
+  padding: 12px;
+  color: #ecfbff;
+  border: 1px solid rgba(65, 183, 255, .42);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(0, 229, 255, .16), transparent 32%),
+    linear-gradient(180deg, rgba(7, 45, 104, .86), rgba(4, 23, 65, .92));
+  box-shadow: inset 0 0 20px rgba(23, 132, 255, .16), 0 10px 26px rgba(0, 0, 0, .22);
 }
 
 .info-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.info-title span {
+  position: relative;
+  padding-left: 12px;
+}
+
+.info-title span::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 16px;
+  transform: translateY(-50%);
+  border-radius: 4px;
+  background: #32d9ff;
+  box-shadow: 0 0 10px rgba(50, 217, 255, .8);
+}
+
+.info-title em {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(94, 220, 255, .45);
+  background: rgba(33, 124, 211, .2);
+  color: #aeefff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
 }
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* 两列 */
-  gap: 4px 12px;  /* 行间距4px，列间距12px */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
 }
 
-.info-item span {
-  color: #9ecbff;        /* 值用浅蓝色突出 */
+.info-card {
+  min-height: 44px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(75, 164, 255, .26);
+  background: rgba(4, 23, 59, .48);
+  box-shadow: inset 0 0 12px rgba(45, 158, 255, .08);
+}
+
+.info-card.wide {
+  grid-column: span 2;
+}
+
+.info-card label {
+  display: block;
+  margin-bottom: 4px;
+  color: rgba(212, 236, 255, .68);
+  font-size: 12px;
+}
+
+.info-card span {
+  color: #72ecff;
+  font-family: DIN Alternate, Bahnschrift, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+  word-break: break-all;
 }
 
 .full-span {

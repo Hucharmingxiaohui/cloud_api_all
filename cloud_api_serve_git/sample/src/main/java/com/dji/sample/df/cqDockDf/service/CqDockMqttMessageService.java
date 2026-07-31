@@ -3,6 +3,7 @@ package com.dji.sample.df.cqDockDf.service;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -11,6 +12,9 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class CqDockMqttMessageService {
+
+    @Autowired
+    private CqDockPictureReportService cqDockPictureReportService;
 
     public void handleDroneOsd(String topic, String payload) {
         JSONObject json = parse(payload);
@@ -82,6 +86,7 @@ public class CqDockMqttMessageService {
                 json.getString("pictureUrl"),
                 json.getString("totalNum"));
         log.info("[cq-dock][push/picture] full payload={}", payload);
+        cqDockPictureReportService.saveMqttPicture(topic, json);
     }
 
     private JSONObject parse(String payload) {

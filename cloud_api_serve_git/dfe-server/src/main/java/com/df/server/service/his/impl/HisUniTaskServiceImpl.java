@@ -650,7 +650,7 @@ public class HisUniTaskServiceImpl implements HisUniTaskService {
             //如果是声音或者红外,用默认图片
             wordImageSource = defaultImage;
         }
-        //TODO 20240514 PSC 图片路径修改后，取出图片
+        // 20240514 PSC 图片路径修改后，取出图片
 //        String wordImageSource = String.format("%s/%s", fileConfig.getFileSavePath(), wordImageSource);
         wordImageSource = processFiles(wordImageSource, fileConfig);
         try {
@@ -689,11 +689,11 @@ public class HisUniTaskServiceImpl implements HisUniTaskService {
             relativePathPic = defaultImage;
         }
         //最后准备复制的图片最终路径
-        //Todo 保留原先 2024/05/14 psc,多硬盘检查文件
+        // 保留原先 2024/05/14 psc,多硬盘检查文件
 //        String sourceImageFullPath = String.format("%s/%s", fileConfig.getFileSavePath(), relativePathPic);
         String sourceImageFullPath = processFiles(relativePathPic, fileConfig);
 
-//        // todo 如果要导出的文件类型是excel，额外增加excel图片的地址解析
+//        //  如果要导出的文件类型是excel，额外增加excel图片的地址解析
 //        if ("2".equals(fileType)) {
 //            ret.setExcelPicUrl(this.imgFormatting(sourceImageFullPath, 95, 53));
 //        }
@@ -739,7 +739,7 @@ public class HisUniTaskServiceImpl implements HisUniTaskService {
         if (isRedPic) {
             String wordImageOtherSource = StringUtils.isBlank(file_path_other_press) ? file_path_other : file_path_other_press;
             wordImageOtherSource = StringUtils.isBlank(wordImageOtherSource) ? defaultImage : wordImageOtherSource;
-            //todo psc 20240514 多硬盘检查文件
+            // psc 20240514 多硬盘检查文件
 //            wordImageOtherSource = String.format("%s/%s", fileConfig.getFileSavePath(), wordImageOtherSource);
             wordImageOtherSource = processFiles(wordImageOtherSource, fileConfig);
             try {
@@ -768,7 +768,7 @@ public class HisUniTaskServiceImpl implements HisUniTaskService {
 
             String picOtherPress = StringUtils.isBlank(file_path_other) ? defaultImage : file_path_other;
             //最后准备复制的图片最终路径
-            //todo psc 20240514 多硬盘检查文件
+            // psc 20240514 多硬盘检查文件
 //            String picOtherPressFullPath = String.format("%s/%s", fileConfig.getFileSavePath(), picOtherPress);
             String picOtherPressFullPath = processFiles(picOtherPress, fileConfig);
             /*3、将images图片复制准备压缩*/

@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.File;
 
 /**
- * FTP工具类 todo 2022.8.24 ftp 修改为资源池方式
+ * FTP工具类 2022.8.24 ftp 修改为资源池方式
  */
 @Slf4j
 public class FtpUtils {

@@ -23,4 +23,6 @@ public class CqDockProperties {
     private String pictureListPath = "/machineNest/noauth/third/picture/list";
 
     private String taskStatusPath = "/machineNest/noauth/third/task/status";
+
+    private String pictureLocalPath = "D:/Temp/eua-picture";
 }

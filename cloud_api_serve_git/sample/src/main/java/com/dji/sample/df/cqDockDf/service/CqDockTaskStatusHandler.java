@@ -34,6 +34,8 @@ public class CqDockTaskStatusHandler {
     @Autowired
     private CqDockApiService cqDockApiService;
     @Autowired
+    private CqDockPictureReportService cqDockPictureReportService;
+    @Autowired
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
@@ -99,6 +101,11 @@ public class CqDockTaskStatusHandler {
             redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
 
             if (isTerminalEuaStatus(euaStatus)) {
+                if ("7".equals(euaStatus)) {
+                    // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
+//                  todo 后续需让EUA平台规定7为图片上传结束标志
+                    cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
+                }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);
                 log.info("EUA任务已结束，停止状态监控: taskCode={}, euaTaskId={}, euaStatus={}, state={}",
@@ -148,8 +155,11 @@ public class CqDockTaskStatusHandler {
         if ("0".equals(value)) {
             return "5";
         }
-        if ("1".equals(value)) {
+        if ("7".equals(value)) {
             return "1";
+        }
+        if ("1".equals(value)) {
+            return "2";
         }
         if ("2".equals(value)) {
             return "2";
@@ -174,7 +184,7 @@ public class CqDockTaskStatusHandler {
             return false;
         }
         String value = status.trim();
-        return "1".equals(value) || "3".equals(value) || "6".equals(value);
+        return "7".equals(value) || "3".equals(value) || "6".equals(value);
     }
 
     private void sendTaskStatus(String taskCode, String taskName, String euaTaskId, String mappedState,
@@ -197,9 +207,14 @@ public class CqDockTaskStatusHandler {
         commandData.setSendCode(centerConfig.getStationCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
-        patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
-        log.info("上报EUA任务状态: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
-                taskCode, euaTaskId, euaStatus, mappedState, progress);
+        boolean sendSuccess = patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
+        if (sendSuccess) {
+            log.info("上报EUA任务状态成功: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
+                    taskCode, euaTaskId, euaStatus, mappedState, progress);
+        } else {
+            log.warn("上报EUA任务状态失败，TCP可能未连接: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
+                    taskCode, euaTaskId, euaStatus, mappedState, progress);
+        }
     }
 
     private String buildDescription(String mappedState, int progress, String euaStatus) {

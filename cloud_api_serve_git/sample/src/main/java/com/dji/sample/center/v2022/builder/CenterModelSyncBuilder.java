@@ -140,7 +140,7 @@ public class CenterModelSyncBuilder {
                         item.setMeter_type("");
                         //无人机点位外观类型，暂时设置为空
                         item.setAppearance_type("");
-                        //现场不需要分析，暂时设置为空  todo 需要确认一下
+                        //现场不需要分析，暂时设置为空 , 需要确认一下
                         item.setRecognition_type_list("");
                         item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
                         item.setDevice_info("");

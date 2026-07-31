@@ -171,28 +171,24 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import OutdoorRenderer from './OutdoorRenderer.vue'
 import { CloudRendererClient } from './cloudRendererClient'
-import { getCloudRendererConfig, isCloudRendererEnabled } from './cloudRendererConfig'
+import { isCloudRendererEnabled } from './cloudRendererConfig'
 import {
   clearCloudWaylineEditDraft,
   readCloudWaylineEditDraft,
   type CloudWaylineDraft
 } from './cloudWaylineMapper'
-import { importSubKmzFile, overwriteWaylineFile } from '/@/api/wayline'
-import { getPlatformInfo } from '/@/api/manage'
-import { ELocalStorageKey } from '/@/types'
+import {
+  buildAndDownloadWaylineKmz,
+  normalizeCaptureMode,
+  normalizeHeading,
+  normalizeRouteName,
+  validateWaypoints,
+  type CaptureMode,
+  type CloudKmzWaypoint,
+  type WaypointCamera
+} from './cloudWaylineKmz'
 
-type CaptureMode = 'none' | 'visable' | 'ir' | 'visable,ir'
-interface WaypointCamera { heading: number; pitch: number; roll: number; focalLength: number }
-interface Waypoint {
-  point_name: string
-  longitude: number
-  latitude: number
-  height: number
-  capture_mode: CaptureMode
-  speed: number
-  headingTrue: number
-  camera_params: WaypointCamera
-}
+type Waypoint = CloudKmzWaypoint
 interface WaylineState { routeName: string; selectedIndex: number; waypoints: Waypoint[] }
 
 const router = useRouter()
@@ -424,7 +420,7 @@ async function clearWaypoints () {
   }
 }
 function isSameRouteName (a: string, b: string) {
-  return sanitizeFileName(a) === sanitizeFileName(b)
+  return normalizeRouteName(a).replace(/[\\/:*?"<>|\s_]+/g, '-') === normalizeRouteName(b).replace(/[\\/:*?"<>|\s_]+/g, '-')
 }
 
 /** 编辑保存：覆盖原航线 / 另存新名称 / 取消 */
@@ -475,21 +471,6 @@ async function resolveSaveRouteName (currentName: string): Promise<string | null
   }
 }
 
-async function importKmzBlob (workspaceId: string, blob: Blob, fileName: string, overwriteWaylineId?: string) {
-  const fileData = new FormData()
-  fileData.append('file', new File([blob], fileName, { type: 'application/vnd.google-earth.kmz' }))
-  const importRes = overwriteWaylineId
-    ? await overwriteWaylineFile(workspaceId, overwriteWaylineId, fileData)
-    : await importSubKmzFile(workspaceId, fileData)
-  if (importRes?.code !== 0) {
-    const msg = String(importRes?.message || '航线导入失败')
-    if (/already exists|已存在|filename/i.test(msg)) {
-      throw new Error('航线名称已存在，请更换名称后重试')
-    }
-    throw new Error(msg)
-  }
-}
-
 async function buildKmz () {
   const error = validateWaypoints(waylineState.waypoints)
   if (error) return ElMessage.error(error)
@@ -511,46 +492,21 @@ async function buildKmz () {
   kmzController?.abort()
   kmzController = new AbortController()
   try {
-    const config = getCloudRendererConfig()
-    const response = await fetch(new URL('/api/wayline/build-kmz', config.baseURL).toString(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/vnd.google-earth.kmz' },
-      body: JSON.stringify(buildWaylineRequest(routeName, waylineState.waypoints)),
+    await buildAndDownloadWaylineKmz({
+      routeName,
+      waypoints: waylineState.waypoints,
+      overwriteWaylineId: overwriteId || undefined,
       signal: kmzController.signal
     })
-    if (!response.ok) throw new Error(await response.text() || `服务返回 ${response.status}`)
-    const contentType = response.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const payload = await response.json().catch(() => null)
-      throw new Error(payload?.message || payload?.error || '云渲染服务未返回 KMZ 文件')
-    }
-    const blob = await response.blob()
-    if (!blob.size) throw new Error('云渲染服务返回了空的 KMZ 文件')
-    const fileName = `${sanitizeFileName(routeName)}.kmz`
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = fileName
-    anchor.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-
-    try {
-      const workspaceId = await resolveWorkspaceId()
-      await importKmzBlob(workspaceId, blob, fileName, overwriteId || undefined)
-      if (overwriteId) {
+    if (overwriteId) {
+      editMeta.originalRouteName = normalizeRouteName(routeName)
+      ElMessage.success('已覆盖当前航线并导入成功')
+    } else {
+      if (editMeta.mode === 'edit' && !isSameRouteName(routeName, editMeta.originalRouteName)) {
+        editMeta.waylineId = ''
         editMeta.originalRouteName = normalizeRouteName(routeName)
-        ElMessage.success('已覆盖当前航线并导入成功')
-      } else {
-        // 另存成功后，后续同名再存按新航线处理（无原 id 可覆盖）
-        if (editMeta.mode === 'edit' && !isSameRouteName(routeName, editMeta.originalRouteName)) {
-          editMeta.waylineId = ''
-          editMeta.originalRouteName = normalizeRouteName(routeName)
-        }
-        ElMessage.success('KMZ 航线已生成、下载并导入成功')
       }
-    } catch (importError) {
-      const msg = importError instanceof Error ? importError.message : '航线导入失败'
-      ElMessage.warning(`KMZ 已下载到本地，但导入航线库失败：${msg}`)
+      ElMessage.success('KMZ 航线已生成、下载并导入成功')
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return
@@ -558,21 +514,6 @@ async function buildKmz () {
   } finally {
     buildingKmz.value = false
     kmzController = null
-  }
-}
-async function resolveWorkspaceId () {
-  const storedWorkspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)?.trim()
-  if (storedWorkspaceId) return storedWorkspaceId
-
-  try {
-    const platformInfo = await getPlatformInfo()
-    const workspaceId = String(platformInfo?.data?.workspace_id || (platformInfo as any)?.workspace_id || '').trim()
-    if (!workspaceId) throw new Error('未获取到工作空间，请重新登录后再试')
-    localStorage.setItem(ELocalStorageKey.WorkspaceId, workspaceId)
-    return workspaceId
-  } catch (error: any) {
-    if (error?.response?.status === 401) throw new Error('登录已过期，请重新登录后再导入航线')
-    throw new Error(error instanceof Error ? error.message : '获取工作空间失败，请重新登录')
   }
 }
 function normalizeWaylineState (value: unknown): WaylineState | null {
@@ -611,86 +552,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
     waypoints
   }
 }
-function buildWaylineRequest (routeName: string, points: Waypoint[]) {
-  return {
-    routeName,
-    templateType: 'waypoint',
-    droneType: 100,
-    subDroneType: 1,
-    payloadType: 99,
-    payloadPosition: 0,
-    finishAction: 'goHome',
-    exitOnRcLostAction: 'goBack',
-    globalHeight: Number(points[0].height || 80),
-    takeOffSecurityHeight: 20,
-    globalRTHHeight: 100,
-    globalTransitionalSpeed: 10,
-    autoFlightSpeed: 5,
-    imageFormat: 'visable',
-    gimbalPitchMode: 'usePointSetting',
-    waypointHeadingReq: { waypointHeadingMode: 'fixed', waypointHeadingAngle: 0 },
-    waypointTurnReq: { waypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', useStraightLine: 1 },
-    startActionList: [],
-    routePointList: points.map((point, index) => {
-      // 统一真实偏航：优先 camera_params.heading
-      const heading = unifyHeading(point)
-      const actions: Record<string, unknown>[] = [{ actionIndex: 0, aircraftHeading: heading, aircraftPathMode: 'counterClockwise' }]
-      if (point.capture_mode !== 'none') {
-        actions.push({
-          actionIndex: 1,
-          takePhotoType: 2,
-          useGlobalImageFormat: 0,
-          imageFormat: point.capture_mode,
-          orientedPhotoMode: 'normalPhoto',
-          focalLength: Number(point.camera_params.focalLength || 75),
-          gimbalYawRotateAngle: heading,
-          gimbalPitchRotateAngle: Number(point.camera_params.pitch ?? -45),
-          imageWidth: 960,
-          imageHeight: 720,
-          orientedCameraApertue: 440,
-          orientedCameraLuminance: 3800,
-          orientedCameraShutterTime: 0.003,
-          orientedCameraISO: 100,
-          AFPos: 159,
-          focusX: 480,
-          focusY: 360,
-          focusRegionWidth: 480,
-          focusRegionHeight: 360,
-          orientedFileSuffix: point.point_name || `WP_${index + 1}`
-        })
-      }
-      return {
-        routePointIndex: index,
-        longitude: Number(point.longitude),
-        latitude: Number(point.latitude),
-        height: Number(point.height),
-        speed: Number(point.speed || 5),
-        gimbalPitchAngle: 0,
-        waypointHeadingReq: { waypointHeadingMode: 'fixed', waypointHeadingAngle: heading },
-        waypointTurnReq: { waypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', useStraightLine: 1 },
-        actions
-      }
-    })
-  }
-}
-function validateWaypoints (points: Waypoint[]) {
-  if (!points.length) return '请至少添加一个航点'
-  if (points.length > 2000) return '航点数量不能超过 2000'
-  for (let index = 0; index < points.length; index += 1) {
-    const point = points[index]
-    if (!Number.isFinite(Number(point.longitude)) || point.longitude < -180 || point.longitude > 180) return `航点 ${index + 1} 经度无效`
-    if (!Number.isFinite(Number(point.latitude)) || point.latitude < -90 || point.latitude > 90) return `航点 ${index + 1} 纬度无效`
-    if (!Number.isFinite(Number(point.height))) return `航点 ${index + 1} 高度无效`
-    if (!Number.isFinite(Number(point.speed)) || point.speed <= 0) return `航点 ${index + 1} 速度无效`
-    if (!Number.isFinite(Number(point.camera_params?.heading))) return `航点 ${index + 1} 缺少偏航角`
-    if (point.capture_mode !== 'none' && (!Number.isFinite(Number(point.camera_params.focalLength)) || point.camera_params.focalLength <= 0)) return `航点 ${index + 1} 焦距无效`
-  }
-  return ''
-}
-function normalizeHeading (value: number) { return Math.min(((Number(value) % 360) + 360) % 360, 359) }
 function captureModeLabel (mode: CaptureMode) { return ({ none: '过渡点', visable: '可见光', ir: '红外', 'visable,ir': '可见光 + 红外' } as Record<CaptureMode, string>)[mode] || '可见光' }
-function sanitizeFileName (name: string) { return name.replace(/[\\/:*?"<>|\s_]+/g, '-') || 'wayline' }
-function normalizeRouteName (name: string) { return String(name).replace(/_/g, '-') }
 function formatCoordinate (value: number) { return Number(value).toFixed(6) }
 function formatNumber (value: number, precision: number) { return Number(value).toFixed(precision) }
 function formatDate (date: Date) {
