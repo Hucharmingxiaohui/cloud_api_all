@@ -63,25 +63,24 @@ public class DeviceLiveStartTimer {
                     startLiveWithRecovery(liveTypeDTO, "机巢", device.getDeviceSn());
                 }
                 if (StringUtils.hasText(device.getChildDeviceSn())) {
-                DeviceDTO child = device.getChildren();
-                if (child != null && Boolean.TRUE.equals(child.getStatus()) && StringUtils.hasText(child.getDeviceSn())) {
-                    log.info("开启无人机直播---");
-//                  开启无人机直播
-                    LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                    liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
-                    VideoId videoId = new VideoId();
-                    videoId.setDroneSn(child.getDeviceSn());
-                    PayloadIndex payloadIndex = new PayloadIndex();
-                    payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
-                    payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
-                    payloadIndex.setPosition(PayloadPositionEnum.FRONT_LEFT);
-                    videoId.setPayloadIndex(payloadIndex);
-                    videoId.setVideoType(VideoTypeEnum.NORMAL);
-                    liveTypeDTO.setVideoId(videoId);
-                    liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
-                    startLiveWithRecovery(liveTypeDTO, "无人机", device.getChildDeviceSn());
-                }
-                    HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
+                    DeviceDTO child = device.getChildren();
+                    if (child != null && Boolean.TRUE.equals(child.getStatus()) && StringUtils.hasText(child.getDeviceSn())) {
+                        log.info("开启无人机直播---");
+//                      开启无人机直播
+                        LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
+                        liveTypeDTO.setUrlType(UrlTypeEnum.RTMP);
+                        VideoId videoId = new VideoId();
+                        videoId.setDroneSn(child.getDeviceSn());
+                        PayloadIndex payloadIndex = new PayloadIndex();
+                        payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
+                        payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
+                        payloadIndex.setPosition(PayloadPositionEnum.FRONT_LEFT);
+                        videoId.setPayloadIndex(payloadIndex);
+                        videoId.setVideoType(VideoTypeEnum.NORMAL);
+                        liveTypeDTO.setVideoId(videoId);
+                        liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
+                        startLiveWithRecovery(liveTypeDTO, "无人机", device.getChildDeviceSn());
+                    }
                 }
 
             }
