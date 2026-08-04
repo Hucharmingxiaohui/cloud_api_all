@@ -8,21 +8,17 @@
     <select id="selectListByMap" resultType="com.dji.sample.df.solar.model.entity.SolarPanel">
         SELECT * FROM manage_solar_panel
         <where>
-            <if test="solarPanelName!=null and solarPanelName!=''">
-                and solar_panel_name LIKE concat('%', #{solarPanelName},'%')
+            <if test="solarPanelName != null and solarPanelName != ''">
+                AND solar_panel_name LIKE concat('%', #{solarPanelName}, '%')
+            </if>
+            <if test="id != null and id != ''">
+                AND id = #{id}
+            </if>
+            <if test="orthophotoId != null and orthophotoId != ''">
+                AND orthophoto_id = #{orthophotoId}
             </if>
         </where>
-        <where>
-            <if test="id!=null and id!=''">
-                and id = #{id}
-            </if>
-        </where>
-        <where>
-            <if test="orthophotoId!=null and orthophotoId!=''">
-                and orthophoto_id = #{orthophotoId}
-            </if>
-        </where>
-        <if test="pageSize != null and pageSize != '' ">
+        <if test="pageSize != null and pageSize != '' and startPos != null">
             LIMIT ${startPos}, ${pageSize}
         </if>
     </select>
@@ -31,22 +27,15 @@
     <select id="selectListCount" resultType="int">
         SELECT count(*) FROM manage_solar_panel
         <where>
-            <if test="solarPanelName!=null and solarPanelName!=''">
-                and solar_panel_name LIKE concat('%', #{solarPanelName},'%')
+            <if test="solarPanelName != null and solarPanelName != ''">
+                AND solar_panel_name LIKE concat('%', #{solarPanelName}, '%')
+            </if>
+            <if test="id != null and id != ''">
+                AND id = #{id}
+            </if>
+            <if test="orthophotoId != null and orthophotoId != ''">
+                AND orthophoto_id = #{orthophotoId}
             </if>
         </where>
-        <where>
-            <if test="id!=null and id!=''">
-                and id = #{id}
-            </if>
-        </where>
-        <where>
-            <if test="orthophotoId!=null and orthophotoId!=''">
-                and orthophoto_id = #{orthophotoId}
-            </if>
-        </where>
-        <if test="pageSize != null and pageSize != '' ">
-            LIMIT ${startPos}, ${pageSize}
-        </if>
     </select>
 </mapper>

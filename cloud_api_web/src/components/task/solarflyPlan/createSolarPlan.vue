@@ -20,14 +20,35 @@
               <el-form-item label="计划名称：" required prop="name">
                 <el-input v-model="planBody.name" maxlength="50"></el-input>
               </el-form-item>
+              <el-form-item label="正射图：" required prop="orthophoto_id">
+                <el-select
+                  v-model="selectedOrthophotoId"
+                  placeholder="请选择正射图"
+                  @change="handleOrthophotoChange"
+                >
+                  <el-option
+                    v-for="item in orthophotoTable"
+                    :label="item.name"
+                    :value="item.id"
+                    :key="item.id"
+                  ></el-option>
+                </el-select>
+              </el-form-item>
               <el-form-item
                 label="光伏板区域："
                 required
                 prop="solar_panel_id"
               >
-                <el-select v-model="selectedSolarIds" multiple collapse-tags @change="handleSolarPanelChange">
+                <el-select
+                  v-model="selectedSolarIds"
+                  multiple
+                  collapse-tags
+                  :disabled="!selectedOrthophotoId"
+                  placeholder="请选择光伏板区域"
+                  @change="handleSolarPanelChange"
+                >
                   <el-option
-                    v-for="item in solarTable"
+                    v-for="item in filteredSolarTable"
                     :label="item.solar_panel_area_name"
                     :value="item.id"
                     :key="item.id"
@@ -315,11 +336,19 @@ const wayline = computed<WaylineFile>(() => {
 const dock = computed<Device>(() => {
   return store.state.dockInfo
 })
+const orthophotoTable = ref([]) // 正射图列表
 const solarTable = ref([]) // 光伏板区域列表
+const selectedOrthophotoId = ref('')
 const selectedImagePath = ref('') // 选中光伏板区域对应的正射图path
 const selectedDetectAreas = ref<any[]>([]) // 选中光伏板区域的检测区域（支持多选）
 const selectedSolarIds = ref<string[]>([]) // 选中的光伏板区域ID数组
 const waylineInfo = ref()
+const filteredSolarTable = computed(() => {
+  if (!selectedOrthophotoId.value) {
+    return []
+  }
+  return solarTable.value.filter((item: any) => item.orthophoto_id === selectedOrthophotoId.value)
+})
 
 interface AreaConfig {
   solar_panel_id: string
@@ -337,6 +366,7 @@ const areaConfigs = ref<AreaConfig[]>([])
 const planBody = reactive({
   plan_source: '系统创建',
   name: '',
+  orthophoto_id: '',
   file_id: computed(() => store?.state?.waylineInfo.id),
   dock_sn: computed(() => store?.state?.dockInfo.device_sn),
   workspace_id: localStorage.getItem(ELocalStorageKey.WorkspaceId)!,
@@ -409,6 +439,7 @@ const rules = {
   poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'change' }],
   fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
   solar_panel_id: [{ required: true, message: '请选择光伏板区域', trigger: 'blur' }],
+  orthophoto_id: [{ required: true, message: '请选择正射图', trigger: 'change' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
     { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'blur' }
@@ -449,8 +480,26 @@ const rules = {
 }
 
 onMounted(async () => {
+  await getOrthophoto()
   getSolarPanel()
 })
+
+async function getOrthophoto () {
+  try {
+    const res = await getOrthophotoListApi({
+      pageSize: 10000,
+      pageNo: 1,
+      name: '',
+      id: ''
+    })
+    if (res.code !== 0) {
+      return
+    }
+    orthophotoTable.value = res.data.list || []
+  } catch (error) {
+    console.error('加载正射图列表失败:', error)
+  }
+}
 
 /**
  * @description: 查询光伏板ID列表
@@ -462,12 +511,13 @@ function getSolarPanel () {
       pageSize: 10000,
       pageNo: 1,
       solar_panel_area_name: '',
-      id: ''
+      id: '',
+      orthophoto_id: ''
     }).then(res => {
       if (res.code !== 0) {
         return
       }
-      solarTable.value = res.data.list
+      solarTable.value = res.data.list || []
     })
   } catch (error) {
   }
@@ -584,6 +634,7 @@ function getSubmitPlanBody () {
     image_format: planBody.image_format,
     plan_id: solarCreatePlanId,
     planId: solarCreatePlanId,
+    orthophoto_id: planBody.orthophoto_id,
     area_configs: getAreaConfigPayload()
   }
 }
@@ -601,13 +652,26 @@ async function handleSolarPanelChange (ids: string[]) {
 
   selectedSolarIds.value = ids
   planBody.solar_panel_id = ids.join(',')
-  const items = solarTable.value.filter((item: any) => ids.includes(item.id))
+  const items = solarTable.value.filter((item: any) => ids.includes(item.id) && item.orthophoto_id === selectedOrthophotoId.value)
   syncAreaConfigs(items)
+  selectedDetectAreas.value = items
   if (items.length > 0) {
-    const path = await getOrthophotoPath(items[0].orthophoto_id)
-    selectedDetectAreas.value = items
-    selectedImagePath.value = path
+    selectedImagePath.value = await getOrthophotoPath(selectedOrthophotoId.value)
   }
+}
+
+async function handleOrthophotoChange (id: string) {
+  planBody.orthophoto_id = id
+  planBody.solar_panel_id = ''
+  selectedSolarIds.value = []
+  selectedDetectAreas.value = []
+  areaConfigs.value = []
+  waylineInfo.value = []
+  selectedImagePath.value = ''
+  if (!id) {
+    return
+  }
+  selectedImagePath.value = await getOrthophotoPath(id)
 }
 
 // 返回
@@ -632,7 +696,7 @@ async function handleNextStep () {
   try {
     // 只校验第一步的字段
     const valid = await valueRef.value.validateField([
-      'name', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
+      'name', 'orthophoto_id', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
     ])
     if (valid) {
       currentStep.value = 2

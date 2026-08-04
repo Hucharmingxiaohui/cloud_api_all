@@ -11,8 +11,6 @@
             <if test="name!=null and name!=''">
                 and name LIKE concat('%', #{name},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
             </if>
@@ -29,8 +27,6 @@
             <if test="name!=null and name!=''">
                 and name LIKE concat('%', #{name},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
             </if>

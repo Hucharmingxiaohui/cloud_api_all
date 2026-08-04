@@ -11,10 +11,11 @@
             <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
                 and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
+            </if>
+            <if test="orthophotoId!=null and orthophotoId!=''">
+                and orthophoto_id = #{orthophotoId}
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
@@ -29,10 +30,11 @@
             <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
                 and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
+            </if>
+            <if test="orthophotoId!=null and orthophotoId!=''">
+                and orthophoto_id = #{orthophotoId}
             </if>
         </where>
     </select>

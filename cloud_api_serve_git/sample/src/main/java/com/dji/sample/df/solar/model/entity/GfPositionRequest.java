@@ -17,13 +17,10 @@ public class GfPositionRequest {
     @JsonProperty("inspection_id")
     private String inspectionId;
 
+
+    @JsonProperty("orthophoto_id")
+    private String orthophotoId;
     private List<Image> images;
-
-    @JsonProperty("area_height")
-    private Double areaHeight;
-
-    @JsonProperty("panel_height")
-    private Double panelHeight;
 
     @Data
     @NoArgsConstructor
@@ -36,6 +33,12 @@ public class GfPositionRequest {
 
         @JsonProperty("image_name")
         private String imageName;
+
+        @JsonProperty("area_height")
+        private Double areaHeight;
+
+        @JsonProperty("panel_height")
+        private Double panelHeight;
 
         @JsonProperty("image_type")
         private String imageType;

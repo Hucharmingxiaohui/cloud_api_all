@@ -10,7 +10,7 @@
       <div v-if="selectedImage" class="image-wrapper">
         <img
           :src="selectedImage"
-          alt="光伏区正射图"
+          alt="正射图"
           @load="onImageLoad"
           @error="onImageError"
           ref="imageRef"
@@ -24,7 +24,7 @@
 
       <!-- 无图片提示 -->
       <div v-else class="no-image-tip">
-        <el-empty description="请选择光伏板区域以加载正射图" :image-size="150">
+        <el-empty description="请选择正射图以加载预览" :image-size="150">
           <template #image>
             <el-icon :size="150"><Picture /></el-icon>
           </template>
@@ -84,7 +84,7 @@ const CANVAS_HEIGHT = 750
 
 // 监听 props 变化
 watch(() => [props.imagePath, props.detectAreas, props.waylineInfo], async ([newPath, newAreas, newWayline]) => {
-  if (newPath && newAreas && Array.isArray(newAreas) && newAreas.length > 0) {
+  if (newPath) {
     await loadImage(newPath as string)
     // loadTestImage()
   } else {

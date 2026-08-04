@@ -1035,6 +1035,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         JSONArray areas = new JSONArray();
         SolarPanelArea firstSolarPanelArea = null;
         OrthophotoEntity orthophotoEntity = null;
+        String orthophotoId = pubWaylineJobPlanDfEntity.getOrthophotoId();
         PubWaylineJobPlanDfEntity.AreaConfig firstAreaConfig = null;
         int areaIndex = 0;
 //      遍历每个区域进行航线参数赋值
@@ -1050,7 +1051,12 @@ public class RoutePlanServiceImpl implements RoutePlanService {
 //          获取首个区域数据库参数
             if (firstSolarPanelArea == null) {
                 firstSolarPanelArea = solarPanelArea;
-                orthophotoEntity = orthophotoEntityMapper.selectById(solarPanelArea.getOrthophotoId());
+                if (orthophotoId != null && !orthophotoId.trim().isEmpty()) {
+                    orthophotoEntity = orthophotoEntityMapper.selectById(orthophotoId);
+                } else {
+                    orthophotoId = solarPanelArea.getOrthophotoId();
+                    orthophotoEntity = orthophotoEntityMapper.selectById(orthophotoId);
+                }
             }
 //          获取首个区域航线参数
             if(firstAreaConfig == null){
@@ -1175,7 +1181,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         }
 
         root.put("planId", pubWaylineJobPlanDfEntity.getPlanId());
-        root.put("orthophoto_id", firstSolarPanelArea.getOrthophotoId());
+        root.put("orthophoto_id", orthophotoId != null && !orthophotoId.trim().isEmpty() ? orthophotoId : firstSolarPanelArea.getOrthophotoId());
         root.put("orthophoto_name", orthophotoEntity != null ? orthophotoEntity.getName() : "");
         String jsonString = root.toString();
         log.info("调用光伏航线接口, 请求参数: {}", jsonString);

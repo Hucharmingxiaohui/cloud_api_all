@@ -317,7 +317,7 @@ public class SDKDeviceService extends AbstractDeviceService {
         long now = System.currentTimeMillis();
         Object lastLiveKeyValue = redisUtils.get(lastLiveKey);
         boolean shouldStartLive = true;
-        log.info("shouldStartLive---"+shouldStartLive);
+//        log.info("shouldStartLive---"+shouldStartLive);
         if (lastLiveKeyValue != null) {
             try {
                 String lastLiveTimeStr = lastLiveKeyValue.toString();

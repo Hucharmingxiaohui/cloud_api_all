@@ -173,17 +173,26 @@ public class FjReportController {
 //              传参赋值
                 List<DefectEntity> defectEntities = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>().eq(DefectEntity::getJobId, jobId));
                 List<GfPositionRequest.Image> images = gfReportService.producePositionParam(defectEntities);
-                gfPositionRequest.setImages(images);
                 String solarPanelId = pubWaylineJobPlanDfEntity.getSolarPanelId().split(",")[0];
                 SolarPanelArea solarPanelArea = solarPanelAreaMapper.selectOne(new LambdaQueryWrapper<SolarPanelArea>()
                         .eq(SolarPanelArea::getId, solarPanelId));
+                String orthophotoId = pubWaylineJobPlanDfEntity.getOrthophotoId();
+                if (orthophotoId == null || orthophotoId.trim().isEmpty()) {
+                    orthophotoId = solarPanelArea != null ? solarPanelArea.getOrthophotoId() : null;
+                }
+                if (solarPanelArea != null) {
+                    for (GfPositionRequest.Image image : images) {
+                        image.setAreaHeight(solarPanelArea.getAreaHeight());
+                        image.setPanelHeight(solarPanelArea.getPanelHeight());
+                    }
+                }
+                gfPositionRequest.setImages(images);
                 gfPositionRequest.setInspectionId(jobId);
-                gfPositionRequest.setAreaHeight(solarPanelArea.getAreaHeight());
-                gfPositionRequest.setPanelHeight(solarPanelArea.getPanelHeight());
+                gfPositionRequest.setOrthophotoId(orthophotoId);
                 log.info("gfPositionRequest---"+gfPositionRequest);
                 ObjectMapper objectMapper = new ObjectMapper();
                 String actualJson = objectMapper.writeValueAsString(gfPositionRequest);
-                System.out.println("真正的 JSON 是：" + actualJson);
+                System.out.println("gfPositionRequest真正的 JSON 是：" + actualJson);
 //              发送请求
                 GfPositionResponse gfPositionResponse = gfReportService.sendGfPositionRequest(gfPositionRequest);
                 gfReportService.processAndUptDefects(gfPositionResponse, jobId);

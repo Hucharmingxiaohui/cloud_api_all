@@ -322,27 +322,48 @@ public class GfReportServiceImpl implements GfReportService {
             return;
         }
         List<GfPositionResponse.ResultItem> results = response.getData().getResults();
+        if (results == null || results.isEmpty()) {
+            log.warn("光伏定位接口结果为空, jobId={}", jobId);
+            return;
+        }
         for (GfPositionResponse.ResultItem item : results) {
             DefectEntity defectEntity = defectEntityMapper.selectById(item.getDefectId());
-            if (defectEntity != null) {
+            if (defectEntity == null) {
+                log.warn("光伏定位结果未找到缺陷记录, jobId={}, defectId={}", jobId, item.getDefectId());
+                continue;
+            }
+            if (!Objects.equals(jobId, defectEntity.getJobId())) {
+                log.warn("光伏定位结果缺陷任务不匹配, jobId={}, defectId={}, defectJobId={}", jobId, item.getDefectId(), defectEntity.getJobId());
+                continue;
+            }
+            if (StringUtils.isNotEmpty(item.getSolarPanelName())) {
                 defectEntity.setSolarPanelName(item.getSolarPanelName());
-                if(item.getHasDefect()){
-                    List<GfPositionResponse.Defect> defects = item.getDefects();
-                    List<String> defectComponentNames =new ArrayList<>();
-                    List<String> defectTypes =new ArrayList<>();
+            }
+            if (Boolean.TRUE.equals(item.getHasDefect())) {
+                List<GfPositionResponse.Defect> defects = item.getDefects();
+                if (defects != null && !defects.isEmpty()) {
+                    List<String> defectComponentNames = new ArrayList<>();
+                    List<String> defectTypes = new ArrayList<>();
                     for (GfPositionResponse.Defect defect : defects) {
-                        defectComponentNames.add(defect.getSolarPanelComponentName());
-                        defectTypes.add(defect.getDefectType());
+                        if (StringUtils.isNotEmpty(defect.getSolarPanelComponentName())) {
+                            defectComponentNames.add(defect.getSolarPanelComponentName());
+                        }
+                        if (StringUtils.isNotEmpty(defect.getDefectType())) {
+                            defectTypes.add(defect.getDefectType());
+                        }
                     }
-                    if(defectEntity.getImageType()==1){
+                    if (defectEntity.getImageType() == 1 && !defectTypes.isEmpty()) {
                         defectEntity.setDefectType(defectTypes.toString());
                         defectEntity.setDefectDescription(defectTypes.toString());
                     }
-                    defectEntity.setDefectComponentName(defectComponentNames.toString());
-                    defectEntityMapper.updateById(defectEntity);
+                    if (!defectComponentNames.isEmpty()) {
+                        defectEntity.setDefectComponentName(defectComponentNames.toString());
+                    }
+                } else {
+                    log.warn("光伏定位结果标记有缺陷但缺陷明细为空, jobId={}, defectId={}", jobId, item.getDefectId());
                 }
-                defectEntityMapper.updateById(defectEntity);
             }
+            defectEntityMapper.updateById(defectEntity);
         }
         log.info("保存缺陷分布图--------");
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
