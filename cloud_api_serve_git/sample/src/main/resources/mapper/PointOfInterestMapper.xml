@@ -3,9 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.df.wind.dao.PointOfInterestMapper">
+<mapper namespace="com.dji.sample.df.pointOfInterestDf.dao.PointOfInterestMapper">
 
-    <select id="selectList" resultType="com.dji.sample.df.wind.model.entity.PointOfInterest">
+    <select id="selectList" resultType="com.dji.sample.df.pointOfInterestDf.model.PointOfInterest">
         SELECT * FROM manage_point_of_interest
         <where>
             <if test="pointName!=null and pointName!=''">

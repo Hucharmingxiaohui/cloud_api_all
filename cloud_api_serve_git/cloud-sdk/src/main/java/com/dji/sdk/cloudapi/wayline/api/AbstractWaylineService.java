@@ -53,7 +53,7 @@ public abstract class AbstractWaylineService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_FLIGHTTASK_PROGRESS, outputChannel = ChannelName.OUTBOUND_EVENTS)
     public TopicEventsResponse<MqttReply> flighttaskProgress(TopicEventsRequest<EventsDataRequest<FlighttaskProgress>> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("flighttaskProgress not implemented");
+        return new TopicEventsResponse<>();
     }
 
 //  空中航线mqtt接收
@@ -70,7 +70,7 @@ public abstract class AbstractWaylineService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_EVENTS_FLIGHTTASK_READY, outputChannel = ChannelName.OUTBOUND_EVENTS)
     public TopicEventsResponse<MqttReply> flighttaskReady(TopicEventsRequest<FlighttaskReady> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("flighttaskReady not implemented");
+        return new TopicEventsResponse<>();
     }
 
     /**
@@ -184,7 +184,7 @@ public abstract class AbstractWaylineService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_FLIGHTTASK_RESOURCE_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
     public TopicRequestsResponse<MqttReply<FlighttaskResourceGetResponse>> flighttaskResourceGet(TopicRequestsRequest<FlighttaskResourceGetRequest> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("flighttaskResourceGet not implemented");
+        return new TopicRequestsResponse<>();
     }
 
     /**

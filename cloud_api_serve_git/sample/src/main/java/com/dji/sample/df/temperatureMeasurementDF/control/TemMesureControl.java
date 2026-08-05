@@ -1,0 +1,32 @@
+package com.dji.sample.df.temperatureMeasurementDF.control;
+
+import com.dji.sample.df.temperatureMeasurementDF.modol.TemParamEntity;
+import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
+import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
+import com.dji.sdk.common.HttpResultResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("tem/api/v1/workspace")
+public class TemMesureControl {
+    @Autowired
+    private TemMeasureService temMeasureService;
+    private final Object lock=new Object();
+    @PostMapping("/getTemByWorkSpaceIdAndFileId")
+    public HttpResultResponse getTemByWorkSpaceIdAndFileId(@RequestParam String workspace_id, @RequestParam String file_id,@RequestBody TemParamEntity temParamEntity){
+        synchronized (lock){
+            TemResultEntity temResultEntity= temMeasureService.getTemByWorkSpaceIdAndFileId(workspace_id, file_id, temParamEntity);
+            return HttpResultResponse.success(temResultEntity);
+        }
+
+    }
+//  红外照片绑定点位和标定接口
+    @PostMapping("/bindPoint")
+    public HttpResultResponse bindPoint(@RequestBody TemParamEntity temParamEntity){
+
+        boolean b = temMeasureService.bindPoint(temParamEntity);
+        return HttpResultResponse.success(b);
+    }
+
+}

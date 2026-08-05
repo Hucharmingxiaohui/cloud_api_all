@@ -3,7 +3,7 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.center.dao.UniPointMapper2">
+<mapper namespace="com.dji.sample.df.substationDf.dao.UniPointMapper2">
 
     <select id="selectListByMap" resultType="com.dji.sample.center.entity.UniPoint">
         SELECT * FROM df_uni_point

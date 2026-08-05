@@ -15,7 +15,7 @@ import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskPictureEntity;
 import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
-import com.dji.sample.df.wind.utils.FileNameUtils;
+import com.dji.sample.df.windDf.utils.FileNameUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

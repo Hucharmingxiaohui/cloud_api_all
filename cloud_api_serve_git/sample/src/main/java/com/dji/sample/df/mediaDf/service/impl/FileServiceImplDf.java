@@ -9,7 +9,7 @@ import com.df.server.entity.uni.UniPointEntity;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
-import com.dji.sample.df.TemperatureMeasurementDF.service.IFileServiceDF;
+import com.dji.sample.df.temperatureMeasurementDF.service.IFileServiceDF;
 import com.dji.sample.df.commonDf.util.DeleteFile;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
@@ -24,9 +24,9 @@ import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointCount.PointCount;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
 import com.dji.sample.df.thirdKmzDf.service.WaylineKmzThirdService;
-import com.dji.sample.df.wind.dao.FanWaylinePointsMapper;
-import com.dji.sample.df.wind.model.entity.FanWaylinePoints;
-import com.dji.sample.df.wind.service.FjReportService;
+import com.dji.sample.df.windDf.dao.FanWaylinePointsMapper;
+import com.dji.sample.df.windDf.model.entity.FanWaylinePoints;
+import com.dji.sample.df.uavCommonHandleDf.service.uavReportService;
 import com.dji.sample.manage.model.dto.DeviceDictionaryDTO;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
@@ -94,7 +94,7 @@ public class FileServiceImplDf implements IFileServiceDf {
     @Autowired
     IFileMapperDf iFileMapperDf;
     @Autowired
-    private FjReportService fjReportService;
+    private uavReportService uavReportService;
 
 
     private Optional<MediaFileEntity> getMediaByFingerprint(String workspaceId, String fingerprint) {
@@ -390,7 +390,7 @@ public class FileServiceImplDf implements IFileServiceDf {
                                 eq(MediaFileEntity::getJobId, job_id).orderByAsc(MediaFileEntity::getId));
                     }
 
-                    List<String> fileNames = fjReportService.generateFjFileNames(mediaFileEntities, jsonArray);
+                    List<String> fileNames = uavReportService.generateFjFileNames(mediaFileEntities, jsonArray);
 
                     if (fileNames.size() == mediaFileDTOList.size()) {
                         for (int i = 0; i < mediaFileDTOList.size(); i++) {

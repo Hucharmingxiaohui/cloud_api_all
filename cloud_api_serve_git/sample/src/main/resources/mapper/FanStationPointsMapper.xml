@@ -3,9 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.df.wind.dao.FanStationPointsMapper">
+<mapper namespace="com.dji.sample.df.windDf.dao.FanStationPointsMapper">
 
-    <select id="selectListById" resultType="com.dji.sample.df.wind.model.entity.FanStationPoints">
+    <select id="selectListById" resultType="com.dji.sample.df.windDf.model.entity.FanStationPoints">
         SELECT * FROM fan_station_points
         <where>
             <if test="id!=null and id!=''">

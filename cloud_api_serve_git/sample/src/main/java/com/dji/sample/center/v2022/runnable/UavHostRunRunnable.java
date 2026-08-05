@@ -7,7 +7,7 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostRunDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.common.util.SpringBeanUtilsTest;
-import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.service.IDeviceRedisService;

@@ -9,7 +9,7 @@ import com.dji.sample.control.model.param.*;
 import com.dji.sample.control.service.IControlService;
 import com.dji.sample.control.service.IControlService2;
 import com.dji.sample.df.importKmzNoValiDf.service.ImportKmzNoValiService;
-import com.dji.sample.df.wind.service.WindTurbineService;
+import com.dji.sample.df.windDf.service.WindTurbineService;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.dao.IWorkspaceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
@@ -35,7 +35,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-import static com.dji.sample.df.wind.utils.FileUtil.convert;
+import static com.dji.sample.df.windDf.utils.FileUtil.convert;
 
 /**
  * @author sean

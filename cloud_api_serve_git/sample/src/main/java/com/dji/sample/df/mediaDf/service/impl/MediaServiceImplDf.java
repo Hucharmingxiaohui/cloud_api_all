@@ -1,6 +1,6 @@
 package com.dji.sample.df.mediaDf.service.impl;
 
-import com.dji.sample.df.TemperatureMeasurementDF.service.IFileServiceDF;
+import com.dji.sample.df.temperatureMeasurementDF.service.IFileServiceDF;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;

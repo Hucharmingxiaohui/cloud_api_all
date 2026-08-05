@@ -15,10 +15,10 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.manageDf.dao.IUniTaskPlanMapper;
 import com.dji.sample.df.manageDf.model.entity.UniTaskPlanEntity;
-import com.dji.sample.df.uavHandlerDf.CenterTaskHandler;
-import com.dji.sample.df.uavHandlerDf.CenterTaskHandler.TaskExecutionResult;
-import com.dji.sample.df.wind.dao.WindTurbineMapper;
-import com.dji.sample.df.wind.model.entity.WindTurbine;
+import com.dji.sample.df.uavCommonHandleDf.handler.CenterTaskHandler;
+import com.dji.sample.df.uavCommonHandleDf.handler.CenterTaskHandler.TaskExecutionResult;
+import com.dji.sample.df.windDf.dao.WindTurbineMapper;
+import com.dji.sample.df.windDf.model.entity.WindTurbine;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
