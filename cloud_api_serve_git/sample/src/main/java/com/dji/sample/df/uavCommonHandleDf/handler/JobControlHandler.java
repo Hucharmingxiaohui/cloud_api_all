@@ -199,9 +199,9 @@ public class JobControlHandler {
      * 任务状态为已完成（status==3）时，根据上传进度和计划类型执行后续处理
      */
     private void handleUploadProgress(String jobId, String taskCode, String taskName, WaylineJobEntity waylineJobEntity, WaylineJobDTO waylineJobDTO, String isCenterTask) throws Exception {
-        log.info("图片上传数为"+waylineJobDTO.getUploadedCount()+"总数为"+waylineJobDTO.getMediaCount());
-        int uploaded = waylineJobDTO.getUploadedCount();
-        int total = waylineJobDTO.getMediaCount();
+        int uploaded = normalizeUploadCount(waylineJobDTO.getUploadedCount());
+        int total = normalizeUploadCount(waylineJobDTO.getMediaCount());
+        log.info("图片上传数为{}总数为{}", uploaded, total);
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
@@ -218,6 +218,11 @@ public class JobControlHandler {
             }
         }
     }
+
+    static int normalizeUploadCount(Integer count) {
+        return count == null ? 0 : count;
+    }
+
 
     /**
      * 上传数已达到总数（uploaded == total）时，按计划类型执行分析/上报并停止监控

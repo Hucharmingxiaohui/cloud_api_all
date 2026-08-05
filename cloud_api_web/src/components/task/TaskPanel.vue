@@ -21,6 +21,20 @@
             <el-option value="1" label="定时执行"></el-option>
           </el-select>
         </el-form-item>
+        <el-form-item label="任务类型:">
+          <el-select
+            v-model="queryForm.planType"
+            placeholder="请选择任务类型"
+            :teleported="false"
+            class="select-operation"
+          >
+            <el-option value="0" label="点位航线计划"></el-option>
+            <el-option value="3" label="普通航线计划"></el-option>
+            <el-option value="4" label="光伏板计划"></el-option>
+            <el-option value="1" label="风机计划"></el-option>
+            <el-option value="2" label="兴趣点环绕计划"></el-option>
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <!-- 查询按钮 -->
           <el-button
@@ -314,6 +328,7 @@ let analysisTimer: number | null = null // 定时器引用
 const queryForm = reactive({
   name: '', // 任务名称
   taskType: '', // 计划类型 执行方式：0立即1定时
+  planType: '' // 任务类型：0点位航线 1风机 2兴趣点环绕 3普通航线 4光伏
 })
 
 const taskTypeLabels = {
@@ -454,6 +469,7 @@ function getPlans () {
 function reset () {
   queryForm.name = ''
   queryForm.taskType = ''
+  queryForm.planType = ''
   getPlans()
 }
 // ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------

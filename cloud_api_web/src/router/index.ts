@@ -142,7 +142,7 @@ const routes: Array<RouteRecordRaw> = [
                 name: 'solarDeviceMgt',
                 component: () => import('/@/components/variableMgt/solarMgt/solarDeviceMgt/index.vue'),
                 meta: {
-                  showInMenu: true,
+                  showInMenu: false,
                   label: '光伏板设备管理',
                   cache: true
                 }

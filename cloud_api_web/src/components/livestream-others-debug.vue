@@ -3,7 +3,7 @@
   <div style="position: relative; width: 100%; height: 100%;">
     <video id="videoElement" autoplay controls :style="{ width: '100%', height: '100%' }"></video>
     <div style="position: absolute; left: 10px; top: 10px;">
-      <el-select v-model="lensSelected" placeholder="镜头切换" size="large" class="select-operation" :teleported='false' @change="onSwitch">
+      <el-select v-model="lensSelected" placeholder="镜头切换" size="large" class="select-operation" :teleported='false' :disabled="!!liveError || liveLoading || !isStartSteam" @change="onSwitch">
         <el-option v-for="item in lensOption" :key="item.value" :label="item.label" :value="item.value" />
       </el-select>
     </div>
@@ -80,6 +80,8 @@ const isDockLive = ref(false)
 const nonSwitchable = 'normal'
 const webrtc: any = null
 const flvURL = ref()
+const liveError = ref('')
+const liveLoading = ref(false)
 
 cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
@@ -98,6 +100,7 @@ watch(() => props.sn, sn => {
   device_sn.value = sn
   isStartSteam.value = false
   isPlay.value = false
+  liveError.value = ''
   getcameraInfo()
 })
 
@@ -121,10 +124,8 @@ async function getcameraInfo () {
   cameraSelected.value = source.cameraIndex
   videoId.value = source.videoId
   flvURL.value = source.flvUrl
-  console.log('[drone-live] direct flv url', flvURL.value)
-  nextTick(() => {
-    initFlv()
-  })
+  liveError.value = ''
+  console.log('[drone-live] resolved flv url', flvURL.value)
   getLiveHttp()
 }
 
@@ -134,46 +135,49 @@ async function getcameraInfo () {
 async function getLiveHttp () {
   try {
     if (!videoId.value || !device_sn.value) return
+    liveLoading.value = true
+    liveError.value = ''
+    destroyFlv()
     console.log('[drone-live] start', { sn: device_sn.value, videoId: videoId.value })
-    await startLivestream({
+    const res = await startLivestream({
       url: liveURL,
       video_id: videoId.value,
       url_type: livetypeSelected.value,
       video_quality: claritySelected.value
-    }).then(res => {
-    // if (res.code !== 0) {
-    //   return
-    // }
-      console.log('获取地址', res)
-      if (res.code === 0) {
-        // isStartSteam.value = true
-        const whepUrl = res.data.url
-        const urlObj = new URL(whepUrl)
-        const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
-        const flvFileName = streamName + '.flv'
-        flvURL.value = getImageUrl(config.flvURL, flvFileName)
-        console.log('[drone-live] flv url', flvURL.value)
-        nextTick(() => {
-          initFlv()
-        })
-      }
-      if (res.code === 513003) {
-        // onStop()
-        isPlay.value = true
-        flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
-        console.log('[drone-live] fallback flv url', flvURL.value)
-        nextTick(() => {
-          console.log('初始化备用flv播放器...')
-          initFlv()
-        })
-        // setTimeout(() => {
-        //   getLiveHttp()
-        // }, 500)
-      }
     })
-  } catch (error) {
+    console.log('[drone-live] start result', res)
+    if (res.code === 0) {
+      const whepUrl = res.data.url
+      const urlObj = new URL(whepUrl)
+      const streamName = urlObj.searchParams.get('stream')
+      const flvFileName = streamName + '.flv'
+      flvURL.value = getImageUrl(config.flvURL, flvFileName)
+      isStartSteam.value = true
+      console.log('[drone-live] flv url', flvURL.value)
+      nextTick(() => {
+        initFlv()
+      })
+      return
+    }
+    if (res.code === 513003 || res.code === 13003) {
+      flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+      isStartSteam.value = true
+      console.log('[drone-live] fallback flv url', flvURL.value)
+      nextTick(() => {
+        initFlv()
+      })
+      return
+    }
     isStartSteam.value = false
     isPlay.value = false
+    liveError.value = res.message || '无人机直播未开启，请确认无人机在线后重试'
+  } catch (error) {
+    console.warn('[drone-live] start failed', error)
+    isStartSteam.value = false
+    isPlay.value = false
+    liveError.value = '无人机直播开启失败，请确认无人机在线后重试'
+  } finally {
+    liveLoading.value = false
   }
 }
 
@@ -285,7 +289,8 @@ const destory = () => {
 }
 onUnmounted(() => {
   // onStop()
-  // destory()
+  // 后端直播需要常驻给上级平台拉流，离开页面不调用 onStop，只销毁前端播放器。
+  destory()
 })
 
 // 根据设备osd信息更新信息
@@ -364,5 +369,13 @@ const onSwitch = () => {
 
     background-color: skyblue;
   }
+}
+</style>
+
+<style scoped>
+.live-error {
+  position: absolute;
+  inset: 0;
+  background: #111;
 }
 </style>

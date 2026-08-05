@@ -1,4 +1,4 @@
-package com.dji.sample.manage.timer;
+package com.dji.sample.df.uavCommonHandleDf.timer;
 
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.LiveTypeDTO;

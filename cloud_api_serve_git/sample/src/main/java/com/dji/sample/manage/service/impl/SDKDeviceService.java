@@ -313,10 +313,13 @@ public class SDKDeviceService extends AbstractDeviceService {
 //        log.info("进入无人机osd上报---");
 //       ===== 直播开启逻辑改造开始 =====
         String droneSn = device.getDeviceSn();
-        String lastLiveKey = "live:last_attempt:" + droneSn;
+        String lastLiveKey = "live:last_success:" + droneSn;
+        String lastFailLiveKey = "live:last_fail:" + droneSn;
         long now = System.currentTimeMillis();
         Object lastLiveKeyValue = redisUtils.get(lastLiveKey);
+        Object lastFailLiveKeyValue = redisUtils.get(lastFailLiveKey);
         boolean shouldStartLive = true;
+        String skipReason = null;
 //        log.info("shouldStartLive---"+shouldStartLive);
         if (lastLiveKeyValue != null) {
             try {
@@ -324,6 +327,20 @@ public class SDKDeviceService extends AbstractDeviceService {
                 long lastLiveTime = Long.parseLong(lastLiveTimeStr);
                 if (now - lastLiveTime < 120000) {
                     shouldStartLive = false;
+                    skipReason = "距离上次成功开启不足2分钟";
+                }
+            } catch (NumberFormatException e) {
+                // 解析异常，视为需要开启
+            }
+        }
+
+        if (shouldStartLive && lastFailLiveKeyValue != null) {
+            try {
+                String lastFailLiveTimeStr = lastFailLiveKeyValue.toString();
+                long lastFailLiveTime = Long.parseLong(lastFailLiveTimeStr);
+                if (now - lastFailLiveTime < 15000) {
+                    shouldStartLive = false;
+                    skipReason = "距离上次开启失败不足15秒";
                 }
             } catch (NumberFormatException e) {
                 // 解析异常，视为需要开启
@@ -331,10 +348,7 @@ public class SDKDeviceService extends AbstractDeviceService {
         }
 
         if (shouldStartLive) {
-            // 存储当前时间到Redis，表示本次尝试调用
-            redisUtils.set(lastLiveKey, String.valueOf(now));
-
-            log.info("开启无人机直播---");
+            log.info("收到无人机OSD，准备开启直播: droneSn={}", droneSn);
             LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
             liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
             VideoId videoId = new VideoId();
@@ -348,18 +362,23 @@ public class SDKDeviceService extends AbstractDeviceService {
             liveTypeDTO.setVideoId(videoId);
             liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
             HttpResultResponse httpResultResponse = liveStreamService.liveStart(liveTypeDTO);
+            log.info("无人机直播开启结果: droneSn={}, videoId={}, code={}, message={}",
+                    droneSn, videoId, httpResultResponse.getCode(), httpResultResponse.getMessage());
 
             if (httpResultResponse.getCode() == 0) {
+                redisUtils.set(lastLiveKey, String.valueOf(now));
                 log.info("无人机 {} 直播开启成功", droneSn);
             } else if (isLiveAlreadyStarted(httpResultResponse.getCode())) {
+                redisUtils.set(lastLiveKey, String.valueOf(now));
                 log.warn("无人机 {} 直播状态已存在，执行停止后重启", droneSn);
                 restartLive(liveTypeDTO);
             } else {
-                log.warn("无人机 {} 直播开启失败，code: {}, message: {}",
+                redisUtils.set(lastFailLiveKey, String.valueOf(now));
+                log.warn("无人机 {} 直播开启失败，15秒后允许重试，code: {}, message: {}",
                         droneSn, httpResultResponse.getCode(), httpResultResponse.getMessage());
             }
         } else {
-//            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
+            log.debug("跳过无人机直播开启: droneSn={}, reason={}", droneSn, skipReason);
         }
         // ===== 直播开启逻辑改造结束 =====
 
