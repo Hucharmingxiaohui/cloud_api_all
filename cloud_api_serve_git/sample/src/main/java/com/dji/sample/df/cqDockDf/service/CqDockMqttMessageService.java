@@ -2,8 +2,15 @@ package com.dji.sample.df.cqDockDf.service;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.dji.sample.df.cqDockDf.dao.CqDockHmsMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockHmsEntity;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import java.util.Date;
 
 /**
  * 重庆电力下级平台 CUSTOM MQTT 上报解析（暂不落库，仅日志）
@@ -11,6 +18,13 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 public class CqDockMqttMessageService {
+
+    @Autowired
+    private CqDockPictureReportService cqDockPictureReportService;
+    @Autowired
+    private CqDockHmsMapper cqDockHmsMapper;
+    @Autowired
+    private CqDockHmsReportService cqDockHmsReportService;
 
     public void handleDroneOsd(String topic, String payload) {
         JSONObject json = parse(payload);
@@ -67,7 +81,52 @@ public class CqDockMqttMessageService {
                 json.getBoolean("imminent"),
                 json.getBoolean("inTheSky"),
                 json.getString("message"));
+        saveHms(topic, code, sn, json, payload);
         log.info("[cq-dock][push/hms] full payload={}", payload);
+    }
+
+    private void saveHms(String topic, String unitCode, String topicDockSn, JSONObject json, String payload) {
+        Date now = new Date();
+        String messageId = json.getString("messageId");
+        CqDockHmsEntity entity = null;
+        if (StringUtils.hasText(messageId)) {
+            entity = cqDockHmsMapper.selectOne(new LambdaQueryWrapper<CqDockHmsEntity>()
+                    .eq(CqDockHmsEntity::getMessageId, messageId)
+                    .last("limit 1"));
+        }
+        boolean isNew = entity == null;
+        if (isNew) {
+            entity = new CqDockHmsEntity();
+            entity.setCreateTime(now);
+        }
+        entity.setUnitCode(unitCode);
+        entity.setTopicDockSn(topicDockSn);
+        entity.setMessageId(messageId);
+        entity.setAlarmCode(json.getString("code"));
+        entity.setDockSn(json.getString("dockSn"));
+        entity.setUavSn(json.getString("uavSn"));
+        entity.setGatewayType(json.getString("gateWayType"));
+        entity.setImminent(json.getBoolean("imminent"));
+        entity.setInTheSky(json.getBoolean("inTheSky"));
+        entity.setLevel(json.getInteger("level"));
+        entity.setModule(json.getInteger("module"));
+        entity.setMessage(json.getString("message"));
+        entity.setRawData(StringUtils.hasText(payload) ? payload : json.toJSONString());
+        if (entity.getReportStatus() == null) {
+            entity.setReportStatus(0);
+        }
+        if (entity.getRetryCount() == null) {
+            entity.setRetryCount(0);
+        }
+        entity.setUpdateTime(now);
+        if (isNew) {
+            cqDockHmsMapper.insert(entity);
+        } else {
+            cqDockHmsMapper.updateById(entity);
+        }
+        log.info("[cq-dock][push/hms] saved hms: id={}, messageId={}, alarmCode={}, dockSn={}, uavSn={}",
+                entity.getId(), entity.getMessageId(), entity.getAlarmCode(), entity.getDockSn(), entity.getUavSn());
+        cqDockHmsReportService.reportIfTcpEnabled(entity.getId());
     }
 
     public void handlePicture(String topic, String payload) {
@@ -82,6 +141,7 @@ public class CqDockMqttMessageService {
                 json.getString("pictureUrl"),
                 json.getString("totalNum"));
         log.info("[cq-dock][push/picture] full payload={}", payload);
+        cqDockPictureReportService.saveMqttPicture(topic, json);
     }
 
     private JSONObject parse(String payload) {

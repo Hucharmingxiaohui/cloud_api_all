@@ -90,7 +90,7 @@ mqtt:
     port: 9205
     username: df1560
     password: dfe2k_1500
-    client-id: 123456
+    client-id: local-dev-001
     # If the protocol is ws/wss, this value is required.
     path:
   DRC:
@@ -102,7 +102,7 @@ mqtt:
     username: df1560
     password: dfe2k_1500
   CUSTOM:
-    enabled: true
+    enabled: false
     protocol: MQTT
     # 重庆电力下级无人机平台 EMQX
     host: 172.20.63.105
@@ -117,8 +117,8 @@ cloud-sdk:
   mqtt:
     enabled: true
     # Topics that need to be subscribed when initially connecting to mqtt, multiple topics are divided by ",".
-    inbound-topic: sys/product/+/status,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
-
+    inbound-topic: sys/product/+/status,thing/product/+/osd,thing/product/+/state,thing/product/+/events,thing/product/+/services_reply,thing/product/+/requests,/patrol/data/LyGroupToSub/guangxi_weilan
+    default-log-ignore-methods: release_terminal_control_area
 url:
   manage:
     prefix: manage
@@ -202,6 +202,10 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级巡视对接开关
 switch:
+#  centerNormalTcpEnable: true
+#  centerOtherTcpEnable: true
+#  centerNormalTcpMsgEnable: true
+#  centerOtherTcpMsgEnable: true
   centerNormalTcpEnable: false
   centerOtherTcpEnable: false
   centerNormalTcpMsgEnable: false
@@ -325,8 +329,6 @@ cq-dock:
   assign-task-path: /machineNest/noauth/third/task/assign_task
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
-  # EUA图片下载到本地的根目录，Windows示例: D:/Temp/eua-picture，Linux示例: /home/uav_server/eua-picture
-  picture-local-path: D:/Temp/eua-picture
 
 #导入巡视点位配置
 importPoint:

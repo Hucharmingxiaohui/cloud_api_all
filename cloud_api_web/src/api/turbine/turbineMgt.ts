@@ -102,7 +102,7 @@ const HTTP_PREFIX_SOLAR1 = '/api/solarPanel'
 
 // 获取所有的光伏板区域参数
 export const getAllSolarPanelApi = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = `${HTTP_PREFIX_SOLAR}/selectList?solarPanelAreaName=${data.solar_panel_area_name}&id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
+  const url = `${HTTP_PREFIX_SOLAR}/selectList?solarPanelAreaName=${data.solar_panel_area_name || ''}&id=${data.id || ''}&orthophotoId=${data.orthophoto_id || data.orthophotoId || ''}&pageSize=${data.pageSize}&page=${data.pageNo}`
   const result = await request.get(url)
   return result.data
 }
@@ -148,7 +148,7 @@ export const getSolarPanelPostionByIdApi = async function (id): Promise<IWorkspa
 
 // 1. 获取正射图列表
 export const getOrthophotoListApi = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = `/api/Orthophoto/selectList?pageSize=${data.pageSize}&page=${data.pageNo}`
+  const url = `/api/Orthophoto/selectList?name=${data.name || data.solar_area_name || ''}&id=${data.id || ''}&pageSize=${data.pageSize}&page=${data.pageNo}`
   const result = await request.get(url)
   return result.data
 }
@@ -182,7 +182,7 @@ export const importSolarPanelImgApi = async function (file): Promise<IWorkspaceR
 // 5. 根据id查询正射图
 
 export const getSolarPanelImgByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
-  const url = 'api/Orthophoto/selectById?id=' + id
+  const url = `/api/Orthophoto/selectById?id=${id}`
   const result = await request.get(url)
   return result.data
 }

@@ -72,7 +72,7 @@ public class CqDockController {
         cqDockPictureReportService.fetchSaveAndReport(request.getTaskCode(), request.getTaskName(), request.getEuaTaskId());
         response.setCode(200);
         response.setSuccess(true);
-        response.setMsg("EUA图片列表获取、入库、FTP上传、TCP上报逻辑已触发");
+        response.setMsg("EUA图片列表获取、入库、本地保存、FTP上传、TCP上报逻辑已触发");
         return response;
     }
 }

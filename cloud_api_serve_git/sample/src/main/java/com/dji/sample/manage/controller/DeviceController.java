@@ -2,16 +2,21 @@ package com.dji.sample.manage.controller;
 
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.DeviceFirmwareUpgradeDTO;
+import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.manage.service.IDeviceService;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
+import com.dji.sdk.common.SDKManager;
+import com.dji.sdk.config.version.GatewayManager;
 import com.dji.sdk.exception.CloudSDKErrorEnum;
 import com.dji.sdk.mqtt.property.PropertySetReplyResultEnum;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +32,9 @@ public class DeviceController {
 
     @Autowired
     private IDeviceService deviceService;
+
+    @Autowired
+    private IDeviceRedisService deviceRedisService;
 
     /**
      * Get the topology list of all online devices in one workspace.
@@ -81,6 +89,62 @@ public class DeviceController {
         PaginationData<DeviceDTO> devices = deviceService.getBoundDevicesWithDomain(workspaceId, page, pageSize, domain);
 
         return HttpResultResponse.success(devices);
+    }
+
+    /**
+     * todo(待测)临时修复接口：服务重启后机巢未重新上报update_topo时，手动补注册SDK设备并刷新在线缓存。
+     */
+    @PostMapping("/{workspace_id}/devices/{dock_sn}/repair-online")
+    public HttpResultResponse repairDeviceOnline(@PathVariable("workspace_id") String workspaceId,
+                                                 @PathVariable("dock_sn") String dockSn,
+                                                 @RequestParam(value = "drone_sn", required = false) String droneSnParam) {
+        Optional<DeviceDTO> dockOpt = deviceService.getDeviceBySn(dockSn);
+        if (dockOpt.isEmpty()) {
+            return HttpResultResponse.error("dock not found.");
+        }
+
+        DeviceDTO dock = dockOpt.get();
+        String droneSn = StringUtils.hasText(droneSnParam) ? droneSnParam : dock.getChildDeviceSn();
+        Optional<DeviceDTO> droneOpt = StringUtils.hasText(droneSn) ? deviceService.getDeviceBySn(droneSn) : Optional.empty();
+        DeviceDTO drone = droneOpt.orElse(null);
+
+        if (!StringUtils.hasText(dock.getWorkspaceId())) {
+            dock.setWorkspaceId(workspaceId);
+        }
+        if (drone != null && !StringUtils.hasText(drone.getWorkspaceId())) {
+            drone.setWorkspaceId(dock.getWorkspaceId());
+        }
+
+        GatewayManager gatewayManager = SDKManager.registerDevice(
+                dock.getDeviceSn(),
+                drone == null ? null : drone.getDeviceSn(),
+                dock.getDomain(),
+                dock.getType(),
+                dock.getSubType(),
+                dock.getThingVersion(),
+                drone == null ? null : drone.getThingVersion()
+        );
+
+        deviceService.gatewayOnlineSubscribeTopic(gatewayManager);
+        if (drone != null) {
+            deviceService.subDeviceOnlineSubscribeTopic(gatewayManager);
+        }
+
+        dock.setStatus(true);
+        dock.setLoginTime(LocalDateTime.now());
+        dock.setChildDeviceSn(drone == null ? null : drone.getDeviceSn());
+        deviceRedisService.setDeviceOnline(dock);
+
+        if (drone != null) {
+            drone.setStatus(true);
+            drone.setLoginTime(LocalDateTime.now());
+            drone.setParentSn(dock.getDeviceSn());
+            deviceRedisService.setDeviceOnline(drone);
+        }
+
+        deviceService.pushDeviceOnlineTopo(dock.getWorkspaceId(), dock.getDeviceSn(), drone == null ? null : drone.getDeviceSn());
+        log.warn("手动修复设备在线状态完成: dockSn={}, droneSn={}, workspaceId={}", dock.getDeviceSn(), droneSn, dock.getWorkspaceId());
+        return HttpResultResponse.success();
     }
 
     /**

@@ -12,7 +12,7 @@
 
 <script lang="ts" setup>
 import { message } from 'ant-design-vue'
-import { onMounted, defineProps, reactive, ref, onUnmounted } from 'vue'
+import { onMounted, defineProps, reactive, ref, onUnmounted, nextTick } from 'vue'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { getImageUrl } from '/@/common/url'
 import { changeLivestreamLens, getLiveCapacity, setLivestreamQuality, startLivestream, stopLivestream } from '/@/api/manage'
@@ -20,6 +20,7 @@ import { getRoot } from '/@/root'
 import jswebrtc from '/@/vendors/jswebrtc.min.js'
 import srs from '/@/vendors/srs.sdk.js'
 import flvjs from 'flv.js'
+import { resolveLiveVideoSource } from '/@/components/livestream/use-live-video-source'
 
 const props = defineProps<{
   sn: string
@@ -76,6 +77,7 @@ const flvURL = ref()
 cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
+let retryTimer: number | undefined
 onMounted(() => {
   // onRefresh()
   // videoRef.value?.addEventListener('play', () => {
@@ -101,30 +103,29 @@ const liveURL = config.rtcURL
 livetypeSelected.value = 4
 claritySelected.value = 2
 async function getcameraInfo () {
-  await getLiveCapacity({})
-    .then(res => {
-      if (res.code !== 0) {
-        return
-      }
-      console.log('sasafdfsa', res.data)
-      const cameraData = res.data.find(item => item.sn === device_sn.value)
-      if (!cameraData) {
-        return
-      }
-      droneSelected.value = cameraData.sn
-      console.log('相机信息', cameraData)
-      cameraSelected.value = cameraData.cameras_list[0].index
-      // '81-0-0'
-      videoId.value = droneSelected.value + '/' + cameraSelected.value + '/' + (videoSelected.value || nonSwitchable + '-0')
-      console.log(res.data)
-      getLiveHttp()
-    })
+  const source = await resolveLiveVideoSource({
+    role: 'drone',
+    sn: props.sn,
+    flvBaseUrl: config.flvURL
+  })
+  if (!source) return
+  device_sn.value = source.deviceSn
+  droneSelected.value = source.deviceSn
+  cameraSelected.value = source.cameraIndex
+  videoId.value = source.videoId
+  flvURL.value = source.flvUrl
+  console.log('[popup-drone-live] direct flv url', flvURL.value)
+  nextTick(() => {
+    initFlv()
+  })
+  getLiveHttp()
 }
 
 /* 请求后端获取视频流地址
 *
 */
 async function getLiveHttp () {
+  if (!videoId.value || !device_sn.value) return
   await startLivestream({
     url: liveURL,
     video_id: videoId.value,
@@ -141,6 +142,9 @@ async function getLiveHttp () {
       const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
       const flvFileName = streamName + '.flv'
       flvURL.value = getImageUrl(config.flvURL, flvFileName)
+      nextTick(() => {
+        initFlv()
+      })
     }
     if (res.code === 513003) {
       flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
@@ -179,9 +183,14 @@ const onStop = () => {
 function initFlv () {
   console.log('无人机视频', flvURL.value)
   videoRef.value = document.getElementById('videoElement') as HTMLVideoElement
+  if (!videoRef.value || !flvURL.value) {
+    retryTimer = window.setTimeout(initFlv, 1000)
+    return
+  }
   if (videoRef.value) {
     if (flvjs.isSupported()) {
       try {
+        destory()
         flvPlayer.value = flvjs.createPlayer({
           type: 'flv',
           // url: 'http://127.0.0.1:80/live?port=1935&app=live&stream=test',
@@ -202,24 +211,21 @@ function initFlv () {
           // fit: 'fill'
         })
         flvPlayer.value.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+          console.warn('[popup-drone-live] flv error', errorType, errorDetail, errorInfo)
           if (flvPlayer.value) {
-            flvPlayer.value.pause()
-            flvPlayer.value.unload()
-            flvPlayer.value.detachMediaElement()
-            flvPlayer.value.destroy()
-            flvPlayer.value = null
-            initFlv() // 重新调用 initFlv 函数重新创建播放器
+            destory()
+            retryTimer = window.setTimeout(initFlv, 1500)
           }
         })
         if (flvPlayer.value) {
           flvPlayer.value.attachMediaElement(videoRef.value)
           flvPlayer.value.load()
           if (videoRef.value.readyState >= 2) {
-            flvPlayer.value.play()
+            flvPlayer.value.play().catch(() => {})
           } else {
             videoRef.value.addEventListener('loadedmetadata', () => {
-              flvPlayer.value.play()
-            })
+              flvPlayer.value?.play().catch(() => {})
+            }, { once: true })
           }
         }
       } catch (error) {
@@ -245,6 +251,7 @@ const onPause = () => flvPlayer.value.pause()
  * 销毁
  */
 const destory = () => {
+  if (!flvPlayer.value) return
   flvPlayer.value.pause()
   flvPlayer.value.unload()
   flvPlayer.value.detachMediaElement()
@@ -252,8 +259,8 @@ const destory = () => {
   flvPlayer.value = null
 }
 onUnmounted(() => {
-  // onStop()
-  // destory()
+  if (retryTimer) window.clearTimeout(retryTimer)
+  destory()
 })
 
 const onSwitch = () => {

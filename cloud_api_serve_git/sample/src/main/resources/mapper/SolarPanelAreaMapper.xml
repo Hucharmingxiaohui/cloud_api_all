@@ -3,18 +3,19 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.df.solar.dao.SolarPanelAreaMapper">
+<mapper namespace="com.dji.sample.df.solarDf.dao.SolarPanelAreaMapper">
 
-    <select id="selectListByMap" resultType="com.dji.sample.df.solar.model.entity.SolarPanelArea">
+    <select id="selectListByMap" resultType="com.dji.sample.df.solarDf.model.entity.SolarPanelArea">
         SELECT * FROM manage_solar_panel_area
         <where>
             <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
                 and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
+            </if>
+            <if test="orthophotoId!=null and orthophotoId!=''">
+                and orthophoto_id = #{orthophotoId}
             </if>
         </where>
         <if test="pageSize != null and pageSize != '' ">
@@ -29,10 +30,11 @@
             <if test="solarPanelAreaName!=null and solarPanelAreaName!=''">
                 and solar_panel_area_name LIKE concat('%', #{solarPanelAreaName},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
+            </if>
+            <if test="orthophotoId!=null and orthophotoId!=''">
+                and orthophoto_id = #{orthophotoId}
             </if>
         </where>
     </select>

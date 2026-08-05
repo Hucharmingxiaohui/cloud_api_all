@@ -1,5 +1,8 @@
 package com.dji.sdk.mqtt;
 
+import com.dji.sdk.common.Common;
+import com.dji.sdk.mqtt.requests.TopicRequestsRequest;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,7 +19,11 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
 import javax.annotation.Resource;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Client configuration for inbound messages.
@@ -32,6 +39,9 @@ public class MqttConfiguration {
 
     @Value("${cloud-sdk.mqtt.inbound-topic: }")
     private String inboundTopic;
+
+    @Value("${cloud-sdk.mqtt.default-log-ignore-methods:}")
+    private String defaultLogIgnoreMethods;
 
     @Resource
     private MqttPahoClientFactory mqttClientFactory;
@@ -85,9 +95,42 @@ public class MqttConfiguration {
     @ServiceActivator(inputChannel = ChannelName.DEFAULT)
     public MessageHandler defaultInboundHandler() {
         return message -> {
-            log.info("The default channel does not handle messages." +
+            if (shouldIgnoreDefaultLog(message.getPayload())) {
+                return;
+            }
+            log.debug("The default channel does not handle messages." +
                     "\nTopic: " + message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC) +
                     "\nPayload: " + message.getPayload() + "\n");
         };
+    }
+
+    private boolean shouldIgnoreDefaultLog(Object payload) {
+        Set<String> ignoredMethods = parseDefaultLogIgnoreMethods();
+        if (ignoredMethods.isEmpty() || payload == null) {
+            return false;
+        }
+        if (payload instanceof TopicRequestsRequest) {
+            return ignoredMethods.contains(((TopicRequestsRequest<?>) payload).getMethod());
+        }
+        try {
+            if (!(payload instanceof byte[])) {
+                JsonNode methodNode = Common.getObjectMapper().convertValue(payload, JsonNode.class).findValue("method");
+                return methodNode != null && ignoredMethods.contains(methodNode.asText());
+            }
+            JsonNode methodNode = Common.getObjectMapper().readTree((byte[]) payload).findValue("method");
+            return methodNode != null && ignoredMethods.contains(methodNode.asText());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Set<String> parseDefaultLogIgnoreMethods() {
+        if (defaultLogIgnoreMethods == null || defaultLogIgnoreMethods.trim().isEmpty()) {
+            return Collections.emptySet();
+        }
+        return Arrays.stream(defaultLogIgnoreMethods.split(","))
+                .map(String::trim)
+                .filter(method -> !method.isEmpty())
+                .collect(Collectors.toSet());
     }
 }

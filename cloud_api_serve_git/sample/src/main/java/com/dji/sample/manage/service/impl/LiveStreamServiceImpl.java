@@ -11,10 +11,17 @@ import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.SDKManager;
 import com.dji.sdk.mqtt.services.ServicesReplyData;
 import com.dji.sdk.mqtt.services.TopicServicesResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,6 +34,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @Transactional
+@Slf4j
 public class LiveStreamServiceImpl implements ILiveStreamService {
 
     @Autowired
@@ -43,6 +51,9 @@ public class LiveStreamServiceImpl implements ILiveStreamService {
 
     @Autowired
     private AbstractLivestreamService abstractLivestreamService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     public List<CapacityDeviceDTO> getLiveCapacity(String workspaceId) {
@@ -75,6 +86,20 @@ public class LiveStreamServiceImpl implements ILiveStreamService {
 
         ILivestreamUrl url = LiveStreamProperty.get(liveParam.getUrlType());
         url = setExt(liveParam.getUrlType(), url, liveParam.getVideoId());
+        log.info("Start livestream push. urlType={}, url={}, videoId={}",
+                liveParam.getUrlType(), url, liveParam.getVideoId());
+
+        SrsStreamStatus streamStatus = getSrsStreamStatus(liveParam.getVideoId());
+        if (streamStatus.healthy) {
+            log.info("SRS stream is already active, skip live_start_push. videoId={}", liveParam.getVideoId());
+            return HttpResultResponse.success(buildLiveResponse(liveParam.getUrlType(), url));
+        }
+        if (streamStatus.exists) {
+            log.warn("SRS stream exists but unhealthy, stop stale livestream before restart. videoId={}", liveParam.getVideoId());
+            deleteSrsClient(streamStatus.cid);
+            liveStop(liveParam.getVideoId());
+            sleepQuietly(2000);
+        }
 
         TopicServicesResponse<ServicesReplyData<String>> response = abstractLivestreamService.liveStartPush(
                 SDKManager.getDeviceSDK(responseResult.getData().getDeviceSn()),
@@ -88,9 +113,12 @@ public class LiveStreamServiceImpl implements ILiveStreamService {
             return HttpResultResponse.error(response.getData().getResult());
         }
 
-        LiveDTO live = new LiveDTO();
+        return HttpResultResponse.success(buildLiveResponse(liveParam.getUrlType(), url));
+    }
 
-        switch (liveParam.getUrlType()) {
+    private LiveDTO buildLiveResponse(UrlTypeEnum urlType, ILivestreamUrl url) {
+        LiveDTO live = new LiveDTO();
+        switch (urlType) {
             case AGORA:
                 break;
             case RTMP:
@@ -108,16 +136,15 @@ public class LiveStreamServiceImpl implements ILiveStreamService {
                         .toString());
                 break;
             case RTSP:
-                live.setUrl(response.getData().getOutput());
+                live.setUrl(url.toString());
                 break;
             case WHIP:
                 live.setUrl(url.toString().replace("whip", "whep"));
                 break;
             default:
-                return HttpResultResponse.error(LiveErrorCodeEnum.URL_TYPE_NOT_SUPPORTED);
+                throw new IllegalArgumentException("Unsupported live url type: " + urlType);
         }
-
-        return HttpResultResponse.success(live);
+        return live;
     }
 
     @Override
@@ -229,5 +256,107 @@ public class LiveStreamServiceImpl implements ILiveStreamService {
                 return whipUrl.setUrl(whipUrl.getUrl() + videoId.getDroneSn() + "-" + videoId.getPayloadIndex().toString());
         }
         return url;
+    }
+
+    private SrsStreamStatus getSrsStreamStatus(VideoId videoId) {
+        try {
+            String api = getSrsStreamsApiUrl();
+            if (Objects.isNull(api)) {
+                return SrsStreamStatus.missing();
+            }
+            HttpURLConnection connection = (HttpURLConnection) new URL(api).openConnection();
+            connection.setConnectTimeout(1000);
+            connection.setReadTimeout(1000);
+            connection.setRequestMethod("GET");
+            if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
+                return SrsStreamStatus.missing();
+            }
+            JsonNode root = objectMapper.readTree(connection.getInputStream());
+            JsonNode streams = root.get("streams");
+            if (Objects.isNull(streams) || !streams.isArray()) {
+                return SrsStreamStatus.missing();
+            }
+            String streamName = buildStreamName(videoId);
+            for (JsonNode stream : streams) {
+                JsonNode name = stream.get("name");
+                if (Objects.isNull(name) || (!streamName.equals(name.asText()) && !(streamName + ".flv").equals(name.asText()))) {
+                    continue;
+                }
+                JsonNode active = stream.path("publish").get("active");
+                JsonNode video = stream.get("video");
+                JsonNode frames = stream.get("frames");
+                JsonNode recvKbps = stream.path("kbps").get("recv_30s");
+                JsonNode cid = stream.path("publish").get("cid");
+                boolean healthy = Objects.nonNull(active) && active.asBoolean(false)
+                        && Objects.nonNull(video) && !video.isNull()
+                        && ((Objects.nonNull(frames) && frames.asLong(0) > 0)
+                        || (Objects.nonNull(recvKbps) && recvKbps.asLong(0) > 0));
+                return new SrsStreamStatus(true, healthy, Objects.nonNull(cid) ? cid.asText() : null);
+            }
+        } catch (IOException e) {
+            log.debug("Failed to check SRS stream status. videoId={}", videoId, e);
+        }
+        return SrsStreamStatus.missing();
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void deleteSrsClient(String cid) {
+        if (!StringUtils.hasText(cid)) {
+            return;
+        }
+        try {
+            String api = getSrsStreamsApiUrl();
+            if (Objects.isNull(api)) {
+                return;
+            }
+            String clientsApi = api.replace("/api/v1/streams/", "/api/v1/clients/") + cid;
+            HttpURLConnection connection = (HttpURLConnection) new URL(clientsApi).openConnection();
+            connection.setConnectTimeout(1000);
+            connection.setReadTimeout(1000);
+            connection.setRequestMethod("DELETE");
+            log.warn("Deleted unhealthy SRS publisher. cid={}, response={}", cid, connection.getResponseCode());
+        } catch (IOException e) {
+            log.warn("Failed to delete unhealthy SRS publisher. cid={}", cid, e);
+        }
+    }
+
+    private String getSrsStreamsApiUrl() {
+        ILivestreamUrl whip = LiveStreamProperty.get(UrlTypeEnum.WHIP);
+        if (!(whip instanceof LivestreamWhipUrl)) {
+            return null;
+        }
+        String whipUrl = whip.toString();
+        int rtcIndex = whipUrl.indexOf("/rtc/");
+        if (rtcIndex < 0) {
+            return null;
+        }
+        return whipUrl.substring(0, rtcIndex) + "/api/v1/streams/";
+    }
+
+    private String buildStreamName(VideoId videoId) {
+        return videoId.getDroneSn() + "-" + videoId.getPayloadIndex();
+    }
+
+    private static class SrsStreamStatus {
+        private final boolean exists;
+        private final boolean healthy;
+        private final String cid;
+
+        private SrsStreamStatus(boolean exists, boolean healthy, String cid) {
+            this.exists = exists;
+            this.healthy = healthy;
+            this.cid = cid;
+        }
+
+        private static SrsStreamStatus missing() {
+            return new SrsStreamStatus(false, false, null);
+        }
     }
 }

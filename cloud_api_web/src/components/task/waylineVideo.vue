@@ -12,7 +12,7 @@
                 </div>
 
                 <div class="video-section">
-                    <LivestreamDock :sn="osdVisible.sn"  :deviceInfo="deviceInfo"></LivestreamDock>
+                    <LivestreamDock v-if="dockVideoSn" :key="dockVideoSn" :sn="dockVideoSn"  :deviceInfo="deviceInfo"></LivestreamDock>
                 </div>
 
                 <div class="title">
@@ -38,7 +38,7 @@
                 </div>
 
                 <div class="uav-video">
-                    <LivestreamOthers :sn="osdVisible.sn"  :deviceInfo="deviceInfo"></LivestreamOthers>
+                    <LivestreamOthers v-if="droneVideoSn" :key="droneVideoSn" :sn="droneVideoSn"  :deviceInfo="deviceInfo"></LivestreamOthers>
                 </div>
 
                 <div class="task-name" style="display: flex; flex-direction: row;">
@@ -162,6 +162,8 @@ const deviceInfo = reactive({
 const osdVisible = computed(() => {
   return store?.state.osdVisible
 })
+const dockVideoSn = computed(() => osdVisible.value.gateway_sn || deviceInfo.gateway?.sn || deviceInfo.dock?.sn || osdVisible.value.sn)
+const droneVideoSn = computed(() => deviceInfo.dock?.basic_osd?.sub_device?.device_sn || deviceInfo.device?.device_sn || (!osdVisible.value.is_dock ? osdVisible.value.sn : ''))
 const taskInfo = reactive({
   file_id: '',
   job_name: '',

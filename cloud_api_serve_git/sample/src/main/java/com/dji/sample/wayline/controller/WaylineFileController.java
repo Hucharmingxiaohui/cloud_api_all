@@ -106,8 +106,18 @@ public class WaylineFileController implements IHttpWaylineService {
      */
     @Override
     public HttpResultResponse<PaginationData<GetWaylineListResponse>> getWaylineList(@Valid GetWaylineListRequest request, String workspaceId, HttpServletRequest req, HttpServletResponse rsp) {
-        PaginationData<GetWaylineListResponse> data = waylineFileService.getWaylinesByParam(workspaceId, request);
+        String waylineId = req.getParameter("wayline_id");
+        PaginationData<GetWaylineListResponse> data = waylineFileService.getWaylinesByParam(workspaceId, request, waylineId);
         return HttpResultResponse.success(data);
+    }
+
+    @GetMapping("${url.wayline.prefix}${url.wayline.version}/workspaces/{workspace_id}/waylines/{wayline_id}/detail")
+    public HttpResultResponse<GetWaylineListResponse> getWaylineDetail(
+            @PathVariable(name = "workspace_id") String workspaceId,
+            @PathVariable(name = "wayline_id") String waylineId) {
+        return waylineFileService.getWaylineByWaylineId(workspaceId, waylineId)
+                .map(HttpResultResponse::success)
+                .orElseGet(() -> HttpResultResponse.error("Wayline does not exist."));
     }
 
     /**

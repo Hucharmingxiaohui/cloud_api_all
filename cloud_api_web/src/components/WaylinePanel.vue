@@ -10,6 +10,13 @@
             class="custom-input"
           ></el-input>
         </el-form-item>
+        <el-form-item label="航线ID:" prop="waylineId">
+          <el-input
+            v-model="queryForm.waylineId"
+            placeholder="请输入航线ID"
+            class="custom-input"
+          ></el-input>
+        </el-form-item>
         <el-form-item>
           <!-- 查询按钮 -->
           <el-button
@@ -284,6 +291,7 @@ const body: IPage = {
 
 const queryForm = reactive({
   name: '',
+  waylineId: ''
 })
 // --------------------------------航线导入-------------------------------------------------------
 const uploadWaylineId = ref(null)
@@ -430,6 +438,7 @@ function getWaylines () {
 
 function reset () {
   queryForm.name = ''
+  queryForm.waylineId = ''
   getWaylines()
 }
 

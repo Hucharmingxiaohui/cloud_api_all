@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
-import com.dji.sample.df.wind.dao.DroneMonitoringEntityMapper;
-import com.dji.sample.df.wind.model.entity.DroneMonitoringEntity;
+import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.uavCommonHandleDf.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.DevicePayloadReceiver;
@@ -161,6 +161,7 @@ public class SDKDeviceService extends AbstractDeviceService {
     @Override
     public void osdDock(TopicOsdRequest<OsdDock> request, MessageHeaders headers) {
         String from = request.getFrom();
+//        log.debug("Received dock OSD. dockSn={}", from);
         Optional<DeviceDTO> deviceOpt = deviceRedisService.getDeviceOnline(from);
         if (deviceOpt.isEmpty() || !StringUtils.hasText(deviceOpt.get().getWorkspaceId())) {
             deviceOpt = deviceService.getDeviceBySn(from);
@@ -273,6 +274,7 @@ public class SDKDeviceService extends AbstractDeviceService {
     @Override
     public void osdDockDrone(TopicOsdRequest<OsdDockDrone> request, MessageHeaders headers) {
         String from = request.getFrom();
+//        log.debug("Received dock drone OSD. droneSn={}", from);
         Optional<DeviceDTO> deviceOpt = deviceRedisService.getDeviceOnline(from);
         if (deviceOpt.isEmpty()) {
             deviceOpt = deviceService.getDeviceBySn(from);
@@ -308,19 +310,19 @@ public class SDKDeviceService extends AbstractDeviceService {
             abstractWaylineService.returnHome(SDKManager.getDeviceSDK(dockSN));
             log.info("电量已小于30%触发返航");
         }
-        log.info("进入无人机osd上报---");
+//        log.info("进入无人机osd上报---");
 //       ===== 直播开启逻辑改造开始 =====
         String droneSn = device.getDeviceSn();
         String lastLiveKey = "live:last_attempt:" + droneSn;
         long now = System.currentTimeMillis();
         Object lastLiveKeyValue = redisUtils.get(lastLiveKey);
         boolean shouldStartLive = true;
-        log.info("shouldStartLive---"+shouldStartLive);
+//        log.info("shouldStartLive---"+shouldStartLive);
         if (lastLiveKeyValue != null) {
             try {
                 String lastLiveTimeStr = lastLiveKeyValue.toString();
                 long lastLiveTime = Long.parseLong(lastLiveTimeStr);
-                if (now - lastLiveTime < 3000) { // 2分钟 = 120000毫秒
+                if (now - lastLiveTime < 120000) {
                     shouldStartLive = false;
                 }
             } catch (NumberFormatException e) {
@@ -349,18 +351,41 @@ public class SDKDeviceService extends AbstractDeviceService {
 
             if (httpResultResponse.getCode() == 0) {
                 log.info("无人机 {} 直播开启成功", droneSn);
-            } else if (httpResultResponse.getCode() == 513003) {
-                log.info("无人机 {} 直播已开启", droneSn);
+            } else if (isLiveAlreadyStarted(httpResultResponse.getCode())) {
+                log.warn("无人机 {} 直播状态已存在，执行停止后重启", droneSn);
+                restartLive(liveTypeDTO);
             } else {
                 log.warn("无人机 {} 直播开启失败，code: {}, message: {}",
                         droneSn, httpResultResponse.getCode(), httpResultResponse.getMessage());
             }
         } else {
-            log.debug("距离上次调用直播接口不足3秒，跳过无人机 {} 直播开启", droneSn);
+//            log.debug("距离上次调用直播接口不足2分钟，跳过无人机 {} 直播开启", droneSn);
         }
         // ===== 直播开启逻辑改造结束 =====
 
         deviceService.pushOsdDataToWeb(device.getWorkspaceId(), BizCodeEnum.DEVICE_OSD, from, request.getData());
+    }
+
+    private boolean isLiveAlreadyStarted(Integer code) {
+        return Integer.valueOf(513003).equals(code) || Integer.valueOf(13003).equals(code);
+    }
+
+    private void restartLive(LiveTypeDTO liveTypeDTO) {
+        try {
+            liveStreamService.liveStop(liveTypeDTO.getVideoId());
+            Thread.sleep(2000);
+            HttpResultResponse restartResult = liveStreamService.liveStart(liveTypeDTO);
+            if (restartResult.getCode() == 0) {
+                log.info("直播重启成功，videoId={}", liveTypeDTO.getVideoId());
+            } else {
+                log.warn("直播重启失败，videoId={}, code={}, message={}",
+                        liveTypeDTO.getVideoId(), restartResult.getCode(), restartResult.getMessage());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.warn("直播重启异常，videoId={}", liveTypeDTO.getVideoId(), e);
+        }
     }
 
     @Override

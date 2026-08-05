@@ -113,6 +113,9 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @TableField("solar_panel_id")
     private String solarPanelId;//光伏板区域id
 
+
+    @TableField("orthophoto_id")
+    private String orthophotoId;//正射图id
     @TableField("plan_type")
     private Integer planType;// 计划类型：0航点航线计划1风机计划2兴趣点环绕计划3普通航线计划4光伏计划
 

@@ -35,7 +35,7 @@ public class UavRouteServiceImpl implements UavRouteService {
 
     @Override
     public void updateKmz(UavRouteReq uavRouteReq) {
-        // TODO 替换本地文件路径！！！
+        //  替换本地文件路径！！！
         File file = FileUtil.file("D:/uav/dj-uav/file/kmz/视讯楼顶设备巡检司空二dock3.kmz");
         try (ArchiveInputStream archiveInputStream = new ZipArchiveInputStream(FileUtil.getInputStream(file))) {
             ArchiveEntry entry;

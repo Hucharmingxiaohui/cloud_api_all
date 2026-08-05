@@ -188,8 +188,7 @@ public class DrcServiceImpl implements IDrcService {
         String pubTopic = topic + TopicConst.DOWN;
         String subTopic = topic + TopicConst.UP;
 
-        if (deviceService.checkDockDrcMode(param.getDockSn())
-                && param.getClientId().equals(this.getDrcModeInRedis(param.getDockSn()))) {
+        if (deviceService.checkDockDrcMode(param.getDockSn())) {
             refreshAcl(param.getDockSn(), param.getClientId(), pubTopic, subTopic);
             return JwtAclDTO.builder().sub(List.of(subTopic)).pub(List.of(pubTopic)).build();
         }

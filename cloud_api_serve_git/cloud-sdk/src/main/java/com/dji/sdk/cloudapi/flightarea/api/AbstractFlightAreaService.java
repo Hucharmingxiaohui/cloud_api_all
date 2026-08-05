@@ -75,6 +75,6 @@ public abstract class AbstractFlightAreaService {
     @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_FLIGHT_AREAS_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     public TopicRequestsResponse<MqttReply<FlightAreasGetResponse>> flightAreasGet(TopicRequestsRequest<FlightAreasGetRequest> request, MessageHeaders headers) {
-        throw new UnsupportedOperationException("flightAreasGet not implemented");
+        return new TopicRequestsResponse<>();
     }
 }

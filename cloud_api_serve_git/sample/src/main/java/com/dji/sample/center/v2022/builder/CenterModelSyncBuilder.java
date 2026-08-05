@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.app.AppContext;
 import com.dji.sample.center.config.CenterFtpsNormalConfig;
 import com.dji.sample.center.config.CenterNormalConfig;
-import com.dji.sample.center.dao.UniPointMapper2;
+import com.dji.sample.df.substationDf.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.center.utils.ftp.FtpUtils;
@@ -15,13 +15,10 @@ import com.dji.sample.center.v2022.enums.DeviceTypeEnum;
 import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper;
-import com.dji.sample.df.electricInspectionDf.model.PubSubstationDfEntity;
 import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
-import com.dji.sample.df.manageDf.model.entity.WaylinePointEntity;
-import com.dji.sample.df.wind.dao.FanStationPointsMapper;
-import com.dji.sample.df.wind.model.entity.FanStationPoints;
+import com.dji.sample.df.windDf.dao.FanStationPointsMapper;
+import com.dji.sample.df.windDf.model.entity.FanStationPoints;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 
 import java.io.File;
@@ -140,7 +137,7 @@ public class CenterModelSyncBuilder {
                         item.setMeter_type("");
                         //无人机点位外观类型，暂时设置为空
                         item.setAppearance_type("");
-                        //现场不需要分析，暂时设置为空  todo 需要确认一下
+                        //现场不需要分析，暂时设置为空 , 需要确认一下
                         item.setRecognition_type_list("");
                         item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
                         item.setDevice_info("");

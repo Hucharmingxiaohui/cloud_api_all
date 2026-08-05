@@ -3,9 +3,9 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.df.wind.dao.WindTurbineMapper">
+<mapper namespace="com.dji.sample.df.windDf.dao.WindTurbineMapper">
 
-    <select id="selectList" resultType="com.dji.sample.df.wind.model.entity.WindTurbine">
+    <select id="selectList" resultType="com.dji.sample.df.windDf.model.entity.WindTurbine">
         SELECT * FROM manage_fan
         <where>
             <if test="turbineName!=null and turbineName!=''">

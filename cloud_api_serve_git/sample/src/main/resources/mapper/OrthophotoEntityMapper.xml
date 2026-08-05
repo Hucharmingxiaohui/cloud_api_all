@@ -3,16 +3,14 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 
-<mapper namespace="com.dji.sample.df.solar.dao.OrthophotoEntityMapper">
+<mapper namespace="com.dji.sample.df.solarDf.dao.OrthophotoEntityMapper">
 
-    <select id="selectListByMap" resultType="com.dji.sample.df.solar.model.entity.OrthophotoEntity">
+    <select id="selectListByMap" resultType="com.dji.sample.df.solarDf.model.entity.OrthophotoEntity">
         SELECT * FROM manage_orthophoto
         <where>
             <if test="name!=null and name!=''">
                 and name LIKE concat('%', #{name},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
             </if>
@@ -29,8 +27,6 @@
             <if test="name!=null and name!=''">
                 and name LIKE concat('%', #{name},'%')
             </if>
-        </where>
-        <where>
             <if test="id!=null and id!=''">
                 and id = #{id}
             </if>

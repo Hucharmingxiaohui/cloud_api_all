@@ -156,6 +156,12 @@ export const getBindingDevices = async function (workspace_id: string, body: IPa
   return result.data
 }
 
+export const repairDeviceOnline = async function (workspace_id: string, dock_sn: string, drone_sn?: string): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/devices/${workspace_id}/devices/${dock_sn}/repair-online${drone_sn ? `?drone_sn=${drone_sn}` : ''}`
+  const result = await request.post(url)
+  return result.data
+}
+
 export const updateDevice = async function (body: {}, workspace_id: string, device_sn: string): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/devices/${workspace_id}/devices/${device_sn}`
   const result = await request.put(url, body)

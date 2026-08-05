@@ -55,13 +55,25 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
   }
 
   function onMessageMqtt (message: any) {
-    if (cacheSubscribeArr.findIndex(item => item.topic === message?.topic) !== -1) {
+    if (cacheSubscribeArr.findIndex(item => topicMatches(item.topic, message?.topic)) !== -1) {
       const payloadStr = new TextDecoder('utf-8').decode(message?.payload)
       const payloadObj = JSON.parse(payloadStr)
       if (payloadObj?.method !== DRC_METHOD.HEART_BEAT) {
         EventBus.emit('droneControlMqttInfo', payloadObj)
       }
     }
+  }
+
+  function topicMatches (filter: string, topic: string) {
+    if (filter === topic) return true
+    const filterParts = filter.split('/')
+    const topicParts = topic.split('/')
+    for (let i = 0; i < filterParts.length; i++) {
+      const part = filterParts[i]
+      if (part === '#') return i === filterParts.length - 1
+      if (part !== '+' && part !== topicParts[i]) return false
+    }
+    return filterParts.length === topicParts.length
   }
 
   function unsubscribeDrc () {
@@ -87,6 +99,8 @@ export function useMqtt (deviceTopicInfo: DeviceTopicInfo) {
       unsubscribeDrc()
       // 1.订阅topic
       subscribeMqtt(deviceTopicInfo.subTopic)
+      subscribeMqtt(`thing/product/${deviceTopicInfo.sn}/services_reply`)
+      subscribeMqtt(`thing/product/${deviceTopicInfo.sn}/events`)
       // 2.发心跳
       publishDrcPing(deviceTopicInfo.sn)
     } else {

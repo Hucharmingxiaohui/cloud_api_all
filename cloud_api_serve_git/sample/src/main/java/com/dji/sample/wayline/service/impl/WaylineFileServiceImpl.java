@@ -60,38 +60,48 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
 
     @Override
     public PaginationData<GetWaylineListResponse> getWaylinesByParam(String workspaceId, GetWaylineListRequest param) {
-        // Paging Query
+        return getWaylinesByParam(workspaceId, param, null);
+    }
+
+    @Override
+    public PaginationData<GetWaylineListResponse> getWaylinesByParam(String workspaceId, GetWaylineListRequest param, String waylineId) {
         Page<WaylineFileEntity> page = mapper.selectPage(
                 new Page<WaylineFileEntity>(param.getPage(), param.getPageSize()),
-                new LambdaQueryWrapper<WaylineFileEntity>()
-                        .eq(WaylineFileEntity::getWorkspaceId, workspaceId)
-                        .eq(Objects.nonNull(param.getFavorited()), WaylineFileEntity::getFavorited, param.getFavorited())
-                        .and(param.getTemplateType() != null, wrapper ->  {
-                                for (WaylineTypeEnum type : param.getTemplateType()) {
-                                    wrapper.like(WaylineFileEntity::getTemplateTypes, type.getValue()).or();
-                                }
-                        })
-                        .and(param.getPayloadModelKey() != null, wrapper ->  {
-                                for (DeviceEnum type : param.getPayloadModelKey()) {
-                                    wrapper.like(WaylineFileEntity::getPayloadModelKeys, type.getType()).or();
-                                }
-                        })
-                        .and(param.getDroneModelKeys() != null, wrapper ->  {
-                                for (DeviceEnum type : param.getDroneModelKeys()) {
-                                    wrapper.eq(WaylineFileEntity::getDroneModelKey, type.getType()).or();
-                                }
-                        })
-                        .like(Objects.nonNull(param.getKey()), WaylineFileEntity::getName, param.getKey())
-                        // There is a risk of SQL injection
-                        .last(Objects.nonNull(param.getOrderBy()), " order by " + param.getOrderBy().toString()));
+                buildWaylineQuery(workspaceId, param, waylineId));
 
-        // Wrap the results of a paging query into a custom paging object.
         List<GetWaylineListResponse> records = page.getRecords()
                 .stream()
                 .map(this::entityConvertToDTO)
                 .collect(Collectors.toList());
 
         return new PaginationData<>(records, new Pagination(page.getCurrent(), page.getSize(), page.getTotal()));
+    }
+
+    private LambdaQueryWrapper<WaylineFileEntity> buildWaylineQuery(String workspaceId, GetWaylineListRequest param, String waylineId) {
+        LambdaQueryWrapper<WaylineFileEntity> wrapper = new LambdaQueryWrapper<WaylineFileEntity>()
+                .eq(WaylineFileEntity::getWorkspaceId, workspaceId)
+                .eq(Objects.nonNull(param.getFavorited()), WaylineFileEntity::getFavorited, param.getFavorited())
+                .eq(StringUtils.hasText(waylineId), WaylineFileEntity::getWaylineId, waylineId)
+                .and(param.getTemplateType() != null, query ->  {
+                    for (WaylineTypeEnum type : param.getTemplateType()) {
+                        query.like(WaylineFileEntity::getTemplateTypes, type.getValue()).or();
+                    }
+                })
+                .and(param.getPayloadModelKey() != null, query ->  {
+                    for (DeviceEnum type : param.getPayloadModelKey()) {
+                        query.like(WaylineFileEntity::getPayloadModelKeys, type.getType()).or();
+                    }
+                })
+                .and(param.getDroneModelKeys() != null, query ->  {
+                    for (DeviceEnum type : param.getDroneModelKeys()) {
+                        query.eq(WaylineFileEntity::getDroneModelKey, type.getType()).or();
+                    }
+                })
+                .like(StringUtils.hasText(param.getKey()), WaylineFileEntity::getName, param.getKey());
+        if (Objects.nonNull(param.getOrderBy())) {
+            wrapper.last(" order by " + param.getOrderBy().toString());
+        }
+        return wrapper;
     }
 
     @Override
