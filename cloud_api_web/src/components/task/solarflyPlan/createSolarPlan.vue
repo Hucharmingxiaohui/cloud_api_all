@@ -209,10 +209,8 @@
               </div>
 
               <!-- 第二步底部按钮 -->
-              <el-form-item style="margin-bottom: 40px;">
-                <div class="footer">
+              <div class="footer footer-actions">
                   <el-button
-                    class="mr10"
                     style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
                     @click="handlePrevStep"
                     >上一步
@@ -229,8 +227,7 @@
                     @click="onSubmit"
                     >确认
                   </el-button>
-                </div>
-              </el-form-item>
+              </div>
             </div>
           </el-form>
         </div>
@@ -851,13 +848,20 @@ async function onSubmit () {
   .footer {
     margin-bottom: 40px;
     display: flex;
+    justify-content: center;
+    gap: 12px;
     padding:10px 0;
 
     button {
       width: 45%;
       color: #fff ;
       border: 0;
+      margin-left: 0;
     }
+  }
+
+  .footer-actions {
+    width: 100%;
   }
 }
 
