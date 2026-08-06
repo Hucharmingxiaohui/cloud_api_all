@@ -244,6 +244,7 @@ public class uavReportServiceImpl implements uavReportService {
         document.createParagraph().setSpacingAfter(200);
         XWPFTable infoTable = document.createTable(1, 2);
         setTableBorders(infoTable);
+        setTableAlignment(infoTable, STJc.CENTER);
         infoTable.setCellMargins(120, 120, 120, 120);
 
         XWPFTableRow row1 = infoTable.getRow(0);
@@ -1979,6 +1980,16 @@ public class uavReportServiceImpl implements uavReportService {
         border.setSz(new BigInteger("4"));
         border.setSpace(new BigInteger("0"));
         border.setColor("000000");
+    }
+
+    // 辅助方法：设置表格水平对齐方式
+    private void setTableAlignment(XWPFTable table, STJc.Enum alignment) {
+        CTTblPr tblPr = table.getCTTbl().getTblPr();
+        if (tblPr == null) {
+            tblPr = table.getCTTbl().addNewTblPr();
+        }
+        CTJc jc = tblPr.isSetJc() ? tblPr.getJc() : tblPr.addNewJc();
+        jc.setVal(alignment);
     }
 
     // 辅助方法：设置单元格底色

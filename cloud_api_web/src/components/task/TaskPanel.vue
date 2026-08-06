@@ -448,6 +448,7 @@ function getCodeMessage (code: number) {
 const root = getRoot()
 function toTaskResult (val) {
   localStorage.setItem('TaskInfo', JSON.stringify(val))
+  localStorage.setItem('TaskResultFromTaskList', '1')
   router.push({ path: '/task/taskResult' })
 }
 
