@@ -143,7 +143,7 @@ public class JobControlHandler {
         if (!value.isEmpty()) {
             taskName = value.keySet().iterator().next();
             Long time = value.get(taskName);
-            log.info("第一个键值对: {} = {}", taskName, time);
+//            log.info("第一个键值对: {} = {}", taskName, time);
         } else {
             taskName = null;
         }

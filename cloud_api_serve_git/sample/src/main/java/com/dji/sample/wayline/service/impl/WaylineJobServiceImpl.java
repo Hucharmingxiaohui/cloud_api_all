@@ -62,7 +62,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 
     private static final int DOCK_FALLBACK_PROGRESS_THRESHOLD = 90;
 
-    private static final long DOCK_FALLBACK_CONFIRM_MILLIS = 30_000L;
+    private static final long DOCK_FALLBACK_CONFIRM_MILLIS = 100_000L;
 
     @Autowired
     private IWaylineJobMapper mapper;
@@ -330,7 +330,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         if (entity == null) {
             return null;
         }
-//      此次任务进度大于90，无人机回巢30秒以上也判断为任务结束，兜底
+//      此次任务进度大于90，无人机回巢60秒以上也判断为任务结束，兜底
         applyDockedSuccessFallback(entity);
 
 //      如果是不停机巡检任务，已上传图片要加上

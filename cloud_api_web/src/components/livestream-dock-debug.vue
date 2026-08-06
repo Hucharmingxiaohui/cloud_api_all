@@ -54,6 +54,8 @@ const flvURL = ref()
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 let retryTimer: number | undefined
+let startingStreamKey = ''
+let activeStreamKey = ''
 
 const osdVisible = computed(() => {
   return store.state.osdVisible || { gateway_sn: '' }
@@ -69,6 +71,8 @@ onMounted(() => {
 watch(() => props.sn, sn => {
   if (!sn || sn === device_sn.value) return
   destroyFlv()
+  startingStreamKey = ''
+  activeStreamKey = ''
   device_sn.value = sn
   isStartSteam.value = false
   isPlay.value = false
@@ -83,7 +87,6 @@ const liveURL = config.rtcURL
 livetypeSelected.value = 4
 claritySelected.value = 2
 async function getcameraInfo () {
-  if (isStartSteam.value) return
   const source = await resolveLiveVideoSource({
     role: 'dock',
     sn: props.sn,
@@ -97,54 +100,68 @@ async function getcameraInfo () {
   videoId.value = source.videoId
   flvURL.value = source.flvUrl
   console.log('[dock-live] direct flv url', flvURL.value)
-  nextTick(() => {
-    initFlv()
-  })
-  getLiveHttp()
+  getLiveHttp(getStreamKey())
+}
+
+function getStreamKey () {
+  if (!device_sn.value || !cameraSelected.value || !videoId.value) return ''
+  return `${device_sn.value}/${cameraSelected.value}/${videoId.value}`
 }
 
 /* 请求后端获取视频流地址
 *
 */
-async function getLiveHttp () {
+async function getLiveHttp (streamKey = getStreamKey()) {
   try {
     if (!videoId.value || !device_sn.value) return
+    if (streamKey && (streamKey === startingStreamKey || (streamKey === activeStreamKey && flvPlayer.value))) return
+    startingStreamKey = streamKey
     console.log('[dock-live] start', { sn: device_sn.value, videoId: videoId.value })
-    await startLivestream({
+    const res = await startLivestream({
       url: liveURL,
       video_id: videoId.value,
       url_type: livetypeSelected.value,
       video_quality: claritySelected.value
-    }).then(res => {
-      if (res.code === 0) {
-        isStartSteam.value = true
-        const whepUrl = res.data.url
-        const urlObj = new URL(whepUrl)
-        const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
-        const flvFileName = streamName + '.flv'
-        flvURL.value = getImageUrl(config.flvURL, flvFileName)
-        console.log('[dock-live] flv url', flvURL.value)
-        nextTick(() => {
-          initFlv()
-        })
-      }
-      if (res.code === 513003) {
-        isPlay.value = true
-        flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
-        console.log('[dock-live] fallback flv url', flvURL.value)
-        nextTick(() => {
-          console.log('初始化备用flv播放器...')
-          initFlv()
-        })
-      }
     })
+    if (res.code === 0) {
+      isStartSteam.value = true
+      const whepUrl = res.data.url
+      const urlObj = new URL(whepUrl)
+      const streamName = urlObj.searchParams.get('stream') // "8UUXN3U00A046E-165-0-7"
+      const flvFileName = streamName + '.flv'
+      flvURL.value = getImageUrl(config.flvURL, flvFileName)
+      console.log('[dock-live] flv url', flvURL.value)
+      nextTick(() => {
+        initFlv(streamKey)
+      })
+      return
+    }
+    if (res.code === 513003 || res.code === 13003) {
+      isStartSteam.value = true
+      flvURL.value = getImageUrl(config.flvURL, device_sn.value + '-' + cameraSelected.value + '.flv')
+      console.log('[dock-live] fallback flv url', flvURL.value)
+      nextTick(() => {
+        initFlv(streamKey)
+      })
+      return
+    }
+    isStartSteam.value = false
+    isPlay.value = false
+    activeStreamKey = ''
   } catch (error) {
     isStartSteam.value = false
     isPlay.value = false
+    activeStreamKey = ''
+  } finally {
+    if (startingStreamKey === streamKey) startingStreamKey = ''
   }
 }
 
 function destroyFlv () {
+  if (retryTimer) {
+    window.clearTimeout(retryTimer)
+    retryTimer = undefined
+  }
   if (!flvPlayer.value) return
   flvPlayer.value.pause()
   flvPlayer.value.unload()
@@ -174,10 +191,10 @@ const onStop = () => {
 /**
  * 初始化
  */
-function initFlv () {
+function initFlv (streamKey = getStreamKey()) {
   videoRef.value = document.getElementById('videoElement1') as HTMLVideoElement
   if (!videoRef.value || !flvURL.value) {
-    retryTimer = window.setTimeout(initFlv, 1000)
+    retryTimer = window.setTimeout(() => initFlv(streamKey), 1000)
     return
   }
   if (videoRef.value) {
@@ -205,7 +222,9 @@ function initFlv () {
           console.warn('[dock-live] flv error', errorType, errorDetail, errorInfo)
           if (flvPlayer.value) {
             destroyFlv()
-            retryTimer = window.setTimeout(initFlv, 1500)
+            isPlay.value = false
+            activeStreamKey = ''
+            retryTimer = window.setTimeout(() => initFlv(streamKey), 1500)
           }
         })
         if (flvPlayer.value) {
@@ -220,13 +239,16 @@ function initFlv () {
           }
         }
         isPlay.value = true
+        activeStreamKey = streamKey
       } catch (error) {
         isPlay.value = false
+        activeStreamKey = ''
         isStartSteam.value = false
         console.log('创建播放器实例时发生错误:', error)
       }
     } else {
       isPlay.value = false
+      activeStreamKey = ''
       isStartSteam.value = false
       console.log('由于视频文件损坏或是该视频使用了你的浏览器不支持的功能')
     }
@@ -256,6 +278,8 @@ const onPause = () => flvPlayer.value.pause()
 const destory = () => {
   if (retryTimer) window.clearTimeout(retryTimer)
   destroyFlv()
+  startingStreamKey = ''
+  activeStreamKey = ''
 }
 onUnmounted(() => {
   destory()

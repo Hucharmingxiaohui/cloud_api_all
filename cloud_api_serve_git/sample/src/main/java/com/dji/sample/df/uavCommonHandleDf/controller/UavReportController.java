@@ -576,7 +576,9 @@ public class UavReportController {
                 log.info("开始执行保存点位----");
 //              截图点位入库
                 FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
-                        .eq(FanWaylinePoints::getJobId, jobId));
+                        .eq(FanWaylinePoints::getJobId, jobId)
+                        .orderByDesc(FanWaylinePoints::getId)
+                        .last("LIMIT 1"));
                 for (int i = 0; i < imageList.size(); i++) {
                     String fileName = imageList.getString(i);
                     imageList.set(i, fileName.replace(".jpg", ""));

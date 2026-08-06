@@ -87,6 +87,8 @@ cameraSelected.value = '99-0-0'
 const flvPlayer: any = ref() // flv 参数声明
 const videoRef = ref<HTMLVideoElement | null>(null)
 let retryTimer: number | undefined
+let startingStreamKey = ''
+let activeStreamKey = ''
 
 const isPlay = ref(false)
 const isStartSteam = ref(false)
@@ -97,6 +99,8 @@ onMounted(() => {
 watch(() => props.sn, sn => {
   if (!sn || sn === device_sn.value) return
   destroyFlv()
+  startingStreamKey = ''
+  activeStreamKey = ''
   device_sn.value = sn
   isStartSteam.value = false
   isPlay.value = false
@@ -126,15 +130,22 @@ async function getcameraInfo () {
   flvURL.value = source.flvUrl
   liveError.value = ''
   console.log('[drone-live] resolved flv url', flvURL.value)
-  getLiveHttp()
+  getLiveHttp(getStreamKey())
+}
+
+function getStreamKey () {
+  if (!device_sn.value || !cameraSelected.value || !videoId.value) return ''
+  return `${device_sn.value}/${cameraSelected.value}/${videoId.value}`
 }
 
 /* 请求后端获取视频流地址
 *
 */
-async function getLiveHttp () {
+async function getLiveHttp (streamKey = getStreamKey()) {
   try {
     if (!videoId.value || !device_sn.value) return
+    if (streamKey && (streamKey === startingStreamKey || (streamKey === activeStreamKey && flvPlayer.value))) return
+    startingStreamKey = streamKey
     liveLoading.value = true
     liveError.value = ''
     destroyFlv()
@@ -155,7 +166,7 @@ async function getLiveHttp () {
       isStartSteam.value = true
       console.log('[drone-live] flv url', flvURL.value)
       nextTick(() => {
-        initFlv()
+        initFlv(streamKey)
       })
       return
     }
@@ -164,24 +175,31 @@ async function getLiveHttp () {
       isStartSteam.value = true
       console.log('[drone-live] fallback flv url', flvURL.value)
       nextTick(() => {
-        initFlv()
+        initFlv(streamKey)
       })
       return
     }
     isStartSteam.value = false
     isPlay.value = false
+    activeStreamKey = ''
     liveError.value = res.message || '无人机直播未开启，请确认无人机在线后重试'
   } catch (error) {
     console.warn('[drone-live] start failed', error)
     isStartSteam.value = false
     isPlay.value = false
+    activeStreamKey = ''
     liveError.value = '无人机直播开启失败，请确认无人机在线后重试'
   } finally {
+    if (startingStreamKey === streamKey) startingStreamKey = ''
     liveLoading.value = false
   }
 }
 
 function destroyFlv () {
+  if (retryTimer) {
+    window.clearTimeout(retryTimer)
+    retryTimer = undefined
+  }
   if (!flvPlayer.value) return
   flvPlayer.value.pause()
   flvPlayer.value.unload()
@@ -211,10 +229,10 @@ const onStop = () => {
 /**
  * 初始化
  */
-function initFlv () {
+function initFlv (streamKey = getStreamKey()) {
   videoRef.value = document.getElementById('videoElement') as HTMLVideoElement
   if (!videoRef.value || !flvURL.value) {
-    retryTimer = window.setTimeout(initFlv, 1000)
+    retryTimer = window.setTimeout(() => initFlv(streamKey), 1000)
     return
   }
   if (videoRef.value) {
@@ -244,7 +262,9 @@ function initFlv () {
           console.warn('[drone-live] flv error', errorType, errorDetail, errorInfo)
           if (flvPlayer.value) {
             destroyFlv()
-            retryTimer = window.setTimeout(initFlv, 1500)
+            isPlay.value = false
+            activeStreamKey = ''
+            retryTimer = window.setTimeout(() => initFlv(streamKey), 1500)
           }
         })
         if (flvPlayer.value) {
@@ -259,12 +279,15 @@ function initFlv () {
           }
         }
         isPlay.value = true
+        activeStreamKey = streamKey
       } catch (error) {
         console.log('创建播放器实例时发生错误:', error)
         isPlay.value = false
+        activeStreamKey = ''
       }
     } else {
       isPlay.value = false
+      activeStreamKey = ''
       console.log('由于视频文件损坏或是该视频使用了你的浏览器不支持的功能')
     }
   }
@@ -286,6 +309,8 @@ const onPause = () => flvPlayer.value.pause()
 const destory = () => {
   if (retryTimer) window.clearTimeout(retryTimer)
   destroyFlv()
+  startingStreamKey = ''
+  activeStreamKey = ''
 }
 onUnmounted(() => {
   // onStop()
