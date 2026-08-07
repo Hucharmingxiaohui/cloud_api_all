@@ -720,7 +720,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 } catch (SQLException ex) {
                     throw new RuntimeException(ex);
                 }
-                log.info("空中航线前1----------");
                 FileParam fileParam = new FileParam();
                 fileParam.setFingerprint(waylineFile.get().getSign());
                 fileParam.setUrl(url1.toString());
@@ -752,7 +751,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String job_id = UUID.randomUUID().toString();
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
-                log.info("空中航线前2----------");
 //              在此处停机直接默认保存了背面，适配保存分析接口
                 waylineJobEntity.setIsSaved(2);
                 waylineJobMapper.updateById(waylineJobEntity);

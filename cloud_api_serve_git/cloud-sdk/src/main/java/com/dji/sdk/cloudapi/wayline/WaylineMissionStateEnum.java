@@ -1,6 +1,5 @@
 package com.dji.sdk.cloudapi.wayline;
 
-import com.dji.sdk.exception.CloudSDKException;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
@@ -33,6 +32,8 @@ public enum WaylineMissionStateEnum {
 
     WAYLINE_END(9, "Wayline stop"),
 
+    UNKNOWN(-1, "Unknown wayline mission state"),
+
     ;
 
     private final int state;
@@ -56,7 +57,7 @@ public enum WaylineMissionStateEnum {
     @JsonCreator
     public static WaylineMissionStateEnum find(int state) {
         return Arrays.stream(values()).filter(stateEnum -> stateEnum.state == state).findAny()
-            .orElseThrow(() -> new CloudSDKException(WaylineMissionStateEnum.class, state));
+            .orElse(UNKNOWN);
     }
 
 }

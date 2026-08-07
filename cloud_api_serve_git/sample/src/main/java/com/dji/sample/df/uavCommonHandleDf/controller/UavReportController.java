@@ -290,16 +290,17 @@ public class UavReportController {
         String reportId =null;
         if(planType==0){
 //           航点航线任务生成报告
+             log.info("生成航点航线任务报告...");
              reportId = uavReportService.createNewReport(jobId);
              uavReportService.genNormalPatrolTaskWordNew(reportId,jobId);
-             log.info("生成普通报告------");
         }else if(planType==1){
 //           风机任务生成报告
+             log.info("生成风机任务报告...");
              reportId = uavReportService.createNewReport(jobId);
              uavReportService.genFjPatrolTaskWordNew(reportId,jobId);
         } else if (planType==4) {
 //           光伏任务生成报告
-            log.info("生成光伏报告------");
+            log.info("生成光伏任务报告...");
             reportId = uavReportService.createNewReport(jobId);
             uavReportService.genGfPatrolTaskWordNew(reportId,jobId);
 

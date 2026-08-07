@@ -42,9 +42,9 @@ public class ResultController {
      */
     @PostMapping("/picAnalyseRetNotify")
     public Result picAnalyseRetNotify(@RequestBody AnalyseParamsRecReq params) {
-        System.out.println("收到请求，队列大小：" + AnalyseResultQueue.size());
+//        System.out.println("收到请求，队列大小：" + AnalyseResultQueue.size());
         boolean added = AnalyseResultQueue.add(params);
-        System.out.println("添加结果：" + added);
+//        System.out.println("添加结果：" + added);
         return Result.success();
     }
 

@@ -97,6 +97,7 @@ import { reactive } from '@vue/reactivity'
 import { ElMessage } from 'element-plus'
 import { onMounted, onUpdated, ref } from 'vue'
 import { deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, searchWaylineFiles } from '/@/api/wayline'
+import { getPointList } from '/@/api/points'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { EllipsisOutlined, RocketOutlined, CameraFilled, UserOutlined, SelectOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { DEVICE_NAME } from '/@/types/device'
@@ -127,10 +128,17 @@ const deleteWaylineId = ref<string>('')
 const canRefresh = ref(true)
 const importVisible = ref<boolean>(root.$router.currentRoute.value.name === ERouterName.WAYLINE)
 const height = ref()
+const isPointWaylinePlan = ref(localStorage.getItem('createPlan_query') === '0')
+const pointWaylineIds = ref<Set<string>>(new Set())
+const pointWaylineTipShown = ref(false)
+const pointWaylineTip = '请先导入点位表，并确认航线已导入并绑定相应点位。'
 
-onMounted(() => {
+onMounted(async () => {
   const parent = document.getElementsByClassName('scrollbar').item(0)?.parentNode as HTMLDivElement
   height.value = document.body.clientHeight - parent.firstElementChild!.clientHeight
+  if (isPointWaylinePlan.value) {
+    await loadPointWaylineIds()
+  }
   getWaylines()
 
   const key = setInterval(() => {
@@ -143,6 +151,47 @@ onMounted(() => {
     getWaylines()
   }, 1000)
 })
+
+async function loadPointWaylineIds () {
+  const res = await getPointList({
+    pageNo: 1,
+    pageSize: 10000,
+    id: '',
+    pointName: '',
+    picType: '',
+    waylineId: ''
+  })
+  if (res.code !== 0) {
+    pointWaylineIds.value = new Set()
+    showPointWaylineTip()
+    return
+  }
+  const pointList = res.data?.list || []
+  pointWaylineIds.value = new Set(
+    pointList
+      .map((point: any) => point.wayline_id)
+      .filter((waylineId: string) => !!waylineId)
+  )
+}
+
+function filterPointWaylines (waylines: WaylineFile[]) {
+  if (!isPointWaylinePlan.value) {
+    return waylines
+  }
+  const filteredWaylines = waylines.filter(wayline => pointWaylineIds.value.has(wayline.id))
+  if (filteredWaylines.length === 0) {
+    showPointWaylineTip()
+  }
+  return filteredWaylines
+}
+
+function showPointWaylineTip () {
+  if (pointWaylineTipShown.value) {
+    return
+  }
+  pointWaylineTipShown.value = true
+  ElMessage.warning(pointWaylineTip)
+}
 
 function getWaylines () {
   if (!canRefresh.value) {
@@ -158,8 +207,8 @@ function getWaylines () {
     if (res.code !== 0) {
       return
     }
-    waylinesData.data = res.data.list
-    pagination.total = res.data.pagination.total
+    waylinesData.data = filterPointWaylines(res.data.list)
+    pagination.total = waylinesData.data.length
     pagination.page = res.data.pagination.page
   }).finally(() => {
     canRefresh.value = true
@@ -185,8 +234,8 @@ function SearchWayline () {
     if (res.code !== 0) {
       return
     }
-    waylinesData.data = res.data.list
-    pagination.total = res.data.pagination.total
+    waylinesData.data = filterPointWaylines(res.data.list)
+    pagination.total = waylinesData.data.length
     pagination.page = res.data.pagination.page
   }).finally(() => {
     canRefresh.value = true

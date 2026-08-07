@@ -1924,7 +1924,7 @@ public class uavReportServiceImpl implements uavReportService {
         String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
-            System.out.println("点位航线报告生成成功：" + reportPath);
+            log.info("点位航线报告生成成功：" + reportPath);
         } catch (IOException e) {
             throw new RuntimeException("报告保存失败", e);
         }

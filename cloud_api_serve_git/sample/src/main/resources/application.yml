@@ -69,7 +69,7 @@ spring:
       # 长连接保持时间 单位s,不宜过长
       keepAliveTime: 10
 
-# 智能分析接口标准切换: false=一般标准, true=57号文标准
+# 智能分析接口标准切换: false=一般标准, true=国网57号文标准
 analyse:
   standard:
     document57: false
@@ -342,6 +342,9 @@ importPoint:
 
 # x86 服务器 SSH 配置(用于大疆sdk测温）
 remote:
+  # 测温模式开关：false=本地读取测温文件，true=SSH调用远程x86服务器测温
+  thermal:
+    enabled: false
   ssh:
     host: 172.20.63.150
     port: 22
