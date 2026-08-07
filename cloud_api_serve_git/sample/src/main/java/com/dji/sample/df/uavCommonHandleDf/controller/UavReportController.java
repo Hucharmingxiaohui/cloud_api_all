@@ -161,8 +161,8 @@ public class UavReportController {
                     fileNames.add(fileName);
                 }
                 request.setFile_name(ImageFileNameUtils.jpegToJpg(fileNames));
-                log.info("文件名为-------------"+fileNames);
-                log.info("request为-------------"+request);
+                log.info("光伏计划媒体文件为："+fileNames);
+                log.info("光伏计划分析服务request为："+request);
                 AnalysisResponse response = gfReportService.sendGfAnalysisRequest(request);
                 if (response != null) {
                     System.out.println("分析结果: " + response);
@@ -189,16 +189,15 @@ public class UavReportController {
                 gfPositionRequest.setImages(images);
                 gfPositionRequest.setInspectionId(jobId);
                 gfPositionRequest.setOrthophotoId(orthophotoId);
-                log.info("gfPositionRequest---"+gfPositionRequest);
                 ObjectMapper objectMapper = new ObjectMapper();
                 String actualJson = objectMapper.writeValueAsString(gfPositionRequest);
-                System.out.println("gfPositionRequest真正的 JSON 是：" + actualJson);
+                System.out.println("光伏定位服务请求JSON为：" + actualJson);
 //              发送请求
                 GfPositionResponse gfPositionResponse = gfReportService.sendGfPositionRequest(gfPositionRequest);
                 gfReportService.processAndUptDefects(gfPositionResponse, jobId);
 //              分析完成
                 waylineJobEntity.setIsAnalyzed(1);
-                log.info(jobId+"分析完成。。。");
+                log.info(jobId+"光伏巡检图片分析完成。。。");
                 waylineJobMapper.updateById(waylineJobEntity);
                 return Result.success("success");
             }
@@ -208,7 +207,6 @@ public class UavReportController {
         if(pubWaylineJobPlanDfEntity!=null && pubWaylineJobPlanDfEntity.getPlanType()==1){
             waylineJobEntity.setIsAnalyzed(2);
             waylineJobMapper.updateById(waylineJobEntity);
-            log.info(jobId+"正在分析。。。");
             Result result = pictureSaveHandler.pictureSave(jobId);
             if (result.getCode() == 0) {
                 AnalysisRequest request = new AnalysisRequest();
@@ -231,17 +229,17 @@ public class UavReportController {
                     jsonArray.addAll(djiPoints);
                 }
                 List<String> fileNames = uavReportService.generateFjFileNames(mediaFileEntities, jsonArray);
-                log.info("文件名为-------------"+fileNames);
-                log.info("request为-------------"+request);
+                log.info("风机计划媒体文件为："+fileNames);
+                log.info("风机计划分析服务request为："+request);
                 request.setFile_name(fileNames);
                 AnalysisResponse response = uavReportService.sendFjAnalysisRequest(request);
                 if (response != null) {
-                    System.out.println("分析结果: " + response);
+                    System.out.println("风机计划分析结果:" + response);
                 }
                 uavReportService.processAndAddDefects(response, jobId);
 //              分析完成
                 waylineJobEntity.setIsAnalyzed(1);
-                log.info(jobId+"分析完成。。。");
+                log.info(jobId+"风机计划分析完成。。。");
                 waylineJobMapper.updateById(waylineJobEntity);
                 return Result.success("success");
             }
@@ -310,7 +308,6 @@ public class UavReportController {
 //      已进行巡检
         waylineJobEntity.setIsReported(1);
         waylineJobMapper.updateById(waylineJobEntity);
-        log.info("创建巡视报告记录，排队生成报告，reportId:{} jobId {}", reportId, jobId);
         return Result.success("reportId:"+reportId);
     }
 
@@ -525,6 +522,7 @@ public class UavReportController {
      */
     @PostMapping("/savePic")
     public Result savePic(@RequestBody JSONObject jsonResponse) {
+        log.info("收到风机不停机视频算法主动调用返回数据：" + jsonResponse);
         String jobId = jsonResponse.getString("jobId");
         WorkspaceEntity workspaceEntity = workspaceMapper.selectOne(new LambdaQueryWrapper<>());
         String workspaceId = workspaceEntity.getWorkspaceId();
@@ -552,7 +550,7 @@ public class UavReportController {
                         }
                         MultipartFile file = convert(checkFile);
                         // 先检查文件是否存在且是文件（不是目录）
-                        log.info("保存文件视频截图文件---"+file.getOriginalFilename());
+                        log.info("风机不停机保存视频截图文件："+file.getOriginalFilename());
                         String ObjectKey= OssConfiguration.objectDirPrefix + "/" + jobId + "/" +file.getOriginalFilename();;
                         ossService.putObject(OssConfiguration.bucket, ObjectKey, file.getInputStream());
                         com.dji.sample.media.model.MediaFileEntity mediaFileEntity = new com.dji.sample.media.model.MediaFileEntity();
@@ -567,13 +565,13 @@ public class UavReportController {
 //                     负载暂时不写
                         mediaFileEntity.setPayload(null);
                         mediaFileEntity.setIsOriginal(true);
-                        log.info("插入文件入库---"+mediaFileEntity);
+                        log.info("风机不停机插入截图文件入库："+mediaFileEntity);
                         fileMapper.insert(mediaFileEntity);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
                 }
-                log.info("开始执行保存点位----");
+                log.info("风机不停机（算法主动调用）开始执行保存点位逻辑...");
 //              截图点位入库
                 FanWaylinePoints fanWaylinePoints = fanWaylinePointsMapper.selectOne(new LambdaQueryWrapper<FanWaylinePoints>()
                         .eq(FanWaylinePoints::getJobId, jobId)
@@ -603,8 +601,7 @@ public class UavReportController {
                     waylineJobEntity.setIsSaved(2);
                     waylineJobMapper.updateById(waylineJobEntity);
                 }
-                log.info("截图点位入库---"+fanWaylinePoints);
-                log.info("处理返回图像---------------------");
+                log.info("风机不停机（算法主动调用）执行保存点位逻辑结束");
            return Result.success("保存成功");
     }
 

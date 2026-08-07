@@ -18,12 +18,16 @@ import com.dji.sample.media.model.MediaFileDTO;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.media.service.IMediaRedisService;
 import com.dji.sample.media.service.IMediaService;
+import com.dji.sample.storage.service.IStorageService;
 import com.dji.sample.wayline.service.IWaylineJobService;
 import com.dji.sdk.cloudapi.media.*;
 import com.dji.sdk.cloudapi.media.api.AbstractMediaService;
+import com.dji.sdk.cloudapi.storage.StsCredentialsResponse;
 import com.dji.sdk.mqtt.MqttReply;
 import com.dji.sdk.mqtt.events.TopicEventsRequest;
 import com.dji.sdk.mqtt.events.TopicEventsResponse;
+import com.dji.sdk.mqtt.requests.TopicRequestsRequest;
+import com.dji.sdk.mqtt.requests.TopicRequestsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +72,9 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
     private IMediaRedisService mediaRedisService;
 
     @Autowired
+    private IStorageService storageService;
+
+    @Autowired
     FanWaylinePointsMapper fanWaylinePointsMapper;
 
     @Resource
@@ -99,6 +106,12 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
                 .filter(tinyFingerprintList::contains)
                 .collect(Collectors.toList());
 
+    }
+
+    @Override
+    public TopicRequestsResponse<MqttReply<StsCredentialsResponse>> storageConfigGet(TopicRequestsRequest<StorageConfigGet> request, MessageHeaders headers) {
+        return new TopicRequestsResponse<MqttReply<StsCredentialsResponse>>()
+                .setData(MqttReply.success(storageService.getSTSCredentials()));
     }
 
     @Override
@@ -147,6 +160,8 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
                 return new TopicEventsResponse<MqttReply>().setData(MqttReply.success());
             }
             countDTO.setPreJobId(countDTO.getJobId());
+        } else {
+            countDTO = new MediaFileCountDTO();
         }
         countDTO.setJobId(jobId);
         mediaRedisService.setMediaHighestPriority(request.getGateway(), countDTO);

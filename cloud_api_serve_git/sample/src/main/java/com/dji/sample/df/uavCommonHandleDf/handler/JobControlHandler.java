@@ -348,7 +348,7 @@ public class JobControlHandler {
         }
     }
 
-//  检查分析状态，分析结束后上报结果（图片和报告，目前适用于风机）
+//  检查分析状态，分析结束后上报结果（图片和报告，目前仅适用于风机）
     private void startAnalysisMonitoring(String jobId, String taskCode,String taskName) {
         // 创建定时检查任务
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -364,17 +364,17 @@ public class JobControlHandler {
                     WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                             .eq(WaylineJobEntity::getJobId, jobId)
                     );
-                    log.info("分析完成上传照片--------");
                     if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
+                        log.info("风机计划分析完成上传照片至巡视系统...");
                         sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = uavReportController.createHisTaskReport(jsonObject);
-                    log.info("已生成完报告-------");
+                    log.info("风机计划已生成完报告");
                     if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
-                        log.info("上传报告-------");
+                        log.info("风机计划分析完成上传报告至巡视系统...");
                         sendPatrolReportResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 3. 清理监控

@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
+import org.springframework.messaging.MessagingException;
 import org.springframework.stereotype.Component;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -25,17 +26,22 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
     @Qualifier("mqttInbound")
     private MqttPahoMessageDrivenChannelAdapter adapter;
 
+    private final Object topicLock = new Object();
+
     @Override
     public void subscribe(String... topics) {
         if (adapter == null) {
             return;
         }
-        Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
-        for (String topic : topics) {
-            if (topicSet.contains(topic)) {
-                return;
+        synchronized (topicLock) {
+            Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
+            for (String topic : topics) {
+                if (topicSet.contains(topic)) {
+                    continue;
+                }
+                subscribe(topic, 1);
+                topicSet.add(topic);
             }
-            subscribe(topic, 1);
         }
     }
 
@@ -44,12 +50,22 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
         if (adapter == null) {
             return;
         }
-        Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
-        if (topicSet.contains(topic)) {
-            return;
+        synchronized (topicLock) {
+            Set<String> topicSet = new HashSet<>(Arrays.asList(getSubscribedTopic()));
+            if (topicSet.contains(topic)) {
+                return;
+            }
+            log.debug("subscribe topic: {}", topic);
+            try {
+                adapter.addTopic(topic, qos);
+            } catch (MessagingException e) {
+                if (e.getMessage() != null && e.getMessage().contains("is already subscribed")) {
+                    log.debug("topic already subscribed: {}", topic);
+                    return;
+                }
+                throw e;
+            }
         }
-        log.debug("subscribe topic: {}", topic);
-        adapter.addTopic(topic, qos);
     }
 
     @Override
@@ -57,8 +73,10 @@ public class MqttTopicServiceImpl implements IMqttTopicService {
         if (adapter == null) {
             return;
         }
-        log.debug("unsubscribe topic: {}", Arrays.toString(topics));
-        adapter.removeTopic(topics);
+        synchronized (topicLock) {
+            log.debug("unsubscribe topic: {}", Arrays.toString(topics));
+            adapter.removeTopic(topics);
+        }
     }
 
     public String[] getSubscribedTopic() {

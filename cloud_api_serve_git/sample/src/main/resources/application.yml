@@ -153,6 +153,7 @@ oss:
 logging:
   level:
     com.dji: debug
+    org.springframework.integration.handler.support.MessagingMethodInvokerHelper: warn
   file:
     name: logs/cloud-api-sample.log
 

@@ -121,11 +121,11 @@ public class CenterTaskHandler {
             // 注意：这可能效率不高，如果任务多的话
             Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
             // 同时打印待执行集合TTL，便于判断任务突然消失是否由key过期导致。
-            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
-                    currentTime,
-                    allTasks == null ? 0 : allTasks.size(),
-                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
-                    RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
+//            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
+//                    currentTime,
+//                    allTasks == null ? 0 : allTasks.size(),
+//                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
+//                    RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
             if (allTasks == null || allTasks.isEmpty()) {
                 return;
             }

@@ -4,12 +4,13 @@ import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.storage.service.IStorageService;
 import com.dji.sdk.cloudapi.media.StorageConfigGet;
-import com.dji.sdk.cloudapi.media.api.AbstractMediaService;
 import com.dji.sdk.cloudapi.storage.StsCredentialsResponse;
+import com.dji.sdk.mqtt.ChannelName;
 import com.dji.sdk.mqtt.MqttReply;
 import com.dji.sdk.mqtt.requests.TopicRequestsRequest;
 import com.dji.sdk.mqtt.requests.TopicRequestsResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Service;
 
@@ -19,7 +20,7 @@ import org.springframework.stereotype.Service;
  * @date 2022/3/9
  */
 @Service
-public class StorageServiceImpl extends AbstractMediaService implements IStorageService {
+public class StorageServiceImpl implements IStorageService {
 
     @Autowired
     private OssServiceContext ossService;
@@ -35,7 +36,7 @@ public class StorageServiceImpl extends AbstractMediaService implements IStorage
                 .setRegion(OssConfiguration.region);
     }
 
-    @Override
+    @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_STORAGE_CONFIG_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
     public TopicRequestsResponse<MqttReply<StsCredentialsResponse>> storageConfigGet(TopicRequestsRequest<StorageConfigGet> response, MessageHeaders headers) {
         return new TopicRequestsResponse<MqttReply<StsCredentialsResponse>>().setData(MqttReply.success(getSTSCredentials()));
     }

@@ -382,7 +382,7 @@ public class GfReportServiceImpl implements GfReportService {
             System.out.println("没有需要新增的缺陷数据");
             return;
         }
-        System.out.println("开始新增 " + defects.size() + " 条缺陷数据:");
+        log.info("开始新增 " + defects.size() + " 条缺陷数据:");
 
         for (int i = 0; i < defects.size(); i++) {
             DefectEntity defect = defects.get(i);
@@ -400,7 +400,7 @@ public class GfReportServiceImpl implements GfReportService {
             defectEntityMapper.insert(defect);
             System.out.println((i + 1) + ". " + defect);
         }
-        System.out.println("缺陷数据新增完成");
+        log.info("缺陷数据新增完成");
     }
 
     public static Integer extractDefectType(String imagePath) {

@@ -163,7 +163,7 @@ public class DevicePayloadServiceImpl implements IDevicePayloadService {
 
         // Save the new payload information.
         boolean isSave = this.savePayloadDTOs(drone, payloads);
-        log.debug("The result of saving the payloads is {}.", isSave);
+//        log.debug("The result of saving the payloads is {}.", isSave);
     }
 
     @Override

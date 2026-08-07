@@ -241,7 +241,7 @@ public class PictureSaveHandler {
                 throw new IOException("无法将图片保存为JPEG格式");
             }
 
-            System.out.println("JPEG图片保存成功: " + localFilePath);
+            log.info("JPEG图片保存成功: " + localFilePath);
             return localFilePath;
 
         } catch (IOException e) {

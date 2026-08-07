@@ -101,11 +101,11 @@ public class MinIOServiceImpl implements IOssService {
             client.statObject(StatObjectArgs.builder().bucket(bucket).object(objectKey).build());
             throw new RuntimeException("The filename already exists.");
         } catch (MinioException | InvalidKeyException | IOException | NoSuchAlgorithmException e) {
-            log.info("The file does not exist, start uploading.");
+//            log.info("The file does not exist, start uploading.");
             try {
                 ObjectWriteResponse response = client.putObject(
                         PutObjectArgs.builder().bucket(bucket).object(objectKey).stream(input, input.available(), 0).build());
-                log.info("Upload FlighttaskCreateFile: {}", response.etag());
+//                log.info("Upload FlighttaskCreateFile: {}", response.etag());
             } catch (MinioException | IOException | InvalidKeyException | NoSuchAlgorithmException ex) {
                 log.error("Failed to upload FlighttaskCreateFile {}.", objectKey);
                 ex.printStackTrace();

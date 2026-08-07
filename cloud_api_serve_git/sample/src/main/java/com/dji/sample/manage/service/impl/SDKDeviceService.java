@@ -598,7 +598,7 @@ public class SDKDeviceService extends AbstractDeviceService {
             deviceService.subDeviceOnlineSubscribeTopic(SDKManager.getDeviceSDK(gatewaySn));
         }
 
-        log.warn("{} is already online.", deviceSn);
+//        log.warn("{} is already online.", deviceSn);
     }
 
     /**
