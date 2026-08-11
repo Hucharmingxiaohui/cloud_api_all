@@ -6,6 +6,8 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavNestDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockUavMonitoringEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockUavMonitoringReportService;
 import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.df.uavCommonHandleDf.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -27,6 +29,7 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
     private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
+    private CqDockUavMonitoringReportService euaReportService = SpringUtils.getBean(CqDockUavMonitoringReportService.class);
 
     public UavNestRunRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -60,13 +63,18 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
         if (list == null) {
             list = new ArrayList<>();
         }
-        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
-                new LambdaQueryWrapper<DroneMonitoringEntity>()
-                        .orderByDesc(DroneMonitoringEntity::getId)
-                        .last("limit 1")
-        );
+        boolean euaEnabled = euaReportService.isEuaDataEnabled();
+        DroneMonitoringEntity droneMonitoringEntity = null;
+        if (!euaEnabled) {
+            droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                    new LambdaQueryWrapper<DroneMonitoringEntity>()
+                            .orderByDesc(DroneMonitoringEntity::getId)
+                            .last("limit 1")
+            );
+        }
 //      此处是针对一个机巢,后续加多个需要改
         for (DeviceEntity entity : list) {
+            CqDockUavMonitoringEntity eua = euaEnabled ? euaReportService.findLatestAny() : null;
             UavNestDataItem item1 = createCommonBean(entity);
             UavNestDataItem item2 = createCommonBean(entity);
             UavNestDataItem item3 = createCommonBean(entity);
@@ -98,20 +106,23 @@ public class UavNestRunRunnable extends IntervalBaseRunnable {
 
             item4.setType("4");
             valueUnit = "";
-            item4.setValue_unit(droneMonitoringEntity.getNestVoltage()+"mV");
-            item4.setValue(droneMonitoringEntity.getNestVoltage());
+            String nestVoltage = euaEnabled ? (eua == null ? null : eua.getNestVoltage()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getNestVoltage());
+            item4.setValue_unit(euaReportService.value(nestVoltage, "").isEmpty() ? "" : euaReportService.value(nestVoltage, "") + "mV");
+            item4.setValue(euaReportService.value(nestVoltage, ""));
             item4.setUnit("mV");
 
             item5.setType("5");
             valueUnit = "";
-            item5.setValue_unit(droneMonitoringEntity.getNestTemperature()+"°C");
-            item5.setValue(droneMonitoringEntity.getNestTemperature());
+            String nestTemperature = euaEnabled ? (eua == null ? null : eua.getNestTemperature()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getNestTemperature());
+            item5.setValue_unit(euaReportService.value(nestTemperature, "").isEmpty() ? "" : euaReportService.value(nestTemperature, "") + "°C");
+            item5.setValue(euaReportService.value(nestTemperature, ""));
             item5.setUnit("°C");
 
             item6.setType("6");
             valueUnit = "";
-            item6.setValue_unit(droneMonitoringEntity.getNestHumidity()+"%RH");
-            item6.setValue(droneMonitoringEntity.getNestHumidity());
+            String nestHumidity = euaEnabled ? (eua == null ? null : eua.getNestHumidity()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getNestHumidity());
+            item6.setValue_unit(euaReportService.value(nestHumidity, "").isEmpty() ? "" : euaReportService.value(nestHumidity, "") + "%RH");
+            item6.setValue(euaReportService.value(nestHumidity, ""));
             item6.setUnit("%RH");
 
             commandData.addItem(item1);

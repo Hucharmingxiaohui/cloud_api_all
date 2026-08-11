@@ -7,7 +7,10 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostRunDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.common.util.SpringBeanUtilsTest;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockUavMonitoringEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockUavMonitoringReportService;
 import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
+import com.dji.sample.df.uavCommonHandleDf.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
 import com.dji.sample.manage.model.entity.DeviceEntity;
 import com.dji.sample.manage.service.IDeviceRedisService;
@@ -32,6 +35,7 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
     private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
+    private CqDockUavMonitoringReportService euaReportService = SpringUtils.getBean(CqDockUavMonitoringReportService.class);
 
     public UavHostRunRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -60,8 +64,19 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
 //                .eq(UavDeviceEntity::getMainDeviceType, 1)
 //        );
         List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
+        boolean euaEnabled = euaReportService.isEuaDataEnabled();
         if (list != null && list.size() > 0) {
             for (DeviceEntity uavDevice : list) {
+                if (euaEnabled) {
+                    CqDockUavMonitoringEntity eua = euaReportService.findLatestAny();
+                    addEuaRunItems(commandData, uavDevice, eua);
+                    continue;
+                }
+                DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                        new LambdaQueryWrapper<DroneMonitoringEntity>()
+                                .orderByDesc(DroneMonitoringEntity::getId)
+                                .last("limit 1")
+                );
                 //无人机数据
                 Optional<OsdDockDrone> deviceOpt = SpringBeanUtilsTest.getBean(IDeviceRedisService.class)
                         .getDeviceOsd(uavDevice.getDeviceSn(), OsdDockDrone.class);
@@ -207,6 +222,28 @@ public class UavHostRunRunnable extends IntervalBaseRunnable {
         commandData.setReceiveCode(centerCode);
         commandData.setType("2");
         patrolHostSocketClient.sendCommand(commandData, UavHostRunDataItem.class);
+    }
+
+    private void addEuaRunItems(PatrolHostCommand commandData, DeviceEntity uavDevice, CqDockUavMonitoringEntity eua) {
+        addRunItem(commandData, uavDevice, "1", eua == null ? "" : euaReportService.value(eua.getHorizontalSpeed(), ""), "m/s");
+        addRunItem(commandData, uavDevice, "2", eua == null ? "" : euaReportService.value(eua.getFlightDistance(), ""), "m");
+        addRunItem(commandData, uavDevice, "3", eua == null ? "" : euaReportService.value(eua.getBatteryLevel(), ""), "%");
+        addRunItem(commandData, uavDevice, "4", eua == null ? "" : euaReportService.value(eua.getVerticalSpeed(), ""), "m/s");
+        addRunItem(commandData, uavDevice, "5", eua == null ? "" : euaReportService.value(eua.getHomeDistance(), ""), "m");
+        addRunItem(commandData, uavDevice, "6", eua == null ? "" : euaReportService.value(eua.getFlightHeight(), ""), "m");
+        addRunItem(commandData, uavDevice, "7", eua == null ? "" : euaReportService.value(eua.getTotalFlightTime(), ""), "h");
+        addRunItem(commandData, uavDevice, "8", "", "");
+        addRunItem(commandData, uavDevice, "9", "", "");
+        addRunItem(commandData, uavDevice, "10", "", "");
+    }
+
+    private void addRunItem(PatrolHostCommand commandData, DeviceEntity device, String type, String value, String unit) {
+        UavHostRunDataItem item = createCommonBean(device);
+        item.setType(type);
+        item.setValue(value);
+        item.setUnit(unit);
+        item.setValue_unit(value == null || value.isEmpty() ? "" : value + unit);
+        commandData.addItem(item);
     }
 
     /**

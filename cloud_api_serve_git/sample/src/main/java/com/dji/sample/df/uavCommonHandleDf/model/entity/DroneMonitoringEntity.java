@@ -13,6 +13,7 @@ import java.io.Serializable;
 
 /**
  * drone_monitoring 表 无人机及机巢监控数据实体
+ * （为管控平台直接控制的无人机）
  */
 @Data
 @Builder

@@ -35,4 +35,9 @@ public class SwitchConfig {
      */
     private String centerCqDockTaskEnable;
 
+    /**
+     * 是否开启EUA平台数据源用于上级TCP上报
+     */
+    private String centerEuaTcpDataEnable;
+
 }
