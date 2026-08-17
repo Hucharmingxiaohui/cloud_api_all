@@ -1,6 +1,6 @@
 const CURRENT_CONFIG = {
   // license
-  baseURL: 'http://172.20.63.157:6789/',
+  baseURL: 'http://172.20.13.54:6789/',
   kmzURL: 'http://172.20.63.157:6789/',
   websocketURL: 'ws://172.20.63.157:6789/api/v1/ws',
   rtmpURL: 'rtmp://172.20.63.157:2035/live/', // 视频请求推流地址

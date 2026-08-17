@@ -15,4 +15,6 @@ public interface SolarPanelAreaService extends IService<SolarPanelArea> {
     SolarPanelArea getSolarPanelAreaById(Long id);
     Map<String, Object> selectList(Map<String, Object> params);
     Result detectAreaGenSolar(SolarDetectRequestDTO solarDetectRequestDTO);
+    boolean addPointsByOrthophotoId(String orthophotoId);
+    Map<String, Object> getPointsByOrthophotoId(Map<String, Object> params);
 }

@@ -52,7 +52,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+/*
+主要负责上级巡视飞行任务执行后本平台的状态监控及结果上传
+ */
 @Slf4j
 @Component
 public class JobControlHandler {

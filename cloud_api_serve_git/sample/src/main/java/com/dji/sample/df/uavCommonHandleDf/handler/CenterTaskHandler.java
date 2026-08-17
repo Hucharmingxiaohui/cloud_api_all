@@ -33,7 +33,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
+/*
+主要负责对接巡视上级的任务下发，根据不同场景分发执行不同通道飞行任务
+ */
 @Component
 @Slf4j
 public class CenterTaskHandler {

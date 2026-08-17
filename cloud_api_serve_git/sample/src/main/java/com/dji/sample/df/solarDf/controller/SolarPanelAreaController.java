@@ -47,6 +47,25 @@ public class SolarPanelAreaController {
     public Result detectAreaGenSolar(@RequestBody SolarDetectRequestDTO solarDetectRequestDTO) {
         return solarPanelAreaService.detectAreaGenSolar(solarDetectRequestDTO);
     }
+
+    /**
+     * 根据正射图ID生成光伏点位模型
+     */
+    @GetMapping("/addPointsById")
+    public Result addPointsById(@RequestParam String id) {
+        boolean success = solarPanelAreaService.addPointsByOrthophotoId(id);
+        return Result.success(success);
+    }
+
+    /**
+     * 根据正射图ID查询光伏点位模型
+     */
+    @GetMapping("/getPointsById")
+    public Result<Map> getPointsById(@RequestParam Map<String, Object> params) {
+        Map<String, Object> pointsList = solarPanelAreaService.getPointsByOrthophotoId(params);
+        return Result.success(pointsList);
+    }
+
     /**
      * 根据ID删除光伏区域参数
      */

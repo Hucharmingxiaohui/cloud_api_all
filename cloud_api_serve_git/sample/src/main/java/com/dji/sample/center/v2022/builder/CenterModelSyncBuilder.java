@@ -16,6 +16,8 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.center.v2022.tool.CenterXmlTool;
 import com.dji.sample.df.electricInspectionDf.dao.PubSubstationDfMapper;
 import com.dji.sample.df.manageDf.dao.IWaylinePointMapper;
+import com.dji.sample.df.solarDf.dao.SolarStationPointsMapper;
+import com.dji.sample.df.solarDf.model.entity.SolarStationPoints;
 import com.dji.sample.df.windDf.dao.FanStationPointsMapper;
 import com.dji.sample.df.windDf.model.entity.FanStationPoints;
 import lombok.extern.slf4j.Slf4j;
@@ -39,16 +41,19 @@ public class CenterModelSyncBuilder {
     private PubSubstationDfMapper pubSubstationDfMapper = AppContext.getBean(PubSubstationDfMapper.class);
     private UniPointMapper2 uniPointMapper = AppContext.getBean(UniPointMapper2.class);
     private FanStationPointsMapper fanStationPointsMapper = AppContext.getBean(FanStationPointsMapper.class);
+    private SolarStationPointsMapper solarStationPointsMapper = AppContext.getBean(SolarStationPointsMapper.class);
 
     // 通过 Environment 获取配置值
     private Environment environment = AppContext.getBean(Environment.class);
     private String fanPoints;
     private String stationPoints;
+    private String solarPoints;
 
     public CenterModelSyncBuilder() {
         // 在构造方法中获取配置值
         this.fanPoints = environment.getProperty("modelSync.fanPoints");
         this.stationPoints = environment.getProperty("modelSync.stationPoints");
+        this.solarPoints = environment.getProperty("modelSync.solarPoints");
     }
 
     private static CenterModelSyncBuilder instance = null;
@@ -101,6 +106,38 @@ public class CenterModelSyncBuilder {
                     //无人机点位外观类型，暂时设置为空
                     item.setAppearance_type("");
                     //现场不需要分析，暂时设置为空
+                    item.setRecognition_type_list("");
+                    item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
+                    item.setDevice_info("");
+                    item.setSave_type_list("2");
+                    data.add(item);
+                }
+            }
+        }
+        if("true".equals(solarPoints)) {
+            List<SolarStationPoints> solarStationPoints = solarStationPointsMapper.selectList(new LambdaQueryWrapper<>());
+            if (solarStationPoints != null && solarStationPoints.size() > 0) {
+                for (SolarStationPoints entity : solarStationPoints) {
+                    PatrolUavPointModelItem item = new PatrolUavPointModelItem();
+                    item.setStation_code(subCode);
+                    item.setStation_name(entity.getStationName());
+                    item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
+                    item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));
+                    item.setData_type("4");
+                    item.setLower_value("");
+                    item.setUpper_value("");
+                    item.setVideo_pos("");
+                    item.setDevice_id(Optional.ofNullable(entity.getPointId()).orElse(""));
+                    item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
+                    item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
+                    item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
+                    item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));
+                    item.setBay_name(Optional.ofNullable(entity.getBayName()).orElse(""));
+                    item.setMain_device_id(Optional.ofNullable(entity.getMainDeviceId()).orElse(""));
+                    item.setMain_device_name(Optional.ofNullable(entity.getMainDeviceName()).orElse(""));
+                    item.setDevice_type("");
+                    item.setMeter_type("");
+                    item.setAppearance_type("");
                     item.setRecognition_type_list("");
                     item.setPhase(Optional.ofNullable(entity.getPhase()).orElse(""));
                     item.setDevice_info("");
