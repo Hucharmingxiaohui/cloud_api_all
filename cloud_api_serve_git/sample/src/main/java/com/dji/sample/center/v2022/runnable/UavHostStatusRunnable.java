@@ -77,7 +77,7 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
         if (list != null && list.size() > 0) {
             for (DeviceEntity uavDevice : list) {
                 CqDockUavMonitoringEntity eua = euaEnabled ? euaReportService.findLatestAny() : null;
-                String runState = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getOperationStatus(), "")) : resolveRedisRunState();
+                String runState = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getOperationStatus(), "")) : resolveRedisRunState(uavDevice);
                 String batteryLevel1 = euaEnabled ? resolveEuaBatteryStatus(eua) : resolveBatteryStatus(droneMonitoringEntity == null ? null : droneMonitoringEntity.getBatteryLevel());
                 String communicationStatus = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getCommunicationStatus(), "")) : "0";
                 String faultAlarm = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getFaultAlarm(), "")) : "0";
@@ -147,13 +147,19 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
         return resolveBatteryStatus(eua.getBatteryLevel());
     }
 
-    private String resolveRedisRunState() {
-        DeviceEntity deviceEntity = iDeviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-        if (deviceEntity == null) {
+    private String resolveRedisRunState(DeviceEntity uavDevice) {
+        if (uavDevice == null || !org.springframework.util.StringUtils.hasText(uavDevice.getDeviceSn())) {
             return "1";
         }
-        Optional<EventsReceiver<FlighttaskProgress>> runningWaylineJob = SpringBeanUtilsTest.getBean(IWaylineRedisService.class)
-                .getRunningWaylineJob(deviceEntity.getDeviceSn());
+        DeviceEntity dockDevice = iDeviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getDomain, 3)
+                .eq(DeviceEntity::getChildSn, uavDevice.getDeviceSn())
+                .last("limit 1"));
+        if (dockDevice == null) {
+            return "1";
+        }
+        IWaylineRedisService waylineRedisService = SpringBeanUtilsTest.getBean(IWaylineRedisService.class);
+        Optional<EventsReceiver<FlighttaskProgress>> runningWaylineJob = waylineRedisService.getRunningWaylineJob(dockDevice.getDeviceSn());
         return runningWaylineJob.isPresent() ? "2" : "1";
     }
 

@@ -17,6 +17,8 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.controller.FileControllerDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
+import com.dji.sample.df.solarDf.dao.SolarStationPointsMapper;
+import com.dji.sample.df.solarDf.model.entity.SolarStationPoints;
 import com.dji.sample.df.uavCommonHandleDf.controller.UavReportController;
 import com.dji.sample.df.uavCommonHandleDf.dao.DefectEntityMapper;
 import com.dji.sample.df.windDf.dao.FanStationPointsMapper;
@@ -81,6 +83,8 @@ public class JobControlHandler {
     private CenterNormalConfig centerConfig;
     @Autowired
     DefectEntityMapper defectEntityMapper;
+    @Resource
+    SolarStationPointsMapper solarStationPointsMapper;
     @Autowired
     UniPointMapper2 uniPointMapper2;
     @Autowired
@@ -287,7 +291,7 @@ public class JobControlHandler {
                     Result result = uavReportController.pictureSaveAndAnalysis(jsonObject);
                     log.info("图片分析已启动: jobId={}, result={}", jobId, result);
                 }
-        // 2. 开始轮询检查分析状态
+            // 2. 开始轮询检查分析状态
                 startAnalysisMonitoring(jobId, taskCode,taskName);
             } catch (Exception e) {
                 log.error("启动图片分析失败: jobId={}", jobId, e);
@@ -419,6 +423,9 @@ public class JobControlHandler {
             }else if(planType==0) {
                 // 航点航线上报结果
                 sendNormalPatrolResult(taskCode, taskName, waylineJobEntity, deviceSn);
+            }else if(planType==4) {
+                // 光伏计划上报结果
+                sendSolarPatrolResult(taskCode, taskName, waylineJobEntity, pubWaylineJobPlanDfEntity, deviceSn);
             }
         } catch (Exception e) {
             log.error("上报巡视结果失败: taskCode={}", taskCode, e);
@@ -488,6 +495,76 @@ public class JobControlHandler {
             commandData.addItem(item);
             patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
             log.info("上报风机巡视图片--------: ");
+        }
+    }
+
+    /**
+     * 光伏计划（planType==4）巡视结果上报：
+     * 查询defect_file可见光图片，按光伏板名称依次匹配solar_station_points点位1/2/3，上限后跳过。
+     */
+    private void sendSolarPatrolResult(String taskCode, String taskName, WaylineJobEntity waylineJobEntity,
+                                       PubWaylineJobPlanDfEntity plan, String deviceSn) throws Exception {
+        List<DefectEntity> defectEntities = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()
+                .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
+                .eq(DefectEntity::getImageType, 0)
+                .isNotNull(DefectEntity::getSolarPanelName)
+                .orderByAsc(DefectEntity::getId));
+        Map<String, List<SolarStationPoints>> panelPointsCache = new HashMap<>();
+        Map<String, Integer> panelPointIndex = new HashMap<>();
+        for (DefectEntity defectEntity : defectEntities) {
+            String solarPanelName = defectEntity.getSolarPanelName();
+            if (!org.springframework.util.StringUtils.hasText(solarPanelName)) {
+                continue;
+            }
+            List<SolarStationPoints> points = panelPointsCache.computeIfAbsent(solarPanelName, panelName ->
+                    solarStationPointsMapper.selectList(new LambdaQueryWrapper<SolarStationPoints>()
+                            .eq(SolarStationPoints::getMainDeviceName, panelName)
+                            .eq(org.springframework.util.StringUtils.hasText(plan.getOrthophotoId()), SolarStationPoints::getAreaId, plan.getOrthophotoId())
+                            .orderByAsc(SolarStationPoints::getPointName)
+                            .orderByAsc(SolarStationPoints::getId)));
+            int pointIndex = panelPointIndex.getOrDefault(solarPanelName, 0);
+            if (pointIndex >= points.size()) {
+                log.info("光伏板点位已用完，跳过图片上报: jobId={}, solarPanelName={}, defectId={}",
+                        waylineJobEntity.getJobId(), solarPanelName, defectEntity.getId());
+                continue;
+            }
+            SolarStationPoints point = points.get(pointIndex);
+            String imagePath = defectEntity.getImagePath();
+            if (!org.springframework.util.StringUtils.hasText(imagePath)) {
+                log.info("光伏可见光图片路径为空，跳过上报: jobId={}, defectId={}", waylineJobEntity.getJobId(), defectEntity.getId());
+                continue;
+            }
+            PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
+            String destDir = "/" + taskCode;
+            String destName = new File(imagePath).getName();
+            String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
+            FtpUtils.getInstance().uploadToCenterNormal(imagePath, destDir, destName1);
+            String format = String.format("%s/%s", destDir, destName1);
+
+            PatrolResultItem item = new PatrolResultItem();
+            item.setPatroldevice_name("大疆M4TD");
+            item.setPatroldevice_code(deviceSn);
+            item.setTask_name(taskName);
+            item.setTask_code(taskCode);
+            item.setDevice_name(point.getPointName());
+            item.setDevice_id(point.getPointId());
+            item.setValue("");
+            item.setUnit("");
+            item.setValue_unit(defectEntity.getDefectDescription());
+            item.setTime(DateUtils.getNowDateTimeStr());
+            item.setRecognition_type("");
+            item.setFile_path(format);
+            item.setFile_type("2");
+            item.setRectangle("");
+            item.setTask_patrolled_id(waylineJobEntity.getJobId());
+            item.setObj_id("");
+            item.setValid("1");
+            item.setDefect_description(defectEntity.getDefectDescription());
+            commandData.addItem(item);
+            patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
+            panelPointIndex.put(solarPanelName, pointIndex + 1);
+            log.info("上报光伏巡视图片: jobId={}, solarPanelName={}, pointName={}",
+                    waylineJobEntity.getJobId(), solarPanelName, point.getPointName());
         }
     }
 
