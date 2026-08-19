@@ -1,16 +1,24 @@
 package com.dji.sample.df.solarDf.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.df.framework.vo.Result;
 import com.dji.sample.df.commonDf.util.PageUtil;
+import com.dji.sample.df.solarDf.dao.OrthophotoEntityMapper;
 import com.dji.sample.df.solarDf.dao.SolarPanelAreaMapper;
+import com.dji.sample.df.solarDf.dao.SolarPanelMapper;
+import com.dji.sample.df.solarDf.dao.SolarStationPointsMapper;
 import com.dji.sample.df.solarDf.model.dto.SolarDetectRequestCutDTO;
 import com.dji.sample.df.solarDf.model.dto.SolarDetectRequestDTO;
 import com.dji.sample.df.solarDf.model.dto.SolarDetectResponseDTO;
+import com.dji.sample.df.solarDf.model.entity.OrthophotoEntity;
+import com.dji.sample.df.solarDf.model.entity.SolarPanel;
 import com.dji.sample.df.solarDf.model.entity.SolarPanelArea;
+import com.dji.sample.df.solarDf.model.entity.SolarStationPoints;
 import com.dji.sample.df.solarDf.service.SolarPanelAreaService;
 import com.dji.sample.df.windDf.config.WaylineUrlConfig;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -30,7 +38,22 @@ public class SolarPanelAreaServiceImpl extends ServiceImpl<SolarPanelAreaMapper,
     private SolarPanelAreaMapper solarPanelAreaMapper;
 
     @Resource
+    private OrthophotoEntityMapper orthophotoEntityMapper;
+
+    @Resource
+    private SolarPanelMapper solarPanelMapper;
+
+    @Resource
+    private SolarStationPointsMapper solarStationPointsMapper;
+
+    @Resource
     WaylineUrlConfig WaylineUrlConfig;
+
+    @Value("${normalStation.stationCode:}")
+    private String stationCode;
+
+    @Value("${normalStation.stationName:}")
+    private String stationName;
 
     private final RestTemplate restTemplate;
 
@@ -71,6 +94,55 @@ public class SolarPanelAreaServiceImpl extends ServiceImpl<SolarPanelAreaMapper,
         PageUtil.setPageArgs(params);
         List<SolarPanelArea> list = solarPanelAreaMapper.selectListByMap(params);
         int count = solarPanelAreaMapper.selectListCount(params);
+
+        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> pagination = new HashMap<>();
+        pagination.put("page", Integer.parseInt(params.get("page").toString()));
+        pagination.put("pageSize", Integer.parseInt(params.get("pageSize").toString()));
+        pagination.put("total", count);
+        result.put("list", list);
+        result.put("pagination", pagination);
+        return result;
+    }
+
+    @Override
+    public boolean addPointsByOrthophotoId(String orthophotoId) {
+        OrthophotoEntity orthophoto = orthophotoEntityMapper.selectById(orthophotoId);
+        if (orthophoto == null) {
+            throw new RuntimeException("未找到正射图信息，ID: " + orthophotoId);
+        }
+        List<SolarPanel> panels = solarPanelMapper.selectList(new LambdaQueryWrapper<SolarPanel>()
+                .eq(SolarPanel::getOrthophotoId, orthophotoId)
+                .orderByAsc(SolarPanel::getSolarPanelName));
+        if (panels == null || panels.isEmpty()) {
+            throw new RuntimeException("当前正射图下未找到光伏板，ID: " + orthophotoId);
+        }
+        List<SolarStationPoints> points = SolarStationPointGenerator.generate(orthophoto, panels);
+        for (SolarStationPoints point : points) {
+            point.setStationName(stationName);
+            point.setStationCode(stationCode);
+            SolarStationPoints existingPoint = solarStationPointsMapper.selectOne(new LambdaQueryWrapper<SolarStationPoints>()
+                    .eq(SolarStationPoints::getPointName, point.getPointName())
+                    .last("LIMIT 1"));
+            if (existingPoint != null) {
+                point.setId(existingPoint.getId());
+                point.setPointId(existingPoint.getPointId());
+                solarStationPointsMapper.updateById(point);
+            } else {
+                String id = UUID.randomUUID().toString();
+                point.setId(id);
+                point.setPointId(id);
+                solarStationPointsMapper.insert(point);
+            }
+        }
+        return true;
+    }
+
+    @Override
+    public Map<String, Object> getPointsByOrthophotoId(Map<String, Object> params) {
+        PageUtil.setPageArgs(params);
+        List<SolarStationPoints> list = solarStationPointsMapper.selectListById(params);
+        int count = solarStationPointsMapper.selectListCount(params);
 
         Map<String, Object> result = new HashMap<>();
         Map<String, Object> pagination = new HashMap<>();

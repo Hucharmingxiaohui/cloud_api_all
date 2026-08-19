@@ -47,7 +47,6 @@ public class CapacityCameraServiceImpl implements ICapacityCameraService {
                 .stream()
                 .map(this::payloadEntityConvertToDTO)
                 .collect(Collectors.toList());
-        System.out.println(devicePayloadList);
         for(int i=0;i<devicePayloadList.size();i++)
         {
             //相机信息

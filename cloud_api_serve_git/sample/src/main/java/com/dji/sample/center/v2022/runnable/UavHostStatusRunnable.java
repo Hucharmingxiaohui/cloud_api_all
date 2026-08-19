@@ -7,6 +7,8 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostStatusDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.common.util.SpringBeanUtilsTest;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockUavMonitoringEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockUavMonitoringReportService;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
 import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
@@ -33,6 +35,7 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
     private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
+    private CqDockUavMonitoringReportService euaReportService = SpringUtils.getBean(CqDockUavMonitoringReportService.class);
 
     public UavHostStatusRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -62,33 +65,22 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
 //        );
 
         List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
-        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
-                new LambdaQueryWrapper<DroneMonitoringEntity>()
-                        .orderByDesc(DroneMonitoringEntity::getId)
-                        .last("limit 1")
-        );
-        String batteryLevel = droneMonitoringEntity.getBatteryLevel();
-        String batteryLevel1 ="0";
-        if (batteryLevel != null) {
-            int i = Integer.parseInt(batteryLevel);
-            if (i < 30) {
-                batteryLevel1 ="1";
-            }else {
-                batteryLevel1 ="0";
-            }
+        boolean euaEnabled = euaReportService.isEuaDataEnabled();
+        DroneMonitoringEntity droneMonitoringEntity = null;
+        if (!euaEnabled) {
+            droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                    new LambdaQueryWrapper<DroneMonitoringEntity>()
+                            .orderByDesc(DroneMonitoringEntity::getId)
+                            .last("limit 1")
+            );
         }
         if (list != null && list.size() > 0) {
             for (DeviceEntity uavDevice : list) {
-                //无人机数据
-                //判断是否飞行需要获取机巢sn,目前一个，之后多机巢需要改
-                DeviceEntity deviceEntity = iDeviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-                Optional<EventsReceiver<FlighttaskProgress>> runningWaylineJob = SpringBeanUtilsTest.getBean(IWaylineRedisService.class)
-                        .getRunningWaylineJob(deviceEntity.getDeviceSn());
-                boolean present = runningWaylineJob.isPresent();
-                String runState = "1";
-                if (present) {
-                    runState = "2";
-                }
+                CqDockUavMonitoringEntity eua = euaEnabled ? euaReportService.findLatestAny() : null;
+                String runState = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getOperationStatus(), "")) : resolveRedisRunState(uavDevice);
+                String batteryLevel1 = euaEnabled ? resolveEuaBatteryStatus(eua) : resolveBatteryStatus(droneMonitoringEntity == null ? null : droneMonitoringEntity.getBatteryLevel());
+                String communicationStatus = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getCommunicationStatus(), "")) : "0";
+                String faultAlarm = euaEnabled ? (eua == null ? "" : euaReportService.value(eua.getFaultAlarm(), "")) : "0";
                 // 电池电量
                 UavHostStatusDataItem item1 = createCommonBean(uavDevice);
                 String valueUnit = "";
@@ -103,7 +95,7 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
                 valueUnit = "";
                 item2.setType("2");
                 item2.setValue_unit(valueUnit);
-                item2.setValue("0");
+                item2.setValue(communicationStatus);
                 item2.setUnit("");
                 commandData.addItem(item2);
 
@@ -112,7 +104,7 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
                 valueUnit = "";
                 item3.setType("5");
                 item3.setValue_unit(valueUnit);
-                item3.setValue("0");
+                item3.setValue(faultAlarm);
                 item3.setUnit("");
                 commandData.addItem(item3);
 
@@ -132,6 +124,43 @@ public class UavHostStatusRunnable extends IntervalBaseRunnable {
         commandData.setReceiveCode(centerCode);
         commandData.setType("1");
         patrolHostSocketClient.sendCommand(commandData, UavHostStatusDataItem.class);
+    }
+
+    private String resolveBatteryStatus(String batteryLevel) {
+        String batteryStatus = "0";
+        if (batteryLevel != null) {
+            try {
+                int i = Integer.parseInt(batteryLevel);
+                if (i < 30) {
+                    batteryStatus = "1";
+                }
+            } catch (NumberFormatException ignore) {
+            }
+        }
+        return batteryStatus;
+    }
+
+    private String resolveEuaBatteryStatus(CqDockUavMonitoringEntity eua) {
+        if (eua == null || !org.springframework.util.StringUtils.hasText(eua.getBatteryLevel())) {
+            return "";
+        }
+        return resolveBatteryStatus(eua.getBatteryLevel());
+    }
+
+    private String resolveRedisRunState(DeviceEntity uavDevice) {
+        if (uavDevice == null || !org.springframework.util.StringUtils.hasText(uavDevice.getDeviceSn())) {
+            return "1";
+        }
+        DeviceEntity dockDevice = iDeviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getDomain, 3)
+                .eq(DeviceEntity::getChildSn, uavDevice.getDeviceSn())
+                .last("limit 1"));
+        if (dockDevice == null) {
+            return "1";
+        }
+        IWaylineRedisService waylineRedisService = SpringBeanUtilsTest.getBean(IWaylineRedisService.class);
+        Optional<EventsReceiver<FlighttaskProgress>> runningWaylineJob = waylineRedisService.getRunningWaylineJob(dockDevice.getDeviceSn());
+        return runningWaylineJob.isPresent() ? "2" : "1";
     }
 
     /**

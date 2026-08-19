@@ -375,8 +375,16 @@ export interface Task {
 
 // 获取飞行任务
 export const getWaylineJobs = async function (workspaceId: string, data: any): Promise<IListWorkspaceResponse<Task>> {
-  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs?page=${data.page}&page_size=${data.page_size}&name=${data.name}&taskType=${data.taskType}`
-  const result = await request.get(url)
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs`
+  const result = await request.get(url, {
+    params: {
+      page: data.page,
+      page_size: data.page_size,
+      name: data.name || '',
+      taskType: data.taskType || '',
+      planType: data.planType || ''
+    }
+  })
   return result.data
 }
 

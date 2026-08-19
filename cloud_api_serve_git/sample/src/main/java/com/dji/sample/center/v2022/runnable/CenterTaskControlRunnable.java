@@ -128,6 +128,9 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
         }
 
         if (entity.getDeviceLevel() == 1) {
+            if (deviceId.endsWith("-bay")) {
+                return new ImmediateTask(4, deviceId.substring(0, deviceId.length() - 4));
+            }
             return new ImmediateTask(isCqDockTaskEnabled() ? 5 : 0, deviceId);
         }
         return null;

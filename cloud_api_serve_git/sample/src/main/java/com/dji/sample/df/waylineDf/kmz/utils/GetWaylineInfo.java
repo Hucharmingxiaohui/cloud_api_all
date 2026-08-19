@@ -54,10 +54,10 @@ public class GetWaylineInfo {
                             List<Element> droneInfoList = mission.elements();
                             for(Element drone:droneInfoList){
                                 if("droneEnumValue".equals(drone.getName())){
-                                    droneInfo.setDroneEnumValue(Integer.parseInt(drone.getText()));
+                                    droneInfo.setDroneEnumValue(parseIntegerText(drone.getText()));
                                 }
                                 if("droneSubEnumValue".equals(drone.getName())){
-                                    droneInfo.setDroneSubEnumValue(Integer.parseInt(drone.getText()));
+                                    droneInfo.setDroneSubEnumValue(parseIntegerText(drone.getText()));
                                 }
                             }
                         }
@@ -65,13 +65,13 @@ public class GetWaylineInfo {
                             List<Element> payloadInfoList = mission.elements();
                             for(Element payload:payloadInfoList){
                                 if("payloadEnumValue".equals(payload.getName())){
-                                    payloadInfo.setPayloadEnumValue(Integer.parseInt(payload.getText()));
+                                    payloadInfo.setPayloadEnumValue(parseIntegerText(payload.getText()));
                                 }
                                 if("payloadSubEnumValue".equals(payload.getName())){
-                                    payloadInfo.setPayloadSubEnumValue(Integer.parseInt(payload.getText()));
+                                    payloadInfo.setPayloadSubEnumValue(parseIntegerText(payload.getText()));
                                 }
                                 if("payloadPositionIndex".equals(payload.getName())){
-                                    payloadInfo.setPayloadPositionIndex(Integer.parseInt(payload.getText()));
+                                    payloadInfo.setPayloadPositionIndex(parseIntegerText(payload.getText()));
                                 }
                             }
                         }
@@ -118,12 +118,12 @@ public class GetWaylineInfo {
                                     List<Element> waypointHeadList = placemarkElement.elements();
                                     for(Element headingElement:waypointHeadList){
                                         if("waypointHeadingAngle".equals(headingElement.getName())){
-                                            placemark.setWaypointHeadingAngle(Integer.parseInt(headingElement.getText()));
+                                            placemark.setWaypointHeadingAngle(parseIntegerText(headingElement.getText()));
                                         }
                                     }
                                 }
                                 if("gimbalPitchAngle".equals(placemarkElement.getName())){
-                                    placemark.setGimbalPitchAngle(Integer.parseInt(placemarkElement.getText()));
+                                    placemark.setGimbalPitchAngle(parseIntegerText(placemarkElement.getText()));
                                 }
                                 if("actionGroup".equals(placemarkElement.getName())){
                                     //动作组
@@ -156,5 +156,14 @@ public class GetWaylineInfo {
         System.out.println(wayline);
         return wayline;
 
+    }
+
+    private static int parseIntegerText(String text) {
+        String value = text.trim();
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return Math.round(Float.parseFloat(value));
+        }
     }
 }

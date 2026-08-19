@@ -244,6 +244,7 @@ public class uavReportServiceImpl implements uavReportService {
         document.createParagraph().setSpacingAfter(200);
         XWPFTable infoTable = document.createTable(1, 2);
         setTableBorders(infoTable);
+        setTableAlignment(infoTable, STJc.CENTER);
         infoTable.setCellMargins(120, 120, 120, 120);
 
         XWPFTableRow row1 = infoTable.getRow(0);
@@ -637,7 +638,7 @@ public class uavReportServiceImpl implements uavReportService {
         String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
-            System.out.println("报告生成成功：" + reportPath);
+            log.info("光伏报告生成成功：" + reportPath);
         } catch (IOException e) {
             throw new RuntimeException("报告保存失败", e);
         }
@@ -747,8 +748,6 @@ public class uavReportServiceImpl implements uavReportService {
         // 先插入左上角logo图片
         try {
             if (new File(logoPath).exists()) {
-                System.out.println("插入Logo图片: " + logoPath);
-
                 // 创建一个段落用于放置logo
                 XWPFParagraph logoPara = document.createParagraph();
                 logoPara.setAlignment(ParagraphAlignment.LEFT);
@@ -759,18 +758,12 @@ public class uavReportServiceImpl implements uavReportService {
                 XWPFRun logoRun = logoPara.createRun();
                 FileInputStream fis = new FileInputStream(logoPath);
 
-                // 根据第二个word中的尺寸设置图片大小
-                // 第二个word中Logo图片的尺寸是3.0416666666666665英寸宽，0.9888888888888889英寸高
-                // 转换为厘米：1英寸 = 2.54厘米
                 double widthCm = 3.0416666666666665 * 2.54;  // 约7.73厘米
                 double heightCm = 0.9888888888888889 * 2.54; // 约2.51厘米
 
                 // 使用厘米转EMU：1厘米 = 360000 EMU
                 int widthEMU = (int)(widthCm * 360000);
                 int heightEMU = (int)(heightCm * 360000);
-
-                System.out.println("Logo图片目标尺寸: " + widthEMU + "x" + heightEMU + " EMU");
-                System.out.println("Logo图片尺寸(厘米): " + widthCm + "x" + heightCm);
 
                 // 使用addPicture方法插入图片
                 logoRun.addPicture(
@@ -784,7 +777,6 @@ public class uavReportServiceImpl implements uavReportService {
 
                 // 图片后面添加一个换行
                 logoRun.addBreak();
-                System.out.println("Logo图片插入成功");
             } else {
                 System.out.println("Logo图片不存在，路径: " + logoPath);
             }
@@ -1183,18 +1175,12 @@ public class uavReportServiceImpl implements uavReportService {
                     int originalWidth = bufferedImage.getWidth();
                     int originalHeight = bufferedImage.getHeight();
 
-                    System.out.println("插入图片: " + imagePath);
-                    System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
-
                     // 使用固定的大EMU值（保持原来的显示尺寸）
                     int targetWidthEMU = 14 * 360000;  // 14厘米 = 5,040,000 EMU
                     int targetHeightEMU = 11 * 360000; // 11厘米 = 3,960,000 EMU
 
-                    System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
-
                     // 压缩图片质量为50%，减小文件大小
                     byte[] compressedBytes = compressImage(imagePath, 0.5f);
-                    System.out.println("压缩后图片大小: " + compressedBytes.length + " 字节");
 
                     // 使用压缩后的图片字节数组
                     imageRun.addPicture(
@@ -1287,7 +1273,7 @@ public class uavReportServiceImpl implements uavReportService {
         String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
-            System.out.println("报告生成成功：" + reportPath);
+            log.info("风机报告生成成功：" + reportPath);
         } catch (IOException e) {
             throw new RuntimeException("报告保存失败", e);
         }
@@ -1846,23 +1832,12 @@ public class uavReportServiceImpl implements uavReportService {
                     XWPFParagraph imagePara = document.createParagraph();
                     imagePara.setAlignment(ParagraphAlignment.CENTER); // 图片居中
                     XWPFRun imageRun = imagePara.createRun();
-
                     // 使用原图，不压缩
                     FileInputStream fis = new FileInputStream(imagePath);
-
                     // 获取图片原始尺寸
                     BufferedImage bufferedImage = ImageIO.read(new File(imagePath));
-                    int originalWidth = bufferedImage.getWidth();
-                    int originalHeight = bufferedImage.getHeight();
-
-                    System.out.println("插入图片: " + imagePath);
-                    System.out.println("原始尺寸: " + originalWidth + "x" + originalHeight + " 像素");
-
                     int targetWidthEMU = 7 * 360000;  // 7厘米 = 2,520,000 EMU（压缩为原来的一半）
                     int targetHeightEMU = 6 * 360000; // 6厘米 = 2,160,000 EMU（压缩为原来的一半）
-
-                    System.out.println("目标EMU尺寸: " + targetWidthEMU + "x" + targetHeightEMU + " EMU");
-
                     imageRun.addPicture(
                             fis,
                             XWPFDocument.PICTURE_TYPE_JPEG,
@@ -1949,7 +1924,7 @@ public class uavReportServiceImpl implements uavReportService {
         String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
-            System.out.println("报告生成成功：" + reportPath);
+            log.info("点位航线报告生成成功：" + reportPath);
         } catch (IOException e) {
             throw new RuntimeException("报告保存失败", e);
         }
@@ -1979,6 +1954,16 @@ public class uavReportServiceImpl implements uavReportService {
         border.setSz(new BigInteger("4"));
         border.setSpace(new BigInteger("0"));
         border.setColor("000000");
+    }
+
+    // 辅助方法：设置表格水平对齐方式
+    private void setTableAlignment(XWPFTable table, STJc.Enum alignment) {
+        CTTblPr tblPr = table.getCTTbl().getTblPr();
+        if (tblPr == null) {
+            tblPr = table.getCTTbl().addNewTblPr();
+        }
+        CTJc jc = tblPr.isSetJc() ? tblPr.getJc() : tblPr.addNewJc();
+        jc.setVal(alignment);
     }
 
     // 辅助方法：设置单元格底色
@@ -2248,7 +2233,7 @@ public class uavReportServiceImpl implements uavReportService {
             return;
         }
 
-        System.out.println("开始新增 " + defects.size() + " 条缺陷数据:");
+        log.info("开始新增 " + defects.size() + " 条缺陷数据:");
 
         for (int i = 0; i < defects.size(); i++) {
             DefectEntity defect = defects.get(i);
@@ -2274,7 +2259,7 @@ public class uavReportServiceImpl implements uavReportService {
             System.out.println((i + 1) + ". " + defect);
         }
 
-        System.out.println("缺陷数据新增完成");
+        log.info("缺陷数据新增完成");
     }
 
     private byte[] compressImage(String imagePath, float quality) throws IOException {

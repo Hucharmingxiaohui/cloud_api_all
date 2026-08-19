@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import org.hibernate.validator.constraints.Range;
@@ -111,10 +112,12 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     private String poiId;//兴趣点id
 
     @TableField("solar_panel_id")
+    @JsonAlias("solar_panel_id")
     private String solarPanelId;//光伏板区域id
 
 
     @TableField("orthophoto_id")
+    @JsonAlias("orthophoto_id")
     private String orthophotoId;//正射图id
     @TableField("plan_type")
     private Integer planType;// 计划类型：0航点航线计划1风机计划2兴趣点环绕计划3普通航线计划4光伏计划

@@ -9,6 +9,7 @@ import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
 import com.dji.sample.df.commonDf.util.DeleteFile;
 import com.dji.sample.media.model.MediaFileEntity;
 import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
 import com.jcraft.jsch.Session;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +39,8 @@ public class TemMeasureServiceImpl implements TemMeasureService {
     //1.根据workspace_id file_id下载图片并返回温度，点测温返回温度（坐标），区域测温返回最大、最小温度坐标
     @Value("${singlePointUrl}")
     private String singlePointUrl;
+    @Value("${remote.thermal.enabled:false}")
+    private boolean remoteThermalEnabled;
 //
     // 新增的远程配置
     @Value("${remote.ssh.host}")
@@ -60,6 +63,13 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
     @Override
     public TemResultEntity getTemByWorkSpaceIdAndFileId(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        return remoteThermalEnabled
+                ? getTemByRemoteServer(workspace_id, file_id, temParamEntity)
+                : getTemByLocalFile(workspace_id, file_id, temParamEntity);
+    }
+
+    public TemResultEntity getTemByLocalFile(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        log.info("测温开始，workspaceId={}, fileId={}", workspace_id, file_id);
         DeleteFile deleteFile = new DeleteFile();
         //0存储温度结构
         TemResultEntity temResultEntity=new TemResultEntity();
@@ -78,6 +88,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             outputPath = Path.of(targetFolder, targetFileName);
         } else{
             temResultEntity.setError("图像信息没有存入数据库");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
         //1.6 获取下载路径url
@@ -88,6 +99,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             Files.copy(in, outputPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
             temResultEntity.setError("图像信息没有存入minio");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
         //2根据图像生成raw图像
@@ -116,25 +128,31 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             processBuilder.redirectErrorStream(true); // 合并标准错误流和标准输出流
             Process process = processBuilder.start();
 
-            // 2.4读取命令执行的输出
+            // 2.4消费命令输出，避免 dji_irp 过程信息刷屏
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println(line);
+                while (reader.readLine() != null) {
+                    // discard process output
                 }
             }
 
             // 2.5等待进程完成并获取退出码
             int exitCode = process.waitFor();
-            System.out.println("Command executed with exit code: " + exitCode);
+            if (exitCode != 0) {
+                temResultEntity.setError("生成raw格式温度图出错");
+                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+                return temResultEntity;
+            }
 
         } catch (Exception e) {
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
             temResultEntity.setError("生成raw格式温度图出错");
-            e.printStackTrace();
+            log.error("生成raw格式温度图出错", e);
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
         //3根据raw文件生成温度矩阵
@@ -153,8 +171,6 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 // 获取图像宽度和高度
                 width = image.getWidth();
                 height = image.getHeight();
-                System.out.println("Image Width: " + width);
-                System.out.println("Image Height: " + height);
                 width=640;
                 height=512;
 
@@ -162,13 +178,16 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 temResultEntity.setError("未找到图像获取像素值");
                 deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
                 deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
                return temResultEntity;
             }
         } catch (IOException e) {
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-            e.printStackTrace();
+            log.error("获取图像像素值失败", e);
             temResultEntity.setError("获取图像像素值失败");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
         }
         //3.2定义温度矩阵
         double[][] temperatureMatrix = new double[height][width];
@@ -213,7 +232,6 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                     // 校验温度范围是否合理
                     if (temperature < -50 || temperature > 500) {
                         hasInvalidData = true;
-                        System.err.printf("Invalid temperature value at [%d][%d]: %.1f°C%n", i, j, temperature);
                     }
 
                     // 更新温度范围
@@ -225,9 +243,6 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 }
             }
 
-            // 3. 打印校验结果
-            //System.out.println("Temperature matrix loaded successfully.");
-            System.out.printf("Temperature range: [%.1f°C, %.1f°C]%n", minTemperature, maxTemperature);
             //设置温度范围
             String range ="(" + minTemperature + "°C"+","+maxTemperature+"°C"+")";
             temResultEntity.setRange(range);
@@ -235,6 +250,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 temResultEntity.setError("温度值异常");
                 deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
                 deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
                 return temResultEntity;
                 //System.err.println("Warning: Detected invalid temperature values in the file.");
             }
@@ -247,9 +263,10 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
             temResultEntity.setError("温度处理异常");
-            System.err.println("Error processing the file: " + e.getMessage());
+            log.error("温度处理异常", e);
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
         //点测温
@@ -261,6 +278,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             temResultEntity.setPoint_position(pointPisition);
             deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return  temResultEntity;
         }else{
             //宽度判断 高度判断
@@ -269,6 +287,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 temResultEntity.setError("区域测温参数设置错误");
                 deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
                 deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
                 return temResultEntity;
             }
             //设置测温点
@@ -310,267 +329,272 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
 
             //返回测温结果
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
     }
 
+    private String formatTemResult(TemResultEntity result) {
+        if (result.getError() != null) {
+            return "失败，error=" + result.getError();
+        }
+        if (result.getPoint_tem() != null) {
+            return "点测温，position=" + result.getPoint_position() + ", temperature=" + result.getPoint_tem() + "°C" + ", range=" + result.getRange();
+        }
+        return "区域测温，leftTop=" + result.getLeft_top_position()
+                + ", rightBottom=" + result.getRight_bottum_position()
+                + ", min=" + result.getMin_tem() + "°C"
+                + ", max=" + result.getMax_tem() + "°C"
+                + ", average=" + result.getAverage_tem() + "°C"
+                + ", range=" + result.getRange();
+    }
 
-//    @Override
-//    public TemResultEntity getTemByWorkSpaceIdAndFileId(String workspace_id, String file_id, TemParamEntity temParamEntity) {
-//        DeleteFile deleteFile = new DeleteFile();
-//        TemResultEntity temResultEntity = new TemResultEntity();
-//
-//        // ---------- 1. 下载图片（保持不变） ----------
-//        String targetFolder = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/temTest";
-//        Optional<MediaFileEntity> fileEntity = fileService.getMediaByFileId(workspace_id, file_id);
-//        if (fileEntity.isEmpty()) {
-//            temResultEntity.setError("图像信息没有存入数据库");
-//            return temResultEntity;
-//        }
-//        String targetFileName = fileEntity.get().getFileName();
-//        Path outputPath = Path.of(targetFolder, targetFileName);
-//        URL imageRemoteAddr = fileService.getObjectUrl(workspace_id, file_id);
-//        try (InputStream in = imageRemoteAddr.openStream()) {
-//            Files.copy(in, outputPath, StandardCopyOption.REPLACE_EXISTING);
-//        } catch (IOException e) {
-//            temResultEntity.setError("图像信息没有存入minio");
-//            return temResultEntity;
-//        }
-//
-//        // ---------- 2. 远程执行 dji_irp 生成 raw 文件 ----------
-//        String localImagePath = outputPath.toString();
-//        String remoteImagePath = remoteTempDir + "/" + targetFileName;
-//        String remoteRawPath = remoteTempDir + "/measure.raw";
-//        String localRawPath = targetFolder + "/measure.raw";
-//
-//        try {
-//            log.info("===== 开始远程执行 dji_irp =====");
-//            log.info("目标服务器: {}:{}", remoteHost, remotePort);
-//
-//            // 2.1 建立 SSH 会话
-//            log.info("正在建立 SSH 连接...");
-//            JSch jsch = new JSch();
-//            Session session = jsch.getSession(remoteUser, remoteHost, remotePort);
-//            session.setPassword(remotePassword);
-//            session.setConfig("StrictHostKeyChecking", "no");
-//            session.connect();
-//            log.info("SSH 连接成功，会话 ID: {}", session);
-//
-//            // 2.2 创建远程临时目录
-//            log.info("确保远程临时目录存在: {}", remoteTempDir);
-//            executeCommand(session, "mkdir -p " + remoteTempDir);
-//            log.info("远程临时目录准备就绪");
-//
-//            // 2.3 上传图片到远程服务器
-//            log.info("开始上传图片: 本地路径 {} -> 远程路径 {}", localImagePath, remoteImagePath);
-//            scpToRemote(session, localImagePath, remoteImagePath);
-//            log.info("图片上传完成");
-//
-//            // 2.4 构造并执行远程命令
-////          这一步要根据不同服务器sdk位置进行路径调整
-//            String libraryPath = remotelibraryPath;
-//            String command = String.format("export LD_LIBRARY_PATH=%s; %s -s '%s' -a measure -o '%s'",
-//                    libraryPath, remoteDjiIrpPath, remoteImagePath, remoteRawPath);
-//            log.info("执行远程命令: {}", command);
-//            String execResult = executeCommand(session, command);
-//            log.info("远程命令执行完成，输出结果: {}", execResult);
-//
-//            // 2.5 下载 raw 文件到本地
-//            log.info("开始下载 raw 文件: 远程路径 {} -> 本地路径 {}", remoteRawPath, localRawPath);
-//            scpFromRemote(session, remoteRawPath, localRawPath);
-//            log.info("raw 文件下载完成");
-//
-//            // 2.6 清理远程临时文件
-//            log.info("清理远程临时文件: {} 和 {}", remoteImagePath, remoteRawPath);
-//            executeCommand(session, "rm -f " + remoteImagePath + " " + remoteRawPath);
-//            log.info("远程临时文件清理完成");
-//
-//            session.disconnect();
-//            log.info("SSH 会话已关闭，远程操作全部成功");
-//
-//        } catch (Exception e) {
-//            log.error("远程执行 dji_irp 失败", e);
-//            deleteFile.deleteFileInFolder(targetFolder, targetFileName);
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//            temResultEntity.setError("远程执行 dji_irp 失败");
-//            return temResultEntity;
-//        }
-//
-//        //3根据raw文件生成温度矩阵
-//        //定义温度矩阵宽和高
-//        Integer width = null;
-//        Integer height = null;
-//        //3.1读像素定义宽高
-//        String imagePath = targetFolder + "/" + fileEntity.get().getFileName();
-//
-//        try {
-//            // 读取图像文件
-//            File imageFile = new File(imagePath);
-//            BufferedImage image = ImageIO.read(imageFile);
-//
-//            if (image != null) {
-//                // 获取图像宽度和高度
-//                width = image.getWidth();
-//                height = image.getHeight();
-//                System.out.println("Image Width: " + width);
-//                System.out.println("Image Height: " + height);
-//                width = 640;
-//                height = 512;
-//
-//            } else {
-//                temResultEntity.setError("未找到图像获取像素值");
-//                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//                return temResultEntity;
-//            }
-//        } catch (IOException e) {
-//            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//            e.printStackTrace();
-//            temResultEntity.setError("获取图像像素值失败");
-//        }
-//        //3.2定义温度矩阵
-//        double[][] temperatureMatrix = new double[height][width];
-//        try {
-//            String filePath = targetFolder + "/" + "measure.raw";
-//            // 1. 读取 .raw 文件
-//            File file = new File(filePath);
-//
-//            // 校验文件大小是否符合预期
-//            long expectedSize = width * height * 2; // 每个 short 数据占 2 字节
-//            //校验长度就行
-////            if (file.length() != expectedSize) {
-////                throw new IOException("File size mismatch. Expected: " + expectedSize + " bytes, but found: " + file.length() + " bytes.");
-////            }
+
+    public TemResultEntity getTemByRemoteServer(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        log.info("测温开始，workspaceId={}, fileId={}", workspace_id, file_id);
+        DeleteFile deleteFile = new DeleteFile();
+        TemResultEntity temResultEntity = new TemResultEntity();
+
+        // ---------- 1. 下载图片（保持不变） ----------
+        String targetFolder = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/temTest";
+        Optional<MediaFileEntity> fileEntity = fileService.getMediaByFileId(workspace_id, file_id);
+        if (fileEntity.isEmpty()) {
+            temResultEntity.setError("图像信息没有存入数据库");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        String targetFileName = fileEntity.get().getFileName();
+        Path outputPath = Path.of(targetFolder, targetFileName);
+        URL imageRemoteAddr = fileService.getObjectUrl(workspace_id, file_id);
+        try (InputStream in = imageRemoteAddr.openStream()) {
+            Files.copy(in, outputPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            temResultEntity.setError("图像信息没有存入minio");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+
+        // ---------- 2. 远程执行 dji_irp 生成 raw 文件 ----------
+        String localImagePath = outputPath.toString();
+        String remoteImagePath = remoteTempDir + "/" + targetFileName;
+        String remoteRawPath = remoteTempDir + "/measure.raw";
+        String localRawPath = targetFolder + "/measure.raw";
+
+        try {
+            // 2.1 建立 SSH 会话
+            JSch jsch = new JSch();
+            Session session = jsch.getSession(remoteUser, remoteHost, remotePort);
+            session.setPassword(remotePassword);
+            session.setConfig("StrictHostKeyChecking", "no");
+            session.connect();
+
+            // 2.2 创建远程临时目录
+            executeCommand(session, "mkdir -p " + remoteTempDir);
+
+            // 2.3 上传图片到远程服务器
+            scpToRemote(session, localImagePath, remoteImagePath);
+
+            // 2.4 构造并执行远程命令
+//          这一步要根据不同服务器sdk位置进行路径调整
+            String libraryPath = remotelibraryPath;
+            String command = String.format("export LD_LIBRARY_PATH=%s; %s -s '%s' -a measure -o '%s'",
+                    libraryPath, remoteDjiIrpPath, remoteImagePath, remoteRawPath);
+            executeCommand(session, command);
+
+            // 2.5 下载 raw 文件到本地
+            scpFromRemote(session, remoteRawPath, localRawPath);
+
+            // 2.6 清理远程临时文件
+            executeCommand(session, "rm -f " + remoteImagePath + " " + remoteRawPath);
+
+            session.disconnect();
+
+        } catch (Exception e) {
+            log.error("远程执行 dji_irp 失败", e);
+            deleteFile.deleteFileInFolder(targetFolder, targetFileName);
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            temResultEntity.setError("远程执行 dji_irp 失败");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+
+        //3根据raw文件生成温度矩阵
+        //定义温度矩阵宽和高
+        Integer width = null;
+        Integer height = null;
+        //3.1读像素定义宽高
+        String imagePath = targetFolder + "/" + fileEntity.get().getFileName();
+
+        try {
+            // 读取图像文件
+            File imageFile = new File(imagePath);
+            BufferedImage image = ImageIO.read(imageFile);
+
+            if (image != null) {
+                // 获取图像宽度和高度
+                width = image.getWidth();
+                height = image.getHeight();
+                width = 640;
+                height = 512;
+
+            } else {
+                temResultEntity.setError("未找到图像获取像素值");
+                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+                return temResultEntity;
+            }
+        } catch (IOException e) {
+            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.error("获取图像像素值失败", e);
+            temResultEntity.setError("获取图像像素值失败");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        //3.2定义温度矩阵
+        double[][] temperatureMatrix = new double[height][width];
+        try {
+            String filePath = targetFolder + "/" + "measure.raw";
+            // 1. 读取 .raw 文件
+            File file = new File(filePath);
+
+            // 校验文件大小是否符合预期
+            long expectedSize = width * height * 2; // 每个 short 数据占 2 字节
+            //校验长度就行
 //            if (file.length() != expectedSize) {
 //                throw new IOException("File size mismatch. Expected: " + expectedSize + " bytes, but found: " + file.length() + " bytes.");
 //            }
-//
-//            FileInputStream fis = new FileInputStream(file);
-//            byte[] buffer = new byte[(int) file.length()];
-//            fis.read(buffer);
-//            fis.close();
-//
-//            // 2. 将字节数组转换为 short 数组
-//            ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
-//            byteBuffer.order(ByteOrder.LITTLE_ENDIAN); // 根据文件的字节序调整（常见为小端）
-//
-//            double minTemperature = Double.MAX_VALUE;
-//            double maxTemperature = Double.MIN_VALUE;
-//            boolean hasInvalidData = false;
-//
-//            for (int i = 0; i < height; i++) {
-//                for (int j = 0; j < width; j++) {
-//                    if (!byteBuffer.hasRemaining()) {
-//                        throw new IOException("Unexpected end of file. Data might be corrupted.");
-//                    }
-//                    // 每两个字节转换为一个 short
-//                    short rawValue = byteBuffer.getShort();
-//                    // 转换为温度值
-//                    double temperature = rawValue / 10.0;
-//
-//                    // 校验温度范围是否合理
-//                    if (temperature < -50 || temperature > 500) {
-//                        hasInvalidData = true;
-//                        System.err.printf("Invalid temperature value at [%d][%d]: %.1f°C%n", i, j, temperature);
-//                    }
-//
-//                    // 更新温度范围
-//                    minTemperature = Math.min(minTemperature, temperature);
-//                    maxTemperature = Math.max(maxTemperature, temperature);
-//
-//                    // 填充温度矩阵
-//                    temperatureMatrix[i][j] = temperature;
-//                }
-//            }
-//
-//            // 3. 打印校验结果
-//            //System.out.println("Temperature matrix loaded successfully.");
-//            System.out.printf("Temperature range: [%.1f°C, %.1f°C]%n", minTemperature, maxTemperature);
-//            //设置温度范围
-//            String range = "(" + minTemperature + "°C" + "," + maxTemperature + "°C" + ")";
-//            temResultEntity.setRange(range);
-//            if (hasInvalidData) {
-//                temResultEntity.setError("温度值异常");
-//                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//                return temResultEntity;
-//                //System.err.println("Warning: Detected invalid temperature values in the file.");
-//            }
-//
-//            // 4. 输出部分温度值验证
-//            //System.out.println("Sample temperatures:");
-//            //System.out.println(temperatureMatrix[511][0]);
-//
-//        } catch (IOException e) {
-//            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//            temResultEntity.setError("温度处理异常");
-//            System.err.println("Error processing the file: " + e.getMessage());
-//            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//            return temResultEntity;
-//        }
-//        //点测温
-//        if (temParamEntity.getPoint_x() != null && temParamEntity.getPoint_y() != null) {
-//            double roundedNum = Math.round(temperatureMatrix[temParamEntity.getPoint_y()][temParamEntity.getPoint_x()] * 10) / 10.0;
-//            temResultEntity.setPoint_tem(roundedNum);
-//            //设置测温点
-//            String pointPisition = "(" + temParamEntity.getPoint_x() + "," + temParamEntity.getPoint_y() + ")";
-//            temResultEntity.setPoint_position(pointPisition);
-//            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//            return temResultEntity;
-//        } else {
-//            //宽度判断 高度判断
-//            if (temParamEntity.getLeft_top_x() > temParamEntity.getRight_bottom_x() ||
-//                    temParamEntity.getLeft_top_y() > temParamEntity.getRight_bottom_y()) {
-//                temResultEntity.setError("区域测温参数设置错误");
-//                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//                return temResultEntity;
-//            }
-//            //设置测温点
-//            temResultEntity.setLeft_top_position("(" + temParamEntity.getLeft_top_x() + "," + temParamEntity.getLeft_top_y() + ")");
-//            temResultEntity.setRight_bottum_position("(" + temParamEntity.getRight_bottom_x() + "," + temParamEntity.getRight_bottom_y() + ")");
-//            //计算最大值，最小值，平均值
-//            //宽度温度个数
-//            int width1 = temParamEntity.getRight_bottom_x() - temParamEntity.getLeft_top_x() + 1;
-//            //高
-//            int height1 = temParamEntity.getRight_bottom_y() - temParamEntity.getLeft_top_y() + 1;
-//            //总温度
-//            Double sumTem = 0.0;
-//            //设置最大
-//            Double temMax = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
-//            //设置最小温度
-//            Double temMin = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
-//
-//            for (int i1 = 0; i1 < height1; i1++) {//高
-//                for (int j1 = 0; j1 < width1; j1++) {//宽
-//                    sumTem = sumTem + temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
-//                    if (temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()] > temMax) {
-//                        temMax = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
-//                    }
-//                    if (temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()] < temMin) {
-//                        temMin = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
-//                    }
-//
-//                }
-//            }
-//            Double avarengeTem = sumTem / (width1 * height1);
-//            //设置区域测温温度信息
-//            //平均
-//            temResultEntity.setAverage_tem(Math.round(avarengeTem * 10) / 10.0);
-//            //最大
-//            temResultEntity.setMax_tem(Math.round(temMax * 10) / 10.0);
-//            //最小
-//            temResultEntity.setMin_tem(Math.round(temMin * 10) / 10.0);
-//            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
-//            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
-//
-//            return temResultEntity;
-//        }
-//    }
+            if (file.length() != expectedSize) {
+                throw new IOException("File size mismatch. Expected: " + expectedSize + " bytes, but found: " + file.length() + " bytes.");
+            }
+
+            FileInputStream fis = new FileInputStream(file);
+            byte[] buffer = new byte[(int) file.length()];
+            fis.read(buffer);
+            fis.close();
+
+            // 2. 将字节数组转换为 short 数组
+            ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN); // 根据文件的字节序调整（常见为小端）
+
+            double minTemperature = Double.MAX_VALUE;
+            double maxTemperature = Double.MIN_VALUE;
+            boolean hasInvalidData = false;
+
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    if (!byteBuffer.hasRemaining()) {
+                        throw new IOException("Unexpected end of file. Data might be corrupted.");
+                    }
+                    // 每两个字节转换为一个 short
+                    short rawValue = byteBuffer.getShort();
+                    // 转换为温度值
+                    double temperature = rawValue / 10.0;
+
+                    // 校验温度范围是否合理
+                    if (temperature < -50 || temperature > 500) {
+                        hasInvalidData = true;
+                    }
+
+                    // 更新温度范围
+                    minTemperature = Math.min(minTemperature, temperature);
+                    maxTemperature = Math.max(maxTemperature, temperature);
+
+                    // 填充温度矩阵
+                    temperatureMatrix[i][j] = temperature;
+                }
+            }
+
+            //设置温度范围
+            String range = "(" + minTemperature + "°C" + "," + maxTemperature + "°C" + ")";
+            temResultEntity.setRange(range);
+            if (hasInvalidData) {
+                temResultEntity.setError("温度值异常");
+                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+                return temResultEntity;
+                //System.err.println("Warning: Detected invalid temperature values in the file.");
+            }
+
+            // 4. 输出部分温度值验证
+            //System.out.println("Sample temperatures:");
+            //System.out.println(temperatureMatrix[511][0]);
+
+        } catch (IOException e) {
+            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            temResultEntity.setError("温度处理异常");
+            log.error("温度处理异常", e);
+            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        //点测温
+        if (temParamEntity.getPoint_x() != null && temParamEntity.getPoint_y() != null) {
+            double roundedNum = Math.round(temperatureMatrix[temParamEntity.getPoint_y()][temParamEntity.getPoint_x()] * 10) / 10.0;
+            temResultEntity.setPoint_tem(roundedNum);
+            //设置测温点
+            String pointPisition = "(" + temParamEntity.getPoint_x() + "," + temParamEntity.getPoint_y() + ")";
+            temResultEntity.setPoint_position(pointPisition);
+            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        } else {
+            //宽度判断 高度判断
+            if (temParamEntity.getLeft_top_x() > temParamEntity.getRight_bottom_x() ||
+                    temParamEntity.getLeft_top_y() > temParamEntity.getRight_bottom_y()) {
+                temResultEntity.setError("区域测温参数设置错误");
+                deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+                return temResultEntity;
+            }
+            //设置测温点
+            temResultEntity.setLeft_top_position("(" + temParamEntity.getLeft_top_x() + "," + temParamEntity.getLeft_top_y() + ")");
+            temResultEntity.setRight_bottum_position("(" + temParamEntity.getRight_bottom_x() + "," + temParamEntity.getRight_bottom_y() + ")");
+            //计算最大值，最小值，平均值
+            //宽度温度个数
+            int width1 = temParamEntity.getRight_bottom_x() - temParamEntity.getLeft_top_x() + 1;
+            //高
+            int height1 = temParamEntity.getRight_bottom_y() - temParamEntity.getLeft_top_y() + 1;
+            //总温度
+            Double sumTem = 0.0;
+            //设置最大
+            Double temMax = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
+            //设置最小温度
+            Double temMin = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
+
+            for (int i1 = 0; i1 < height1; i1++) {//高
+                for (int j1 = 0; j1 < width1; j1++) {//宽
+                    sumTem = sumTem + temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
+                    if (temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()] > temMax) {
+                        temMax = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
+                    }
+                    if (temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()] < temMin) {
+                        temMin = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
+                    }
+
+                }
+            }
+            Double avarengeTem = sumTem / (width1 * height1);
+            //设置区域测温温度信息
+            //平均
+            temResultEntity.setAverage_tem(Math.round(avarengeTem * 10) / 10.0);
+            //最大
+            temResultEntity.setMax_tem(Math.round(temMax * 10) / 10.0);
+            //最小
+            temResultEntity.setMin_tem(Math.round(temMin * 10) / 10.0);
+            deleteFile.deleteFileInFolder(targetFolder, fileEntity.get().getFileName());
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+    }
 
     @Override
     public boolean bindPoint(TemParamEntity temParamEntity) {
@@ -585,7 +609,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         uniPointMapper.updateById(uniPoint);
         return true;
         }catch (Exception e){
-        e.printStackTrace();
+        log.error("绑定测温点位失败", e);
         return false;
        }
 
@@ -763,7 +787,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
                 sb.append((char) c);
             } while (c != '\n');
             if (b == 1) {
-                System.err.print("SCP warning: " + sb.toString());
+                log.debug("SCP warning: {}", sb.toString());
             } else {
                 throw new IOException("SCP error: " + sb.toString());
             }

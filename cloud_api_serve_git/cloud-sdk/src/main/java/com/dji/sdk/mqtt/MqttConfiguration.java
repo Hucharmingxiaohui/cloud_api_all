@@ -98,9 +98,9 @@ public class MqttConfiguration {
             if (shouldIgnoreDefaultLog(message.getPayload())) {
                 return;
             }
-            log.debug("The default channel does not handle messages." +
-                    "\nTopic: " + message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC) +
-                    "\nPayload: " + message.getPayload() + "\n");
+//            log.debug("The default channel does not handle messages." +
+//                    "\nTopic: " + message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC) +
+//                    "\nPayload: " + message.getPayload() + "\n");
         };
     }
 

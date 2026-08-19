@@ -362,9 +362,9 @@ public class ResultServiceImpl implements ResultService {
         if(mediaCount.equals(analyzedNum1)){
             waylineJobEntity.setIsAnalyzed(1);
             waylineJobMapper.updateById(waylineJobEntity);
-            log.info("智能分析结束----------");
+            log.info("智能分析结束");
         }else {
-            log.info("仍在智能分析中，分析照片数----"+analyzedNum1);
+            log.info("仍在智能分析中，分析照片数："+analyzedNum1);
         }
         String subCode = recgPointsEntity.getSubCode();
         String pointCode = recgPointsEntity.getPointCode();

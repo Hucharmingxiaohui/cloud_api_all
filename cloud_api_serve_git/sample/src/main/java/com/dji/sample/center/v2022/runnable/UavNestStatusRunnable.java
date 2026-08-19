@@ -6,6 +6,8 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavNestStatusDataItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockUavMonitoringEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockUavMonitoringReportService;
 import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.df.uavCommonHandleDf.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -27,6 +29,7 @@ public class UavNestStatusRunnable extends IntervalBaseRunnable {
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
     private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
+    private CqDockUavMonitoringReportService euaReportService = SpringUtils.getBean(CqDockUavMonitoringReportService.class);
 
     public UavNestStatusRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -60,12 +63,17 @@ public class UavNestStatusRunnable extends IntervalBaseRunnable {
         if (list == null) {
             list = new ArrayList<>();
         }
-        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
-                new LambdaQueryWrapper<DroneMonitoringEntity>()
-                        .orderByDesc(DroneMonitoringEntity::getId)
-                        .last("limit 1")
-        );
+        boolean euaEnabled = euaReportService.isEuaDataEnabled();
+        DroneMonitoringEntity droneMonitoringEntity = null;
+        if (!euaEnabled) {
+            droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                    new LambdaQueryWrapper<DroneMonitoringEntity>()
+                            .orderByDesc(DroneMonitoringEntity::getId)
+                            .last("limit 1")
+            );
+        }
         for (DeviceEntity entity : list) {
+            CqDockUavMonitoringEntity eua = euaEnabled ? euaReportService.findLatestAny() : null;
             UavNestStatusDataItem item1 = createCommonBean(entity);
             UavNestStatusDataItem item2 = createCommonBean(entity);
             UavNestStatusDataItem item3 = createCommonBean(entity);
@@ -78,19 +86,20 @@ public class UavNestStatusRunnable extends IntervalBaseRunnable {
             item1.setType("2");
             String valueUnit = "";
             item1.setValue_unit(valueUnit);
-            item1.setValue(droneMonitoringEntity.getNestDoorStatus());
+            String nestDoorStatus = euaEnabled ? (eua == null ? null : eua.getNestDoorStatus()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getNestDoorStatus());
+            item1.setValue(euaReportService.value(nestDoorStatus, ""));
             item1.setUnit("");
-//          平台默认一直开启
+//          EUA开关开启时按实际字段输出，字段为空则保持空
             item2.setType("3");
             valueUnit = "";
             item2.setValue_unit(valueUnit);
-            item2.setValue("1");
+            item2.setValue(euaEnabled ? euaReportService.value(eua == null ? null : eua.getNestPlatformStatus(), "") : "1");
             item2.setUnit("");
-//          机巢默认一直充电中
+//          EUA开关开启时按实际字段输出，字段为空则保持空
             item3.setType("4");
             valueUnit = "";
             item3.setValue_unit(valueUnit);
-            item3.setValue("1");
+            item3.setValue(euaEnabled ? euaReportService.value(eua == null ? null : eua.getNestChargeStatus(), "") : "1");
             item3.setUnit("");
 
             commandData.addItem(item1);

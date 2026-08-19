@@ -58,6 +58,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class WaylineJobServiceImpl implements IWaylineJobService {
 
+    private static final String WAYLINE_DOCK_FALLBACK_PREFIX = "wayline:dock_fallback:";
+
+    private static final int DOCK_FALLBACK_PROGRESS_THRESHOLD = 90;
+
+    private static final long DOCK_FALLBACK_CONFIRM_MILLIS = 100_000L;
+
     @Autowired
     private IWaylineJobMapper mapper;
 
@@ -225,6 +231,25 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 queryWrapper.eq(WaylineJobEntity::getTaskType, taskType);
             }
         }
+        // 动态添加 planType 条件：通过任务关联的计划 plan_id 过滤
+        if (map != null && map.containsKey("planType")) {
+            String planType = map.get("planType").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(planType)) {
+                List<String> planIds = pubWaylineJobPlanDfMapper.selectList(
+                                new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                                        .eq(PubWaylineJobPlanDfEntity::getPlanType, Integer.valueOf(planType))
+                                        .select(PubWaylineJobPlanDfEntity::getPlanId))
+                        .stream()
+                        .map(PubWaylineJobPlanDfEntity::getPlanId)
+                        .filter(com.dji.sample.center.utils.StringUtils::isNotBlank)
+                        .collect(Collectors.toList());
+                if (planIds.isEmpty()) {
+                    queryWrapper.eq(WaylineJobEntity::getPlanId, "__NO_MATCH_PLAN_ID__");
+                } else {
+                    queryWrapper.in(WaylineJobEntity::getPlanId, planIds);
+                }
+            }
+        }
         // 排序
         queryWrapper.orderByDesc(WaylineJobEntity::getId);
         // 执行分页查询
@@ -305,6 +330,8 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         if (entity == null) {
             return null;
         }
+//      此次任务进度大于90，无人机回巢60秒以上也判断为任务结束，兜底
+        applyDockedSuccessFallback(entity);
 
 //      如果是不停机巡检任务，已上传图片要加上
         int videoPointNum=0;
@@ -388,5 +415,64 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                         .mediaCount(entity.getMediaCount())
                         .uploadedCount(uploadedSize).build());
         return builder.build();
+    }
+
+    private void applyDockedSuccessFallback(WaylineJobEntity entity) {
+        if (WaylineJobStatusEnum.IN_PROGRESS.getVal() != entity.getStatus()
+                || !StringUtils.hasText(entity.getDockSn())
+                || !StringUtils.hasText(entity.getJobId())) {
+            return;
+        }
+
+        String fallbackKey = WAYLINE_DOCK_FALLBACK_PREFIX + entity.getDockSn() + RedisConst.DELIMITER + entity.getJobId();
+        Optional<EventsReceiver<FlighttaskProgress>> runningJobOpt = waylineRedisService.getRunningWaylineJob(entity.getDockSn());
+        Integer progress = runningJobOpt
+                .map(EventsReceiver::getOutput)
+                .map(FlighttaskProgress::getProgress)
+                .map(FlighttaskProgressData::getPercent)
+                .orElse(null);
+        Optional<OsdDock> dockOsdOpt = deviceRedisService.getDeviceOsd(entity.getDockSn(), OsdDock.class);
+
+        if (Objects.isNull(progress)
+                || progress < DOCK_FALLBACK_PROGRESS_THRESHOLD
+                || dockOsdOpt.isEmpty()
+                || !Boolean.TRUE.equals(dockOsdOpt.get().getDroneInDock())) {
+            redisUtils.delete(fallbackKey);
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        Object firstDockedValue = redisUtils.get(fallbackKey);
+        if (Objects.isNull(firstDockedValue)) {
+            redisUtils.set(fallbackKey, String.valueOf(now));
+            return;
+        }
+
+        long firstDockedTime;
+        try {
+            firstDockedTime = Long.parseLong(String.valueOf(firstDockedValue));
+        } catch (NumberFormatException e) {
+            redisUtils.set(fallbackKey, String.valueOf(now));
+            return;
+        }
+
+        if (now - firstDockedTime < DOCK_FALLBACK_CONFIRM_MILLIS) {
+            return;
+        }
+
+        boolean updated = this.updateJob(WaylineJobDTO.builder()
+                .jobId(entity.getJobId())
+                .status(WaylineJobStatusEnum.SUCCESS.getVal())
+                .completedTime(LocalDateTime.now())
+                .build());
+        if (updated) {
+            entity.setStatus(WaylineJobStatusEnum.SUCCESS.getVal());
+            entity.setCompletedTime(now);
+            entity.setUpdateTime(now);
+            waylineRedisService.delRunningWaylineJob(entity.getDockSn());
+            redisUtils.delete(fallbackKey);
+            log.warn("Wayline job marked success by docked fallback. jobId={}, dockSn={}, progress={}, dockedMillis={}",
+                    entity.getJobId(), entity.getDockSn(), progress, now - firstDockedTime);
+        }
     }
 }

@@ -80,6 +80,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
         String fixedStartTime = taskCommandItem.getFixed_start_time();
 //      上级下发定时任务存表，方便上级立即执行去查询
         saveOrUpdateTaskPlan(taskCommandItem, sub_code);
+//      上级对接飞控平台下任务，平台要提前建立相关计划
         try {
             // 1. 检查设备层级和列表
             if (deviceLevel == 2) {
@@ -106,10 +107,15 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     }
                 }
             }else if (deviceLevel == 1) {
-//              普通航线：规定选一个间隔
+//              航点航线计划：规定选一个间隔
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
+                    if (bayId.endsWith("-bay")) {
+                        String orthophotoId = bayId.substring(0, bayId.length() - 4);
+                        centerTaskHandler.addScheduledTask(4, taskCode, fixedStartTime, orthophotoId, taskName);
+                        return;
+                    }
                     if (isCqDockTaskEnabled()) {
                         // EUA平台任务同样复用原有Redis定时任务，到fixedStartTime后再调用下级下发接口。
                         centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);

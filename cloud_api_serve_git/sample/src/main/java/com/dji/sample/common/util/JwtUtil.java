@@ -112,7 +112,7 @@ public class JwtUtil {
                 .withIssuedAt(now)
                 .withNotBefore(now)
                 .sign(algorithm);
-        log.debug("token created. " + token);
+//        log.debug("token created. " + token);
         return token;
     }
 

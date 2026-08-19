@@ -37,6 +37,8 @@ import com.dji.sdk.common.SDKManager;
 import com.dji.sdk.mqtt.MqttReply;
 import com.dji.sdk.mqtt.events.TopicEventsRequest;
 import com.dji.sdk.mqtt.events.TopicEventsResponse;
+import com.dji.sdk.mqtt.requests.TopicRequestsRequest;
+import com.dji.sdk.mqtt.requests.TopicRequestsResponse;
 import com.dji.sdk.mqtt.services.ServicesReplyData;
 import com.dji.sdk.mqtt.services.TopicServicesResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -606,6 +608,21 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             e.printStackTrace();
         }
         return new TopicEventsResponse<>();
+    }
+
+    @Override
+    public TopicEventsResponse<MqttReply> returnHomeInfo(TopicEventsRequest<ReturnHomeInfo> request, MessageHeaders headers) {
+        return abstractWaylineService.returnHomeInfo(request, headers);
+    }
+
+    @Override
+    public TopicEventsResponse<MqttReply> inFlighttaskProgress(TopicEventsRequest<InFlighttaskProgress> response, MessageHeaders headers) {
+        return abstractWaylineService.inFlighttaskProgress(response, headers);
+    }
+
+    @Override
+    public TopicRequestsResponse<MqttReply<FlighttaskResourceGetResponse>> flighttaskResourceGet(TopicRequestsRequest<FlighttaskResourceGetRequest> response, MessageHeaders headers) {
+        return abstractWaylineService.flighttaskResourceGet(response, headers);
     }
 
 }

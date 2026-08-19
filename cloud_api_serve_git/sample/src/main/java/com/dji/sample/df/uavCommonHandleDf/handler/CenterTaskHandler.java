@@ -22,6 +22,7 @@ import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import com.dji.sdk.common.HttpResultResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -33,7 +34,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
+/*
+主要负责对接巡视上级的任务下发，根据不同场景分发执行不同通道飞行任务
+ */
 @Component
 @Slf4j
 public class CenterTaskHandler {
@@ -55,6 +58,9 @@ public class CenterTaskHandler {
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
     @Autowired
     private CqDockTaskStatusHandler cqDockTaskStatusHandler;
+
+    @Value("${solar.center-plan-prefix:上级}")
+    private String solarCenterPlanPrefix;
 
     // 使用有序集合存储定时任务，score为执行时间戳
     private static final String TASK_SCHEDULE_ZSET = "task_schedule:zset";
@@ -121,11 +127,11 @@ public class CenterTaskHandler {
             // 注意：这可能效率不高，如果任务多的话
             Set<Object> allTasks = redisUtils.members(TASK_SCHEDULE_ZSET);
             // 同时打印待执行集合TTL，便于判断任务突然消失是否由key过期导致。
-            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
-                    currentTime,
-                    allTasks == null ? 0 : allTasks.size(),
-                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
-                    RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
+//            log.info("扫描定时任务: 当前时间戳={}, 任务数量={}, scheduleTtlSeconds={}, scheduleKeyExists={}",
+//                    currentTime,
+//                    allTasks == null ? 0 : allTasks.size(),
+//                    RedisOpsUtils.getExpire(TASK_SCHEDULE_ZSET),
+//                    RedisOpsUtils.checkExist(TASK_SCHEDULE_ZSET));
             if (allTasks == null || allTasks.isEmpty()) {
                 return;
             }
@@ -313,6 +319,8 @@ public class CenterTaskHandler {
                 return executeNormalTaskResult(singleDeviceId, taskName);
             } else if ("1".equals(planType)) {
                 return executeFanTaskResult(singleDeviceId, taskCode, taskName);
+            } else if ("4".equals(planType)) {
+                return executeSolarTaskResult(singleDeviceId, taskName);
             } else if ("5".equals(planType)) {
                 return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
             }
@@ -334,6 +342,8 @@ public class CenterTaskHandler {
                 return executeNormalTask(singleDeviceId, taskName);
             }else if ("1".equals(planType)){
                 return executeFanTask(singleDeviceId, taskCode, taskName);
+            }else if ("4".equals(planType)){
+                return executeSolarTask(singleDeviceId, taskName);
             }else if ("5".equals(planType)){
                 return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime).getCode();
             }
@@ -388,6 +398,30 @@ public class CenterTaskHandler {
 
     private int executeFanTask(String singleDeviceId, String taskCode, String taskName) throws SQLException {
         return executeFanTaskResult(singleDeviceId, taskCode, taskName).getCode();
+    }
+
+    /**
+     * 执行光伏任务（planType=4，传入正射图id）
+     */
+    private TaskExecutionResult executeSolarTaskResult(String orthophotoId, String taskName) throws SQLException {
+        PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanType, 4)
+                .eq(PubWaylineJobPlanDfEntity::getOrthophotoId, orthophotoId)
+                .eq(PubWaylineJobPlanDfEntity::getTaskType, 0)
+                .likeRight(StringUtils.hasText(solarCenterPlanPrefix), PubWaylineJobPlanDfEntity::getName, solarCenterPlanPrefix)
+                .orderByDesc(PubWaylineJobPlanDfEntity::getCreateTime)
+                .orderByDesc(PubWaylineJobPlanDfEntity::getId)
+                .last("LIMIT 1"));
+        if (pubWaylineJobPlanDfEntity == null) {
+            log.error("未找到匹配的上级光伏计划: orthophotoId={}, prefix={}", orthophotoId, solarCenterPlanPrefix);
+            return TaskExecutionResult.failed();
+        }
+        pubWaylineJobPlanDfEntity.setName(taskName);
+        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity);
+    }
+
+    private int executeSolarTask(String orthophotoId, String taskName) throws SQLException {
+        return executeSolarTaskResult(orthophotoId, taskName).getCode();
     }
 
     /**

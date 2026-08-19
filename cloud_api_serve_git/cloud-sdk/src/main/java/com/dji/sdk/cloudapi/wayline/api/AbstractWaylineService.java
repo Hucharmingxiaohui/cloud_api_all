@@ -197,7 +197,7 @@ public abstract class AbstractWaylineService {
     @CloudSDKVersion(since = CloudSDKVersionEnum.V1_0_0)
     public TopicEventsResponse<MqttReply> returnHomeInfo(TopicEventsRequest<ReturnHomeInfo> request, MessageHeaders headers) {
 //      这个地方需要实现
-        throw new UnsupportedOperationException("returnHomeInfo not implemented");
+        return new TopicEventsResponse<>();
     }
 
     private void validPrepareParam(FlighttaskPrepareRequest request) {

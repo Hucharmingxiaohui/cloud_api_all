@@ -13,7 +13,7 @@ import org.springframework.util.StringUtils;
 import java.util.Date;
 
 /**
- * 重庆电力下级平台 CUSTOM MQTT 上报解析（暂不落库，仅日志）
+ * 重庆电力下级平台 CUSTOM MQTT 上报解析与落库
  */
 @Slf4j
 @Service
@@ -25,44 +25,17 @@ public class CqDockMqttMessageService {
     private CqDockHmsMapper cqDockHmsMapper;
     @Autowired
     private CqDockHmsReportService cqDockHmsReportService;
+    @Autowired
+    private CqDockUavMonitoringService cqDockUavMonitoringService;
 
     public void handleDroneOsd(String topic, String payload) {
-        JSONObject json = parse(payload);
-        String code = pathSegment(topic, 1);
-        String sn = pathSegment(topic, 2);
-        log.info("[cq-dock][drone/osd] topic={}, code={}, sn={}, taskId={}, dockId={}, droneId={}, messageId={}, currTime={}, modeCode={}, lat={}, lon={}, height={}, batteryPercent={}",
-                topic, code, sn,
-                json.getString("taskId"),
-                json.getString("dockId"),
-                json.getString("droneId"),
-                json.getString("messageId"),
-                json.getString("currTime"),
-                nestedInt(json, "osdDockDrone", "modeCode"),
-                nestedDouble(json, "osdDockDrone", "latitude"),
-                nestedDouble(json, "osdDockDrone", "longitude"),
-                nestedDouble(json, "osdDockDrone", "height"),
-                nestedInt(json, "osdDockDrone", "battery", "capacityPercent"));
-        log.info("[cq-dock][drone/osd] full payload={}", payload);
+        cqDockUavMonitoringService.saveDroneOsd(topic, payload);
+        log.info("[cq-dock][drone/osd] saved topic={}, dockSn={}", topic, pathSegment(topic, 2));
     }
 
     public void handleDockOsd(String topic, String payload) {
-        JSONObject json = parse(payload);
-        String code = pathSegment(topic, 1);
-        String sn = pathSegment(topic, 2);
-        log.info("[cq-dock][dock/osd] topic={}, code={}, sn={}, taskId={}, dockId={}, messageId={}, currTime={}, modeCode={}, flighttaskStepCode={}, droneInDock={}, lat={}, lon={}, temp={}, humidity={}",
-                topic, code, sn,
-                json.getString("taskId"),
-                json.getString("dockId"),
-                json.getString("messageId"),
-                json.getString("currTime"),
-                nestedInt(json, "osdDock", "modeCode"),
-                nestedInt(json, "osdDock", "flighttaskStepCode"),
-                nestedBoolean(json, "osdDock", "droneInDock"),
-                nestedDouble(json, "osdDock", "latitude"),
-                nestedDouble(json, "osdDock", "longitude"),
-                nestedDouble(json, "osdDock", "temperature"),
-                nestedDouble(json, "osdDock", "humidity"));
-        log.info("[cq-dock][dock/osd] full payload={}", payload);
+        cqDockUavMonitoringService.saveDockOsd(topic, payload);
+        log.info("[cq-dock][dock/osd] saved topic={}, dockSn={}", topic, pathSegment(topic, 2));
     }
 
     public void handleHms(String topic, String payload) {
@@ -170,41 +143,4 @@ public class CqDockMqttMessageService {
         return null;
     }
 
-    private Integer nestedInt(JSONObject root, String... path) {
-        Object v = nested(root, path);
-        if (v instanceof Number) {
-            return ((Number) v).intValue();
-        }
-        return null;
-    }
-
-    private Double nestedDouble(JSONObject root, String... path) {
-        Object v = nested(root, path);
-        if (v instanceof Number) {
-            return ((Number) v).doubleValue();
-        }
-        return null;
-    }
-
-    private Boolean nestedBoolean(JSONObject root, String... path) {
-        Object v = nested(root, path);
-        if (v instanceof Boolean) {
-            return (Boolean) v;
-        }
-        return null;
-    }
-
-    private Object nested(JSONObject root, String... path) {
-        Object cur = root;
-        for (String key : path) {
-            if (!(cur instanceof JSONObject)) {
-                return null;
-            }
-            cur = ((JSONObject) cur).get(key);
-            if (cur == null) {
-                return null;
-            }
-        }
-        return cur;
-    }
 }

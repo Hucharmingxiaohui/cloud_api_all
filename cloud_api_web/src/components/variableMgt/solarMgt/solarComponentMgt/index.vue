@@ -78,6 +78,8 @@
               <el-button link type="primary" @click="openEditDialog(scope.row)" v-if="scope.row.component_list && scope.row.component_list.length>0">重新检测</el-button>
               <el-button link type="primary" @click="openEditDialog(scope.row)" v-else>检测</el-button>
               <el-button link type="primary" @click="openDetailDialog(scope.row)" v-if="scope.row.component_list && scope.row.component_list.length>0">详情</el-button>
+              <el-button link type="primary" @click="createPoints(scope.row)">生成点位</el-button>
+              <el-button link type="primary" @click="showPoints(scope.row)">查看点位</el-button>
               <el-button link type="danger" @click="handleDelete(scope.row)">删除</el-button>
             </template>
           </el-table-column>
@@ -102,6 +104,12 @@
       :row-data="currentRowData"
       @close="detailDialogVisible = false"
     />
+
+    <el-dialog v-model="pointsDialogVisible" title="点位详情">
+      <div>
+        <PointsDetail :id="currentPointOrthophotoId"></PointsDetail>
+      </div>
+    </el-dialog>
 
     <!-- 导入正射图弹窗 -->
     <el-dialog
@@ -150,8 +158,9 @@
 import { reactive, ref, onMounted } from 'vue'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { ElButton, ElInput, ElMessage, ElMessageBox } from 'element-plus'
-import { getOrthophotoListApi, deleteSolarImgByIdApi, detecSolarImgByIdApi, importSolarPanelImgApi } from '/@/api/turbine/turbineMgt'
+import { getOrthophotoListApi, deleteSolarImgByIdApi, detecSolarImgByIdApi, importSolarPanelImgApi, createSolarPanelPointsApi } from '/@/api/turbine/turbineMgt'
 import SolarComponentDetail from './SolarComponentDetail.vue'
+import PointsDetail from '../solarPanelMgt/pointsDetail.vue'
 
 const queryForm = reactive({
   solar_area_name: '',
@@ -168,6 +177,8 @@ const tableData = ref([])
 
 const detailDialogVisible = ref(false)
 const currentRowData = ref<any>({})
+const pointsDialogVisible = ref(false)
+const currentPointOrthophotoId = ref('')
 
 async function openEditDialog (row: any) {
   try {
@@ -188,6 +199,32 @@ async function openEditDialog (row: any) {
 function openDetailDialog (row: any) {
   currentRowData.value = JSON.parse(JSON.stringify(row))
   detailDialogVisible.value = true
+}
+
+async function createPoints (row: any) {
+  if (!row.id) {
+    ElMessage.warning('当前正射图ID为空，无法生成点位')
+    return
+  }
+  try {
+    const res = await createSolarPanelPointsApi(row.id)
+    if (res.code !== 0) {
+      ElMessage.error('生成点位失败')
+      return
+    }
+    ElMessage.success('生成点位成功')
+  } catch (error) {
+    ElMessage.error('生成点位失败')
+  }
+}
+
+function showPoints (row: any) {
+  if (!row.id) {
+    ElMessage.warning('当前正射图ID为空，无法查看点位')
+    return
+  }
+  currentPointOrthophotoId.value = row.id
+  pointsDialogVisible.value = true
 }
 
 async function handleDelete (row: any) {

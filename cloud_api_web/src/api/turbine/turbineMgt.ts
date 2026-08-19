@@ -135,6 +135,20 @@ export const getSolarPanelByIdApi = async function (id): Promise<IWorkspaceRespo
   return result.data
 }
 
+// 生成光伏点位
+export const createSolarPanelPointsApi = async function (id:string): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/addPointsById?id=${id}`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 查询光伏点位
+export const getSolarPanelPointsApi = async function (data:any): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR}/getPointsById?id=${data.id}&pageSize=${data.pageSize}&page=${data.pageNo}`
+  const result = await request.get(url)
+  return result.data
+}
+
 // 根据ID查询光伏板位置参数
 export const getSolarPanelPostionByIdApi = async function (id): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_SOLAR1}/getById?id=${id}`

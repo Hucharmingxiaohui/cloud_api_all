@@ -230,7 +230,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             }
             // 获取响应
             int responseCode = con.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(con.getInputStream(), "utf-8"))) {
                 StringBuilder response1 = new StringBuilder();
@@ -238,10 +237,8 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 while ((responseLine = br.readLine()) != null) {
                     response1.append(responseLine.trim());
                 }
-                log.info("执行飞向中心点空中航线1");
                 // 使用FastJSON解析响应
                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                System.out.println("JSON Response: " + jsonResponse.toJSONString());
                 String routeName = jsonResponse.getString("routeName");
                 // 项目根目录下的文件路径（根据实际部署环境调整）
                 String projectPath = System.getProperty("user.dir");
@@ -250,7 +247,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-                log.info("执行飞向中心点空中航线2");
                 String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
                 String creator = "adminPC";
 
@@ -259,12 +255,10 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (fileName != null && fileName.endsWith(".kmz")) {
                     fileName = fileName.substring(0, fileName.length() - 4);
                 }
-                log.info("执行飞向中心点空中航线3");
                 WaylineFileEntity entity = importKmzNoValiService.getWaylineByFileName(fileName);
                 if (Objects.isNull(entity)) {
                     log.error("导入外部航线失败");
                 }
-                log.info("执行飞向中心点空中航线4");
                 InFlightWaylineDeliverParam param = new InFlightWaylineDeliverParam();
                 String jobId = redisUtils.get("jobId").toString();
                 WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
@@ -280,7 +274,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 }
                 // get file url
                 URL url1 = waylineFileService.getObjectUrl(workspaceEntity.getWorkspaceId(), waylineFile.get().getId());
-                log.info("执行飞向中心点空中航线5");
                 FileParam fileParam = new FileParam();
                 fileParam.setFingerprint(waylineFile.get().getSign());
                 fileParam.setUrl(url1.toString());
@@ -312,11 +305,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String job_id = UUID.randomUUID().toString();
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
-                log.info("执行飞向中心点空中航线6");
 //              0不停机 1停机 2中心点
                 int planType=2;
                 performDeliveryWithRetry(waylineJobEntity.getDockSn(), param, createJobParam,planType);
-                log.info("执行飞向中心点空中航线7----");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -361,7 +352,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             }
             // 获取响应
             int responseCode = con.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
 //          如果响应成功，则成功生成kmz文件转为multipartFile，导入minio
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 try (BufferedReader br = new BufferedReader(
@@ -538,7 +528,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             }
             // 获取响应
             int responseCode = con.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(con.getInputStream(), "utf-8"))) {
                 StringBuilder response1 = new StringBuilder();
@@ -548,10 +537,9 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 }
                 // 使用FastJSON解析响应
                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                System.out.println("JSON Response: " + jsonResponse.toJSONString());
                 String routeName = jsonResponse.getString("routeName");
                 JSONArray points = jsonResponse.getJSONArray("points");
-//                redisUtils.set("fanPoints",points.toJSONString());
+                log.info("不停机巡视存大疆点位入库:"+points);
                 FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
                 String jobId = redisUtils.get("jobId").toString();
                 fanWaylinePoints.setJobId(jobId);
@@ -601,7 +589,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 param.setOutOfControlAction(OutOfControlActionEnum.RETURN_TO_HOME);
                 param.setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION);
                 Integer rthAltitude = pubWaylineJobPlanDfEntity.getRthAltitude();
-                log.info("不停机航线返航高度---"+rthAltitude);
                 param.setRthAltitude(rthAltitude);
                 param.setRthMode(RthModeEnum.PRESET_HEIGHT);
                 param.setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK);
@@ -673,7 +660,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             }
             // 获取响应
             int responseCode = con.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
             try (BufferedReader br = new BufferedReader(
                     new InputStreamReader(con.getInputStream(), "utf-8"))) {
                 StringBuilder response1 = new StringBuilder();
@@ -683,11 +669,10 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 }
                 // 使用FastJSON解析响应
                 JSONObject jsonResponse = JSONObject.parseObject(response1.toString());
-                System.out.println("JSON Response: " + jsonResponse.toJSONString());
                 String routeName = jsonResponse.getString("routeName");
 //              把扇叶位置存到redis
                 JSONArray points = jsonResponse.getJSONArray("points");
-//                redisUtils.set("fanPoints",points.toJSONString());
+                log.info("停机巡视存大疆点位入库:"+points);
                 FanWaylinePoints fanWaylinePoints = new FanWaylinePoints();
                 String jobId = redisUtils.get("jobId").toString();
                 fanWaylinePoints.setJobId(jobId);
@@ -701,12 +686,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 if (Objects.isNull(file)) {
                     log.error("kmz文件未检测到");
                 }
-//                String workspaceId = redisUtils.get("workspaceId") != null ?
-//                        redisUtils.get("workspaceId").toString() :
-//                        "e3dea0f5-37f2-4d79-ae58-490af3228069";
-//                String creator = redisUtils.get("creator") != null ?
-//                        redisUtils.get("creator").toString() :
-//                        "adminPC";
+
                 String workspaceId = "e3dea0f5-37f2-4d79-ae58-490af3228069";
                 String creator = "adminPC";
 
@@ -740,7 +720,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 } catch (SQLException ex) {
                     throw new RuntimeException(ex);
                 }
-                log.info("空中航线前1----------");
                 FileParam fileParam = new FileParam();
                 fileParam.setFingerprint(waylineFile.get().getSign());
                 fileParam.setUrl(url1.toString());
@@ -772,7 +751,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
                 String job_id = UUID.randomUUID().toString();
                 createJobParam.setPlanId(job_id);
                 param.setInFlightWaylineId(job_id);
-                log.info("空中航线前2----------");
 //              在此处停机直接默认保存了背面，适配保存分析接口
                 waylineJobEntity.setIsSaved(2);
                 waylineJobMapper.updateById(waylineJobEntity);
@@ -833,7 +811,6 @@ public class RoutePlanServiceImpl implements RoutePlanService {
             }
             // 获取响应
             int responseCode = con.getResponseCode();
-            System.out.println("Response Code: " + responseCode);
 //          如果响应成功，则成功生成kmz文件转为multipartFile，导入minio
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 try (BufferedReader br = new BufferedReader(

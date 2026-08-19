@@ -1,4 +1,4 @@
-package com.dji.sample.manage.timer;
+package com.dji.sample.df.uavCommonHandleDf.timer;
 
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.model.dto.LiveTypeDTO;
@@ -62,27 +62,6 @@ public class DeviceLiveStartTimer {
                     liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
                     startLiveWithRecovery(liveTypeDTO, "机巢", device.getDeviceSn());
                 }
-                if (StringUtils.hasText(device.getChildDeviceSn())) {
-                    DeviceDTO child = device.getChildren();
-                    if (child != null && Boolean.TRUE.equals(child.getStatus()) && StringUtils.hasText(child.getDeviceSn())) {
-                        log.info("开启无人机直播---");
-//                      开启无人机直播
-                        LiveTypeDTO liveTypeDTO = new LiveTypeDTO();
-                        liveTypeDTO.setUrlType(UrlTypeEnum.WHIP);
-                        VideoId videoId = new VideoId();
-                        videoId.setDroneSn(child.getDeviceSn());
-                        PayloadIndex payloadIndex = new PayloadIndex();
-                        payloadIndex.setType(DeviceTypeEnum.M4TD_CAMERA);
-                        payloadIndex.setSubType(DeviceSubTypeEnum.ZERO);
-                        payloadIndex.setPosition(PayloadPositionEnum.FRONT_LEFT);
-                        videoId.setPayloadIndex(payloadIndex);
-                        videoId.setVideoType(VideoTypeEnum.NORMAL);
-                        liveTypeDTO.setVideoId(videoId);
-                        liveTypeDTO.setVideoQuality(VideoQualityEnum.STANDARD_DEFINITION);
-                        startLiveWithRecovery(liveTypeDTO, "无人机", device.getChildDeviceSn());
-                    }
-                }
-
             }
         } catch (Exception e) {
             log.error("定时任务执行异常", e);
@@ -96,8 +75,7 @@ public class DeviceLiveStartTimer {
             return;
         }
         if (isLiveAlreadyStarted(result.getCode())) {
-            log.warn("{} {} 直播状态已存在，执行停止后重启", sourceName, sn);
-            restartLive(liveTypeDTO, sourceName, sn);
+            log.warn("{} {} 直播状态已存在", sourceName, sn);
             return;
         }
         log.warn("{} {} 直播开启失败，code: {}, message: {}", sourceName, sn, result.getCode(), result.getMessage());
@@ -105,24 +83,6 @@ public class DeviceLiveStartTimer {
 
     private boolean isLiveAlreadyStarted(Integer code) {
         return Integer.valueOf(513003).equals(code) || Integer.valueOf(13003).equals(code);
-    }
-
-    private void restartLive(LiveTypeDTO liveTypeDTO, String sourceName, String sn) {
-        try {
-            liveStreamService.liveStop(liveTypeDTO.getVideoId());
-            Thread.sleep(2000);
-            HttpResultResponse restartResult = liveStreamService.liveStart(liveTypeDTO);
-            if (restartResult.getCode() == 0) {
-                log.info("{} {} 直播重启成功", sourceName, sn);
-            } else {
-                log.warn("{} {} 直播重启失败，code: {}, message: {}", sourceName, sn,
-                        restartResult.getCode(), restartResult.getMessage());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        } catch (Exception e) {
-            log.warn("{} {} 直播重启异常", sourceName, sn, e);
-        }
     }
 
 }

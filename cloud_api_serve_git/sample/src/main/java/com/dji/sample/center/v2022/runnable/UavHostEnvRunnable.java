@@ -7,6 +7,8 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.UavHostEnvItem;
 import com.dji.sample.center.v2022.data.IntervalProtocolData;
 import com.dji.sample.df.manageDf.dao.IUavDeviceMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockUavMonitoringEntity;
+import com.dji.sample.df.cqDockDf.service.CqDockUavMonitoringReportService;
 import com.dji.sample.df.uavCommonHandleDf.dao.DroneMonitoringEntityMapper;
 import com.dji.sample.df.uavCommonHandleDf.model.entity.DroneMonitoringEntity;
 import com.dji.sample.manage.dao.IDeviceMapper;
@@ -27,6 +29,7 @@ public class UavHostEnvRunnable extends IntervalBaseRunnable {
     private IUavDeviceMapper iUavDeviceMapper = SpringUtils.getBean(IUavDeviceMapper.class);
     private IDeviceMapper iDeviceMapper = SpringUtils.getBean(IDeviceMapper.class);
     private DroneMonitoringEntityMapper droneMonitoringEntityMapper = SpringUtils.getBean(DroneMonitoringEntityMapper.class);
+    private CqDockUavMonitoringReportService euaReportService = SpringUtils.getBean(CqDockUavMonitoringReportService.class);
 
     public UavHostEnvRunnable(IntervalProtocolData protocolData) {
         super(protocolData);
@@ -57,31 +60,39 @@ public class UavHostEnvRunnable extends IntervalBaseRunnable {
 //                Wrappers.lambdaQuery(UavDeviceEntity.class)
 //        );
         List<DeviceEntity> list = iDeviceMapper.selectList(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 3));
-        DroneMonitoringEntity droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
-                new LambdaQueryWrapper<DroneMonitoringEntity>()
-                        .orderByDesc(DroneMonitoringEntity::getId)
-                        .last("limit 1")
-        );
+        boolean euaEnabled = euaReportService.isEuaDataEnabled();
+        DroneMonitoringEntity droneMonitoringEntity = null;
+        if (!euaEnabled) {
+            droneMonitoringEntity = droneMonitoringEntityMapper.selectOne(
+                    new LambdaQueryWrapper<DroneMonitoringEntity>()
+                            .orderByDesc(DroneMonitoringEntity::getId)
+                            .last("limit 1")
+            );
+        }
         if (list != null && list.size() > 0) {
             for (DeviceEntity entity : list) {
+                CqDockUavMonitoringEntity eua = euaEnabled ? euaReportService.findLatestAny() : null;
                 UavHostEnvItem itemUav1 = createCommonBeanUav(entity);
                 UavHostEnvItem itemUav2 = createCommonBeanUav(entity);
                 UavHostEnvItem itemUav3 = createCommonBeanUav(entity);
 
-            /* <1>: = 环境温度  <3>: = 风速 <4>: = 雨量 */
+                /* <1>: = 环境温度  <3>: = 风速 <4>: = 雨量 */
                 itemUav1.setType("1");
-                itemUav1.setValue_unit(droneMonitoringEntity.getAmbientTemperature()+"°C");
-                itemUav1.setValue(droneMonitoringEntity.getAmbientTemperature());
+                String ambientTemperature = euaEnabled ? (eua == null ? null : eua.getAmbientTemperature()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getAmbientTemperature());
+                itemUav1.setValue_unit(euaReportService.value(ambientTemperature, "").isEmpty() ? "" : euaReportService.value(ambientTemperature, "") + "°C");
+                itemUav1.setValue(euaReportService.value(ambientTemperature, ""));
                 itemUav1.setUnit("°C");
 
                 itemUav2.setType("3");
-                itemUav2.setValue_unit(droneMonitoringEntity.getWindSpeed()+"m/s");
-                itemUav2.setValue(droneMonitoringEntity.getWindSpeed());
+                String windSpeed = euaEnabled ? (eua == null ? null : eua.getWindSpeed()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getWindSpeed());
+                itemUav2.setValue_unit(euaReportService.value(windSpeed, "").isEmpty() ? "" : euaReportService.value(windSpeed, "") + "m/s");
+                itemUav2.setValue(euaReportService.value(windSpeed, ""));
                 itemUav2.setUnit("m/s");
 
                 itemUav3.setType("4");
                 itemUav3.setValue_unit("");
-                itemUav3.setValue(droneMonitoringEntity.getRainfall());
+                String rainfall = euaEnabled ? (eua == null ? null : eua.getRainfall()) : (droneMonitoringEntity == null ? null : droneMonitoringEntity.getRainfall());
+                itemUav3.setValue(euaReportService.value(rainfall, ""));
                 itemUav3.setUnit("");
 
                 commandData.addItem(itemUav1);

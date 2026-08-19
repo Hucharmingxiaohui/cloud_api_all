@@ -49,6 +49,13 @@
           <el-button
             class="new_btn"
             type="primary"
+            @click="goBackToTaskList"
+          >
+            返回
+          </el-button>
+          <el-button
+            class="new_btn"
+            type="primary"
             :icon="Download"
             v-if="resultType === 1"
             @click="exportImageZip()"
@@ -541,6 +548,7 @@
 
 <script setup lang="ts">
 import { reactive, ref, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
@@ -557,6 +565,7 @@ const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
 const viewloading = ref(false) // 全局下载loading
 const resultType = ref(1)
+const router = useRouter()
 
 // 测温
 const tempStatus = ref(false)
@@ -619,6 +628,15 @@ const selectedImage = ref(mediaData.data[0]) // 初始选中第一个任务
 const selectedIndex = ref(0) // 当前图片索引
 const scale = ref(1) // 图片缩放比例
 const rotation = ref(0) // 图片旋转角度
+
+function goBackToTaskList () {
+  if (localStorage.getItem('TaskResultFromTaskList') === '1' && window.history.length > 1) {
+    localStorage.removeItem('TaskResultFromTaskList')
+    router.back()
+    return
+  }
+  router.push({ path: '/' + ERouterName.TASK })
+}
 
 onMounted(() => {
   const data = JSON.parse(localStorage.getItem('TaskInfo'))

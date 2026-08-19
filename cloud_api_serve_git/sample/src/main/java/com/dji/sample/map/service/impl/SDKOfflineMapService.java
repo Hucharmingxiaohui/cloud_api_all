@@ -16,7 +16,7 @@ public class SDKOfflineMapService extends AbstractOfflineMapService {
 
     public TopicStateResponse<MqttReply> dockDroneOfflineMapEnable(TopicStateRequest<DockDroneOfflineMapEnable> request, MessageHeaders headers) {
         // 空实现，只记录日志，不抛出异常
-        log.debug("收到离线地图信息");
+//        log.debug("收到离线地图信息");
 
         // 返回空的成功响应
         return new TopicStateResponse<MqttReply>()

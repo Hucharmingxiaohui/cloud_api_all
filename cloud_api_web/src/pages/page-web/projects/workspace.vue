@@ -29,9 +29,16 @@ let dockOsdEmptyStartTime = 0
 // 当前暂存的设备状态
 const dock_sn = ref('')
 const drone_online_status = ref(false)
+const drone_sn = ref('')
+const startedDockSns = new Set<string>()
+const startedDroneSns = new Set<string>()
 
 const root = getRoot()
 const store = useMyStore()
+const isLivestreamRoute = () => {
+  const routeName = root.$router.currentRoute.value.name
+  return routeName === 'remoteDebug' || routeName === ERouterName.LIVESTREAM || routeName === ERouterName.LIVING
+}
 const messageHandler = async (payload: any) => {
   if (!payload) {
     return
@@ -58,15 +65,25 @@ const messageHandler = async (payload: any) => {
         store.commit('SET_DOCK_INFO', currentData)
         // store?.state.deviceState
 
-        // 开始推流
-        if (currentData.sn && currentData.sn !== dock_sn.value) {
-          dock_sn.value = currentData.sn
-          startStream(currentData.sn, 'dock')
-          drone_online_status.value = currentData.host?.sub_device.device_online_status
-          if (currentData.host?.sub_device.device_online_status === true && currentData.host?.sub_device.device_online_status !== drone_online_status.value) {
-            startStream(currentData.host?.sub_device.device_sn, 'drone')
-          }
+        if (!isLivestreamRoute()) {
+          break
         }
+
+        // 开始推流
+        if (currentData.sn && !startedDockSns.has(currentData.sn)) {
+          dock_sn.value = currentData.sn
+          startedDockSns.add(currentData.sn)
+          startStream(currentData.sn, 'dock')
+        }
+        const subDevice = currentData.host?.sub_device
+        if (subDevice?.device_online_status === true && subDevice?.device_sn && !startedDroneSns.has(subDevice.device_sn)) {
+          drone_sn.value = subDevice.device_sn
+          startedDroneSns.add(subDevice.device_sn)
+          startStream(subDevice.device_sn, 'drone')
+        } else if (subDevice?.device_online_status !== true && subDevice?.device_sn) {
+          startedDroneSns.delete(subDevice.device_sn)
+        }
+        drone_online_status.value = subDevice?.device_online_status || false
       } else {
         // 为空，检查是否已经持续2秒
         const now = Date.now()

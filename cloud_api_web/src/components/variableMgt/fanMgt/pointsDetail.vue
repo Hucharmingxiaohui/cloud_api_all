@@ -41,9 +41,21 @@ const body = reactive({
 
 watch(id, (newId) => {
   if (newId) {
+    body.pageNo = 1
     getPoints()
   }
 }, { immediate: true })
+
+function handleSizeChange (pageSize) {
+  body.pageSize = pageSize
+  body.pageNo = 1
+  getPoints()
+}
+
+function handleCurrentChange (pageNo) {
+  body.pageNo = pageNo
+  getPoints()
+}
 
 // 获取站点信息
 async function getPoints () {
