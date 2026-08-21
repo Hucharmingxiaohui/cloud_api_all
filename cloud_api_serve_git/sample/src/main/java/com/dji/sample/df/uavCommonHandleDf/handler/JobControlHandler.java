@@ -109,6 +109,10 @@ public class JobControlHandler {
     @Value("${normalStation.stationCode}")
     private String normalStationCode;
 
+    private String centerSendCode() {
+        return centerConfig.getStationCode();
+    }
+
     /**
      * 开始监控任务状态
      */
@@ -354,7 +358,7 @@ public class JobControlHandler {
         }
     }
 
-//  检查分析状态，分析结束后上报结果（图片和报告，目前仅适用于风机）
+//  检查分析状态，分析结束后上报结果（图片和报告，目前适用于风机、光伏）
     private void startAnalysisMonitoring(String jobId, String taskCode,String taskName) {
         // 创建定时检查任务
         ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -371,16 +375,16 @@ public class JobControlHandler {
                             .eq(WaylineJobEntity::getJobId, jobId)
                     );
                     if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
-                        log.info("风机计划分析完成上传照片至巡视系统...");
+                        log.info("分析完成上传照片至巡视系统...");
                         sendPatrolResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 2. 分析完成，执行后续逻辑，生成报告上传上级
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
                     Result hisTaskReport = uavReportController.createHisTaskReport(jsonObject);
-                    log.info("风机计划已生成完报告");
+                    log.info("飞行任务已生成完报告");
                     if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
-                        log.info("风机计划分析完成上传报告至巡视系统...");
+                        log.info("分析完成上传报告至巡视系统...");
                         sendPatrolReportResult(taskCode, taskName, waylineJobEntity);
                     }
                     // 3. 清理监控
@@ -415,8 +419,7 @@ public class JobControlHandler {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                     .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
-            DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
-            String deviceSn = deviceEntity.getDeviceSn();
+            String deviceSn = resolveDroneSnForReport(pubWaylineJobPlanDfEntity, waylineJobEntity);
             if(planType==1){
                 // 风机计报结果
                 sendFanPatrolResult(taskCode, taskName, waylineJobEntity, deviceSn);
@@ -636,8 +639,7 @@ public class JobControlHandler {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                     .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
-            DeviceEntity deviceEntity = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>().eq(DeviceEntity::getDomain, 0));
-            String deviceSn = deviceEntity.getDeviceSn();
+            String deviceSn = resolveDroneSnForReport(pubWaylineJobPlanDfEntity, waylineJobEntity);
             if(planType==1){
                     PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
                     String destDir = "/" + taskCode;
@@ -731,6 +733,27 @@ public class JobControlHandler {
         return imagePath.replaceAll(pattern, replacement);
     }
 
+    private String resolveDroneSnForReport(PubWaylineJobPlanDfEntity plan, WaylineJobEntity waylineJobEntity) {
+        String dockSn = null;
+        if (plan != null && org.springframework.util.StringUtils.hasText(plan.getDockSn())) {
+            dockSn = plan.getDockSn();
+        } else if (waylineJobEntity != null && org.springframework.util.StringUtils.hasText(waylineJobEntity.getDockSn())) {
+            dockSn = waylineJobEntity.getDockSn();
+        }
+        if (!org.springframework.util.StringUtils.hasText(dockSn)) {
+            log.warn("巡视报告上报未找到计划机场SN: planId={}", waylineJobEntity == null ? null : waylineJobEntity.getPlanId());
+            return "";
+        }
+        DeviceEntity dockDevice = deviceMapper.selectOne(new LambdaQueryWrapper<DeviceEntity>()
+                .eq(DeviceEntity::getDeviceSn, dockSn)
+                .last("LIMIT 1"));
+        if (dockDevice == null || !org.springframework.util.StringUtils.hasText(dockDevice.getChildSn())) {
+            log.warn("巡视报告上报未找到机场绑定无人机SN: dockSn={}, planId={}", dockSn, waylineJobEntity == null ? null : waylineJobEntity.getPlanId());
+            return "";
+        }
+        return dockDevice.getChildSn();
+    }
+
 
     // ========== 上报方法（下对上） ==========
 
@@ -776,7 +799,7 @@ public class JobControlHandler {
 
         PatrolHostCommand commandData = new PatrolHostCommand();
         commandData.addItems(patrolStatusItems);
-        commandData.setSendCode(normalStationCode);
+        commandData.setSendCode(centerSendCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
         patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);

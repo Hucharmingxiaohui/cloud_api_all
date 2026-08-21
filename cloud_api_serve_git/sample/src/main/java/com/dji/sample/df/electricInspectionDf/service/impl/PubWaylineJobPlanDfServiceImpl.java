@@ -216,11 +216,16 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     //执行任务
     @Override
     public HttpResultResponse expressPlan(CustomClaim customClaim,  PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+        return expressPlan(customClaim, pubWaylineJobPlanDfEntity, pubWaylineJobPlanDfEntity.getName());
+    }
+
+    @Override
+    public HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
         CreateJobParam param =new CreateJobParam();
 
         //设置param参数
         //任务名称
-        param.setName(pubWaylineJobPlanDfEntity.getName());
+        param.setName(jobName);
         //航线id
         param.setFileId(pubWaylineJobPlanDfEntity.getFileId());
         //机场sn

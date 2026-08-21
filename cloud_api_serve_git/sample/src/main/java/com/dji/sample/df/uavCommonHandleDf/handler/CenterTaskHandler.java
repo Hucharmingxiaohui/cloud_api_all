@@ -320,7 +320,7 @@ public class CenterTaskHandler {
             } else if ("1".equals(planType)) {
                 return executeFanTaskResult(singleDeviceId, taskCode, taskName);
             } else if ("4".equals(planType)) {
-                return executeSolarTaskResult(singleDeviceId, taskName);
+                return executeSolarTaskResult(singleDeviceId, taskCode, taskName);
             } else if ("5".equals(planType)) {
                 return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
             }
@@ -343,7 +343,7 @@ public class CenterTaskHandler {
             }else if ("1".equals(planType)){
                 return executeFanTask(singleDeviceId, taskCode, taskName);
             }else if ("4".equals(planType)){
-                return executeSolarTask(singleDeviceId, taskName);
+                return executeSolarTask(singleDeviceId, taskCode, taskName);
             }else if ("5".equals(planType)){
                 return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime).getCode();
             }
@@ -403,7 +403,7 @@ public class CenterTaskHandler {
     /**
      * 执行光伏任务（planType=4，传入正射图id）
      */
-    private TaskExecutionResult executeSolarTaskResult(String orthophotoId, String taskName) throws SQLException {
+    private TaskExecutionResult executeSolarTaskResult(String orthophotoId, String taskCode, String taskName) throws SQLException {
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanType, 4)
                 .eq(PubWaylineJobPlanDfEntity::getOrthophotoId, orthophotoId)
@@ -416,12 +416,12 @@ public class CenterTaskHandler {
             log.error("未找到匹配的上级光伏计划: orthophotoId={}, prefix={}", orthophotoId, solarCenterPlanPrefix);
             return TaskExecutionResult.failed();
         }
-        pubWaylineJobPlanDfEntity.setName(taskName);
-        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity);
+        redisUtils.set("taskCode", taskCode);
+        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity, taskName);
     }
 
-    private int executeSolarTask(String orthophotoId, String taskName) throws SQLException {
-        return executeSolarTaskResult(orthophotoId, taskName).getCode();
+    private int executeSolarTask(String orthophotoId, String taskCode, String taskName) throws SQLException {
+        return executeSolarTaskResult(orthophotoId, taskCode, taskName).getCode();
     }
 
     /**
@@ -515,10 +515,14 @@ public class CenterTaskHandler {
     }
 
     private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+        return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity, pubWaylineJobPlanDfEntity.getName());
+    }
+
+    private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
         CustomClaim customClaim = new CustomClaim();
         customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");
         customClaim.setUsername("adminPC");
-        HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity);
+        HttpResultResponse httpResultResponse = pubWaylineJobPlanDfService.expressPlan(customClaim, pubWaylineJobPlanDfEntity, jobName);
         String jobId = httpResultResponse == null ? null : httpResultResponse.getMessage();
         if (httpResultResponse != null && httpResultResponse.getCode() == 0) {
             log.info("成功执行上级任务: jobId={}", jobId);
