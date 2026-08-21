@@ -2,6 +2,10 @@
   "name": "demo-web",
   "version": "0.0.1",
   "scripts": {
+    "generate:model-manifest": "node scripts/generate-model-manifest.cjs",
+    "preserve": "npm run generate:model-manifest",
+    "prebuild": "npm run generate:model-manifest",
+    "prebuild:test": "npm run generate:model-manifest",
     "serve": "vite",
     "build:test": "vite build --mode stag",
     "build": "vite build",

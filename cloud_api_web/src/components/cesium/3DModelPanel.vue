@@ -194,7 +194,8 @@ function startRenderLoop () {
 
 function load3DTiles () {
   // const tilesetUrl = 'http://172.20.63.157:9000/models/dfelanqiuchang/tileset.json'
-  const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
+  //const tilesetUrl = '/model/dfelanqiuchang/tileset.json'
+  const tilesetUrl = '/model/solarqingxie_1_egm96_test/Scene/solarqingxie_1.json'
   load3DTilesModels(cesium.viewer, tilesetUrl)
 }
 // 加载glft模型
