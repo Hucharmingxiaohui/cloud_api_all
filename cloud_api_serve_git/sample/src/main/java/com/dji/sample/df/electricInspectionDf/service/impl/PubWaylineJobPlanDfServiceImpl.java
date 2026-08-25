@@ -403,9 +403,11 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         if(isPicDeleted){
             log.info("已成功删除图片");
         }
-        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
+        String reportPath = fileConfig.getFileReportPath() + "/" + waylineJobEntity.getName() + "_" + job_id + ".docx";
         File reportFile = new File(reportPath);
-        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
+        File legacyReportFile = new File(fileConfig.getFileReportPath() + "/" + waylineJobEntity.getName() + ".docx");
+        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName())
+                | deleteReportFile(legacyReportFile, waylineJobEntity.getName());
         if(isFileDeleted){
             log.info("已成功删除报告");
         }

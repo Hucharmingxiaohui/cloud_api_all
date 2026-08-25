@@ -697,7 +697,7 @@ async function createReport () {
         return
       }
       const data = new Blob([res])
-      downloadFile(data, `${jobInfo.job_name}.docx`)
+      downloadFile(data, `${jobInfo.job_name}_${jobInfo.job_id}.docx`)
     } else if (response.code === 601) {
       ElMessage.warning('任务结果分析中,请稍后重试!')
     }

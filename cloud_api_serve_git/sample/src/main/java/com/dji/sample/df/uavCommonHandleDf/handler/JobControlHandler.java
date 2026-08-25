@@ -651,7 +651,7 @@ public class JobControlHandler {
             if(planType==1){
                     PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
                     String destDir = "/" + taskCode;
-                    String reportPath ="/home/uav_server/report/"+waylineJobEntity.getName()+".docx";
+                    String reportPath = resolveReportPath(waylineJobEntity);
                     String destName = new File(reportPath).getName();
                     String destName1 = FileNameUtils.convertChineseToPinyinInitials(destName);
                     FtpUtils.getInstance().uploadToCenterNormal(reportPath, destDir, destName1);
@@ -684,6 +684,16 @@ public class JobControlHandler {
         } catch (Exception e) {
             log.error("上报巡视结果失败: taskCode={}", taskCode, e);
         }
+    }
+
+    private String resolveReportPath(WaylineJobEntity waylineJobEntity) {
+        String taskName = waylineJobEntity.getName();
+        String jobId = waylineJobEntity.getJobId();
+        String newReportPath = "/home/uav_server/report/" + taskName + "_" + jobId + ".docx";
+        if (new File(newReportPath).exists()) {
+            return newReportPath;
+        }
+        return "/home/uav_server/report/" + taskName + ".docx";
     }
 
     public Integer extractWaypointNumber(String fileName) {

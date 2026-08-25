@@ -72,6 +72,19 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("fjReport/api/v1/")
 public class UavReportController {
 
+    private String buildReportFileName(String taskName, String jobId) {
+        return taskName + "_" + jobId + ".docx";
+    }
+
+    private String resolveReportFilePath(String taskName, String jobId) {
+        String newPath = fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId);
+        File newFile = new File(newPath);
+        if (newFile.exists()) {
+            return newPath;
+        }
+        return fileConfig.getFileReportPath() + "/" + taskName + ".docx";
+    }
+
     @Autowired
     ReportService reportService;
     @Autowired
@@ -319,10 +332,9 @@ public class UavReportController {
                 new LambdaQueryWrapper<WaylineJobEntity>()
                         .eq(WaylineJobEntity::getJobId, jobId)
         );
-        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
-        File reportFile = new File(reportPath);
-
-        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
+        String taskName = waylineJobEntity.getName();
+        boolean isFileDeleted = deleteReportFile(new File(fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId)), taskName)
+                | deleteReportFile(new File(fileConfig.getFileReportPath() + "/" + taskName + ".docx"), taskName);
         waylineJobEntity.setIsReported(0);
         waylineJobMapper.updateById(waylineJobEntity);
         if (isFileDeleted) {
@@ -465,7 +477,7 @@ public class UavReportController {
                             .eq(WaylineJobEntity::getJobId, jobId)
             );
             String name = waylineJobEntity.getName();
-            String filePath = fileConfig.getFileReportPath() + name + ".docx";
+            String filePath = resolveReportFilePath(name, jobId);
             Path path = Paths.get(filePath).normalize();
             File file = path.toFile();
 
