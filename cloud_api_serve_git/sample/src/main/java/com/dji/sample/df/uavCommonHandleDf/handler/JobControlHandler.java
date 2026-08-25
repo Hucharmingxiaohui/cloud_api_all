@@ -503,14 +503,15 @@ public class JobControlHandler {
 
     /**
      * 光伏计划（planType==4）巡视结果上报：
-     * 查询defect_file可见光图片，按光伏板名称依次匹配solar_station_points点位1/2/3，上限后跳过。
+     * 查询defect_file可见光/红外图片，按光伏板名称和图片类型分别匹配solar_station_points点位，上限后跳过。
      */
     private void sendSolarPatrolResult(String taskCode, String taskName, WaylineJobEntity waylineJobEntity,
                                        PubWaylineJobPlanDfEntity plan, String deviceSn) throws Exception {
         List<DefectEntity> defectEntities = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()
                 .eq(DefectEntity::getJobId, waylineJobEntity.getJobId())
-                .eq(DefectEntity::getImageType, 0)
+                .in(DefectEntity::getImageType, 0, 1)
                 .isNotNull(DefectEntity::getSolarPanelName)
+                .orderByAsc(DefectEntity::getImageType)
                 .orderByAsc(DefectEntity::getId));
         Map<String, List<SolarStationPoints>> panelPointsCache = new HashMap<>();
         Map<String, Integer> panelPointIndex = new HashMap<>();
@@ -519,22 +520,29 @@ public class JobControlHandler {
             if (!org.springframework.util.StringUtils.hasText(solarPanelName)) {
                 continue;
             }
-            List<SolarStationPoints> points = panelPointsCache.computeIfAbsent(solarPanelName, panelName ->
+            Integer imageType = defectEntity.getImageType();
+            if (!Integer.valueOf(0).equals(imageType) && !Integer.valueOf(1).equals(imageType)) {
+                continue;
+            }
+            String cacheKey = solarPanelName + "#" + imageType;
+            List<SolarStationPoints> points = panelPointsCache.computeIfAbsent(cacheKey, key ->
                     solarStationPointsMapper.selectList(new LambdaQueryWrapper<SolarStationPoints>()
-                            .eq(SolarStationPoints::getMainDeviceName, panelName)
+                            .eq(SolarStationPoints::getMainDeviceName, solarPanelName)
                             .eq(org.springframework.util.StringUtils.hasText(plan.getOrthophotoId()), SolarStationPoints::getAreaId, plan.getOrthophotoId())
+                            .like(Integer.valueOf(1).equals(imageType), SolarStationPoints::getPointName, "红外点位")
+                            .notLike(Integer.valueOf(0).equals(imageType), SolarStationPoints::getPointName, "红外点位")
                             .orderByAsc(SolarStationPoints::getPointName)
                             .orderByAsc(SolarStationPoints::getId)));
-            int pointIndex = panelPointIndex.getOrDefault(solarPanelName, 0);
+            int pointIndex = panelPointIndex.getOrDefault(cacheKey, 0);
             if (pointIndex >= points.size()) {
-                log.info("光伏板点位已用完，跳过图片上报: jobId={}, solarPanelName={}, defectId={}",
-                        waylineJobEntity.getJobId(), solarPanelName, defectEntity.getId());
+                log.info("光伏板点位已用完，跳过图片上报: jobId={}, solarPanelName={}, imageType={}, defectId={}",
+                        waylineJobEntity.getJobId(), solarPanelName, imageType, defectEntity.getId());
                 continue;
             }
             SolarStationPoints point = points.get(pointIndex);
             String imagePath = defectEntity.getImagePath();
             if (!org.springframework.util.StringUtils.hasText(imagePath)) {
-                log.info("光伏可见光图片路径为空，跳过上报: jobId={}, defectId={}", waylineJobEntity.getJobId(), defectEntity.getId());
+                log.info("光伏图片路径为空，跳过上报: jobId={}, imageType={}, defectId={}", waylineJobEntity.getJobId(), imageType, defectEntity.getId());
                 continue;
             }
             PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
@@ -565,9 +573,9 @@ public class JobControlHandler {
             item.setDefect_description(defectEntity.getDefectDescription());
             commandData.addItem(item);
             patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
-            panelPointIndex.put(solarPanelName, pointIndex + 1);
-            log.info("上报光伏巡视图片: jobId={}, solarPanelName={}, pointName={}",
-                    waylineJobEntity.getJobId(), solarPanelName, point.getPointName());
+            panelPointIndex.put(cacheKey, pointIndex + 1);
+            log.info("上报光伏巡视图片: jobId={}, solarPanelName={}, imageType={}, pointName={}",
+                    waylineJobEntity.getJobId(), solarPanelName, imageType, point.getPointName());
         }
     }
 

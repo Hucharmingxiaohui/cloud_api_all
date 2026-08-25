@@ -11,6 +11,7 @@ import java.util.List;
 final class SolarStationPointGenerator {
 
     private static final int POINTS_PER_COMPONENT = 3;
+    private static final String INFRARED_POINT_PREFIX = "红外点位";
 
     private SolarStationPointGenerator() {
     }
@@ -27,14 +28,17 @@ final class SolarStationPointGenerator {
             String componentName = panel.getSolarPanelName() + "部件";
             String componentId = panel.getId() + "-component";
             for (int i = 1; i <= POINTS_PER_COMPONENT; i++) {
-                result.add(createPoint(orthophoto, panel, componentName, componentId, i));
+                result.add(createPoint(orthophoto, panel, componentName, componentId, "点位" + i));
+            }
+            for (int i = 1; i <= POINTS_PER_COMPONENT; i++) {
+                result.add(createPoint(orthophoto, panel, componentName, componentId, INFRARED_POINT_PREFIX + i));
             }
         }
         return result;
     }
 
     private static SolarStationPoints createPoint(OrthophotoEntity orthophoto, SolarPanel panel,
-                                                 String componentName, String componentId, int index) {
+                                                 String componentName, String componentId, String pointNameSuffix) {
         SolarStationPoints point = new SolarStationPoints();
         String orthophotoName = orthophoto.getName();
         point.setAreaName(orthophotoName);
@@ -45,7 +49,7 @@ final class SolarStationPointGenerator {
         point.setMainDeviceId(panel.getId());
         point.setComponentName(componentName);
         point.setComponentId(componentId);
-        point.setPointName(componentName + "-点位" + index);
+        point.setPointName(componentName + "-" + pointNameSuffix);
         point.setDeviceType("");
         point.setSaveType("3");
         point.setDataType(4);

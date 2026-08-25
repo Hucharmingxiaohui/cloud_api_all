@@ -105,7 +105,13 @@
       @close="detailDialogVisible = false"
     />
 
-    <el-dialog v-model="pointsDialogVisible" title="点位详情">
+    <el-dialog
+      v-model="pointsDialogVisible"
+      title="点位详情"
+      width="90%"
+      class="points-detail-dialog"
+      :destroy-on-close="true"
+    >
       <div>
         <PointsDetail :id="currentPointOrthophotoId"></PointsDetail>
       </div>
@@ -504,6 +510,31 @@ function handleCurrentChange (val: number) {
     background-color: #0B2756;
     box-shadow: 0 0 0 1px #163474 inset;
     color: aliceblue;
+}
+
+:deep(.points-detail-dialog) {
+  background-color: #0A2D63;
+  border: 1px solid rgba(17, 180, 251, 0.18);
+  overflow: hidden;
+}
+
+:deep(.points-detail-dialog .el-dialog__header) {
+  margin-right: 0;
+  padding: 16px 20px 12px;
+  background-color: #0A2D63;
+}
+
+:deep(.points-detail-dialog .el-dialog__body) {
+  padding: 0 20px 16px;
+  background-color: #0A2D63;
+}
+
+:deep(.points-detail-dialog .el-dialog__title) {
+  color: white;
+}
+
+:deep(.points-detail-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: white;
 }
 
 </style>
