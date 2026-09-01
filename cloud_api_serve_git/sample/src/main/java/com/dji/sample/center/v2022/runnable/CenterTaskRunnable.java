@@ -70,28 +70,24 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     @Transactional(rollbackFor = Exception.class)
     public void taskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
        log.info("开始处理下发任务");
-//      需要区分普通任务和风机任务
-//      暂定风机任务设备层级设备id匹配风机；普通任务间隔层级间隔id匹配航线
-//      todo 对接第三方无人机平台下发任务，暂定先只能安间隔下发，根据配置开关位区分和普通航线任务的逻辑
+//      需要区分不同任务类型：风机任务、航点航线任务、光伏任务、EUA任务
+//      暂定风机任务设备层级设备id匹配风机；航点航线任务、光伏任务、EUA任务 间隔层级间隔id匹配航线
+//      todo 对接第三方无人机平台下发任务，暂定先只能安间隔下发，根据配置开关位区分和其他任务的逻辑
         String taskCode = taskCommandItem.getTask_code();
         String taskName = taskCommandItem.getTask_name();
         int deviceLevel = taskCommandItem.getDevice_level();
         String deviceList = taskCommandItem.getDevice_list();
         String fixedStartTime = taskCommandItem.getFixed_start_time();
-//      上级下发定时任务存表，方便上级立即执行去查询
         saveOrUpdateTaskPlan(taskCommandItem, sub_code);
-//      上级对接飞控平台下任务，平台要提前建立相关计划
         try {
-            // 1. 检查设备层级和列表
+//          规定选一个设备：风机任务
             if (deviceLevel == 2) {
                 // 2. 检查设备列表是否只有一个ID
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String singleDeviceId = deviceIds[0].trim();
-
                     // 3. 查询所有风机
                     List<WindTurbine> windTurbines = windTurbineMapper.selectList(new HashMap<>());
-
                     // 4. 检查是否能匹配上风机ID
                     WindTurbine matchedTurbine = windTurbines.stream()
                             .filter(wt -> singleDeviceId.equals(wt.getId()) ||
@@ -99,34 +95,33 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                             .findFirst()
                             .orElse(null);
                     if (matchedTurbine!=null) {
-
                         // 存入定时任务
                         centerTaskHandler.addScheduledTask(1,taskCode, fixedStartTime,
                                 singleDeviceId, taskName);
-
                     }
                 }
             }else if (deviceLevel == 1) {
-//              航点航线计划：规定选一个间隔
+//              规定选一个间隔：航点航线任务、光伏任务、EUA任务
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
+//                  间隔以-bay结尾为光伏任务
                     if (bayId.endsWith("-bay")) {
                         String orthophotoId = bayId.substring(0, bayId.length() - 4);
                         centerTaskHandler.addScheduledTask(4, taskCode, fixedStartTime, orthophotoId, taskName);
                         return;
                     }
+ //                 重庆下级对接开关开了为EUA任务
                     if (isCqDockTaskEnabled()) {
                         // EUA平台任务同样复用原有Redis定时任务，到fixedStartTime后再调用下级下发接口。
                         centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
                         return;
                     }
-                    // 存入定时任务
+//                  其他为航点航线任务
                     centerTaskHandler.addScheduledTask(0,taskCode, fixedStartTime,
                             bayId, taskName);
                 }
             }
-
         } catch (Exception e) {
             log.error("任务处理失败", e);
         }

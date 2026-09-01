@@ -358,6 +358,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 .setRthAltitude(waylineJob.getRthAltitude())
                 .setOutOfControlAction(waylineJob.getOutOfControlAction())
                 .setExitWaylineWhenRcLost(ExitWaylineWhenRcLostEnum.EXECUTE_RC_LOST_ACTION)
+                .setWaylinePrecisionType(WaylinePrecisionTypeEnum.RTK)
                 .setFile(new FlighttaskFile()
                         .setUrl(url.toString())
                         .setFingerprint(waylineFile.get().getSign()));
