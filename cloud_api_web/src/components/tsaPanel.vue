@@ -113,6 +113,7 @@
                 <div style="height: 40px; width: 100%;display:flex;align-items: center;justify-content: center;">
                     <el-button style="width: 100px; height: 30px; border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16);" @click="toTask()">查看任务</el-button>
                     <el-button  style="width: 100px; height: 30px;border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16);"  @click="showWayline()">查看航线</el-button>
+                    <el-button  style="width: 100px; height: 30px;border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16); color: #ff7875;"  @click="stopCurrentTask()">停止任务</el-button>
                 </div>
             </div>
         </div>
@@ -235,7 +236,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
-import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf } from '/@/api/wayline'
+import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, stopTask } from '/@/api/wayline'
 import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusMap, MediaStatus, MediaStatusProgressInfo, TaskMediaHighestPriorityProgressInfo } from '/@/types/task'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
 
@@ -515,6 +516,23 @@ function toTask () {
   router.push({ path: '/task' })
 }
 
+function stopCurrentTask () {
+  if (!MytaskId.value) {
+    return
+  }
+  if (!window.confirm(`确定要停止当前任务 ${MytaskId.value} 吗？`)) {
+    return
+  }
+  stopTask(workspaceId.value, MytaskId.value).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    message.success('停止任务指令已下发')
+    MytaskId.value = ''
+    getPlans()
+  })
+}
+
 // 弹出设备弹窗
 function switchVisible (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
   if (!isClick) {
@@ -601,6 +619,12 @@ function openLivestreamAgora () {
 </script>
 
 <style lang="scss" scoped>
+.content{
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .nav{
   height: 27px;
   background: url('/@/assets/v4/livestream-nav.png') 100% no-repeat;

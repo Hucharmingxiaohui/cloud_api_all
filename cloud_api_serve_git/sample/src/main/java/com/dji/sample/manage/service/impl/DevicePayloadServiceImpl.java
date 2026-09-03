@@ -15,6 +15,7 @@ import com.dji.sample.manage.service.IDevicePayloadService;
 import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sdk.cloudapi.device.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,12 +61,24 @@ public class DevicePayloadServiceImpl implements IDevicePayloadService {
         int id = this.checkPayloadExist(entity.getPayloadSn());
         // If it already exists, update the data directly.
         if (id > 0) {
-            entity.setId(id);
-            // For the payload of the drone itself, there is no firmware version.
-            entity.setFirmwareVersion(null);
-            return mapper.updateById(entity) > 0 ? entity.getId() : 0;
+            return updatePayloadEntity(id, entity);
         }
-        return mapper.insert(entity) > 0 ? entity.getId() : 0;
+        try {
+            return mapper.insert(entity) > 0 ? entity.getId() : 0;
+        } catch (DuplicateKeyException e) {
+            id = this.checkPayloadExist(entity.getPayloadSn());
+            if (id > 0) {
+                return updatePayloadEntity(id, entity);
+            }
+            throw e;
+        }
+    }
+
+    private Integer updatePayloadEntity(Integer id, DevicePayloadEntity entity) {
+        entity.setId(id);
+        // For the payload of the drone itself, there is no firmware version.
+        entity.setFirmwareVersion(null);
+        return mapper.updateById(entity) > 0 ? entity.getId() : 0;
     }
 
     @Override

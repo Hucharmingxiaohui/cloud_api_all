@@ -82,6 +82,13 @@ public class WaylineJobController {
         return HttpResultResponse.success();
     }
 
+    @PostMapping("/{workspace_id}/jobs/{job_id}/stop")
+    public HttpResultResponse stopJob(@PathVariable(name = "workspace_id") String workspaceId,
+                                      @PathVariable(name = "job_id") String jobId) {
+        flighttaskService.stopFlightTask(workspaceId, jobId);
+        return HttpResultResponse.success();
+    }
+
     /**
      * Set the media files for this job to upload immediately.
      * @param workspaceId

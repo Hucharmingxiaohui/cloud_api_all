@@ -323,6 +323,8 @@ watch(() => store?.state.deviceState, data => {
   color: white;
   border-radius: 0;
   height: calc(100vh - 120px);;
+  overflow-y: auto;
+  overflow-x: hidden;
   // display: flex;
   // flex-direction: column; /* 使子元素按列排列 */
   .workspace-node{

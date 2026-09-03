@@ -187,7 +187,8 @@ public class SDKWaylineService extends AbstractWaylineService {
         log.info("Flighttask progress detail: gateway={}, flightId={}, status={}, currentWaypointIndex={}, result={}, ext={}",
                 response.getGateway(), flightId, statusEnum, currentWaypointIndex, eventsReceiver.getResult(), JSON.toJSONString(output.getExt()));
         saveFrogJumpDockProgress(response.getGateway(), flightId, output);
-        notifyFrogJumpPeerStopIfEnd(response.getGateway(), flightId, statusEnum);
+        boolean taskEnd = statusEnum.isEnd() || isFrogJumpDisconnectEnd(response.getGateway(), flightId, output);
+        notifyFrogJumpPeerStopIfEnd(response.getGateway(), flightId, statusEnum, taskEnd);
 
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, flightId));
@@ -283,7 +284,7 @@ public class SDKWaylineService extends AbstractWaylineService {
             }
         }
 
-        if (statusEnum.isEnd()) {
+        if (taskEnd) {
             WaylineJobDTO job = WaylineJobDTO.builder()
                     .jobId(response.getBid())
                     .status(WaylineJobStatusEnum.SUCCESS.getVal())
@@ -803,8 +804,22 @@ public class SDKWaylineService extends AbstractWaylineService {
         return dockSns.length == 2 && (dockSns[0].equals(dockSn) || dockSns[1].equals(dockSn));
     }
 
-    private void notifyFrogJumpPeerStopIfEnd(String currentDockSn, String flightId, FlighttaskStatusEnum statusEnum) {
-        if (statusEnum == null || !statusEnum.isEnd()) {
+    private boolean isFrogJumpDisconnectEnd(String dockSn, String flightId, FlighttaskProgress progress) {
+        if (flightId == null || progress == null || progress.getExt() == null
+                || progress.getExt().getWaylineMissionState() != WaylineMissionStateEnum.DISCONNECT) {
+            return false;
+        }
+        Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);
+        if (pairValue == null || getFrogJumpPeerDockSn(dockSn, String.valueOf(pairValue)) == null) {
+            return false;
+        }
+        log.warn("Frog jump task treated as ended because wayline mission disconnected: flightId={}, dockSn={}, status={}",
+                flightId, dockSn, progress.getStatus());
+        return true;
+    }
+
+    private void notifyFrogJumpPeerStopIfEnd(String currentDockSn, String flightId, FlighttaskStatusEnum statusEnum, boolean taskEnd) {
+        if (!taskEnd) {
             return;
         }
         Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);

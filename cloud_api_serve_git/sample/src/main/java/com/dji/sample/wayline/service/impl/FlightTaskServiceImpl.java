@@ -518,6 +518,41 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     }
 
+    @Override
+    public void stopFlightTask(String workspaceId, String jobId) {
+        Optional<WaylineJobDTO> waylineJob = waylineJobService.getJobByJobId(workspaceId, jobId);
+        if (waylineJob.isEmpty()) {
+            throw new IllegalArgumentException("Job doesn't exist.");
+        }
+
+        WaylineJobDTO job = waylineJob.get();
+        WaylineJobStatusEnum statusEnum = WaylineJobStatusEnum.find(job.getStatus());
+        if (WaylineJobStatusEnum.IN_PROGRESS != statusEnum && WaylineJobStatusEnum.PAUSED != statusEnum) {
+            throw new IllegalArgumentException("Only executing or paused tasks can be stopped.");
+        }
+
+        String dockSn = job.getDockSn();
+        if (!deviceRedisService.checkDeviceOnline(dockSn)) {
+            throw new RuntimeException("Dock is offline.");
+        }
+
+        TopicServicesResponse<ServicesReplyData> serviceReply = abstractWaylineService.flighttaskStop(
+                SDKManager.getDeviceSDK(dockSn), new FlighttaskStopRequest().setFlightId(jobId).setReason(0));
+        if (!serviceReply.getData().getResult().isSuccess()) {
+            log.info("Stop job ====> Error: {}", serviceReply.getData().getResult());
+            throw new RuntimeException("Failed to stop the wayline job of " + dockSn);
+        }
+
+        waylineJobService.updateJob(WaylineJobDTO.builder()
+                .workspaceId(workspaceId)
+                .jobId(jobId)
+                .status(WaylineJobStatusEnum.CANCEL.getVal())
+                .completedTime(LocalDateTime.now())
+                .build());
+        waylineRedisService.delRunningWaylineJob(dockSn);
+        waylineRedisService.delPausedWaylineJob(dockSn);
+    }
+
     public void publishCancelTask(String workspaceId, String dockSn, List<String> jobIds) {
         boolean isOnline = deviceRedisService.checkDeviceOnline(dockSn);
         if (!isOnline) {

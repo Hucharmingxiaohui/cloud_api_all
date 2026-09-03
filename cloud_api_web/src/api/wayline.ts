@@ -410,6 +410,13 @@ export async function deleteTask (workspaceId: string, params: DeleteTaskParams)
   return result.data
 }
 
+// 停止执行中的机场任务
+export async function stopTask (workspaceId: string, jobId: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs/${jobId}/stop`
+  const result = await request.post(url)
+  return result.data
+}
+
 // 批量删除机场任务
 export async function batchDeleteTaskApi (data: any): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX3}/waylinePlan/batchDeleteJobByJobIds`

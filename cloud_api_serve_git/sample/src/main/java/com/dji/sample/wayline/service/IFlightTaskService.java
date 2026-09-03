@@ -57,6 +57,13 @@ public interface IFlightTaskService {
     HttpResultResponse cancelFlightTask(String workspaceId, Collection<String> jobIds);
 
     /**
+     * Stop the wayline task that is already executing on the dock.
+     * @param workspaceId
+     * @param jobId
+     */
+    void stopFlightTask(String workspaceId, String jobId);
+
+    /**
      * Cancel the dock tasks that have been issued but have not yet been executed.
      * @param workspaceId
      * @param dockSn
