@@ -54,4 +54,10 @@ public class CreateJobParam {
     private String fanName;
 
     private Long beginTime;
+
+    private Boolean frogJumpMode;
+
+    private String landingDockSn;
+
+    private String frogJumpDroneSn;
 }

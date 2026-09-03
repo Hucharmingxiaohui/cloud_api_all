@@ -291,6 +291,8 @@ export interface FlightTestPlan {
   update_time: number; // 更新时间，时间戳（毫秒数）
   enable_status: number; // 启用状态，数字类型（通常是0或1）
   plan_priority: number; // 计划优先级，数字类型
+  frog_jump_mode?: boolean; // 是否蛙跳模式
+  landing_dock_sn?: string; // 蛙跳降落机场
 }
 // 下发计划
 export const DistributeFlyPlan = async function (data: FlightTestPlan): Promise<IWorkspaceResponse<any>> {

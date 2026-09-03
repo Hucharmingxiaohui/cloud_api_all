@@ -6,10 +6,16 @@ import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.ICapacityCameraService;
 import com.dji.sample.manage.service.IDeviceRedisService;
+import com.dji.sdk.mqtt.osd.IOsdCacheService;
+import com.dji.sdk.mqtt.state.IRawStateCacheService;
 import com.dji.sdk.cloudapi.firmware.OtaProgress;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -20,10 +26,15 @@ import java.util.stream.Collectors;
  * @date 2023/3/21
  */
 @Service
-public class DeviceRedisServiceImpl implements IDeviceRedisService {
+public class DeviceRedisServiceImpl implements IDeviceRedisService, IRawStateCacheService, IOsdCacheService {
+
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<Map<String, Object>>() {};
 
     @Autowired
     private ICapacityCameraService capacityCameraService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Override
     public Boolean checkDeviceOnline(String sn) {
@@ -57,8 +68,96 @@ public class DeviceRedisServiceImpl implements IDeviceRedisService {
     }
 
     @Override
+    public void setDeviceRawOsd(String sn, Object data) {
+        mergeAndSetRawCache(RedisConst.RAW_OSD_PREFIX + sn, data);
+    }
+
+    @Override
+    public <T> Optional<T> getDeviceRawOsd(String sn, Class<T> clazz) {
+        return Optional.ofNullable(clazz.cast(RedisOpsUtils.get(RedisConst.RAW_OSD_PREFIX + sn)));
+    }
+
+    @Override
+    public void setDeviceRawState(String sn, Object data) {
+        mergeAndSetRawCache(RedisConst.RAW_STATE_PREFIX + sn, data);
+    }
+
+    @Override
+    public <T> Optional<T> getDeviceRawState(String sn, Class<T> clazz) {
+        return Optional.ofNullable(clazz.cast(RedisOpsUtils.get(RedisConst.RAW_STATE_PREFIX + sn)));
+    }
+
+    @Override
     public Boolean delDeviceOsd(String sn) {
         return RedisOpsUtils.del(RedisConst.OSD_PREFIX + sn);
+    }
+
+    @Override
+    public Boolean delDeviceRawOsd(String sn) {
+        return RedisOpsUtils.del(RedisConst.RAW_OSD_PREFIX + sn);
+    }
+
+    @Override
+    public Boolean delDeviceRawState(String sn) {
+        return RedisOpsUtils.del(RedisConst.RAW_STATE_PREFIX + sn);
+    }
+
+    private void mergeAndSetRawCache(String key, Object newValue) {
+        Object oldValue = RedisOpsUtils.get(key);
+        if (oldValue == null) {
+            RedisOpsUtils.set(key, newValue);
+            return;
+        }
+        Map<String, Object> oldMap = toMap(oldValue);
+        Map<String, Object> newMap = toMap(newValue);
+        if (oldMap == null || newMap == null) {
+            RedisOpsUtils.set(key, newValue);
+            return;
+        }
+        mergeTopicRequest(oldMap, newMap);
+        RedisOpsUtils.set(key, objectMapper.convertValue(oldMap, newValue.getClass()));
+    }
+
+    private void mergeTopicRequest(Map<String, Object> oldMap, Map<String, Object> newMap) {
+        Object oldData = oldMap.get("data");
+        Object newData = newMap.get("data");
+        Map<String, Object> oldDataMap = toMap(oldData);
+        Map<String, Object> newDataMap = toMap(newData);
+        oldMap.putAll(newMap);
+        if (oldDataMap != null && newDataMap != null) {
+            mergeMap(oldDataMap, newDataMap);
+            oldMap.put("data", oldDataMap);
+        }
+    }
+
+    private void mergeMap(Map<String, Object> target, Map<String, Object> source) {
+        source.forEach((key, value) -> {
+            Map<String, Object> targetValue = asMap(target.get(key));
+            Map<String, Object> sourceValue = asMap(value);
+            if (targetValue != null && sourceValue != null) {
+                mergeMap(targetValue, sourceValue);
+                target.put(key, targetValue);
+                return;
+            }
+            target.put(key, value);
+        });
+    }
+
+    private Map<String, Object> toMap(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Map) {
+            return new LinkedHashMap<>((Map<String, Object>) value);
+        }
+        return objectMapper.convertValue(value, MAP_TYPE);
+    }
+
+    private Map<String, Object> asMap(Object value) {
+        if (value instanceof Map) {
+            return new LinkedHashMap<>((Map<String, Object>) value);
+        }
+        return null;
     }
 
     @Override
@@ -95,6 +194,7 @@ public class DeviceRedisServiceImpl implements IDeviceRedisService {
     @Override
     public void gatewayOffline(String gatewaySn) {
         delDeviceOnline(gatewaySn);
+        delDeviceOsd(gatewaySn);
         delHmsKeysBySn(gatewaySn);
         capacityCameraService.deleteCapacityCameraByDeviceSn(gatewaySn);
     }

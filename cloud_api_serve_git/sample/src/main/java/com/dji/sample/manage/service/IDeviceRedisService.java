@@ -57,12 +57,35 @@ public interface IDeviceRedisService {
      * @return
      */
     <T> Optional<T> getDeviceOsd(String sn, Class<T> clazz);
+
+    /**
+     * Save the device's raw state data.
+     * @param sn
+     * @param data
+     */
+    void setDeviceRawState(String sn, Object data);
+
+    /**
+     * Get the device's raw state data.
+     * @param sn
+     * @param clazz
+     * @param <T>
+     * @return
+     */
+    <T> Optional<T> getDeviceRawState(String sn, Class<T> clazz);
     /**
      * Delete the device's osd real-time data.
      * @param sn
      * @return
      */
     Boolean delDeviceOsd(String sn);
+
+    /**
+     * Delete the device's raw state data.
+     * @param sn
+     * @return
+     */
+    Boolean delDeviceRawState(String sn);
 
     /**
      * Save the firmware update progress of the device in redis.

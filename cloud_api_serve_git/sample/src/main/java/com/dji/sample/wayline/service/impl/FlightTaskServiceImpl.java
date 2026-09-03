@@ -11,6 +11,8 @@ import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
+import com.dji.sample.df.frogJumpDf.model.dto.FrogJumpExecuteParam;
+import com.dji.sample.df.frogJumpDf.service.FrogJumpExecuteService;
 import com.dji.sample.df.uavCommonHandleDf.handler.JobControlHandler;
 import com.dji.sample.manage.model.dto.DeviceDTO;
 import com.dji.sample.manage.service.IDeviceRedisService;
@@ -90,6 +92,9 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     @Autowired
     private IWaylineFileService waylineFileService;
+
+    @Autowired
+    private FrogJumpExecuteService frogJumpExecuteService;
 
     @Autowired
     private SDKWaylineService abstractWaylineService;
@@ -297,7 +302,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 // If it is a conditional task type, add conditions to the job parameters.
                 addConditions(waylineJob, param, beginTime, endTime);
 
-                HttpResultResponse response = this.publishOneFlightTask(waylineJob);
+                HttpResultResponse response = this.publishOneFlightTask(waylineJob, param);
                 if (HttpResultResponse.CODE_SUCCESS != response.getCode()) {
                     return response;
                 }
@@ -309,20 +314,36 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
 
     public HttpResultResponse publishOneFlightTask(WaylineJobDTO waylineJob) throws SQLException {
+        return publishOneFlightTask(waylineJob, null);
+    }
+
+
+    public HttpResultResponse publishOneFlightTask(WaylineJobDTO waylineJob, CreateJobParam createJobParam) throws SQLException {
 
         boolean isOnline = deviceRedisService.checkDeviceOnline(waylineJob.getDockSn());
         if (!isOnline) {
             throw new RuntimeException("Dock is offline.");
         }
 
-        boolean isSuccess = this.prepareFlightTask(waylineJob);
+        if (isFrogJumpMode(createJobParam)) {
+            saveFrogJumpTaskPair(waylineJob, createJobParam);
+        }
+
+        boolean isSuccess = isFrogJumpMode(createJobParam)
+                ? this.prepareFrogJumpFlightTask(waylineJob, createJobParam)
+                : this.prepareFlightTask(waylineJob);
         if (!isSuccess) {
             return HttpResultResponse.error("Failed to prepare job.");
         }
 
         // Issue an immediate task execution command.
         if (TaskTypeEnum.IMMEDIATE == waylineJob.getTaskType()) {
-            if (!executeFlightTask(waylineJob.getWorkspaceId(), waylineJob.getJobId())) {
+            if (isFrogJumpMode(createJobParam)) {
+                HttpResultResponse frogJumpResult = executeFrogJumpTask(waylineJob, createJobParam);
+                if (HttpResultResponse.CODE_SUCCESS != frogJumpResult.getCode()) {
+                    return frogJumpResult;
+                }
+            } else if (!executeFlightTask(waylineJob.getWorkspaceId(), waylineJob.getJobId())) {
                 return HttpResultResponse.error("Failed to execute job.");
             }
         }
@@ -340,7 +361,48 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         return HttpResultResponse.success();
     }
 
+    private boolean isFrogJumpMode(CreateJobParam createJobParam) {
+        return createJobParam != null && Boolean.TRUE.equals(createJobParam.getFrogJumpMode());
+    }
+
+    private HttpResultResponse executeFrogJumpTask(WaylineJobDTO waylineJob, CreateJobParam createJobParam) {
+        FrogJumpExecuteParam param = new FrogJumpExecuteParam();
+        param.setFlightId(waylineJob.getJobId());
+        param.setTakeoffDockSn(waylineJob.getDockSn());
+        param.setLandingDockSn(createJobParam.getLandingDockSn());
+        param.setDroneSn(createJobParam.getFrogJumpDroneSn());
+        return frogJumpExecuteService.execute(param);
+    }
+
+    private void saveFrogJumpTaskPair(WaylineJobDTO waylineJob, CreateJobParam createJobParam) {
+        if (!StringUtils.hasText(createJobParam.getLandingDockSn())) {
+            return;
+        }
+        RedisOpsUtils.set(RedisConst.FROG_JUMP_TASK_PREFIX + waylineJob.getJobId(),
+                waylineJob.getDockSn() + RedisConst.DELIMITER + createJobParam.getLandingDockSn());
+        log.info("Frog jump task pair saved: flightId={}, takeoffDockSn={}, landingDockSn={}",
+                waylineJob.getJobId(), waylineJob.getDockSn(), createJobParam.getLandingDockSn());
+    }
+
+    private Boolean prepareFrogJumpFlightTask(WaylineJobDTO waylineJob, CreateJobParam createJobParam) throws SQLException {
+        if (!StringUtils.hasText(createJobParam.getLandingDockSn())) {
+            throw new IllegalArgumentException("Landing dock sn is required for frog jump task.");
+        }
+        if (!deviceRedisService.checkDeviceOnline(createJobParam.getLandingDockSn())) {
+            throw new RuntimeException("Landing dock is offline.");
+        }
+        boolean takeoffPrepared = prepareFlightTask(waylineJob, waylineJob.getDockSn(), "takeoffDock");
+        if (!takeoffPrepared) {
+            return false;
+        }
+        return prepareFlightTask(waylineJob, createJobParam.getLandingDockSn(), "landingDock");
+    }
+
     private Boolean prepareFlightTask(WaylineJobDTO waylineJob) throws SQLException {
+        return prepareFlightTask(waylineJob, waylineJob.getDockSn(), "dock");
+    }
+
+    private Boolean prepareFlightTask(WaylineJobDTO waylineJob, String targetDockSn, String targetName) throws SQLException {
         // get wayline file
         Optional<GetWaylineListResponse> waylineFile = waylineFileService.getWaylineByWaylineId(waylineJob.getWorkspaceId(), waylineJob.getFileId());
         if (waylineFile.isEmpty()) {
@@ -372,9 +434,11 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         }
 
         TopicServicesResponse<ServicesReplyData> serviceReply = abstractWaylineService.flighttaskPrepare(
-                SDKManager.getDeviceSDK(waylineJob.getDockSn()), flightTask);
+                SDKManager.getDeviceSDK(targetDockSn), flightTask);
+        log.info("Prepare task reply: flightId={}, targetName={}, targetDockSn={}, result={}",
+                waylineJob.getJobId(), targetName, targetDockSn, serviceReply.getData().getResult());
         if (!serviceReply.getData().getResult().isSuccess()) {
-            log.info("Prepare task ====> Error code: {}", serviceReply.getData().getResult());
+            log.info("Prepare task ====> Error code: {}, targetDockSn={}", serviceReply.getData().getResult(), targetDockSn);
             waylineJobService.updateJob(WaylineJobDTO.builder()
                     .workspaceId(waylineJob.getWorkspaceId())
                     .jobId(waylineJob.getJobId())
@@ -624,6 +688,11 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
     @Override
     public TopicRequestsResponse<MqttReply<FlighttaskResourceGetResponse>> flighttaskResourceGet(TopicRequestsRequest<FlighttaskResourceGetRequest> response, MessageHeaders headers) {
         return abstractWaylineService.flighttaskResourceGet(response, headers);
+    }
+
+    @Override
+    public TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>> flighttaskProgressGet(TopicRequestsRequest<FlighttaskProgressGetRequest> response, MessageHeaders headers) {
+        return abstractWaylineService.flighttaskProgressGet(response, headers);
     }
 
 }

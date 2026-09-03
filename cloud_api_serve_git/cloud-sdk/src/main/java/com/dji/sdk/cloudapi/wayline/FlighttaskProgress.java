@@ -1,11 +1,13 @@
 package com.dji.sdk.cloudapi.wayline;
 
+import com.dji.sdk.common.BaseModel;
+
 /**
  * @author sean
  * @version 1.1
  * @date 2022/6/9
  */
-public class FlighttaskProgress {
+public class FlighttaskProgress extends BaseModel {
 
     private FlighttaskProgressExt ext;
 

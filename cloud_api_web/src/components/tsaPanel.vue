@@ -8,7 +8,7 @@
       <a-empty :image="noData" :image-style="{ height: '60px' }" />
     </div>
     <div class="content" v-else>
-      <div class="device" v-for="dock in onlineDocks.data" :key="dock.sn">
+      <div class="device" v-for="dock in onlineDocks.data" :key="dock.gateway.sn">
         <div class="dock" >
         <!-- <div class="dock"  v-if="currentDeviceForSub.includes(dock.sn)"> -->
           <div class="group_4 flex-col justify-end">
@@ -40,8 +40,8 @@
                   </div>
                   <!-- {{ (deviceInfo[dock.sn]?.mode_code !== EModeCode.Disconnected) ? '已连接' : '未连接' }} -->
                   <!-- <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code == 0"> 已连接</span> -->
-                  <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code === EModeCode.Disconnected">未连接</span>
-                  <span class="text_15" v-else >已连接</span>
+                   <span class="text_15" v-if="dock.has_drone && deviceInfo[droneSn(dock)]?.mode_code !== EModeCode.Disconnected">已连接</span>
+                   <span class="text_15" v-else >未连接</span>
                 </div>
               </div>
               <div style="width: 230px; ">
@@ -132,32 +132,32 @@
                     referrerpolicy="no-referrer"
                     src="../assets/v4/fan.png"
                   />
-                  <span class="text_22">{{ dock.callsign ?? 'No Drone' }}</span>
+                  <span class="text_22">{{ dock.has_drone ? dock.callsign : '未绑定无人机' }}</span>
                 </div>
                 <div style="width: 170px; margin-top: 10px;" >
                   <div style="display: flex; align-items: center; height: 25px;">
                     <span style="width: 50px;">状态:</span>
-                    <span  style="overflow: hidden;width: 120px;" :style="deviceInfo[dock.sn] && deviceInfo[dock.sn].mode_code !== EModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
-                      {{ deviceInfo[dock.sn] ? EModeCode[deviceInfo[dock.sn].mode_code] : EModeCode[EModeCode.Disconnected] }}</span>
+                    <span  style="overflow: hidden;width: 120px;" :style="dock.has_drone && deviceInfo[droneSn(dock)] && deviceInfo[droneSn(dock)].mode_code !== EModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
+                      {{ dock.has_drone && deviceInfo[droneSn(dock)] ? EModeCode[deviceInfo[droneSn(dock)].mode_code] : EModeCode[EModeCode.Disconnected] }}</span>
                   </div>
                   <div style="display: flex; align-items: center; height: 25px;" >
-                    <div v-if="hmsInfo[dock.sn]" class="flex-align-center flex-row">
+                    <div v-if="dock.has_drone && hmsInfo[droneSn(dock)]" class="flex-align-center flex-row">
                         <div  style="width: 18px; height: 16px; text-align: center; border: 1px solid orange; line-height: 16px;">
-                          <div :class="hmsInfo[dock.sn][0].level === EHmsLevel.CAUTION ? 'caution-blink' :
-                          hmsInfo[dock.sn][0].level === EHmsLevel.WARN ? 'warn-blink' : 'notice-blink'">
-                            <span :style="hmsInfo[dock.sn].length > 99 ? 'font-size: 11px' : 'font-size: 12px'">{{ hmsInfo[dock.sn].length }}</span>
-                            <span class="fz10">{{ hmsInfo[dock.sn].length > 99 ? '+' : ''}}</span>
+                          <div :class="hmsInfo[droneSn(dock)][0].level === EHmsLevel.CAUTION ? 'caution-blink' :
+                          hmsInfo[droneSn(dock)][0].level === EHmsLevel.WARN ? 'warn-blink' : 'notice-blink'">
+                            <span :style="hmsInfo[droneSn(dock)].length > 99 ? 'font-size: 11px' : 'font-size: 12px'">{{ hmsInfo[droneSn(dock)].length }}</span>
+                            <span class="fz10">{{ hmsInfo[droneSn(dock)].length > 99 ? '+' : ''}}</span>
                           </div>
                         </div>
-                        <a-popover trigger="click" placement="bottom" background-color="#43C575" v-model:visible="hmsVisible[dock.sn]" @visibleChange="readHms(hmsVisible[dock.sn], dock.sn)"
+                        <a-popover trigger="click" placement="bottom" background-color="#43C575" v-model:visible="hmsVisible[droneSn(dock)]" @visibleChange="readHms(hmsVisible[droneSn(dock)], droneSn(dock))"
                           :overlayStyle="{width: '200px', height: '300px'}">
-                          <div :class="hmsInfo[dock.sn][0].level === EHmsLevel.CAUTION ? 'caution' :
-                            hmsInfo[dock.sn][0].level === EHmsLevel.WARN ? 'warn' : 'notice'" style="margin-left: 10px; width: 150px; height: 16px; line-height: 16px;background: transparent !important;;">
-                            <span class="word-loop">{{ hmsInfo[dock.sn][0].message_zh }}</span>
+                          <div :class="hmsInfo[droneSn(dock)][0].level === EHmsLevel.CAUTION ? 'caution' :
+                            hmsInfo[droneSn(dock)][0].level === EHmsLevel.WARN ? 'warn' : 'notice'" style="margin-left: 10px; width: 150px; height: 16px; line-height: 16px;background: transparent !important;;">
+                            <span class="word-loop">{{ hmsInfo[droneSn(dock)][0].message_zh }}</span>
                           </div>
                           <template #content>
                             <a-collapse style="background: transparent; height: 300px; overflow-y: auto;" :bordered="false" expand-icon-position="right" :accordion="true">
-                              <a-collapse-panel v-for="hms in hmsInfo[dock.sn]" :key="hms.hms_id" :showArrow="false"
+                              <a-collapse-panel v-for="hms in hmsInfo[droneSn(dock)]" :key="hms.hms_id" :showArrow="false"
                                 style=" margin: 0 auto 3px auto; border: 0; width: 140px; border-radius: 3px"
                                 :class="hms.level === EHmsLevel.CAUTION ? 'caution' : hms.level === EHmsLevel.WARN ? 'warn' : 'notice'"
                                 >
@@ -430,8 +430,9 @@ function getOnlineTopo () {
       const child = gateway.children
       const device: OnlineDevice = {
         model: child?.device_name,
-        callsign: child?.nickname,
+        callsign: child?.nickname || child?.device_sn,
         sn: child?.device_sn,
+        has_drone: !!child?.device_sn,
         mode: EModeCode.Disconnected,
         gateway: {
           model: gateway?.device_name,
@@ -441,7 +442,7 @@ function getOnlineTopo () {
         },
         payload: []
       }
-      child?.payloads_list.forEach((payload: any) => {
+      child?.payloads_list?.forEach((payload: any) => {
         device.payload.push({
           index: payload.index,
           model: payload.model,
@@ -452,7 +453,9 @@ function getOnlineTopo () {
         })
       })
       if (EDeviceTypeName.Dock === gateway.domain) {
-        hmsVisible.set(device.sn, false)
+        if (device.sn) {
+          hmsVisible.set(device.sn, false)
+        }
         hmsVisible.set(device.gateway.sn, false)
         onlineDocks.data.push(device)
       }
@@ -463,17 +466,26 @@ function getOnlineTopo () {
   })
 }
 
+function droneSn (dock: OnlineDevice) {
+  return dock.sn || ''
+}
+
 // 获取所有的场站信息
 const current_sub = ref('')
 
 // 跳转到远程调试界面
 function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
-  if (device.sn === osdVisible.value.sn) {
+  const targetSn = isDock ? device.gateway.sn : device.sn
+  if (!targetSn) {
+    e.target.style.cursor = 'not-allowed'
+    return
+  }
+  if (targetSn === osdVisible.value.sn) {
     osdVisible.value.visible = false
   } else {
-    osdVisible.value.sn = device.sn
-    osdVisible.value.callsign = device.callsign
-    osdVisible.value.model = device.model
+    osdVisible.value.sn = targetSn
+    osdVisible.value.callsign = isDock ? device.gateway.callsign : device.callsign
+    osdVisible.value.model = isDock ? device.gateway.model : device.model
     osdVisible.value.visible = false
     osdVisible.value.gateway_sn = device.gateway.sn
     osdVisible.value.is_dock = isDock
@@ -509,12 +521,17 @@ function switchVisible (e: any, device: OnlineDevice, isDock: boolean, isClick: 
     e.target.style.cursor = 'not-allowed'
     return
   }
-  if (device.sn === osdVisible.value.sn) {
+  const targetSn = isDock ? device.gateway.sn : device.sn
+  if (!targetSn) {
+    e.target.style.cursor = 'not-allowed'
+    return
+  }
+  if (targetSn === osdVisible.value.sn) {
     osdVisible.value.visible = !osdVisible.value.visible
   } else {
-    osdVisible.value.sn = device.sn
-    osdVisible.value.callsign = device.callsign
-    osdVisible.value.model = device.model
+    osdVisible.value.sn = targetSn
+    osdVisible.value.callsign = isDock ? device.gateway.callsign : device.callsign
+    osdVisible.value.model = isDock ? device.gateway.model : device.model
     osdVisible.value.visible = true
     osdVisible.value.gateway_sn = device.gateway.sn
     osdVisible.value.is_dock = isDock
@@ -532,7 +549,8 @@ function openLiveStream (device: OnlineDevice) {
   // }
   liveStream.value.visible = !liveStream.value.visible
   liveStream.value.dock_sn = device.gateway.sn
-  liveStream.value.dorne_sn = device.sn
+  liveStream.value.dorne_sn = device.sn || ''
+  liveStream.value.has_drone = !!device.has_drone
   store.commit('SET_LIVESTREAM_INFO', liveStream)
 }
 

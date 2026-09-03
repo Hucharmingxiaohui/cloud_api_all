@@ -36,6 +36,8 @@ public interface IFlightTaskService {
      */
     HttpResultResponse publishOneFlightTask(WaylineJobDTO waylineJob) throws SQLException;
 
+    HttpResultResponse publishOneFlightTask(WaylineJobDTO waylineJob, CreateJobParam createJobParam) throws SQLException;
+
     /**
      * Execute the task immediately.
      * @param jobId

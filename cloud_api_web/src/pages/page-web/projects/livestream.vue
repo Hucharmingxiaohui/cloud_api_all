@@ -24,11 +24,11 @@
             <button class="liveview__close" type="button" @click="closeLivestream">×</button>
           </div>
           <div class="liveview__tabs">
-            <el-button class="btn" :class="{ active: showLive }" @click="toggleDroneVideo">无人机视频</el-button>
+            <el-button class="btn" :class="{ active: showLive }" :disabled="!livestream.has_drone" @click="toggleDroneVideo">无人机视频</el-button>
             <el-button class="btn" :class="{ active: showDockLive }" @click="toggleDockVideo">机场视频</el-button>
           </div>
           <div class="liveview__video">
-            <LivestreamOthers v-if="showLive" :sn="livestream.dorne_sn" />
+            <LivestreamOthers v-if="showLive && livestream.has_drone" :sn="livestream.dorne_sn" />
             <LivestreamDock v-else-if="showDockLive" :sn="livestream.dock_sn" />
             <div v-else class="liveview__empty">请选择监控画面</div>
           </div>
@@ -76,6 +76,11 @@ const isMounted = ref(false) // 是否已经完成初始化
 
 // 无人机视频---------------------------------------------------
 const toggleDroneVideo = () => {
+  if (!livestream.value.has_drone) {
+    showLive.value = false
+    showDockLive.value = true
+    return
+  }
   showLive.value = true
   showDockLive.value = false
 }
@@ -205,6 +210,16 @@ const osdVisible = computed(() => {
   return store.state.osdVisible
 })
 const livestream = computed(() => store.state.liveStream)
+
+watch(() => [livestream.value.visible, livestream.value.has_drone, livestream.value.dock_sn, livestream.value.dorne_sn], ([visible]) => {
+  if (!visible) {
+    showLive.value = false
+    showDockLive.value = false
+    return
+  }
+  showLive.value = !!livestream.value.has_drone
+  showDockLive.value = !livestream.value.has_drone
+}, { deep: true })
 
 function closeLivestream () {
   livestream.value.visible = false

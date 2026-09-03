@@ -77,7 +77,8 @@ const initStateFunc = () => ({
   liveStream: {
     visible: false,
     dock_sn: '',
-    dorne_sn: ''
+    dorne_sn: '',
+    has_drone: false
   }, // 新增，开启视频弹窗
   wsEvent: {
     mapElementCreat: {},

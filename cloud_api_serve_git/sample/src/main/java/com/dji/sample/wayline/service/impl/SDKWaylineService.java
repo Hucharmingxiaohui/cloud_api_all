@@ -9,6 +9,8 @@ import com.dji.sample.common.error.CommonErrorEnum;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.IOssService;
+import com.dji.sample.component.redis.RedisConst;
+import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
@@ -43,14 +45,18 @@ import com.dji.sdk.cloudapi.wayline.*;
 import com.dji.sdk.cloudapi.wayline.api.AbstractWaylineService;
 import com.dji.sdk.common.SDKManager;
 import com.dji.sdk.mqtt.MqttReply;
+import com.dji.sdk.mqtt.ChannelName;
 import com.dji.sdk.mqtt.events.EventsDataRequest;
 import com.dji.sdk.mqtt.events.TopicEventsRequest;
 import com.dji.sdk.mqtt.events.TopicEventsResponse;
 import com.dji.sdk.mqtt.requests.TopicRequestsRequest;
 import com.dji.sdk.mqtt.requests.TopicRequestsResponse;
+import com.dji.sdk.mqtt.services.ServicesReplyData;
+import com.dji.sdk.mqtt.services.TopicServicesResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -178,6 +184,10 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         Integer currentWaypointIndex = response.getData().getOutput().getExt().getCurrentWaypointIndex();
         String flightId = response.getData().getOutput().getExt().getFlightId();
+        log.info("Flighttask progress detail: gateway={}, flightId={}, status={}, currentWaypointIndex={}, result={}, ext={}",
+                response.getGateway(), flightId, statusEnum, currentWaypointIndex, eventsReceiver.getResult(), JSON.toJSONString(output.getExt()));
+        saveFrogJumpDockProgress(response.getGateway(), flightId, output);
+        notifyFrogJumpPeerStopIfEnd(response.getGateway(), flightId, statusEnum);
 
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, flightId));
@@ -716,5 +726,112 @@ public class SDKWaylineService extends AbstractWaylineService {
         // 返回空的成功响应
         return new TopicEventsResponse<MqttReply>()
                 .setData(MqttReply.success());
+    }
+
+    @Override
+    @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_FLIGHTTASK_PROGRESS_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
+    public TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>> flighttaskProgressGet(TopicRequestsRequest<FlighttaskProgressGetRequest> response, MessageHeaders headers) {
+        String flightId = response.getData().getFlightId();
+        Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);
+        if (pairValue == null) {
+            log.warn("Flighttask progress get failed: frog jump pair not found, gateway={}, flightId={}", response.getGateway(), flightId);
+            return new TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>>().setData(MqttReply.error(CommonErrorEnum.ILLEGAL_ARGUMENT));
+        }
+        String peerDockSn = getProgressTargetSn(response);
+        if (peerDockSn == null || peerDockSn.isBlank()) {
+            peerDockSn = getFrogJumpPeerDockSn(response.getGateway(), String.valueOf(pairValue));
+        }
+        if (peerDockSn == null) {
+            log.warn("Flighttask progress get failed: request gateway not in pair, gateway={}, flightId={}, pairValue={}",
+                    response.getGateway(), flightId, pairValue);
+            return new TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>>().setData(MqttReply.error(CommonErrorEnum.ILLEGAL_ARGUMENT));
+        }
+        if (!isFrogJumpPairDock(peerDockSn, String.valueOf(pairValue))) {
+            log.warn("Flighttask progress get failed: target sn not in pair, gateway={}, targetSn={}, flightId={}, pairValue={}",
+                    response.getGateway(), peerDockSn, flightId, pairValue);
+            return new TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>>().setData(MqttReply.error(CommonErrorEnum.ILLEGAL_ARGUMENT));
+        }
+        FlighttaskProgress peerProgress = (FlighttaskProgress) RedisOpsUtils.get(getFrogJumpProgressKey(flightId, peerDockSn));
+        if (peerProgress == null) {
+            log.warn("Flighttask progress get failed: peer progress not found, gateway={}, peerDockSn={}, flightId={}",
+                    response.getGateway(), peerDockSn, flightId);
+            return new TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>>().setData(MqttReply.error(CommonErrorEnum.ILLEGAL_ARGUMENT));
+        }
+        log.info("Flighttask progress get reply: gateway={}, peerDockSn={}, flightId={}, peerStatus={}, peerProgress={}",
+                response.getGateway(), peerDockSn, flightId, peerProgress.getStatus(), peerProgress.getProgress());
+        return new TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>>().setData(MqttReply.success(new FlighttaskProgressGetResponse()
+                .setFlightId(flightId)
+                .setProgress(peerProgress.getProgress())
+                .setStatus(peerProgress.getStatus())));
+    }
+
+    private String getProgressTargetSn(TopicRequestsRequest<FlighttaskProgressGetRequest> response) {
+        if (response.getData().getTargetSn() != null && !response.getData().getTargetSn().isBlank()) {
+            return response.getData().getTargetSn();
+        }
+        return response.getData().getSn();
+    }
+
+    private void saveFrogJumpDockProgress(String dockSn, String flightId, FlighttaskProgress progress) {
+        Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);
+        if (pairValue == null || getFrogJumpPeerDockSn(dockSn, String.valueOf(pairValue)) == null) {
+            return;
+        }
+        RedisOpsUtils.set(getFrogJumpProgressKey(flightId, dockSn), progress);
+    }
+
+    private String getFrogJumpProgressKey(String flightId, String dockSn) {
+        return RedisConst.FROG_JUMP_TASK_PREFIX + "progress" + RedisConst.DELIMITER + flightId + RedisConst.DELIMITER + dockSn;
+    }
+
+    private String getFrogJumpPeerDockSn(String currentDockSn, String pairValue) {
+        String[] dockSns = pairValue.split(RedisConst.DELIMITER);
+        if (dockSns.length != 2) {
+            return null;
+        }
+        if (currentDockSn.equals(dockSns[0])) {
+            return dockSns[1];
+        }
+        if (currentDockSn.equals(dockSns[1])) {
+            return dockSns[0];
+        }
+        return null;
+    }
+
+    private boolean isFrogJumpPairDock(String dockSn, String pairValue) {
+        String[] dockSns = pairValue.split(RedisConst.DELIMITER);
+        return dockSns.length == 2 && (dockSns[0].equals(dockSn) || dockSns[1].equals(dockSn));
+    }
+
+    private void notifyFrogJumpPeerStopIfEnd(String currentDockSn, String flightId, FlighttaskStatusEnum statusEnum) {
+        if (statusEnum == null || !statusEnum.isEnd()) {
+            return;
+        }
+        Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);
+        if (pairValue == null) {
+            return;
+        }
+        String peerDockSn = getFrogJumpPeerDockSn(currentDockSn, String.valueOf(pairValue));
+        if (peerDockSn == null) {
+            log.warn("Frog jump peer stop skipped: current dock not in pair, flightId={}, currentDockSn={}, pairValue={}", flightId, currentDockSn, pairValue);
+            return;
+        }
+        String stopKey = RedisConst.FROG_JUMP_TASK_PREFIX + "stop" + RedisConst.DELIMITER + flightId + RedisConst.DELIMITER + currentDockSn;
+        if (RedisOpsUtils.checkExist(stopKey)) {
+            return;
+        }
+        RedisOpsUtils.set(stopKey, true);
+        FlighttaskStopRequest request = new FlighttaskStopRequest()
+                .setFlightId(flightId)
+                .setReason(statusEnum == FlighttaskStatusEnum.OK ? 0 : 1);
+        log.info("Frog jump peer stop request: flightId={}, currentDockSn={}, peerDockSn={}, status={}, reason={}",
+                flightId, currentDockSn, peerDockSn, statusEnum, request.getReason());
+        try {
+            TopicServicesResponse<ServicesReplyData> reply = flighttaskStop(SDKManager.getDeviceSDK(peerDockSn), request);
+            log.info("Frog jump peer stop reply: flightId={}, peerDockSn={}, result={}",
+                    flightId, peerDockSn, reply == null || reply.getData() == null ? null : reply.getData().getResult());
+        } catch (Exception e) {
+            log.error("Frog jump peer stop failed: flightId={}, currentDockSn={}, peerDockSn={}", flightId, currentDockSn, peerDockSn, e);
+        }
     }
 }

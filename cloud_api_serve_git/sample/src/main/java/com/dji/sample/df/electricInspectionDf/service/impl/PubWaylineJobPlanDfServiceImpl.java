@@ -324,6 +324,9 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         param.setPlanId(pubWaylineJobPlanDfEntity.getPlanId());
         param.setFanName(pubWaylineJobPlanDfEntity.getFanName());
         param.setBeginTime(pubWaylineJobPlanDfEntity.getBeginTime());
+        param.setFrogJumpMode(pubWaylineJobPlanDfEntity.getFrogJumpMode());
+        param.setLandingDockSn(pubWaylineJobPlanDfEntity.getLandingDockSn());
+        param.setFrogJumpDroneSn(pubWaylineJobPlanDfEntity.getFrogJumpDroneSn());
         System.out.println(param);
 
         //更新状态
