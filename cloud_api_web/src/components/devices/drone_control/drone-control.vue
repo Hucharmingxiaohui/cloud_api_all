@@ -525,12 +525,12 @@ async function sendControlCmd (cmdItem: DeviceCmdItem, index: number) {
     action: cmdItem.action
   }, false)
   if (result) {
-    message.success('Return home successful')
+    message.success('自动返航指令已发送')
     if (flightController.value) {
       exitFlightCOntrol()
     }
   } else {
-    message.error('Failed to return home')
+    message.error('自动返航失败')
   }
   cmdItem.loading = false
 }

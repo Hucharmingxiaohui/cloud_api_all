@@ -40,16 +40,22 @@
                   </div>
                   <!-- {{ (deviceInfo[dock.sn]?.mode_code !== EModeCode.Disconnected) ? '已连接' : '未连接' }} -->
                   <!-- <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code == 0"> 已连接</span> -->
-                   <span class="text_15" v-if="dock.has_drone && deviceInfo[droneSn(dock)]?.mode_code !== EModeCode.Disconnected">已连接</span>
-                   <span class="text_15" v-else >未连接</span>
+                   <span class="text_15" v-if="dock.has_drone && deviceInfo[droneSn(dock)] && deviceInfo[droneSn(dock)].mode_code !== EModeCode.Disconnected">无人机已连接</span>
+                   <span class="text_15" v-else >无人机未连接</span>
                 </div>
               </div>
               <div style="width: 230px; ">
                 <div style="width: 170px; margin-left: 60px;" >
                   <div style="display: flex; align-items: center; height: 25px;">
                     <span style="width: 50px;">状态:</span>
-                    <span  style="overflow: hidden;width: 120px;" :style="dockInfo[dock.gateway.sn] && dockInfo[dock.gateway.sn].basic_osd?.mode_code !== EDockModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
-                      {{ dockInfo[dock.gateway.sn] ? EDockModeCode[dockInfo[dock.gateway.sn].basic_osd?.mode_code] : EDockModeCode[EDockModeCode.Disconnected] }}</span>
+                    <span  style="overflow: hidden;width: 75px;" :style="dockInfo[dock.gateway.sn] && dockInfo[dock.gateway.sn].basic_osd?.mode_code !== EDockModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
+                      {{ dockModeCodeZh(dockInfo[dock.gateway.sn]?.basic_osd?.mode_code) }}</span>
+                    <a-button
+                      v-if="isDockWorking(dock.gateway.sn)"
+                      size="small"
+                      type="primary"
+                      danger
+                      @click.stop="stopDockTask(dock.gateway.sn)">停止</a-button>
                   </div>
                   <div style="display: flex; align-items: center; height: 25px;" >
                     <div v-if="hmsInfo[dock.gateway.sn]" class="flex-align-center flex-row">
@@ -139,7 +145,7 @@
                   <div style="display: flex; align-items: center; height: 25px;">
                     <span style="width: 50px;">状态:</span>
                     <span  style="overflow: hidden;width: 120px;" :style="dock.has_drone && deviceInfo[droneSn(dock)] && deviceInfo[droneSn(dock)].mode_code !== EModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
-                      {{ dock.has_drone && deviceInfo[droneSn(dock)] ? EModeCode[deviceInfo[droneSn(dock)].mode_code] : EModeCode[EModeCode.Disconnected] }}</span>
+                      {{ dock.has_drone && deviceInfo[droneSn(dock)] ? droneModeCodeZh(deviceInfo[droneSn(dock)].mode_code) : droneModeCodeZh(undefined) }}</span>
                   </div>
                   <div style="display: flex; align-items: center; height: 25px;" >
                     <div v-if="dock.has_drone && hmsInfo[droneSn(dock)]" class="flex-align-center flex-row">
@@ -236,7 +242,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
-import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, stopTask } from '/@/api/wayline'
+import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, stopTask, stopDockRunningTask } from '/@/api/wayline'
 import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusMap, MediaStatus, MediaStatusProgressInfo, TaskMediaHighestPriorityProgressInfo } from '/@/types/task'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
 
@@ -533,9 +539,73 @@ function stopCurrentTask () {
   })
 }
 
+function isDockWorking (dockSn: string) {
+  return dockInfo.value[dockSn]?.basic_osd?.mode_code === EDockModeCode.Working
+}
+
+// 机场模式码中文映射（EDockModeCode）
+const dockModeCodeZhMap: Record<string, string> = {
+  Disconnected: '断开',
+  Idle: '空闲',
+  Debugging: '调试中',
+  Remote_Debugging: '远程调试中',
+  Upgrading: '升级中',
+  Working: '作业中',
+}
+
+function dockModeCodeZh (modeCode: EDockModeCode | undefined): string {
+  if (modeCode === undefined || modeCode === null) {
+    return dockModeCodeZhMap.Disconnected
+  }
+  return dockModeCodeZhMap[EDockModeCode[modeCode]] ?? EDockModeCode[modeCode]
+}
+
+// 无人机模式码中文映射（EModeCode）
+const droneModeCodeZhMap: Record<string, string> = {
+  Standby: '待机',
+  Preparing: '准备中',
+  Ready: '准备就绪',
+  Manual: '手动飞行',
+  Automatic: '自动飞行',
+  Waypoint: '航点飞行',
+  Panoramic: '全景拍摄',
+  Active_Track: '智能跟随',
+  ADS_B: 'ADS_B',
+  Return_To_Home: '返航中',
+  Landing: '降落中',
+  Forced_Landing: '迫降中',
+  Three_Blades_Landing: '单桨迫降',
+  Upgrading: '升级中',
+  Disconnected: '断开',
+}
+
+function droneModeCodeZh (modeCode: EModeCode | undefined): string {
+  if (modeCode === undefined || modeCode === null) {
+    return droneModeCodeZhMap.Disconnected
+  }
+  return droneModeCodeZhMap[EModeCode[modeCode]] ?? EModeCode[modeCode]
+}
+
+function stopDockTask (dockSn: string) {
+  if (!dockSn) {
+    return
+  }
+  if (!window.confirm(`确定要停止机场 ${dockSn} 当前执行中的任务吗？`)) {
+    return
+  }
+  stopDockRunningTask(workspaceId.value, dockSn).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    message.success('停止任务指令已下发')
+    getPlans()
+  })
+}
+
 // 弹出设备弹窗
 function switchVisible (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
   if (!isClick) {
+    message.warning('设备离线或实时数据未就绪，请刷新页面后重试')
     e.target.style.cursor = 'not-allowed'
     return
   }
@@ -850,9 +920,9 @@ function openLivestreamAgora () {
       margin: 29px 0 0 11px;
       .group_7 {
         margin-top: 1px;
-        width: 112px;
+        width: 134px;
         .group_8 {
-          width: 113px;
+          width: 134px;
           height: 38px;
           background: url('/@/assets/v4/btn_bg.png') 100% no-repeat;
           background-size: 100% 100%;
@@ -864,7 +934,7 @@ function openLivestreamAgora () {
             background: url('/@/assets/v4/duihao.png') 100% no-repeat;
             background-size: 70% 70%;
             width: 30px;
-            margin: 3px 0 0 10px;
+            margin: 3px 0 0 6px;
             // .block_3 {
             //   width: 18px;
             //   height: 18px;
@@ -875,17 +945,17 @@ function openLivestreamAgora () {
             // }
           }
           .text_15 {
-            width: 42px;
+            width: auto;
             height: 18px;
             overflow-wrap: break-word;
             color: rgba(122, 250, 251, 1);
-            font-size: 14px;
+            font-size: 12px;
             font-family: Google Sans-Medium;
             font-weight: 500;
             text-align: center;
             white-space: nowrap;
-            line-height: 14px;
-            margin: 11px 18px 0 13px;
+            line-height: 12px;
+            margin: 13px 2px 0 2px;
           }
         }
       }

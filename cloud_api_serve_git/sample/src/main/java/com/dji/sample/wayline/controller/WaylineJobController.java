@@ -84,8 +84,14 @@ public class WaylineJobController {
 
     @PostMapping("/{workspace_id}/jobs/{job_id}/stop")
     public HttpResultResponse stopJob(@PathVariable(name = "workspace_id") String workspaceId,
-                                      @PathVariable(name = "job_id") String jobId) {
+                                       @PathVariable(name = "job_id") String jobId) {
         flighttaskService.stopFlightTask(workspaceId, jobId);
+        return HttpResultResponse.success();
+    }
+
+    @PostMapping("/{workspace_id}/docks/{dock_sn}/running-job/stop")
+    public HttpResultResponse stopDockRunningJob(@PathVariable(name = "dock_sn") String dockSn) {
+        flighttaskService.stopDockRunningFlightTask(dockSn);
         return HttpResultResponse.success();
     }
 

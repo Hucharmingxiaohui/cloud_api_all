@@ -73,7 +73,8 @@ public class ControlServiceImpl implements IControlService {
                 mapper.convertValue(Objects.nonNull(param) ? param : new Object(), controlMethodEnum.getClazz())
                 : new RemoteDebugHandler();
         if (!handler.canPublish(sn)) {
-            throw new RuntimeException("The current state of the dock does not support this function.");
+            // 校验的是设备实时状态（如返航要求无人机在空中且未处于降落/待机状态），失败原因见各 Handler 的 canPublish 实现
+            throw new RuntimeException("当前设备状态不支持该操作（如返航需无人机在空中且非降落/待机状态），请稍后重试。");
         }
         return handler;
     }

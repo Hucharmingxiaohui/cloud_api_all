@@ -39,7 +39,7 @@ export function useDockControl () {
       }
       throw (msg)
     } catch (e) {
-      message.error(tip ? `指令发送失败${e ? `：${e}` : ''}` : `设备调试模式切换失败${e ? `：${e}` : ''}`)
+      message.error(`指令发送失败${e ? `：${e}` : ''}`)
       return false
     }
   }

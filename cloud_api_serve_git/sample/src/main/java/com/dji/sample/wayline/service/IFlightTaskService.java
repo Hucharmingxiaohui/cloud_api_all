@@ -63,6 +63,8 @@ public interface IFlightTaskService {
      */
     void stopFlightTask(String workspaceId, String jobId);
 
+    void stopDockRunningFlightTask(String dockSn);
+
     /**
      * Cancel the dock tasks that have been issued but have not yet been executed.
      * @param workspaceId

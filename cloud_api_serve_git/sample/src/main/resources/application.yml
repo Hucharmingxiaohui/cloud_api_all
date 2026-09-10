@@ -102,7 +102,7 @@ mqtt:
     username: df1560
     password: dfe2k_1500
   CUSTOM:
-    enabled: false
+    enabled: true
     protocol: MQTT
     # 重庆电力下级无人机平台 EMQX
     host: 172.20.63.105
@@ -213,6 +213,8 @@ switch:
   centerOtherTcpMsgEnable: false
   # 上级任务下发时，deviceLevel=1(间隔)是否转发到重庆电力下级EUA平台
   centerCqDockTaskEnable: true
+  # 给上级TCP上报无人机/机巢/环境数据时，是否改用重庆电力下级EUA平台MQTT落库数据
+  centerEuaTcpDataEnable: false
 
 #国网规范对接上级巡视配置
 centernormal:
@@ -317,9 +319,10 @@ wayline:
 windFarm:
   stationCode: "Sub_WeiLan"
   stationName: "广西蔚蓝风电场"
-# 上报场站（用于对接巡视上报的场站编码，可能是变电站也可能是风电场，根据实际情况配置）
+# 上报场站（用于对接巡视上报的场站编码，可能是变电站也可能是风电场或者光伏场站，根据实际情况配置）
 normalStation:
   stationCode: "Sub_WeiLan"
+  stationName: "光伏电站1"
 
 # 重庆电力下级无人机平台（机场对接 HTTP）
 cq-dock:
@@ -370,8 +373,10 @@ solar:
     #  /dji/orthophoto
     upload-dir: D:/orthophoto/
   stationName: "光伏电站"
+  center-plan-prefix: "上级"
 #点位同步类别控制
 modelSync:
   fanPoints: false
-  stationPoints: true
+  stationPoints: false
+  solarPoints: true
 

@@ -378,8 +378,9 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         if (!StringUtils.hasText(createJobParam.getLandingDockSn())) {
             return;
         }
-        RedisOpsUtils.set(RedisConst.FROG_JUMP_TASK_PREFIX + waylineJob.getJobId(),
-                waylineJob.getDockSn() + RedisConst.DELIMITER + createJobParam.getLandingDockSn());
+        RedisOpsUtils.setWithExpire(RedisConst.FROG_JUMP_TASK_PREFIX + waylineJob.getJobId(),
+                waylineJob.getDockSn() + RedisConst.DELIMITER + createJobParam.getLandingDockSn(),
+                FROG_JUMP_KEY_TTL_SECONDS);
         log.info("Frog jump task pair saved: flightId={}, takeoffDockSn={}, landingDockSn={}",
                 waylineJob.getJobId(), waylineJob.getDockSn(), createJobParam.getLandingDockSn());
     }
@@ -551,6 +552,96 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 .build());
         waylineRedisService.delRunningWaylineJob(dockSn);
         waylineRedisService.delPausedWaylineJob(dockSn);
+    }
+
+    @Override
+    public void stopDockRunningFlightTask(String dockSn) {
+        if (!deviceRedisService.checkDeviceOnline(dockSn)) {
+            throw new RuntimeException("Dock is offline.");
+        }
+
+        String flightId = waylineRedisService.getRunningWaylineJob(dockSn)
+                .map(EventsReceiver::getBid)
+                .filter(StringUtils::hasText)
+                .orElse(null);
+        if (flightId == null) {
+            flightId = waylineRedisService.getPausedWaylineJobId(dockSn);
+        }
+        if (!StringUtils.hasText(flightId)) {
+            flightId = getFrogJumpProgressFlightId(dockSn).orElse(null);
+        }
+        if (!StringUtils.hasText(flightId)) {
+            throw new IllegalArgumentException("No running wayline job found for dock " + dockSn);
+        }
+
+        TopicServicesResponse<ServicesReplyData> serviceReply = abstractWaylineService.flighttaskStop(
+                SDKManager.getDeviceSDK(dockSn), new FlighttaskStopRequest().setFlightId(flightId).setReason(0));
+        if (!serviceReply.getData().getResult().isSuccess()) {
+            log.info("Stop dock running job ====> Error: {}", serviceReply.getData().getResult());
+            throw new RuntimeException("Failed to stop the wayline job of " + dockSn);
+        }
+
+        waylineRedisService.delRunningWaylineJob(dockSn);
+        waylineRedisService.delPausedWaylineJob(dockSn);
+    }
+
+    /**
+     * 蛙跳 Redis key 保留时长，与 SDKWaylineService 保持一致，防止旧任务 key 残留污染。
+     */
+    private static final long FROG_JUMP_KEY_TTL_SECONDS = 2 * 60 * 60L;
+
+    private Optional<String> getFrogJumpProgressFlightId(String dockSn) {
+        Set<String> keys = RedisOpsUtils.getAllKeys(RedisConst.FROG_JUMP_TASK_PREFIX + "progress" + RedisConst.DELIMITER + "*" + RedisConst.DELIMITER + dockSn);
+        if (keys == null || keys.isEmpty()) {
+            return Optional.empty();
+        }
+        // 可能存在旧任务残留的 progress key（无 TTL 时期写入），按最近上报时间取最新的 flightId，避免停止错任务
+        String latestFlightId = null;
+        long latestTime = Long.MIN_VALUE;
+        for (String key : keys) {
+            Object value = RedisOpsUtils.get(key);
+            if (!(value instanceof FlighttaskProgress)) {
+                continue;
+            }
+            FlighttaskProgress progress = (FlighttaskProgress) value;
+            if (progress.getStatus() == null || progress.getStatus().isEnd() || progress.getExt() == null || !StringUtils.hasText(progress.getExt().getFlightId())) {
+                continue;
+            }
+            String flightId = progress.getExt().getFlightId();
+            Object pairValue = RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + flightId);
+            if (pairValue == null) {
+                continue;
+            }
+            String[] dockSns = String.valueOf(pairValue).split(RedisConst.DELIMITER);
+            if (dockSns.length == 2 && (dockSn.equals(dockSns[0]) || dockSn.equals(dockSns[1]))) {
+                Long progressTime = parseLong(RedisOpsUtils.get(RedisConst.FROG_JUMP_TASK_PREFIX + "progress_time" + RedisConst.DELIMITER + flightId + RedisConst.DELIMITER + dockSn));
+                long time = progressTime == null ? 0L : progressTime;
+                if (latestFlightId != null && time <= latestTime) {
+                    continue;
+                }
+                latestFlightId = flightId;
+                latestTime = time;
+            }
+        }
+        if (latestFlightId != null) {
+            log.info("Stop dock running job fallback to frog jump progress: dockSn={}, flightId={}", dockSn, latestFlightId);
+            return Optional.of(latestFlightId);
+        }
+        return Optional.empty();
+    }
+
+    private Long parseLong(Object value) {
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        if (value instanceof String && !((String) value).isBlank()) {
+            try {
+                return Long.parseLong((String) value);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     public void publishCancelTask(String workspaceId, String dockSn, List<String> jobIds) {
