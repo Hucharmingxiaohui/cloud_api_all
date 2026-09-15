@@ -201,8 +201,10 @@ public class SDKWaylineService extends AbstractWaylineService {
         saveFrogJumpDockProgress(response.getGateway(), flightId, output);
 //      蛙跳降落机场可能入舱断连后不再上报，仍在上报的一方需要兜底检查对端是否卡在降落收尾阶段
         stopCurrentDockIfPeerLandingProgressStale(response.getGateway(), flightId, output);
-//      上报状态是否结束标志（status 终态或任务状态机 WAYLINE_END）
-        boolean taskEnd = statusEnum.isEnd() || isFrogJumpMissionStateEnd(response.getGateway(), flightId, output);
+//      上报状态是否结束标志（status 终态或蛙跳降落机场任务状态机 WAYLINE_END）
+        boolean statusEnd = statusEnum.isEnd();
+        boolean frogJumpMissionEnd = isFrogJumpMissionStateEnd(response.getGateway(), flightId, output);
+        boolean taskEnd = statusEnd || frogJumpMissionEnd;
 //      如果结束状态则发送任务结束命令给另一条机场
         notifyFrogJumpPeerStopIfEnd(response.getGateway(), flightId, statusEnum, taskEnd);
 
@@ -316,7 +318,7 @@ public class SDKWaylineService extends AbstractWaylineService {
                                 .jobId(response.getBid()).mediaCount(job.getMediaCount()).uploadedCount(0).build());
             }
 
-            if (FlighttaskStatusEnum.OK != statusEnum) {
+            if (statusEnd && FlighttaskStatusEnum.OK != statusEnum) {
                 job.setCode(eventsReceiver.getResult().getCode());
                 job.setStatus(WaylineJobStatusEnum.FAILED.getVal());
             }

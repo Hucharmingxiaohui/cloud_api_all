@@ -361,6 +361,7 @@ export interface Task {
   dock_name: string,
   workspace_id: string,
   username: string,
+  frog_jump_mode: boolean,
   begin_time: string,
   end_time: string,
   execute_time: string,

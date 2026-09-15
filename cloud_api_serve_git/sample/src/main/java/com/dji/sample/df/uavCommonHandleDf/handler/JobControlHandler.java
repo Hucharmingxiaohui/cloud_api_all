@@ -109,6 +109,12 @@ public class JobControlHandler {
     // 任务完成后媒体总数为0的首次观察时间：等待机场回传/最终OK把media_count更新，防止0==0被误判为"上传完成"
     private final Map<String, Long> zeroTotalFirstSeen = new ConcurrentHashMap<>();
 
+    // 任务完成后按实际上传数做统一稳定等待，防止 media_count 被边上传边回填时 uploaded==total 提前触发分析
+    private final Map<String, UploadStallInfo> completedUploadStableMap = new ConcurrentHashMap<>();
+
+    @Value("${media.upload.over-total-stable-seconds:60}")
+    private long overUploadStableSeconds;
+
     @Value("${media.upload.zero-total-wait-seconds:300}")
     private long zeroTotalWaitSeconds;
 
@@ -164,23 +170,23 @@ public class JobControlHandler {
             taskName = null;
         }
         try {
-            // 从Redis获取jobId
-            Object jobIdObj = redisUtils.get("jobId");
-            if (jobIdObj == null) {
-                log.warn("未找到jobId，跳过任务状态检查: taskCode={}", taskCode);
-                return;
-            }
-            String jobId = jobIdObj.toString();
+            String jobId = taskCode;
 
             // 查询航线任务状态
             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
-                    .eq(WaylineJobEntity::getJobId, redisUtils.get("jobId").toString())
+                    .eq(WaylineJobEntity::getJobId, jobId)
             );
             if (waylineJobEntity == null) {
+                Object jobIdObj = redisUtils.get("jobId");
+                if (jobIdObj != null) {
+                    jobId = jobIdObj.toString();
+                    waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                            .eq(WaylineJobEntity::getJobId, jobId));
+                }
+            }
+            if (waylineJobEntity == null) {
                 log.warn("未找到航线任务，移除监控: taskCode={}, jobId={}", taskCode, jobId);
-                monitoringTasks.remove(taskCode);
-                uploadStallMap.remove(taskCode);
-                zeroTotalFirstSeen.remove(taskCode);
+                clearMonitoringState(taskCode);
                 return;
             }
             WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
@@ -201,10 +207,8 @@ public class JobControlHandler {
 //              任务完成，执行上报结果
                     handleUploadProgress(jobId, taskCode, taskName, waylineJobEntity, waylineJobDTO, isCenterTask);
                 }else {
-                    monitoringTasks.remove(taskCode);
                     log.info("任务失败/取消/终止，停止监控: taskCode={}", taskCode);
-                    uploadStallMap.remove(taskCode);
-                    zeroTotalFirstSeen.remove(taskCode);
+                    clearMonitoringState(taskCode);
                 }
             }
 
@@ -222,18 +226,28 @@ public class JobControlHandler {
         log.info("图片上传数为{}总数为{}", uploaded, total);
 //      任务完成但媒体总数为0：机场通常还没回传照片（蛙跳场景下media_count会先被写成0），
 //      此时0==0不能视为上传完成，需等待media_count被机场最终OK更新，超时仍为0才按0图片任务收尾
+        boolean waitedForZeroTotal = zeroTotalFirstSeen.containsKey(taskCode);
         if (total == 0) {
             if (waitForZeroTotalTimeout(taskCode)) {
                 return;
             }
-        } else {
-            zeroTotalFirstSeen.remove(taskCode);
         }
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
-//      上传数等于总数开始后续处理
-        if(uploaded == total){
+//      上传数达到总数开始后续处理（>=：蛙跳场景机场可能少报media_count，实际上传数会超过总数）
+        if(uploaded >= total){
+            if (Boolean.TRUE.equals(waylineJobEntity.getFrogJumpMode())
+                    && !isCompletedUploadStable(taskCode, uploaded, total)) {
+                return;
+            }
+            if (uploaded > total || waitedForZeroTotal) {
+//              实际上传数超过设备上报总数，或媒体总数曾为0后按实际上传数回填：完成后统一按实际上传数收尾
+                if (uploaded != total) {
+                    waylineJobServiceimpl.updateJob(WaylineJobDTO.builder().jobId(jobId).mediaCount(uploaded).build());
+                    log.info("实际上传数超过媒体总数，已按实际上传数修正: jobId={}, 原总数={}, 实际上传={}", jobId, total, uploaded);
+                }
+            }
             handleUploadCompleted(planType, jobId, taskCode, taskName, waylineJobEntity, isCenterTask);
 //          只针对航点航线任务，如果拍照上传数停滞，则执行下面的逻辑
         }else if (planType == 0 && uploaded >= total - 2 && uploaded < total) {
@@ -269,6 +283,36 @@ public class JobControlHandler {
         return false;
     }
 
+    private boolean isCompletedUploadStable(String taskCode, int uploaded, int total) {
+        long now = System.currentTimeMillis();
+        UploadStallInfo info = completedUploadStableMap.get(taskCode);
+        if (info == null || info.lastUploadedCount != uploaded) {
+            UploadStallInfo latest = new UploadStallInfo();
+            latest.lastUploadedCount = uploaded;
+            latest.lastChangeTime = now;
+            completedUploadStableMap.put(taskCode, latest);
+            log.info("任务完成后等待媒体上传稳定: taskCode={}，uploaded={}，total={}，需稳定{}秒",
+                    taskCode, uploaded, total, overUploadStableSeconds);
+            return false;
+        }
+        long stableMillis = now - info.lastChangeTime;
+        if (stableMillis < overUploadStableSeconds * 1000L) {
+            log.info("任务完成后媒体上传尚未稳定: taskCode={}，uploaded={}，total={}，已稳定{}秒/{}秒",
+                    taskCode, uploaded, total, stableMillis / 1000L, overUploadStableSeconds);
+            return false;
+        }
+        log.info("任务完成后媒体上传已稳定: taskCode={}，uploaded={}，total={}，已稳定{}秒/{}秒",
+                taskCode, uploaded, total, stableMillis / 1000L, overUploadStableSeconds);
+        return true;
+    }
+
+    private void clearMonitoringState(String taskCode) {
+        monitoringTasks.remove(taskCode);
+        uploadStallMap.remove(taskCode);
+        zeroTotalFirstSeen.remove(taskCode);
+        completedUploadStableMap.remove(taskCode);
+    }
+
 
     /**
      * 上传数已达到总数（uploaded == total）时，按计划类型执行分析/上报并停止监控
@@ -276,6 +320,7 @@ public class JobControlHandler {
     private void handleUploadCompleted(Integer planType, String jobId, String taskCode, String taskName, WaylineJobEntity waylineJobEntity, String isCenterTask) throws Exception {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("jobId", jobId);
+        jsonObject.put("fromJobMonitor", true);
 
         if(planType==1){
             log.info("处理风机任务结果----");
@@ -292,9 +337,7 @@ public class JobControlHandler {
             } catch (Exception e) {
                 log.error("pictureSaveAndAnalysis failed", e);
             } finally {
-                monitoringTasks.remove(taskCode);
-                uploadStallMap.remove(taskCode);
-                zeroTotalFirstSeen.remove(taskCode);
+                clearMonitoringState(taskCode);
                 log.info("任务完成，停止监控: taskCode={}", taskCode);
             }
         }else if(planType==3){
@@ -305,9 +348,7 @@ public class JobControlHandler {
                     sendPatrolResult(taskCode, taskName, waylineJobEntity);
                 }
             }
-            monitoringTasks.remove(taskCode);
-            uploadStallMap.remove(taskCode);
-            zeroTotalFirstSeen.remove(taskCode);
+            clearMonitoringState(taskCode);
             log.info("任务完成，停止监控: taskCode={}", taskCode);
         }else if(planType==4){
             log.info("处理光伏任务结果----");
@@ -329,6 +370,7 @@ public class JobControlHandler {
                 if(data==0){
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
+                    jsonObject.put("fromJobMonitor", true);
 //                  保存图片并分析
                     Result result = uavReportController.pictureSaveAndAnalysis(jsonObject);
                     log.info("图片分析已启动: jobId={}, result={}", jobId, result);
@@ -338,14 +380,10 @@ public class JobControlHandler {
             } catch (Exception e) {
                 log.error("启动图片分析失败: jobId={}", jobId, e);
                 // 分析失败也要从监控中移除
-                monitoringTasks.remove(taskCode);
-                uploadStallMap.remove(taskCode);
-                zeroTotalFirstSeen.remove(taskCode);
+                clearMonitoringState(taskCode);
             }
         }).start();
-        monitoringTasks.remove(taskCode);
-        uploadStallMap.remove(taskCode);
-        zeroTotalFirstSeen.remove(taskCode);
+        clearMonitoringState(taskCode);
         log.info("任务完成，停止监控: taskCode={}", taskCode);
     }
 
@@ -376,20 +414,23 @@ public class JobControlHandler {
                 // 上传数未变化，检查是否超过30秒
                 long stagnantDuration = now - stallInfo.lastChangeTime;
                 if (stagnantDuration >= 30_000) {  // 30秒阈值
+                    if (Boolean.TRUE.equals(waylineJobEntity.getFrogJumpMode())
+                            && !isCompletedUploadStable(taskCode, uploaded, total)) {
+                        return;
+                    }
                     log.warn("上传数已停滞超过30秒: taskCode={}, 上传={}/{}, 强制进入后续处理",
                             taskCode, uploaded, total);
                     // 执行与完全相同时相同的后续逻辑
                     JSONObject jsonObject = new JSONObject();
                     jsonObject.put("jobId", jobId);
+                    jsonObject.put("fromJobMonitor", true);
                     Result result = uavReportController.pictureSaveAndAnalysis(jsonObject);
                     if(result.getCode() == 0){
                         if(isCenterTask.equals("1")&& !jobId.equals(taskCode)){
                             sendPatrolResult(taskCode, taskName, waylineJobEntity);
                         }
                     }
-                    monitoringTasks.remove(taskCode);
-                    uploadStallMap.remove(taskCode);
-                    zeroTotalFirstSeen.remove(taskCode);
+                    clearMonitoringState(taskCode);
                     log.info("停滞任务已处理并移除监控: taskCode={}", taskCode);
                 } else {
                     log.debug("上传数停滞中，已持续{}ms: taskCode={}, 上传={}/{}",
@@ -954,9 +995,7 @@ public class JobControlHandler {
 
         // 移除超时任务
         for (String taskCode : timeoutTasks) {
-            monitoringTasks.remove(taskCode);
-            uploadStallMap.remove(taskCode);
-            zeroTotalFirstSeen.remove(taskCode);
+            clearMonitoringState(taskCode);
         }
     }
 

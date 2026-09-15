@@ -3,6 +3,7 @@ package com.dji.sample.wayline.model.dto;
 import com.dji.sdk.cloudapi.wayline.OutOfControlActionEnum;
 import com.dji.sdk.cloudapi.wayline.TaskTypeEnum;
 import com.dji.sdk.cloudapi.wayline.WaylineTypeEnum;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -60,6 +61,9 @@ public class WaylineJobDTO {
     private OutOfControlActionEnum outOfControlAction;
 
     private Integer mediaCount;
+
+    @JsonProperty("frog_jump_mode")
+    private Boolean frogJumpMode;
 
     private Integer uploadedCount;
 

@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.df.framework.utils.ParamsUtils;
 import com.df.framework.vo.Result;
 import com.df.server.dto.HisUniTask.HisUniTaskParamsDTO;
@@ -56,6 +57,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpServletRequest;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
@@ -127,9 +129,21 @@ public class UavReportController {
      * 保存巡检图片并分析
      */
     @PostMapping("/pictureSave")
-    public Result pictureSaveAndAnalysis(@RequestBody JSONObject jsonObject) throws Exception {
+    public Result pictureSaveAndAnalysis(@RequestBody JSONObject jsonObject, HttpServletRequest httpRequest) throws Exception {
         String jobId = jsonObject.get("jobId").toString();
+        boolean fromJobMonitor = jsonObject.getBooleanValue("fromJobMonitor");
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        if (Boolean.TRUE.equals(waylineJobEntity == null ? null : waylineJobEntity.getFrogJumpMode())
+                && !fromJobMonitor && waylineJobEntity != null) {
+            if (!Objects.equals(waylineJobEntity.getStatus(), 3)) {
+                log.info("任务尚未完成，外部图片分析请求暂不执行: jobId={}, status={}", jobId, waylineJobEntity.getStatus());
+                return Result.analyzing("任务尚未完成，请稍后尝试");
+            }
+            if (waylineJobEntity.getIsAnalyzed() == null) {
+                log.info("任务已完成但媒体稳定等待未结束，外部图片分析请求暂不执行: jobId={}", jobId);
+                return Result.analyzing("任务媒体仍在稳定等待，请稍后尝试");
+            }
+        }
         waylineJobEntity.setIsReported(0);
         waylineJobMapper.updateById(waylineJobEntity);
 //      正在分析（实则是正在保存加分析）
@@ -260,6 +274,13 @@ public class UavReportController {
         return Result.success("success");
     }
 
+    /**
+     * 供任务监控器在进程内直接调用，保持原有调用方式。
+     */
+    public Result pictureSaveAndAnalysis(JSONObject jsonObject) throws Exception {
+        return pictureSaveAndAnalysis(jsonObject, null);
+    }
+
     @GetMapping("/isAnalyzed")
     public Result isAnalyzed(@RequestParam String jobId) {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
@@ -297,6 +318,13 @@ public class UavReportController {
                 return Result.duplicate("巡检结果已生成巡检报告，无需重复生成");
             }
         }
+        int reportLockRows = waylineJobMapper.update(null, new LambdaUpdateWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId)
+                .ne(WaylineJobEntity::getIsReported, 1)
+                .set(WaylineJobEntity::getIsReported, 1));
+        if (reportLockRows == 0) {
+            return Result.duplicate("巡检报告正在生成或已生成，请勿重复提交");
+        }
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
@@ -319,9 +347,6 @@ public class UavReportController {
 
         }
 
-//      已进行巡检
-        waylineJobEntity.setIsReported(1);
-        waylineJobMapper.updateById(waylineJobEntity);
         return Result.success("reportId:"+reportId);
     }
 

@@ -127,6 +127,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .outOfControlAction(param.getOutOfControlAction().getAction())
                 .rthAltitude(param.getRthAltitude())
                 .mediaCount(0)
+                .frogJumpMode(Boolean.TRUE.equals(param.getFrogJumpMode()))
                 .planId(param.getPlanId())
                 .fanName(param.getFanName())
 //                .allPointCnt(split.length)
@@ -160,6 +161,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .outOfControlAction(param.getOutOfControlAction().getAction())
                 .rthAltitude(param.getRthAltitude())
                 .mediaCount(0)
+                .frogJumpMode(Boolean.TRUE.equals(param.getFrogJumpMode()))
                 .planId(param.getPlanId())
 //                .allPointCnt(split.length)
                 .build();
@@ -285,6 +287,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         }
         return builder.status(dto.getStatus())
                 .mediaCount(dto.getMediaCount())
+                .frogJumpMode(dto.getFrogJumpMode())
                 .name(dto.getJobName())
                 .errorCode(dto.getCode())
                 .jobId(dto.getJobId())
@@ -375,6 +378,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .rthAltitude(entity.getRthAltitude())
                 .outOfControlAction(OutOfControlActionEnum.find(entity.getOutOfControlAction()))
                 .mediaCount(entity.getMediaCount())
+                .frogJumpMode(Boolean.TRUE.equals(entity.getFrogJumpMode()))
                 .savedCount(videoPointNum);
 
         if (Objects.nonNull(entity.getEndTime())) {
@@ -388,23 +392,27 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                     .orElse(null));
         }
 
-        if (entity.getMediaCount() == 0) {
-            return builder.build();
-        }
-
         // sync the number of media files
         String key = RedisConst.MEDIA_HIGHEST_PRIORITY_PREFIX + entity.getDockSn();
         String countKey = RedisConst.MEDIA_FILE_PREFIX + entity.getDockSn();
         Object mediaFileCount = RedisOpsUtils.hashGet(countKey, entity.getJobId());
+        int dbUploadedSize = fileService.getFilesByWorkspaceAndJobId(entity.getWorkspaceId(), entity.getJobId()).size();
 
 
         if (Objects.nonNull(mediaFileCount)) {
-            builder.uploadedCount(((MediaFileCountDTO) mediaFileCount).getUploadedCount()+videoPointNum)
+            int redisUploadedCount = ((MediaFileCountDTO) mediaFileCount).getUploadedCount() + videoPointNum;
+            int uploadedCount = Math.max(redisUploadedCount, dbUploadedSize);
+            syncUnderReportedMediaCount(entity, builder, uploadedCount);
+            builder.uploadedCount(uploadedCount)
                     .uploading(RedisOpsUtils.checkExist(key) && entity.getJobId().equals(((MediaFileCountDTO)RedisOpsUtils.get(key)).getJobId()));
             return builder.build();
         }
 
-        int uploadedSize = fileService.getFilesByWorkspaceAndJobId(entity.getWorkspaceId(), entity.getJobId()).size();
+        int uploadedSize = dbUploadedSize;
+        syncUnderReportedMediaCount(entity, builder, uploadedSize);
+        if (entity.getMediaCount() == 0) {
+            return uploadedSize > 0 ? builder.uploadedCount(uploadedSize).build() : builder.build();
+        }
         // All media for this job have been uploaded.
         if (uploadedSize >= entity.getMediaCount()) {
             return builder.uploadedCount(uploadedSize).build();
@@ -415,6 +423,22 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                         .mediaCount(entity.getMediaCount())
                         .uploadedCount(uploadedSize).build());
         return builder.build();
+    }
+
+    private void syncUnderReportedMediaCount(WaylineJobEntity entity, WaylineJobDTO.WaylineJobDTOBuilder builder, int uploadedCount) {
+        if (Objects.isNull(entity.getMediaCount()) || uploadedCount <= entity.getMediaCount()) {
+            return;
+        }
+        boolean updated = this.updateJob(WaylineJobDTO.builder()
+                .jobId(entity.getJobId())
+                .mediaCount(uploadedCount)
+                .build());
+        if (updated) {
+            log.info("媒体总数少报，已按实际上传数修正: jobId={}, 原总数={}, 实际上传={}",
+                    entity.getJobId(), entity.getMediaCount(), uploadedCount);
+            entity.setMediaCount(uploadedCount);
+            builder.mediaCount(uploadedCount);
+        }
     }
 
     private void applyDockedSuccessFallback(WaylineJobEntity entity) {
