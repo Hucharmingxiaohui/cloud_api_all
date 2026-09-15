@@ -25,6 +25,12 @@ export async function executePlanWithFrogJumpMode (plan: any, onSuccess: () => v
             h('div', { style: 'font-size: 12px; color: #687789; line-height: 1.5; word-break: break-all;' }, '选择降落机场后执行跨机场任务'),
           ]),
         ]),
+        h('div', {
+          style: 'margin-top: 12px; padding: 10px 12px; border-radius: 7px; background: #fff7e8; border: 1px solid #f3d19e; color: #7a4d12; font-size: 12px; line-height: 1.6;',
+        }, [
+          h('span', { style: 'font-weight: 600;' }, '蛙跳模式注意：'),
+          h('span', '如机巢位置、备降点位置、RTK信息有变化，或长时间没执行蛙跳，需重启机场和无人机同步最新蛙跳所需报文'),
+        ]),
       ]),
       '下发任务', {
         confirmButtonText: '蛙跳模式',

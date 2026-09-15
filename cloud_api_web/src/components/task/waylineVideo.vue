@@ -74,7 +74,7 @@
                 </div>
                 <div style="height: calc(100vh - 210px); overflow-y: auto;">
                 <div class="upper-part" v-if="activeRightTab === 'status'">
-                    <deviceState :deviceInfo="deviceInfo" />
+                    <deviceState :deviceInfo="deviceInfo" :droneSn="droneVideoSn" />
                     <droneControlPanel :sn="osdVisible.gateway_sn" :deviceInfo="deviceInfo" :payloads="osdVisible.payloads" />
 
                 </div>
