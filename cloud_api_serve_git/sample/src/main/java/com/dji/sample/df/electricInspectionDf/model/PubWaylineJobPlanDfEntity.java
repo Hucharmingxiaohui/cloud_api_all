@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import com.alibaba.fastjson.JSON;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import org.hibernate.validator.constraints.Range;
 import javax.persistence.Transient;
@@ -169,6 +170,21 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
     @Transient
     @TableField(exist = false)
     private Integer index;//0代表仅生成航线不保存计划 1代表生成航线
+
+    @Transient
+    @TableField(exist = false)
+    @JsonProperty("frog_jump_mode")
+    private Boolean frogJumpMode;//是否蛙跳模式，不持久化
+
+    @Transient
+    @TableField(exist = false)
+    @JsonProperty("landing_dock_sn")
+    private String landingDockSn;//蛙跳降落机场，不持久化
+
+    @Transient
+    @TableField(exist = false)
+    @JsonProperty("frog_jump_drone_sn")
+    private String frogJumpDroneSn;//蛙跳无人机，不持久化
 
     @TableField(exist = false)
     private String areaConfigJson;//每个区域独立参数JSON（不持久化）

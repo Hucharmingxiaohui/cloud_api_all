@@ -139,6 +139,11 @@
               <div>{{ taskTypeLabels[scope.row.task_type] }}</div>
             </template>
           </el-table-column>
+          <el-table-column label="任务模式">
+            <template #default="scope">
+              <div>{{ scope.row.frog_jump_mode ? '蛙跳模式' : '普通模式' }}</div>
+            </template>
+          </el-table-column>
           <el-table-column label="航线名称" show-overflow-tooltip="true">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.file_name }}</div>
@@ -157,11 +162,6 @@
           <el-table-column label="失联动作" show-overflow-tooltip="true">
             <template #default="scope">
               <div>{{ outControlAcion[scope.row.out_of_control_action]  }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="用户" show-overflow-tooltip="true">
-            <template #default="scope">
-              <div>{{ scope.row.username }}</div>
             </template>
           </el-table-column>
           <el-table-column label="媒体文件上传" width="200">

@@ -7,6 +7,7 @@ import com.dji.sdk.cloudapi.media.StorageConfigGet;
 import com.dji.sdk.cloudapi.organization.AirportBindStatusRequest;
 import com.dji.sdk.cloudapi.organization.AirportOrganizationBindRequest;
 import com.dji.sdk.cloudapi.organization.AirportOrganizationGetRequest;
+import com.dji.sdk.cloudapi.wayline.FlighttaskProgressGetRequest;
 import com.dji.sdk.cloudapi.wayline.FlighttaskResourceGetRequest;
 import com.dji.sdk.mqtt.ChannelName;
 
@@ -28,6 +29,8 @@ public enum RequestsMethodEnum {
     AIRPORT_ORGANIZATION_GET("airport_organization_get", ChannelName.INBOUND_REQUESTS_AIRPORT_ORGANIZATION_GET, AirportOrganizationGetRequest.class),
 
     FLIGHT_TASK_RESOURCE_GET("flighttask_resource_get", ChannelName.INBOUND_REQUESTS_FLIGHTTASK_RESOURCE_GET, FlighttaskResourceGetRequest.class),
+
+    FLIGHT_TASK_PROGRESS_GET("flighttask_progress_get", ChannelName.INBOUND_REQUESTS_FLIGHTTASK_PROGRESS_GET, FlighttaskProgressGetRequest.class),
 
     CONFIG("config", ChannelName.INBOUND_REQUESTS_CONFIG, RequestsConfigRequest.class),
 

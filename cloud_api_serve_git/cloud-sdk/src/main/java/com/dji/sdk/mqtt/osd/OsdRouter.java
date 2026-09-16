@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Resource;
 
 import static com.dji.sdk.mqtt.TopicConst.*;
 
@@ -30,6 +31,9 @@ import static com.dji.sdk.mqtt.TopicConst.*;
 @Configuration
 public class OsdRouter {
 
+    @Resource
+    private IOsdCacheService osdCacheService;
+
     @Bean
     public IntegrationFlow osdRouterFlow() {
         return IntegrationFlows
@@ -39,7 +43,10 @@ public class OsdRouter {
                         TopicOsdRequest response = Common.getObjectMapper().readValue((byte[]) source.getPayload(), new TypeReference<TopicOsdRequest>() {
                         });
                         String topic = String.valueOf(source.getHeaders().get(MqttHeaders.RECEIVED_TOPIC));
-                        return response.setFrom(topic.substring((THING_MODEL_PRE + PRODUCT).length(), topic.indexOf(OSD_SUF)));
+                        String from = topic.substring((THING_MODEL_PRE + PRODUCT).length(), topic.indexOf(OSD_SUF));
+                        response.setFrom(from);
+                        osdCacheService.setDeviceRawOsd(from, response);
+                        return response;
                     } catch (IOException e) {
                         throw new CloudSDKException(e);
                     }

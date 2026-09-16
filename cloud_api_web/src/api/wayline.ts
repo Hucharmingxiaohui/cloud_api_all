@@ -291,6 +291,8 @@ export interface FlightTestPlan {
   update_time: number; // 更新时间，时间戳（毫秒数）
   enable_status: number; // 启用状态，数字类型（通常是0或1）
   plan_priority: number; // 计划优先级，数字类型
+  frog_jump_mode?: boolean; // 是否蛙跳模式
+  landing_dock_sn?: string; // 蛙跳降落机场
 }
 // 下发计划
 export const DistributeFlyPlan = async function (data: FlightTestPlan): Promise<IWorkspaceResponse<any>> {
@@ -359,6 +361,7 @@ export interface Task {
   dock_name: string,
   workspace_id: string,
   username: string,
+  frog_jump_mode: boolean,
   begin_time: string,
   end_time: string,
   execute_time: string,
@@ -405,6 +408,20 @@ export async function deleteTask (workspaceId: string, params: DeleteTaskParams)
   const result = await request.delete(url, {
     params: params
   })
+  return result.data
+}
+
+// 停止执行中的机场任务
+export async function stopTask (workspaceId: string, jobId: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs/${jobId}/stop`
+  const result = await request.post(url)
+  return result.data
+}
+
+// 按机场停止设备侧正在执行的航线任务
+export async function stopDockRunningTask (workspaceId: string, dockSn: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/docks/${dockSn}/running-job/stop`
+  const result = await request.post(url)
   return result.data
 }
 

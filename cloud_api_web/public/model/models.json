@@ -15,11 +15,6 @@
     "url": "/model/las250902003/tileset.json"
   },
   {
-    "label": "Model",
-    "value": "Model",
-    "url": "/model/Model/Model.json"
-  },
-  {
     "label": "out4",
     "value": "out4",
     "url": "/model/out4/tileset.json"
@@ -68,20 +63,5 @@
     "label": "Scene",
     "value": "Scene",
     "url": "/model/Scene/Production_5.json"
-  },
-  {
-    "label": "Scene_solar",
-    "value": "Scene_solar",
-    "url": "/model/Scene_solar/solar_1.json"
-  },
-  {
-    "label": "solarqingxie_1",
-    "value": "solarqingxie_1",
-    "url": "/model/solarqingxie_1/Scene/solarqingxie_1.json"
-  },
-  {
-    "label": "solarqingxie_1_egm96_test",
-    "value": "solarqingxie_1_egm96_test",
-    "url": "/model/solarqingxie_1_egm96_test/Scene/solarqingxie_1.json"
   }
 ]

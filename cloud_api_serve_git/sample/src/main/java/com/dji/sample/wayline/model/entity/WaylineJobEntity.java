@@ -68,6 +68,9 @@ public class WaylineJobEntity implements Serializable {
     @TableField("media_count")
     private Integer mediaCount;
 
+    @TableField("frog_jump_mode")
+    private Boolean frogJumpMode;
+
     @TableField(value = "create_time", fill = FieldFill.INSERT)
     private Long createTime;
 

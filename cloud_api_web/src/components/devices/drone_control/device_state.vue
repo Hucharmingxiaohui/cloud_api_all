@@ -1,7 +1,7 @@
 <template>
     <div v-if="true">
        <!-- 机场信息 -->
-       <div class="content_title">机场状态: {{ EDockModeCode[deviceInfo.dock.basic_osd?.mode_code] }}</div>
+       <div class="content_title">机场状态: {{ dockModeText }}</div>
       <div  class="device-content" style="margin-bottom: 20px;">
         <!-- <div class="items">
             <span :style="deviceInfo.dock.basic_osd?.mode_code === EDockModeCode.Disconnected ? 'color: red; font-weight: 700;': 'color: rgb(25,190,107)'"> 2222{{ EDockModeCode[deviceInfo.dock.basic_osd?.mode_code] }}</span>
@@ -58,14 +58,14 @@
           </div>
         </div>
       </div>
-      <div class="content_title">无人机状态: {{   !deviceInfo.device ? EModeCode[EModeCode.Disconnected] : EModeCode[deviceInfo.device?.mode_code] }}</div>
+       <div class="content_title">无人机状态: {{ droneModeText }}</div>
       <!-- 机场无人机信息 -->
       <div  class="device-content">
         <div class="left">
           <div class="left-box">
             <p class="caption">无人机</p>
             <img src="../../../assets/v3/icon/uav-fly.png" alt="描述" class="responsive-image"/>
-            <p class="caption">{{ osdVisible.model }}</p>
+             <p v-if="droneName" class="caption">{{ droneName }}</p>
           </div>
         </div>
         <div class="right">
@@ -82,11 +82,11 @@
           <div class="items">
             <div class="item">
                 <span> {{ !deviceInfo.device || deviceInfo.device.height === str ? str : deviceInfo.device?.height.toFixed(2) + ' m'}}</span>
-                <span style="color: #717EE2;">ASL</span>
+                <span style="color: #717EE2;">海拔高度</span>
             </div>
             <div class="item">
                 <span >{{ !deviceInfo.device || deviceInfo.device.elevation === str ? str : deviceInfo.device?.elevation.toFixed(2) + ' m' }}</span>
-                <span style="color: #717EE2;">ALT</span>
+                <span style="color: #717EE2;">相对高度</span>
               </div>
           </div>
           <div class="items">
@@ -135,6 +135,7 @@ import controlPanel from '/@/components/control/ControlDegree.vue'
 import UAVControlPanel from '/@/components/control/ControlUAV.vue'
 const props = defineProps<{
   deviceInfo: DeviceInfoType,
+  droneSn?: string,
 }>()
 
 const store = useMyStore()
@@ -142,6 +143,45 @@ const osdVisible = computed(() => {
   return store.state.osdVisible
 })
 const str: string = '--'
+const dockModeMap: Record<string, string> = {
+  Disconnected: '已断开',
+  Idle: '空闲',
+  Debugging: '调试中',
+  Remote_Debugging: '远程调试中',
+  Upgrading: '升级中',
+  Working: '工作中',
+}
+const droneModeMap: Record<string, string> = {
+  Disconnected: '已断开',
+  Idle: '空闲',
+  Preparing: '准备中',
+  Ready: '就绪',
+  Manual: '手动飞行',
+  Automatic: '自动飞行',
+  Waypoint: '航点任务',
+  Panoramic: '全景拍摄',
+  Active_Track: '智能跟随',
+  ADS_B: 'ADS-B避让',
+  Return_To_Home: '返航中',
+  Landing: '降落中',
+  Forced_Landing: '迫降中',
+  Three_Blades_Landing: '三桨叶降落',
+  Upgrading: '升级中',
+}
+const dockModeText = computed(() => {
+  const mode = EDockModeCode[props.deviceInfo.dock.basic_osd?.mode_code]
+  return dockModeMap[mode] || mode || str
+})
+const droneModeText = computed(() => {
+  const mode = !props.deviceInfo.device ? EModeCode[EModeCode.Disconnected] : EModeCode[props.deviceInfo.device?.mode_code]
+  return droneModeMap[mode] || mode || str
+})
+const droneName = computed(() => {
+  if (!props.deviceInfo.device || osdVisible.value.is_dock) {
+    return ''
+  }
+  return osdVisible.value.callsign || ''
+})
 const qualityStyle = computed(() => {
   if (props.deviceInfo.dock.basic_osd?.network_state?.type === NetworkStateTypeEnum.ETHERNET ||
         (props.deviceInfo.dock.basic_osd?.network_state?.quality || 0) > NetworkStateQualityEnum.FAIR) {

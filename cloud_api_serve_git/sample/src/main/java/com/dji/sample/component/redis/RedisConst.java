@@ -45,7 +45,13 @@ public final class RedisConst {
 
     public static final String WAYLINE_JOB_PAUSED_PREFIX = "wayline_job_paused" + DELIMITER;
 
+    public static final String FROG_JUMP_TASK_PREFIX = "frog_jump_task" + DELIMITER;
+
     public static final String OSD_PREFIX = "osd" + DELIMITER;
+
+    public static final String RAW_OSD_PREFIX = "raw_osd" + DELIMITER;
+
+    public static final String RAW_STATE_PREFIX = "raw_state" + DELIMITER;
 
     public static final String MEDIA_FILE_PREFIX = "media_file" + DELIMITER;
 

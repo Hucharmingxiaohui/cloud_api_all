@@ -526,6 +526,7 @@ CREATE TABLE `wayline_job` (
   `rth_altitude` int NOT NULL COMMENT 'return to home altitude. min: 20m; max: 500m',
   `out_of_control` int NOT NULL COMMENT 'out of control action. 0: go home; 1: hover; 2: landing;',
   `media_count` int NOT NULL DEFAULT '0',
+  `frog_jump_mode` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'whether the job uses frog jump execution mode',
   `create_time` bigint NOT NULL,
   `update_time` bigint NOT NULL,
   `parent_id` varchar(45) CHARACTER SET utf8 COLLATE utf8_general_ci DEFAULT NULL,

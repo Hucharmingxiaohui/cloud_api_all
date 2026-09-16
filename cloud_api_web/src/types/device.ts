@@ -183,10 +183,11 @@ export interface PayloadInfo {
 
 // 设备信息
 export interface OnlineDevice {
-  model: string,
-  callsign: string,
-  sn: string,
+  model?: string,
+  callsign?: string,
+  sn?: string,
   mode: number,
+  has_drone?: boolean,
   gateway: {
     model: string,
     callsign: string,

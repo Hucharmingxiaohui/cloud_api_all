@@ -216,11 +216,16 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     //执行任务
     @Override
     public HttpResultResponse expressPlan(CustomClaim customClaim,  PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
+        return expressPlan(customClaim, pubWaylineJobPlanDfEntity, pubWaylineJobPlanDfEntity.getName());
+    }
+
+    @Override
+    public HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
         CreateJobParam param =new CreateJobParam();
 
         //设置param参数
         //任务名称
-        param.setName(pubWaylineJobPlanDfEntity.getName());
+        param.setName(jobName);
         //航线id
         param.setFileId(pubWaylineJobPlanDfEntity.getFileId());
         //机场sn
@@ -319,6 +324,9 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         param.setPlanId(pubWaylineJobPlanDfEntity.getPlanId());
         param.setFanName(pubWaylineJobPlanDfEntity.getFanName());
         param.setBeginTime(pubWaylineJobPlanDfEntity.getBeginTime());
+        param.setFrogJumpMode(pubWaylineJobPlanDfEntity.getFrogJumpMode());
+        param.setLandingDockSn(pubWaylineJobPlanDfEntity.getLandingDockSn());
+        param.setFrogJumpDroneSn(pubWaylineJobPlanDfEntity.getFrogJumpDroneSn());
         System.out.println(param);
 
         //更新状态
@@ -398,9 +406,11 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         if(isPicDeleted){
             log.info("已成功删除图片");
         }
-        String reportPath = fileConfig.getFileReportPath() + "/"+ waylineJobEntity.getName() +".docx";
+        String reportPath = fileConfig.getFileReportPath() + "/" + waylineJobEntity.getName() + "_" + job_id + ".docx";
         File reportFile = new File(reportPath);
-        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName());
+        File legacyReportFile = new File(fileConfig.getFileReportPath() + "/" + waylineJobEntity.getName() + ".docx");
+        boolean isFileDeleted = deleteReportFile(reportFile, waylineJobEntity.getName())
+                | deleteReportFile(legacyReportFile, waylineJobEntity.getName());
         if(isFileDeleted){
             log.info("已成功删除报告");
         }

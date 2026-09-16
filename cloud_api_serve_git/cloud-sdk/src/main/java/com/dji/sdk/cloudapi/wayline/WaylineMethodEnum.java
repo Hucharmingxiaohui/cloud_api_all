@@ -21,6 +21,8 @@ public enum WaylineMethodEnum {
 
     FLIGHTTASK_RECOVERY("flighttask_recovery"),
 
+    FLIGHTTASK_STOP("flighttask_stop"),
+
     RETURN_HOME("return_home"),
 
     RETURN_HOME_CANCEL("return_home_cancel");

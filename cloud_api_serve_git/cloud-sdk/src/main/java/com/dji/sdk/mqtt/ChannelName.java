@@ -101,6 +101,8 @@ public class ChannelName {
 
     public static final String INBOUND_REQUESTS_FLIGHTTASK_RESOURCE_GET = "inboundRequestsFlightTaskResourceGet";
 
+    public static final String INBOUND_REQUESTS_FLIGHTTASK_PROGRESS_GET = "inboundRequestsFlightTaskProgressGet";
+
     public static final String INBOUND_REQUESTS_FLIGHT_AREAS_GET = "inboundRequestsFlightAreasGet";
 
     public static final String INBOUND_REQUESTS_OFFLINE_MAP_GET = "inboundRequestsOfflineMapGet";

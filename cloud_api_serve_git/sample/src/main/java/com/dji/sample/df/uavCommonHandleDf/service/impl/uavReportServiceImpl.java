@@ -112,6 +112,14 @@ public class uavReportServiceImpl implements uavReportService {
         return reportEntity.getId();
     }
 
+    private String buildReportFileName(String taskName, String jobId) {
+        return taskName + "_" + jobId + ".docx";
+    }
+
+    private String resolveLegacyReportFileName(String taskName) {
+        return taskName + ".docx";
+    }
+
 
     @Override
     public void genGfPatrolTaskWordNew(String reportId, String jobId){
@@ -635,7 +643,7 @@ public class uavReportServiceImpl implements uavReportService {
         }
 
         // 7. 保存Word文档
-        String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
+        String reportPath = fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId);
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
             log.info("光伏报告生成成功：" + reportPath);
@@ -1270,7 +1278,7 @@ public class uavReportServiceImpl implements uavReportService {
         }
 
         // 7. 保存Word文档
-        String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
+        String reportPath = fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId);
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
             log.info("风机报告生成成功：" + reportPath);
@@ -1921,7 +1929,7 @@ public class uavReportServiceImpl implements uavReportService {
         }
 
         // 7. 保存Word文档
-        String reportPath = fileConfig.getFileReportPath() + "/" + taskName + ".docx";
+        String reportPath = fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId);
         try (FileOutputStream fos = new FileOutputStream(reportPath)) {
             document.write(fos);
             log.info("点位航线报告生成成功：" + reportPath);

@@ -24,6 +24,8 @@ public interface PubWaylineJobPlanDfService {
     PaginationData<PubWaylineJobPlanDfEntity> getPlanByPlantype(String sub_code, long page, long pageSize,Map map);
     //执行计划生成任务&&更新计划
     HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException;
+    //执行计划生成任务，任务名使用指定名称但不改计划名称
+    HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException;
     //取消任务
     HttpResultResponse cancelPlan(CustomClaim customClaim, WaylineJobEntity waylineJobEntity) throws SQLException;
     //按id删除计划

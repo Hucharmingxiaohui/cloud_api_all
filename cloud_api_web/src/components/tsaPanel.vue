@@ -8,7 +8,7 @@
       <a-empty :image="noData" :image-style="{ height: '60px' }" />
     </div>
     <div class="content" v-else>
-      <div class="device" v-for="dock in onlineDocks.data" :key="dock.sn">
+      <div class="device" v-for="dock in onlineDocks.data" :key="dock.gateway.sn">
         <div class="dock" >
         <!-- <div class="dock"  v-if="currentDeviceForSub.includes(dock.sn)"> -->
           <div class="group_4 flex-col justify-end">
@@ -40,16 +40,22 @@
                   </div>
                   <!-- {{ (deviceInfo[dock.sn]?.mode_code !== EModeCode.Disconnected) ? '已连接' : '未连接' }} -->
                   <!-- <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code == 0"> 已连接</span> -->
-                  <span class="text_15" v-if="deviceInfo[dock.sn]?.mode_code === EModeCode.Disconnected">未连接</span>
-                  <span class="text_15" v-else >已连接</span>
+                   <span class="text_15" v-if="dock.has_drone && deviceInfo[droneSn(dock)] && deviceInfo[droneSn(dock)].mode_code !== EModeCode.Disconnected">无人机已连接</span>
+                   <span class="text_15" v-else >无人机未连接</span>
                 </div>
               </div>
               <div style="width: 230px; ">
                 <div style="width: 170px; margin-left: 60px;" >
                   <div style="display: flex; align-items: center; height: 25px;">
                     <span style="width: 50px;">状态:</span>
-                    <span  style="overflow: hidden;width: 120px;" :style="dockInfo[dock.gateway.sn] && dockInfo[dock.gateway.sn].basic_osd?.mode_code !== EDockModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
-                      {{ dockInfo[dock.gateway.sn] ? EDockModeCode[dockInfo[dock.gateway.sn].basic_osd?.mode_code] : EDockModeCode[EDockModeCode.Disconnected] }}</span>
+                    <span  style="overflow: hidden;width: 75px;" :style="dockInfo[dock.gateway.sn] && dockInfo[dock.gateway.sn].basic_osd?.mode_code !== EDockModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
+                      {{ dockModeCodeZh(dockInfo[dock.gateway.sn]?.basic_osd?.mode_code) }}</span>
+                    <a-button
+                      v-if="isDockWorking(dock.gateway.sn)"
+                      size="small"
+                      type="primary"
+                      danger
+                      @click.stop="stopDockTask(dock.gateway.sn)">停止</a-button>
                   </div>
                   <div style="display: flex; align-items: center; height: 25px;" >
                     <div v-if="hmsInfo[dock.gateway.sn]" class="flex-align-center flex-row">
@@ -113,6 +119,7 @@
                 <div style="height: 40px; width: 100%;display:flex;align-items: center;justify-content: center;">
                     <el-button style="width: 100px; height: 30px; border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16);" @click="toTask()">查看任务</el-button>
                     <el-button  style="width: 100px; height: 30px;border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16);"  @click="showWayline()">查看航线</el-button>
+                    <el-button  style="width: 100px; height: 30px;border: 1px solid rgba(0, 64, 147, 1);  background-color: rgba(0, 52, 152, 0.16); color: #ff7875;"  @click="stopCurrentTask()">停止任务</el-button>
                 </div>
             </div>
         </div>
@@ -132,32 +139,32 @@
                     referrerpolicy="no-referrer"
                     src="../assets/v4/fan.png"
                   />
-                  <span class="text_22">{{ dock.callsign ?? 'No Drone' }}</span>
+                  <span class="text_22">{{ dock.has_drone ? dock.callsign : '未绑定无人机' }}</span>
                 </div>
                 <div style="width: 170px; margin-top: 10px;" >
                   <div style="display: flex; align-items: center; height: 25px;">
                     <span style="width: 50px;">状态:</span>
-                    <span  style="overflow: hidden;width: 120px;" :style="deviceInfo[dock.sn] && deviceInfo[dock.sn].mode_code !== EModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
-                      {{ deviceInfo[dock.sn] ? EModeCode[deviceInfo[dock.sn].mode_code] : EModeCode[EModeCode.Disconnected] }}</span>
+                    <span  style="overflow: hidden;width: 120px;" :style="dock.has_drone && deviceInfo[droneSn(dock)] && deviceInfo[droneSn(dock)].mode_code !== EModeCode.Disconnected ? 'color: #00ee8b' :  'color: red;'">
+                      {{ dock.has_drone && deviceInfo[droneSn(dock)] ? droneModeCodeZh(deviceInfo[droneSn(dock)].mode_code) : droneModeCodeZh(undefined) }}</span>
                   </div>
                   <div style="display: flex; align-items: center; height: 25px;" >
-                    <div v-if="hmsInfo[dock.sn]" class="flex-align-center flex-row">
+                    <div v-if="dock.has_drone && hmsInfo[droneSn(dock)]" class="flex-align-center flex-row">
                         <div  style="width: 18px; height: 16px; text-align: center; border: 1px solid orange; line-height: 16px;">
-                          <div :class="hmsInfo[dock.sn][0].level === EHmsLevel.CAUTION ? 'caution-blink' :
-                          hmsInfo[dock.sn][0].level === EHmsLevel.WARN ? 'warn-blink' : 'notice-blink'">
-                            <span :style="hmsInfo[dock.sn].length > 99 ? 'font-size: 11px' : 'font-size: 12px'">{{ hmsInfo[dock.sn].length }}</span>
-                            <span class="fz10">{{ hmsInfo[dock.sn].length > 99 ? '+' : ''}}</span>
+                          <div :class="hmsInfo[droneSn(dock)][0].level === EHmsLevel.CAUTION ? 'caution-blink' :
+                          hmsInfo[droneSn(dock)][0].level === EHmsLevel.WARN ? 'warn-blink' : 'notice-blink'">
+                            <span :style="hmsInfo[droneSn(dock)].length > 99 ? 'font-size: 11px' : 'font-size: 12px'">{{ hmsInfo[droneSn(dock)].length }}</span>
+                            <span class="fz10">{{ hmsInfo[droneSn(dock)].length > 99 ? '+' : ''}}</span>
                           </div>
                         </div>
-                        <a-popover trigger="click" placement="bottom" background-color="#43C575" v-model:visible="hmsVisible[dock.sn]" @visibleChange="readHms(hmsVisible[dock.sn], dock.sn)"
+                        <a-popover trigger="click" placement="bottom" background-color="#43C575" v-model:visible="hmsVisible[droneSn(dock)]" @visibleChange="readHms(hmsVisible[droneSn(dock)], droneSn(dock))"
                           :overlayStyle="{width: '200px', height: '300px'}">
-                          <div :class="hmsInfo[dock.sn][0].level === EHmsLevel.CAUTION ? 'caution' :
-                            hmsInfo[dock.sn][0].level === EHmsLevel.WARN ? 'warn' : 'notice'" style="margin-left: 10px; width: 150px; height: 16px; line-height: 16px;background: transparent !important;;">
-                            <span class="word-loop">{{ hmsInfo[dock.sn][0].message_zh }}</span>
+                          <div :class="hmsInfo[droneSn(dock)][0].level === EHmsLevel.CAUTION ? 'caution' :
+                            hmsInfo[droneSn(dock)][0].level === EHmsLevel.WARN ? 'warn' : 'notice'" style="margin-left: 10px; width: 150px; height: 16px; line-height: 16px;background: transparent !important;;">
+                            <span class="word-loop">{{ hmsInfo[droneSn(dock)][0].message_zh }}</span>
                           </div>
                           <template #content>
                             <a-collapse style="background: transparent; height: 300px; overflow-y: auto;" :bordered="false" expand-icon-position="right" :accordion="true">
-                              <a-collapse-panel v-for="hms in hmsInfo[dock.sn]" :key="hms.hms_id" :showArrow="false"
+                              <a-collapse-panel v-for="hms in hmsInfo[droneSn(dock)]" :key="hms.hms_id" :showArrow="false"
                                 style=" margin: 0 auto 3px auto; border: 0; width: 140px; border-radius: 3px"
                                 :class="hms.level === EHmsLevel.CAUTION ? 'caution' : hms.level === EHmsLevel.WARN ? 'warn' : 'notice'"
                                 >
@@ -235,7 +242,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
-import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf } from '/@/api/wayline'
+import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, stopTask, stopDockRunningTask } from '/@/api/wayline'
 import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusMap, MediaStatus, MediaStatusProgressInfo, TaskMediaHighestPriorityProgressInfo } from '/@/types/task'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
 
@@ -430,8 +437,9 @@ function getOnlineTopo () {
       const child = gateway.children
       const device: OnlineDevice = {
         model: child?.device_name,
-        callsign: child?.nickname,
+        callsign: child?.nickname || child?.device_sn,
         sn: child?.device_sn,
+        has_drone: !!child?.device_sn,
         mode: EModeCode.Disconnected,
         gateway: {
           model: gateway?.device_name,
@@ -441,7 +449,7 @@ function getOnlineTopo () {
         },
         payload: []
       }
-      child?.payloads_list.forEach((payload: any) => {
+      child?.payloads_list?.forEach((payload: any) => {
         device.payload.push({
           index: payload.index,
           model: payload.model,
@@ -452,7 +460,9 @@ function getOnlineTopo () {
         })
       })
       if (EDeviceTypeName.Dock === gateway.domain) {
-        hmsVisible.set(device.sn, false)
+        if (device.sn) {
+          hmsVisible.set(device.sn, false)
+        }
         hmsVisible.set(device.gateway.sn, false)
         onlineDocks.data.push(device)
       }
@@ -463,17 +473,26 @@ function getOnlineTopo () {
   })
 }
 
+function droneSn (dock: OnlineDevice) {
+  return dock.sn || ''
+}
+
 // 获取所有的场站信息
 const current_sub = ref('')
 
 // 跳转到远程调试界面
 function toRemoteDebug (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
-  if (device.sn === osdVisible.value.sn) {
+  const targetSn = isDock ? device.gateway.sn : device.sn
+  if (!targetSn) {
+    e.target.style.cursor = 'not-allowed'
+    return
+  }
+  if (targetSn === osdVisible.value.sn) {
     osdVisible.value.visible = false
   } else {
-    osdVisible.value.sn = device.sn
-    osdVisible.value.callsign = device.callsign
-    osdVisible.value.model = device.model
+    osdVisible.value.sn = targetSn
+    osdVisible.value.callsign = isDock ? device.gateway.callsign : device.callsign
+    osdVisible.value.model = isDock ? device.gateway.model : device.model
     osdVisible.value.visible = false
     osdVisible.value.gateway_sn = device.gateway.sn
     osdVisible.value.is_dock = isDock
@@ -503,18 +522,104 @@ function toTask () {
   router.push({ path: '/task' })
 }
 
+function stopCurrentTask () {
+  if (!MytaskId.value) {
+    return
+  }
+  if (!window.confirm(`确定要停止当前任务 ${MytaskId.value} 吗？`)) {
+    return
+  }
+  stopTask(workspaceId.value, MytaskId.value).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    message.success('停止任务指令已下发')
+    MytaskId.value = ''
+    getPlans()
+  })
+}
+
+function isDockWorking (dockSn: string) {
+  return dockInfo.value[dockSn]?.basic_osd?.mode_code === EDockModeCode.Working
+}
+
+// 机场模式码中文映射（EDockModeCode）
+const dockModeCodeZhMap: Record<string, string> = {
+  Disconnected: '断开',
+  Idle: '空闲',
+  Debugging: '调试中',
+  Remote_Debugging: '远程调试中',
+  Upgrading: '升级中',
+  Working: '作业中',
+}
+
+function dockModeCodeZh (modeCode: EDockModeCode | undefined): string {
+  if (modeCode === undefined || modeCode === null) {
+    return dockModeCodeZhMap.Disconnected
+  }
+  return dockModeCodeZhMap[EDockModeCode[modeCode]] ?? EDockModeCode[modeCode]
+}
+
+// 无人机模式码中文映射（EModeCode）
+const droneModeCodeZhMap: Record<string, string> = {
+  Standby: '待机',
+  Preparing: '准备中',
+  Ready: '准备就绪',
+  Manual: '手动飞行',
+  Automatic: '自动飞行',
+  Waypoint: '航点飞行',
+  Panoramic: '全景拍摄',
+  Active_Track: '智能跟随',
+  ADS_B: 'ADS_B',
+  Return_To_Home: '返航中',
+  Landing: '降落中',
+  Forced_Landing: '迫降中',
+  Three_Blades_Landing: '单桨迫降',
+  Upgrading: '升级中',
+  Disconnected: '断开',
+}
+
+function droneModeCodeZh (modeCode: EModeCode | undefined): string {
+  if (modeCode === undefined || modeCode === null) {
+    return droneModeCodeZhMap.Disconnected
+  }
+  return droneModeCodeZhMap[EModeCode[modeCode]] ?? EModeCode[modeCode]
+}
+
+function stopDockTask (dockSn: string) {
+  if (!dockSn) {
+    return
+  }
+  if (!window.confirm(`确定要停止机场 ${dockSn} 当前执行中的任务吗？`)) {
+    return
+  }
+  stopDockRunningTask(workspaceId.value, dockSn).then(res => {
+    if (res.code !== 0) {
+      return
+    }
+    message.success('停止任务指令已下发')
+    getPlans()
+  })
+}
+
 // 弹出设备弹窗
 function switchVisible (e: any, device: OnlineDevice, isDock: boolean, isClick: boolean) {
   if (!isClick) {
+    message.warning('设备离线或实时数据未就绪，请刷新页面后重试')
     e.target.style.cursor = 'not-allowed'
     return
   }
-  if (device.sn === osdVisible.value.sn) {
+  const targetSn = isDock ? device.gateway.sn : device.sn
+  if (!targetSn) {
+    e.target.style.cursor = 'not-allowed'
+    return
+  }
+  if (targetSn === osdVisible.value.sn) {
     osdVisible.value.visible = !osdVisible.value.visible
   } else {
-    osdVisible.value.sn = device.sn
-    osdVisible.value.callsign = device.callsign
-    osdVisible.value.model = device.model
+    osdVisible.value.sn = targetSn
+    osdVisible.value.callsign = isDock ? device.gateway.callsign : device.callsign
+    osdVisible.value.model = isDock ? device.gateway.model : device.model
     osdVisible.value.visible = true
     osdVisible.value.gateway_sn = device.gateway.sn
     osdVisible.value.is_dock = isDock
@@ -532,7 +637,8 @@ function openLiveStream (device: OnlineDevice) {
   // }
   liveStream.value.visible = !liveStream.value.visible
   liveStream.value.dock_sn = device.gateway.sn
-  liveStream.value.dorne_sn = device.sn
+  liveStream.value.dorne_sn = device.sn || ''
+  liveStream.value.has_drone = !!device.has_drone
   store.commit('SET_LIVESTREAM_INFO', liveStream)
 }
 
@@ -583,6 +689,12 @@ function openLivestreamAgora () {
 </script>
 
 <style lang="scss" scoped>
+.content{
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .nav{
   height: 27px;
   background: url('/@/assets/v4/livestream-nav.png') 100% no-repeat;
@@ -808,9 +920,9 @@ function openLivestreamAgora () {
       margin: 29px 0 0 11px;
       .group_7 {
         margin-top: 1px;
-        width: 112px;
+        width: 134px;
         .group_8 {
-          width: 113px;
+          width: 134px;
           height: 38px;
           background: url('/@/assets/v4/btn_bg.png') 100% no-repeat;
           background-size: 100% 100%;
@@ -822,7 +934,7 @@ function openLivestreamAgora () {
             background: url('/@/assets/v4/duihao.png') 100% no-repeat;
             background-size: 70% 70%;
             width: 30px;
-            margin: 3px 0 0 10px;
+            margin: 3px 0 0 6px;
             // .block_3 {
             //   width: 18px;
             //   height: 18px;
@@ -833,17 +945,17 @@ function openLivestreamAgora () {
             // }
           }
           .text_15 {
-            width: 42px;
+            width: auto;
             height: 18px;
             overflow-wrap: break-word;
             color: rgba(122, 250, 251, 1);
-            font-size: 14px;
+            font-size: 12px;
             font-family: Google Sans-Medium;
             font-weight: 500;
             text-align: center;
             white-space: nowrap;
-            line-height: 14px;
-            margin: 11px 18px 0 13px;
+            line-height: 12px;
+            margin: 13px 2px 0 2px;
           }
         }
       }

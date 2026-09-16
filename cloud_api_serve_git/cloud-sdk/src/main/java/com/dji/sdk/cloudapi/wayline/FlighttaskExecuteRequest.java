@@ -16,6 +16,8 @@ public class FlighttaskExecuteRequest extends BaseModel {
     @Pattern(regexp = "^[^<>:\"/|?*._\\\\]+$")
     private String flightId;
 
+    private MultiDockTask multiDockTask;
+
     public FlighttaskExecuteRequest() {
     }
 
@@ -23,6 +25,7 @@ public class FlighttaskExecuteRequest extends BaseModel {
     public String toString() {
         return "FlighttaskExecuteRequest{" +
                 "flightId='" + flightId + '\'' +
+                ", multiDockTask=" + multiDockTask +
                 '}';
     }
 
@@ -32,6 +35,15 @@ public class FlighttaskExecuteRequest extends BaseModel {
 
     public FlighttaskExecuteRequest setFlightId(String flightId) {
         this.flightId = flightId;
+        return this;
+    }
+
+    public MultiDockTask getMultiDockTask() {
+        return multiDockTask;
+    }
+
+    public FlighttaskExecuteRequest setMultiDockTask(MultiDockTask multiDockTask) {
+        this.multiDockTask = multiDockTask;
         return this;
     }
 }

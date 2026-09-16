@@ -36,6 +36,9 @@ public class StateRouter {
     @Resource
     private MqttGatewayPublish gatewayPublish;
 
+    @Resource
+    private IRawStateCacheService stateCacheService;
+
     @Bean
     public IntegrationFlow stateDataRouterFlow() {
         return IntegrationFlows
@@ -45,8 +48,9 @@ public class StateRouter {
                         TopicStateRequest response = Common.getObjectMapper().readValue((byte[]) source.getPayload(), new TypeReference<TopicStateRequest>() {});
                         String topic = String.valueOf(source.getHeaders().get(MqttHeaders.RECEIVED_TOPIC));
                         String from = topic.substring((THING_MODEL_PRE + PRODUCT).length(), topic.indexOf(STATE_SUF));
-                        return response.setFrom(from)
-                                .setData(Common.getObjectMapper().convertValue(response.getData(), getTypeReference(response.getGateway(), response.getData())));
+                        response.setFrom(from);
+                        stateCacheService.setDeviceRawState(from, response);
+                        return response.setData(Common.getObjectMapper().convertValue(response.getData(), getTypeReference(response.getGateway(), response.getData())));
                     } catch (IOException e) {
                         throw new CloudSDKException(e);
                     }

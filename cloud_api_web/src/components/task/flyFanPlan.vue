@@ -127,9 +127,10 @@ import { reactive, ref, onMounted, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
-import { Task, getFlyWaylinePlan, DistributeFlyPlan, batchDeleteFlyPlan, deleteFlyPlan } from '/@/api/wayline'
+import { Task, getFlyWaylinePlan, batchDeleteFlyPlan, deleteFlyPlan } from '/@/api/wayline'
 import { useRouter } from 'vue-router'
 import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
+import { executePlanWithFrogJumpMode } from './useFrogJumpExecute'
 
 const router = useRouter()
 
@@ -183,12 +184,7 @@ function reset () {
 
 // 下发任务
 function executeNow (data: any) {
-  DistributeFlyPlan(data).then(res => {
-    if (res.code !== 0) {
-      return
-    }
-    router.push({ path: '/livestream' })
-  })
+  executePlanWithFrogJumpMode(data, () => router.push({ path: '/livestream' }))
 }
 
 function handleSelectionChange (val) {

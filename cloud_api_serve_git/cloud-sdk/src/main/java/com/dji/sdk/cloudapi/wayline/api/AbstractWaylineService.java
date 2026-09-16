@@ -153,6 +153,21 @@ public abstract class AbstractWaylineService {
     }
 
     /**
+     * Stop wayline task.
+     * @param gateway
+     * @param request
+     * @return services_reply
+     */
+    @CloudSDKVersion(exclude = GatewayTypeEnum.RC)
+    public TopicServicesResponse<ServicesReplyData> flighttaskStop(GatewayManager gateway, FlighttaskStopRequest request) {
+        return servicesPublish.publish(
+                gateway.getGatewaySn(),
+                WaylineMethodEnum.FLIGHTTASK_STOP.getMethod(),
+                request,
+                request.getFlightId());
+    }
+
+    /**
      * Return to Home (RTH)
      * @param gateway
      * @return  services_reply
@@ -184,6 +199,16 @@ public abstract class AbstractWaylineService {
      */
     @ServiceActivator(inputChannel = ChannelName.INBOUND_REQUESTS_FLIGHTTASK_RESOURCE_GET, outputChannel = ChannelName.OUTBOUND_REQUESTS)
     public TopicRequestsResponse<MqttReply<FlighttaskResourceGetResponse>> flighttaskResourceGet(TopicRequestsRequest<FlighttaskResourceGetRequest> request, MessageHeaders headers) {
+        return new TopicRequestsResponse<>();
+    }
+
+    /**
+     * Get peer wayline task progress for multi-dock task synchronization.
+     * @param request data
+     * @param headers headers
+     * @return requests_reply
+     */
+    public TopicRequestsResponse<MqttReply<FlighttaskProgressGetResponse>> flighttaskProgressGet(TopicRequestsRequest<FlighttaskProgressGetRequest> request, MessageHeaders headers) {
         return new TopicRequestsResponse<>();
     }
 
