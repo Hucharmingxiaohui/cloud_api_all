@@ -74,7 +74,39 @@
         <span class="status-dot" :class="{ online: !statusText }"></span>
         <span>{{ statusText || '云渲染航线会话已连接' }}</span>
       </div>
-      <div class="stage-hint">左键拖动旋转 · 右键拖动平移 · 滚轮缩放 · 双击模型添加航点</div>
+      <div class="stage-actions">
+        <el-button
+          size="small"
+          :type="waylineState.followMode ? 'warning' : 'default'"
+          @click="toggleFollowMode"
+        >
+          {{ waylineState.followMode ? '切换编辑模式' : '切换跟随模式' }}
+        </el-button>
+        <el-button size="small" type="primary" :disabled="!waylineState.followMode" @click="dropFollowWaypoint">
+          打点
+        </el-button>
+      </div>
+      <div v-if="waylineState.followMode" class="follow-pad">
+        <div class="follow-pad__caption">跟随无人机控制</div>
+        <div class="follow-pad__grid">
+          <div class="direction-pad direction-pad--follow">
+            <el-button class="north" @click="sendFollowDroneControl('forward')">前进</el-button>
+            <el-button class="west" @click="sendFollowDroneControl('left')">左移</el-button>
+            <div class="direction-pad__center">无人机</div>
+            <el-button class="east" @click="sendFollowDroneControl('right')">右移</el-button>
+            <el-button class="south" @click="sendFollowDroneControl('back')">后退</el-button>
+          </div>
+          <div class="follow-pad__aux">
+            <el-button @click="sendFollowDroneControl('up')">上升</el-button>
+            <el-button @click="sendFollowDroneControl('down')">下降</el-button>
+            <el-button @click="sendFollowDroneControl('yaw-left')">左转</el-button>
+            <el-button @click="sendFollowDroneControl('yaw-right')">右转</el-button>
+          </div>
+        </div>
+      </div>
+      <div class="stage-hint">
+        {{ waylineState.followMode ? '跟随模式：控制无人机移动 · 调整拍摄姿态后点击「打点」保存航点' : '左键拖动旋转 · 右键拖动平移 · 滚轮缩放 · 双击模型添加航点' }}
+      </div>
     </main>
 
     <aside class="editor-panel editor-panel--right">
@@ -87,14 +119,18 @@
           <span class="capture-badge">{{ captureModeLabel(selectedWaypoint.capture_mode) }}</span>
         </div>
 
+        <div v-if="waylineState.followMode" class="follow-banner">
+          跟随模式：下方数值编辑暂停，微调作用于跟随无人机，「打点」后保存为新航点
+        </div>
+
         <div class="form-scroll" :class="{ 'form-scroll--disabled': !!statusText }">
           <section class="edit-section">
             <h3>位置</h3>
             <div class="form-grid">
-              <label>经度<el-input-number v-model="selectedWaypoint.longitude" :precision="7" :step="0.000001" controls-position="right" @change="updatePosition" /></label>
-              <label>纬度<el-input-number v-model="selectedWaypoint.latitude" :precision="7" :step="0.000001" controls-position="right" @change="updatePosition" /></label>
-              <label>绝对高度 (m)<el-input-number v-model="selectedWaypoint.height" :precision="2" :step="0.5" controls-position="right" @change="updatePosition" /></label>
-              <label>速度 (m/s)<el-input-number v-model="selectedWaypoint.speed" :min="0.1" :max="30" :step="0.5" controls-position="right" @change="updatePosition" /></label>
+              <label>经度<el-input-number v-model="selectedWaypoint.longitude" :precision="7" :step="0.000001" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
+              <label>纬度<el-input-number v-model="selectedWaypoint.latitude" :precision="7" :step="0.000001" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
+              <label>绝对高度 (m)<el-input-number v-model="selectedWaypoint.height" :precision="2" :step="0.5" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
+              <label>速度 (m/s)<el-input-number v-model="selectedWaypoint.speed" :min="0.1" :max="30" :step="0.5" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
             </div>
             <div class="nudge-row">
               <span>微调步长</span>
@@ -123,10 +159,10 @@
           <section class="edit-section">
             <h3>姿态与拍摄</h3>
             <div class="form-grid">
-              <label>偏航角 (°)<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359.99" :step="0.1" :precision="2" controls-position="right" @change="updateCamera" /></label>
-              <label>俯仰角 (°)<el-input-number v-model="selectedWaypoint.camera_params.pitch" :min="-90" :max="0" :step="1" controls-position="right" @change="updateCamera" /></label>
-              <label>滚转角 (°)<el-input-number v-model="selectedWaypoint.camera_params.roll" :min="-180" :max="180" :step="1" controls-position="right" @change="updateCamera" /></label>
-              <label>35mm 焦距 (mm)<el-input-number v-model="selectedWaypoint.camera_params.focalLength" :min="1" :max="500" :step="1" controls-position="right" @change="updateCamera" /></label>
+              <label>偏航角 (°)<el-input-number v-model="selectedWaypoint.camera_params.heading" :min="0" :max="359.99" :step="0.1" :precision="2" controls-position="right" :disabled="waylineState.followMode" @change="updateCamera" /></label>
+              <label>俯仰角 (°)<el-input-number v-model="selectedWaypoint.camera_params.pitch" :min="-90" :max="0" :step="1" controls-position="right" :disabled="waylineState.followMode" @change="updateCamera" /></label>
+              <label>滚转角 (°)<el-input-number v-model="selectedWaypoint.camera_params.roll" :min="-180" :max="180" :step="1" controls-position="right" :disabled="waylineState.followMode" @change="updateCamera" /></label>
+              <label>35mm 焦距 (mm)<el-input-number v-model="selectedWaypoint.camera_params.focalLength" :min="1" :max="500" :step="1" controls-position="right" :disabled="waylineState.followMode" @change="updateCamera" /></label>
             </div>
             <div class="nudge-row attitude-step">
               <span>姿态微调步长</span>
@@ -146,7 +182,7 @@
               </div>
             </div>
             <label class="select-label">拍摄镜头
-              <el-select v-model="selectedWaypoint.capture_mode" @change="updateCaptureMode">
+              <el-select v-model="selectedWaypoint.capture_mode" :disabled="waylineState.followMode" @change="updateCaptureMode">
                 <el-option label="不拍照（过渡点）" value="none" />
                 <el-option label="可见光" value="visable" />
                 <el-option label="红外" value="ir" />
@@ -189,13 +225,13 @@ import {
 } from './cloudWaylineKmz'
 
 type Waypoint = CloudKmzWaypoint
-interface WaylineState { routeName: string; selectedIndex: number; waypoints: Waypoint[] }
+interface WaylineState { routeName: string; selectedIndex: number; followMode: boolean; waypoints: Waypoint[] }
 
 const router = useRouter()
 const route = useRoute()
 const cloudRendererEnabled = isCloudRendererEnabled()
 const waylineClient = new CloudRendererClient()
-const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, waypoints: [] })
+const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, followMode: false, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
@@ -274,6 +310,7 @@ function applyDraftToLocalState (draft: CloudWaylineDraft) {
   const routeName = normalizeRouteName(draft.routeName || waylineState.routeName)
   waylineState.routeName = routeName
   waylineState.selectedIndex = draft.selectedIndex ?? (draft.waypoints.length ? 0 : -1)
+  waylineState.followMode = false
   waylineState.waypoints = cloneWaypoints(draft.waypoints)
   routeNameInput.value = routeName
 }
@@ -304,6 +341,7 @@ function applyRemoteWaylineState (raw: unknown) {
   const routeName = normalizeRouteName(payload.routeName || waylineState.routeName)
   waylineState.routeName = routeName
   waylineState.selectedIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : -1
+  waylineState.followMode = payload.followMode === true
   waylineState.waypoints = remotePoints
   routeNameInput.value = routeName
   if (payload.routeName !== routeName) {
@@ -380,6 +418,7 @@ function updateCaptureMode () {
   if (selectedWaypoint.value) updateSelected({ capture_mode: selectedWaypoint.value.capture_mode })
 }
 function nudgeGeo (east: number, north: number) {
+  if (waylineState.followMode) return waylineClient.sendFollowAdjust({ eastM: east, northM: north })
   const point = selectedWaypoint.value
   if (!point) return
   const latitudeRadians = point.latitude * Math.PI / 180
@@ -388,11 +427,13 @@ function nudgeGeo (east: number, north: number) {
   updatePosition()
 }
 function nudgeHeight (delta: number) {
+  if (waylineState.followMode) return waylineClient.sendFollowAdjust({ heightM: delta })
   if (!selectedWaypoint.value) return
   selectedWaypoint.value.height += delta
   updatePosition()
 }
 function nudgeBody (forward: number, right: number) {
+  if (waylineState.followMode) return waylineClient.sendFollowAdjust({ forwardM: forward, rightM: right })
   if (waylineState.selectedIndex < 0) return
   // 机体前后左右由云渲染 georef 解算，避免本地用 camera_params.heading 导致镜像
   waylineClient.sendWaylineCommand('move-body', {
@@ -402,6 +443,10 @@ function nudgeBody (forward: number, right: number) {
   })
 }
 function nudgeCamera (field: 'heading' | 'pitch', delta: number) {
+  if (waylineState.followMode) {
+    // 跟随模式下航向/俯仰微调作用于跟随无人机，由 renderer 解算
+    return waylineClient.sendFollowAdjust(field === 'heading' ? { yawDeg: delta } : { pitchDeg: delta })
+  }
   const point = selectedWaypoint.value
   if (!point) return
   if (field === 'heading') {
@@ -410,6 +455,25 @@ function nudgeCamera (field: 'heading' | 'pitch', delta: number) {
     point.camera_params.pitch = Math.min(0, Math.max(-90, point.camera_params.pitch + delta))
   }
   updateCamera()
+}
+
+/** 切换跟随模式：乐观更新本地，最终以 renderer 回推的 wayline-state.followMode 为准 */
+function toggleFollowMode () {
+  if (statusText.value) return ElMessage.warning('云渲染未连接，暂不能切换跟随模式')
+  if (!waylineState.followMode && !waylineState.waypoints.length) {
+    return ElMessage.warning('请先双击三维画面添加航点，作为跟随无人机起始位置')
+  }
+  const next = !waylineState.followMode
+  waylineState.followMode = next
+  waylineClient.sendFollowMode(next)
+}
+function dropFollowWaypoint () {
+  if (!waylineState.followMode) return
+  waylineClient.sendFollowDrop()
+}
+function sendFollowDroneControl (action: string) {
+  if (!waylineState.followMode) return
+  waylineClient.sendDroneControl(action)
 }
 async function clearWaypoints () {
   try {
@@ -549,6 +613,7 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
   return {
     routeName: String(payload.routeName || waylineState.routeName),
     selectedIndex: Number.isInteger(selectedIndex) && selectedIndex >= -1 && selectedIndex < waypoints.length ? selectedIndex : -1,
+    followMode: payload.followMode === true,
     waypoints
   }
 }
@@ -614,8 +679,17 @@ onBeforeUnmount(() => {
 .waypoint-card__body small { color: #83a9bd; font-size: 11px; } .empty-list, .empty-editor { display: grid; place-content: center; gap: 8px; text-align: center; color: #7094a6; }
 .empty-list { min-height: 180px; border: 1px dashed rgba(79, 165, 202, .28); } .left-actions { padding-top: 14px; display: grid; grid-template-columns: 1fr 1.35fr; gap: 8px; }
 .renderer-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid rgba(70, 192, 231, .62); background: #030b12; box-shadow: 0 0 28px rgba(10, 104, 151, .2); }
-.stage-toolbar, .stage-hint { position: absolute; z-index: 4; color: #ccefff; background: rgba(3, 17, 29, .8); border: 1px solid rgba(80, 189, 226, .34); backdrop-filter: blur(5px); }
+.stage-toolbar, .stage-actions, .stage-hint { position: absolute; z-index: 4; color: #ccefff; background: rgba(3, 17, 29, .8); border: 1px solid rgba(80, 189, 226, .34); backdrop-filter: blur(5px); }
 .stage-toolbar { top: 12px; left: 12px; padding: 7px 11px; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.stage-actions { top: 12px; right: 12px; padding: 6px 8px; display: flex; align-items: center; gap: 8px; }
+.stage-actions :deep(.el-button) { margin: 0; }
+.follow-pad { position: absolute; z-index: 4; right: 12px; bottom: 52px; padding: 12px; color: #ccefff; background: rgba(3, 17, 29, .84); border: 1px solid rgba(80, 189, 226, .34); backdrop-filter: blur(5px); }
+.follow-pad__caption { margin-bottom: 9px; color: #79b8d0; font-size: 12px; text-align: center; }
+.follow-pad__grid { display: flex; align-items: center; gap: 10px; }
+.follow-pad__aux { display: grid; gap: 6px; }
+.follow-pad__aux :deep(.el-button) { width: 62px; margin: 0; padding: 6px; }
+.direction-pad--follow { margin: 0; }
+.follow-banner { margin-top: 12px; padding: 8px 10px; color: #ffd699; font-size: 12px; line-height: 1.6; border: 1px solid rgba(233, 154, 67, .45); background: rgba(233, 154, 67, .1); }
 .stage-hint { left: 50%; bottom: 14px; transform: translateX(-50%); padding: 7px 13px; font-size: 12px; white-space: nowrap; }
 .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #e99a43; box-shadow: 0 0 8px #e99a43; } .status-dot.online { background: #41e7a1; box-shadow: 0 0 8px #41e7a1; }
 .capture-badge { padding: 5px 9px; color: #70ddff; font-size: 11px; border: 1px solid rgba(72, 214, 255, .4); background: rgba(72, 214, 255, .08); }
