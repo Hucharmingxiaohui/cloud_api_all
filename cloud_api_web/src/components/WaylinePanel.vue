@@ -255,8 +255,7 @@ import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-p
 import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, batchDeleteWaylineFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
-import { saveCloudWaylineEditDraft } from '/@/components/cloudRenderer/cloudWaylineMapper'
-import { parseKmzBlobToCloudDraft } from '/@/components/cloudRenderer/kmzBrowserParser'
+import { openCloudWaylineEdit } from '/@/components/cloudRenderer/useCloudWaylineEdit'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { DEVICE_NAME } from '/@/types/device'
@@ -543,26 +542,7 @@ async function openCloud3dEdit (row: { id: string; name?: string; template_types
   if (editingWaylineId.value) return
   editingWaylineId.value = row.id
   try {
-    const blob = await downloadWaylineFile(workspaceId, row.id)
-    if (!blob) throw new Error('航线文件下载失败')
-    const draft = await parseKmzBlobToCloudDraft(blob, {
-      waylineId: row.id,
-      routeName: row.name || ''
-    })
-    saveCloudWaylineEditDraft(draft)
-    console.info('[cloud3d-edit] draft ready', {
-      waylineId: draft.waylineId,
-      routeName: draft.routeName,
-      count: draft.waypoints.length,
-      sample: draft.waypoints[0]
-    })
-    await router.push({
-      path: '/wayline/cloud3d-editor',
-      query: { mode: 'edit', waylineId: row.id }
-    })
-  } catch (error) {
-    console.error('[cloud3d-edit] failed', error)
-    ElMessage.error(error instanceof Error ? error.message : '打开三维编辑失败')
+    await openCloudWaylineEdit({ router, waylineId: row.id, routeName: row.name || '' })
   } finally {
     editingWaylineId.value = ''
   }

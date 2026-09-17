@@ -93,6 +93,8 @@
           <el-table-column label="操作" width="300px">
             <template #default="scope">
               <div class="action-buttons">
+                <el-button size="small" type="primary" class="custom-execute-btn" link
+                  @click="editWayline(scope.row)">编辑航线</el-button>
                 <div v-if="scope.row.task_type === 0">
                     <el-button size="small" type="primary" class="custom-execute-btn" link
                       @click="executeNow(scope.row)">下发任务</el-button>
@@ -134,6 +136,7 @@ import { useRouter } from 'vue-router'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
 import { executePlanWithFrogJumpMode } from './useFrogJumpExecute'
+import { openCloudWaylineEdit } from '/@/components/cloudRenderer/useCloudWaylineEdit'
 
 const router = useRouter()
 
@@ -189,6 +192,10 @@ function reset () {
 // 下发任务
 function executeNow (data: any) {
   executePlanWithFrogJumpMode(data, () => router.push({ path: '/livestream' }))
+}
+
+function editWayline (data: any) {
+  openCloudWaylineEdit({ router, waylineId: data.file_id })
 }
 
 function handleSelectionChange (val:any) {
