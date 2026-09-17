@@ -114,7 +114,7 @@ export class CloudRendererClient {
   }
 
   clearPath () {
-    this.sendSignal({ type: 'drone-control', action: 'clear-path' })
+    this.sendDroneControl('clear-path')
   }
 
   sendAlignCommand (action: string, payload: Record<string, any> = {}) {
@@ -123,6 +123,22 @@ export class CloudRendererClient {
 
   sendWaylineCommand (action: string, payload: Record<string, any> = {}) {
     this.sendSignal({ type: 'wayline-command', action, ...payload })
+  }
+
+  sendDroneControl (action: string, payload: Record<string, any> = {}) {
+    this.sendSignal({ type: 'drone-control', action, ...payload })
+  }
+
+  sendFollowMode (follow: boolean) {
+    this.sendSignal({ type: 'follow-mode', follow })
+  }
+
+  sendFollowDrop () {
+    this.sendSignal({ type: 'follow-drop' })
+  }
+
+  sendFollowAdjust (payload: Record<string, any>) {
+    this.sendSignal({ type: 'follow-adjust', ...payload })
   }
 
   onSignalMessage (listener: SignalListener) {
