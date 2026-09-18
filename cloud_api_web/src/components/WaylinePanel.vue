@@ -170,7 +170,7 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="380px">
+          <el-table-column label="操作" width="420" align="center">
             <template #default="scope">
               <div class="action-buttons">
                 <el-button
@@ -193,9 +193,18 @@
                   size="small"
                   link
                   type="primary"
+                  class="cloud3d-edit-btn"
                   :loading="editingWaylineId === scope.row.id"
                   @click="openCloud3dEdit(scope.row)"
                   >三维编辑</el-button
+                >
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  class="bound-plan-btn"
+                  @click="showBoundPlans(scope.row)"
+                  >所属计划</el-button
                 >
                 <!-- <el-button size="small" link type="primary" class="waylipot"
                   @click="openWaylinePoints(scope.row)">航点</el-button>
@@ -245,6 +254,34 @@
         <waylineMap ref="wayLineid"></waylineMap>
       </div>
     </el-dialog>
+    <!-- 所属计划弹窗 -->
+    <el-dialog
+      v-model="boundPlansVisible"
+      :title="`所属计划 - ${boundPlansRouteName || '航线'}`"
+      width="860px"
+    >
+      <el-table :data="boundPlans" v-loading="boundPlansLoading" stripe max-height="420">
+        <el-table-column label="序号" type="index" width="60" align="center" />
+        <el-table-column prop="name" label="计划名称" show-overflow-tooltip />
+        <el-table-column prop="plan_id" label="计划ID" show-overflow-tooltip />
+        <el-table-column label="计划类型" width="130">
+          <template #default="scope">
+            {{ PLAN_TYPE_NAME[scope.row.plan_type] || scope.row.plan_type }}
+          </template>
+        </el-table-column>
+        <el-table-column label="执行方式" width="100">
+          <template #default="scope">
+            {{ scope.row.task_type === 0 ? '立即执行' : '定时执行' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="170">
+          <template #default="scope">
+            {{ scope.row.create_time ? new Date(scope.row.create_time).toLocaleString() : '-' }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!boundPlansLoading && boundPlans.length === 0" description="该航线暂未绑定任何计划" />
+    </el-dialog>
   </div>
 </template>
 
@@ -254,7 +291,7 @@ import { message } from 'ant-design-vue'
 import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-plus'
 import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
 import { TableState } from 'ant-design-vue/lib/table/interface'
-import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, batchDeleteWaylineFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile } from '/@/api/wayline'
+import { bindWaylineAndSub, getLocation, deleteWaylineFile, downloadWaylineFile, getWaylineFiles, importKmzFile, batchDeleteWaylineFile, searchWaylineFiles, gethWaylineInfo, editWaylineInfo, importSubKmzFile, getFlyWaylinePlan } from '/@/api/wayline'
 import { openCloudWaylineEdit } from '/@/components/cloudRenderer/useCloudWaylineEdit'
 import { ELocalStorageKey, ERouterName } from '/@/types'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
@@ -528,6 +565,52 @@ function downloadWayline (waylineId: string, fileName: string) {
   }).finally(() => {
     loading.value = false
   })
+}
+
+/**
+ * 查询航线绑定的飞行计划（遍历全部计划类型后按 file_id 过滤）
+ */
+const PLAN_TYPE_NAME: Record<string, string> = {
+  0: '航点航线计划',
+  1: '风机计划',
+  2: '兴趣点环绕计划',
+  3: '普通航线计划',
+  4: '光伏计划'
+}
+const boundPlansVisible = ref(false)
+const boundPlansLoading = ref(false)
+const boundPlansRouteName = ref('')
+const boundPlans = ref<any[]>([])
+
+async function showBoundPlans (row: { id: string; name?: string }) {
+  if (!row?.id) {
+    ElMessage.error('航线 ID 无效')
+    return
+  }
+  boundPlansVisible.value = true
+  boundPlansLoading.value = true
+  boundPlansRouteName.value = row.name || ''
+  boundPlans.value = []
+  const results: any[] = []
+  const planTypes = ['0', '1', '2', '3', '4']
+  const responses = await Promise.all(planTypes.map(plan_type => getFlyWaylinePlan({
+    plan_type,
+    page: 1,
+    page_size: 1000,
+    name: '',
+    planId: '',
+    taskType: ''
+  }).catch(() => null)))
+  responses.forEach(res => {
+    if (!res || res.code !== 0 || !res.data?.list) return
+    res.data.list.forEach((plan: any) => {
+      if (plan.file_id === row.id) {
+        results.push(plan)
+      }
+    })
+  })
+  boundPlans.value = results
+  boundPlansLoading.value = false
 }
 
 /**
@@ -909,13 +992,30 @@ const uploadFile = async () => {
 .preview,
 .temeasure,
 .waylipot,
-.wayliedit {
+.wayliedit,
+.cloud3d-edit-btn,
+.bound-plan-btn {
   background-color: rgba(51, 122, 255, 0.12);
   border-radius: 4px;
   height: 28px;
   border: 1px solid rgba(0, 64, 147, 1);
+  padding: 0 6px;
+  margin-left: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.download,
+.preview,
+.temeasure,
+.waylipot,
+.wayliedit {
   width: 40px;
-  margin-left: 7px;
+}
+
+.cloud3d-edit-btn,
+.bound-plan-btn {
+  width: 64px;
 }
 
 .delete {
@@ -925,12 +1025,26 @@ const uploadFile = async () => {
   color: rgba(255, 215, 215, 1);
   border: 1px solid rgba(255, 132, 132, 1);
   width: 40px;
-  margin-left: 7px;
+  margin-left: 0;
+  flex: 0 0 auto;
 }
 
 .action-buttons .el-button {
   color: white;
   /* 使文字颜色为白色 */
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.action-buttons .el-button + .el-button {
+  margin-left: 0;
 }
 
 .action-buttons .delete {
