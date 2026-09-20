@@ -158,6 +158,7 @@ function mapOnePlacemark (
   let focalLength = NaN
   let captureMode: CaptureMode = 'none'
   let parsedYaw = NaN
+  let kmzPointName = ''
 
   const actions = listActions(placemark)
   for (const action of actions) {
@@ -179,6 +180,8 @@ function mapOnePlacemark (
       if (Number.isFinite(p)) pitch = p
       if (Number.isFinite(f)) focalLength = f
       captureMode = normalizeCaptureMode(lens || 'visable')
+      // KMZ 无独立航点名称字段，名称搭拍照动作 orientedFileSuffix 往返（对接文档 4.6.11 环节5）
+      if (!kmzPointName) kmzPointName = String(oriented.orientedFileSuffix ?? oriented.oriented_file_suffix ?? '').trim()
       continue
     }
 
@@ -206,10 +209,11 @@ function mapOnePlacemark (
     }
 
     if (name === 'takePhoto' || name === 'take_photo' || name === 'panoShot') {
+      const photo = asRecord(param.takePhoto) || param
       if (captureMode === 'none') {
-        const photo = asRecord(param.takePhoto) || param
         captureMode = normalizeCaptureMode(photo.payloadLensIndex || photo.payload_lens_index || 'visable')
       }
+      if (!kmzPointName) kmzPointName = String(photo.orientedFileSuffix ?? photo.oriented_file_suffix ?? '').trim()
     }
   }
 
@@ -223,7 +227,7 @@ function mapOnePlacemark (
   const suffix = String(idx + 1).padStart(3, '0')
 
   return {
-    point_name: String(placemark.point_name || placemark.name || `WP_${suffix}`),
+    point_name: kmzPointName || String(placemark.point_name || placemark.name || `WP_${suffix}`),
     longitude: coords.longitude,
     latitude: coords.latitude,
     height,
