@@ -11,6 +11,9 @@
             <if test="pointName!=null and pointName!=''">
                 and point_name LIKE concat('%', #{pointName},'%')
             </if>
+            <if test="subCode!=null and subCode!=''">
+                and sub_code = #{subCode}
+            </if>
             <if test="componentName!=null and componentName!=''">
                 and component_name LIKE concat('%', #{componentName},'%')
             </if>
@@ -44,6 +47,9 @@
         <where>
             <if test="pointName!=null and pointName!=''">
                 and point_name LIKE concat('%', #{pointName},'%')
+            </if>
+            <if test="subCode!=null and subCode!=''">
+                and sub_code = #{subCode}
             </if>
             <if test="componentName!=null and componentName!=''">
                 and component_name LIKE concat('%', #{componentName},'%')

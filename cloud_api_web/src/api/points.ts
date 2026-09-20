@@ -13,8 +13,27 @@ const HTTP_PREFIX2 = '/tem/api/v1'
 
 // 查询点位列表
 export const getPointList = async function (data): Promise<IWorkspaceResponse<any>> {
-  const url = `/api/point/selectList?page=${data.pageNo}&pageSize=${data.pageSize}&id=${data.id}&pointName=${data.pointName}&picType=${data.picType}&waylineId=${data.waylineId}`
-  const result = await request.get(url)
+  const result = await request.get('/api/point/selectList', {
+    params: {
+      page: data.pageNo,
+      pageSize: data.pageSize,
+      id: data.id,
+      pointName: data.pointName,
+      picType: data.picType,
+      waylineId: data.waylineId,
+      subCode: data.subCode,
+      areaName: data.areaName,
+      bayName: data.bayName,
+      deviceName: data.deviceName,
+      componentName: data.componentName
+    }
+  })
+  return result.data
+}
+
+// 查询点位层级树
+export const getPointTree = async function (): Promise<IWorkspaceResponse<any>> {
+  const result = await request.get('/api/point/tree')
   return result.data
 }
 

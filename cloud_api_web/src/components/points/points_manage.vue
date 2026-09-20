@@ -78,7 +78,27 @@
         </el-form-item>
       </el-form>
     </div>
-    <div class="content">
+    <div class="content point-content">
+      <div class="point-tree-panel">
+        <div class="point-tree-title">点位表</div>
+        <el-tree
+          ref="pointTreeRef"
+          class="point-tree"
+          :data="pointTreeData"
+          node-key="id"
+          :props="pointTreeProps"
+          highlight-current
+          default-expand-all
+          :expand-on-click-node="false"
+          empty-text="暂无点位数据"
+          @node-click="handlePointTreeClick"
+        >
+          <template #default="{ node, data }">
+            <span class="tree-node-label" :title="data.label">{{ node.label }}</span>
+          </template>
+        </el-tree>
+      </div>
+      <div class="point-main-panel">
       <div class="table-container">
         <el-table :data="tableData" stripe  @selection-change="handleSelectionChange">
           <el-table-column type="selection"  align="center" width="60"></el-table-column>
@@ -101,8 +121,8 @@
           <el-table-column label="主设备名称" prop="device_name" align="center"></el-table-column>
           <el-table-column label="部件名称" prop="component_name" align="center"></el-table-column>
           <el-table-column label="关联航线" prop="wayline_id" align="center"></el-table-column>
-          <el-table-column label="关联航点号" prop="wayline_point_pos" align="center"></el-table-column>
-          <el-table-column label="图片类型" prop="pic_type" align="center">
+          <el-table-column label="关联航点号" prop="wayline_point_pos" align="center" width="95"></el-table-column>
+          <el-table-column label="图片类型" prop="pic_type" align="center" width="90">
             <template #default="scope">
               {{ scope.row.pic_type === 0? '可见光':'红外' }}
             </template>
@@ -126,6 +146,7 @@
             </template>
           </el-table-column> -->
         </el-table>
+      </div>
       </div>
       <div class="pagination-container">
         <!-- 分页 -->
@@ -183,7 +204,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { downloadFile } from '/@/utils/common'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
-import { getPointList, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile } from '/@/api/points'
+import { getPointList, getPointTree, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile } from '/@/api/points'
 import { getWaylineDetail } from '/@/api/wayline'
 import { ELocalStorageKey } from '/@/types'
 import { DEVICE_NAME } from '/@/types/device'
@@ -194,7 +215,12 @@ const queryForm = reactive({
   pointName: '',
   id: '',
   picType: '',
-  waylineId: ''
+  waylineId: '',
+  subCode: '',
+  areaName: '',
+  bayName: '',
+  deviceName: '',
+  componentName: ''
 })
 
 const paginationProp = reactive({
@@ -223,10 +249,24 @@ const waylineDetailVisible = ref(false)
 const waylineDetailLoading = ref('')
 const waylineDetail = ref<WaylineFile | null>(null)
 const exportingPointData = ref(false)
+const pointTreeRef = ref()
+const pointTreeData = ref([])
+const pointTreeProps = {
+  label: 'label',
+  children: 'children'
+}
 
 onMounted(() => {
+  getPointTreeData()
   getPoinntList()
 })
+
+async function getPointTreeData () {
+  const res = await getPointTree()
+  if (res.code === 0) {
+    pointTreeData.value = res.data || []
+  }
+}
 
 // 获取风机信息查询
 function getPoinntList () {
@@ -249,6 +289,31 @@ function handleRest () {
   queryForm.id = ''
   queryForm.picType = ''
   queryForm.waylineId = ''
+  clearTreeQuery()
+  pointTreeRef.value?.setCurrentKey(null)
+  getPoinntList()
+}
+
+function clearTreeQuery () {
+  queryForm.subCode = ''
+  queryForm.areaName = ''
+  queryForm.bayName = ''
+  queryForm.deviceName = ''
+  queryForm.componentName = ''
+}
+
+function handlePointTreeClick (data) {
+  clearTreeQuery()
+  queryForm.pointName = ''
+  queryForm.id = ''
+  const filter = data?.filter || {}
+  queryForm.subCode = filter.subCode || ''
+  queryForm.areaName = filter.areaName || ''
+  queryForm.bayName = filter.bayName || ''
+  queryForm.deviceName = filter.deviceName || ''
+  queryForm.componentName = filter.componentName || ''
+  queryForm.pointName = filter.pointName || ''
+  paginationProp.pageNo = 1
   getPoinntList()
 }
 
@@ -575,7 +640,7 @@ async function exportPointData () {
 .table-container {
     flex-grow: 1;
     overflow: hidden;
-    height: 65vh;
+    height: 100%;
     overflow-y: auto;
 }
 
@@ -728,8 +793,77 @@ async function exportPointData () {
 
 .content {
     margin: 15px 12px 0 12px;
-    max-height: calc(100vh - 300px);
-    overflow-y: auto;
+    height: calc(100vh - 220px);
+    max-height: none;
+    overflow: hidden;
+}
+
+.point-content {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 64px;
+    gap: 12px;
+    height: calc(100vh - 220px);
+}
+
+.point-tree-panel {
+    grid-row: 1;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgba(54, 134, 255, 0.32);
+    border-radius: 6px;
+    background: rgba(1, 36, 98, 0.72);
+    box-shadow: inset 0 0 14px rgba(34, 135, 255, 0.22);
+}
+
+.point-tree-title {
+    height: 42px;
+    line-height: 42px;
+    padding: 0 14px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(82, 151, 255, 0.28);
+    background: linear-gradient(90deg, rgba(0, 57, 154, 0.86), rgba(5, 32, 75, 0.72));
+}
+
+.point-tree {
+    height: calc(100% - 42px);
+    overflow: auto;
+    padding: 8px 6px 12px 4px;
+    color: #dcecff;
+    background: transparent;
+}
+
+:deep(.point-tree .el-tree-node__content) {
+    height: 30px;
+    color: #dcecff;
+    border-radius: 4px;
+}
+
+:deep(.point-tree .el-tree-node__content:hover),
+:deep(.point-tree .el-tree-node.is-current > .el-tree-node__content) {
+    color: #fff;
+    background: rgba(34, 100, 167, 0.74);
+}
+
+:deep(.point-tree .el-tree-node__expand-icon) {
+    color: #8ec8ff;
+}
+
+.tree-node-label {
+    display: inline-block;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.point-main-panel {
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
 }
 
 .item1 {
@@ -829,15 +963,12 @@ async function exportPointData () {
 }
 
 .pagination-container {
-    position: absolute;
-    bottom: 40px;
-    /* 距离底部的距离，可调整 */
-    left: 50%;
-    /* 距离右边的距离，可调整 */
-    transform: translateX(-50%);
+    grid-column: 1 / 3;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    min-height: 64px;
+    padding-top: 16px;
 }
 
 // 输入框

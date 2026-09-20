@@ -236,6 +236,12 @@ public class ImportPointController {
         return Result.success(stringObjectMap);
     }
 
+    /** 查询点位层级树：变电站-区域-间隔-设备-部件-点位。 */
+    @GetMapping("tree")
+    public Result<List<Map<String, Object>>> selectTree() {
+        return Result.success(importPointService.selectTree());
+    }
+
     @PostMapping("batchDelete")
     public Result<String> batchDelete(@RequestBody Map<String, Object> params) {
         try {

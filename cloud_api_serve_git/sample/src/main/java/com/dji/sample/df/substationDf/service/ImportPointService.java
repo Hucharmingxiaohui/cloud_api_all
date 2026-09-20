@@ -12,6 +12,8 @@ public interface ImportPointService {
 
     Map<String,Object> selectList(Map map);
 
+    List<Map<String, Object>> selectTree();
+
     public int batchDelete(List<Integer> ids);
 
     public UniPoint getPointByCode(String subCode, String pointCode);

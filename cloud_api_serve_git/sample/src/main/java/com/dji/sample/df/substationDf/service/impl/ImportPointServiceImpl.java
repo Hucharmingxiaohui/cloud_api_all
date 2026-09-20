@@ -463,6 +463,102 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
     }
 
     @Override
+    public List<Map<String, Object>> selectTree() {
+        List<UniPoint> points = this.lambdaQuery()
+                .orderByAsc(UniPoint::getSubName)
+                .orderByAsc(UniPoint::getAreaName)
+                .orderByAsc(UniPoint::getBayName)
+                .orderByAsc(UniPoint::getDeviceName)
+                .orderByAsc(UniPoint::getComponentName)
+                .orderByAsc(UniPoint::getPointName)
+                .list();
+        List<Map<String, Object>> tree = new ArrayList<>();
+        Map<String, Map<String, Object>> nodeIndex = new LinkedHashMap<>();
+        for (UniPoint point : points) {
+            Map<String, Object> subNode = getOrCreateTreeNode(tree, nodeIndex,
+                    "sub:" + safeKey(point.getSubCode(), point.getSubName()),
+                    displayName(point.getSubName(), point.getSubCode(), "未命名变电站"),
+                    "sub", filter("subCode", point.getSubCode()));
+            Map<String, Object> areaNode = getOrCreateTreeNode(childrenOf(subNode), nodeIndex,
+                    "area:" + safeKey(point.getSubCode(), point.getAreaName()),
+                    displayName(point.getAreaName(), null, "未命名区域"),
+                    "area", filter("subCode", point.getSubCode(), "areaName", point.getAreaName()));
+            Map<String, Object> bayNode = getOrCreateTreeNode(childrenOf(areaNode), nodeIndex,
+                    "bay:" + safeKey(point.getSubCode(), point.getAreaName(), point.getBayName()),
+                    displayName(point.getBayName(), null, "未命名间隔"),
+                    "bay", filter("subCode", point.getSubCode(), "areaName", point.getAreaName(), "bayName", point.getBayName()));
+            Map<String, Object> deviceNode = getOrCreateTreeNode(childrenOf(bayNode), nodeIndex,
+                    "device:" + safeKey(point.getSubCode(), point.getAreaName(), point.getBayName(), point.getDeviceName()),
+                    displayName(point.getDeviceName(), null, "未命名设备"),
+                    "device", filter("subCode", point.getSubCode(), "areaName", point.getAreaName(), "bayName", point.getBayName(), "deviceName", point.getDeviceName()));
+            Map<String, Object> componentNode = getOrCreateTreeNode(childrenOf(deviceNode), nodeIndex,
+                    "component:" + safeKey(point.getSubCode(), point.getAreaName(), point.getBayName(), point.getDeviceName(), point.getComponentName()),
+                    displayName(point.getComponentName(), null, "未命名部件"),
+                    "component", filter("subCode", point.getSubCode(), "areaName", point.getAreaName(), "bayName", point.getBayName(), "deviceName", point.getDeviceName(), "componentName", point.getComponentName()));
+            getOrCreateTreeNode(childrenOf(componentNode), nodeIndex,
+                    "point:" + point.getId(),
+                    displayName(point.getPointName(), point.getPointCode(), "未命名点位"),
+                    "point", filter("subCode", point.getSubCode(), "areaName", point.getAreaName(), "bayName", point.getBayName(), "deviceName", point.getDeviceName(), "componentName", point.getComponentName(), "pointName", point.getPointName()));
+        }
+        return tree;
+    }
+
+    private Map<String, Object> getOrCreateTreeNode(List<Map<String, Object>> siblings,
+                                                    Map<String, Map<String, Object>> nodeIndex,
+                                                    String id,
+                                                    String label,
+                                                    String type,
+                                                    Map<String, Object> filter) {
+        Map<String, Object> node = nodeIndex.get(id);
+        if (node != null) {
+            return node;
+        }
+        node = new LinkedHashMap<>();
+        node.put("id", id);
+        node.put("label", label);
+        node.put("type", type);
+        node.put("filter", filter);
+        node.put("children", new ArrayList<Map<String, Object>>());
+        nodeIndex.put(id, node);
+        siblings.add(node);
+        return node;
+    }
+
+    private Map<String, Object> filter(Object... keyValues) {
+        Map<String, Object> filter = new LinkedHashMap<>();
+        for (int i = 0; i + 1 < keyValues.length; i += 2) {
+            filter.put(String.valueOf(keyValues[i]), keyValues[i + 1]);
+        }
+        return filter;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> childrenOf(Map<String, Object> node) {
+        return (List<Map<String, Object>>) node.get("children");
+    }
+
+    private String safeKey(Object... values) {
+        StringBuilder key = new StringBuilder();
+        for (Object value : values) {
+            if (key.length() > 0) {
+                key.append('|');
+            }
+            key.append(value == null ? "" : value);
+        }
+        return key.toString();
+    }
+
+    private String displayName(String name, String code, String fallback) {
+        if (StringUtils.isNotBlank(name)) {
+            return name;
+        }
+        if (StringUtils.isNotBlank(code)) {
+            return code;
+        }
+        return fallback;
+    }
+
+    @Override
     public int batchDelete(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
             return 0;
