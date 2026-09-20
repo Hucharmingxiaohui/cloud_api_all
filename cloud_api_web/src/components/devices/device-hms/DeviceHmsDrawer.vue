@@ -5,19 +5,21 @@
     v-model:visible="sVisible"
     @update:visible="onVisibleChange"
     :destroyOnClose="true"
-     wrapClassName="drawer-style"
-    :width="800">
-    <div class="flex-row flex-align-center" style="margin-bottom: 20px;">
-      <div style="width: 240px;">
+    wrapClassName="drawer-style"
+    :width="1100">
+    <div class="hms-filter-bar">
+      <div class="hms-filter-item hms-filter-time">
+        <span class="hms-filter-label">时间范围</span>
         <a-range-picker
           v-model:value="time"
           format="YYYY-MM-DD"
           :placeholder="['开始时间', '结束时间']"
           @change="onTimeChange"/>
       </div>
-      <div class="ml5">
+      <div class="hms-filter-item">
+        <span class="hms-filter-label">告警等级</span>
         <a-select
-          style="width: 150px"
+          class="hms-short-select"
           v-model:value="param.level"
           @select="onLevelSelect">
           <a-select-option
@@ -29,11 +31,12 @@
           </a-select-option>
         </a-select>
       </div>
-      <div class="ml5">
+      <div class="hms-filter-item">
+        <span class="hms-filter-label">设备类型</span>
         <a-select
           v-model:value="param.domain"
           :disabled="!param.children_sn || !param.device_sn"
-          style="width: 150px"
+          class="hms-short-select"
           @select="onDeviceTypeSelect">
           <a-select-option
             v-for="item in deviceTypes"
@@ -44,16 +47,17 @@
           </a-select-option>
         </a-select>
       </div>
-      <div class="ml5">
+      <div class="hms-filter-item hms-filter-keyword">
+        <span class="hms-filter-label">关键词</span>
         <!-- <a-input-search
           v-model:value="param.message"
           placeholder="请输入查询内容"
           style="width: 200px"
           @search="getHms"/> -->
 
-        <a-input v-model:value="param.message"  placeholder="请输入查询内容"  style="width: 200px">
+        <a-input v-model:value="param.message" placeholder="请输入错误代码或信息" @pressEnter="getHms">
           <template #suffix >
-              <a @search="getHms">  <SearchOutlined style="color: rgba(255, 255, 255, 1)" /></a>
+              <a @click="getHms">  <SearchOutlined style="color: rgba(255, 255, 255, 1)" /></a>
           </template>
         </a-input>
       </div>
@@ -63,13 +67,13 @@
           :data="hmsData.data"
           row-key="hms_id"
           default-expand-all
-          show-overflow-tooltip
+          class="hms-table"
           stripe
         >
           <el-table-column
             prop="device_type"
             label="警告时间|结束时间"
-            show-overflow-tooltip
+            width="220"
           >
             <template #default="scope">
               <div>{{ scope.row.create_time }}</div>
@@ -80,7 +84,7 @@
           <el-table-column
             prop="level"
             label="层级"
-            show-overflow-tooltip
+            width="110"
           >
             <template #default="scope">
                 <div :class="scope.row.level === EHmsLevel.CAUTION ? 'caution' : scope.row.level === EHmsLevel.WARN ? 'warn' : 'notice'" style="width: 10px; height: 10px; border-radius: 50%;"></div>
@@ -90,14 +94,22 @@
           <el-table-column
             prop="domain"
             label="设备"
-            show-overflow-tooltip
+            width="120"
           >
             <template #default="scope">
               <div >{{ EDeviceTypeName[scope.row.domain] }}</div>
             </template>
           </el-table-column>
-          <el-table-column prop="key" label="错误代码"  show-overflow-tooltip />
-          <el-table-column prop="message_zh" label="信息" show-overflow-tooltip />
+          <el-table-column prop="key" label="错误代码" width="260">
+            <template #default="scope">
+              <div class="hms-wrap-cell">{{ scope.row.key }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="message_zh" label="信息" min-width="360">
+            <template #default="scope">
+              <div class="hms-wrap-cell hms-message-cell">{{ scope.row.message_zh }}</div>
+            </template>
+          </el-table-column>
       </el-table>
       <div class="pagination-container">
         <el-pagination v-model:current-page="hmsPaginationProp.current" v-model:page-size="hmsPaginationProp.pageSize"
@@ -348,6 +360,65 @@ function onLevelSelect (val: number) {
 }
 </script>
 <style lang="scss" scoped>
+.hms-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px;
+  border: 1px solid #0b6cff;
+  background: rgba(0, 31, 83, 0.35);
+}
+
+.hms-filter-item {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.hms-filter-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 8px;
+  color: #fff;
+  font-size: 14px;
+  white-space: nowrap;
+  border: 1px solid #2f76d8;
+  border-right: 0;
+  background: rgba(0, 57, 154, 0.45);
+}
+
+.hms-filter-time :deep(.ant-picker) {
+  width: 210px;
+}
+
+.hms-short-select {
+  width: 105px;
+}
+
+.hms-filter-keyword {
+  flex: 1 1 auto;
+  min-width: 280px;
+}
+
+.hms-filter-keyword :deep(.ant-input-affix-wrapper) {
+  flex: 1;
+}
+
+.hms-wrap-cell {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 22px;
+  text-align: left;
+}
+
+.hms-message-cell {
+  word-break: break-word;
+}
+
 .notice {
   background: $success;
   overflow: hidden;
@@ -418,6 +489,9 @@ function onLevelSelect (val: number) {
 
 :global(.ant-drawer-close){
   color: #fff;
+}
+:global(.drawer-style .ant-drawer-content-wrapper) {
+  max-width: calc(100vw - 120px);
 }
 :global(.drawer-style .ant-drawer-content) {
   background-color: #0B2756;

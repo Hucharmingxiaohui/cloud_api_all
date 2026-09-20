@@ -303,7 +303,13 @@ export const DistributeFlyPlan = async function (data: FlightTestPlan): Promise<
 
 // 查询航线计划
 export const getFlyWaylinePlan = async function (data: any): Promise<IWorkspaceResponse<any>> {
-  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${data.plan_type}/getPlanByPlantype?page=${data.page}&page_size=${data.page_size}&name=${data.name}&planId=${data.planId}&taskType=${data.taskType}`
+  const params = new URLSearchParams()
+  params.append('page', String(data.page || 1))
+  params.append('page_size', String(data.page_size || 10))
+  params.append('name', data.name || '')
+  params.append('planId', data.planId || '')
+  params.append('taskType', data.taskType || '')
+  const url = `${HTTP_PREFIX3}/waylinePlan/plan_type/${data.plan_type}/getPlanByPlantype?${params.toString()}`
   const result = await request.get(url)
   return result.data
 }

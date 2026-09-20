@@ -16,9 +16,9 @@
         @click="select(EDeviceTypeName.Gateway)">
         <span style="margin-left: 5px; font-size: 14px;">遥控器</span>
       </el-button>
-      <el-popconfirm width="240" confirm-button-text="确定" cancel-button-text="取消" icon-color="#626AEF" title="确定手动注册当前机场和无人机吗？" @confirm="manualRepairDeviceOnline">
+      <el-popconfirm width="260" confirm-button-text="确定" cancel-button-text="取消" icon-color="#626AEF" title="确定手动注册当前所有机场和无人机吗？" @confirm="manualRepairDeviceOnline">
         <template #reference>
-          <el-button class="new_btn" type="primary" style="margin-left: 10px; width: 120px;">
+          <el-button class="new_btn" type="primary" style="margin-left: 10px; width: 120px;" :loading="manualRepairing">
             <span style="font-size: 14px;">手动注册</span>
           </el-button>
         </template>
@@ -41,26 +41,30 @@
                 {{ scope.$index +(paginationProp.current - 1) * paginationProp.pageSize+ 1 }}
               </template>
             </el-table-column>
-          <el-table-column label="模型" prop="nickname">
+          <el-table-column prop="nickname" label="设备名称">
             <template #default="scope">
-              <div>
-                <el-input v-if="editableData[scope.row.device_sn]" v-model="editableData[scope.row.device_sn].nickname"
-                  style="margin: -5px 0" />
-                <template v-else>
-                  <el-tooltip :content="scope.row.nickname">
-                    <div style="display: flex; justify-content: center; align-items: center;">
-                      <span v-if="(judgeCurrentType(EDeviceTypeName.Dock) && scope.row.domain !== EDeviceTypeName.Dock)" style="height: 30px; width: 30px;">
-                        <span style="border-left: 2px solid rgb(200,200,200);border-bottom: 2px solid rgb(200,200,200);height: 15px; width: 15px;  display: inline-block;"></span>
-                      </span>
-                      <span>{{ scope.row.nickname }}</span>
-                    </div>
-                  </el-tooltip>
-                </template>
-              </div>
+              <el-input v-if="editableData[scope.row.device_sn]" v-model="editableData[scope.row.device_sn].nickname"
+                style="margin: -5px 0" />
+              <el-tooltip v-else :content="scope.row.nickname">
+                <span>{{ scope.row.nickname }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
           <el-table-column prop="device_sn" label="SN" />
-          <el-table-column prop="device_name" label="名称" />
+          <el-table-column label="设备型号" prop="device_name">
+            <template #default="scope">
+              <div>
+                <el-tooltip :content="scope.row.device_name">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <span v-if="(judgeCurrentType(EDeviceTypeName.Dock) && scope.row.domain !== EDeviceTypeName.Dock)" style="height: 30px; width: 30px;">
+                      <span style="border-left: 2px solid rgb(200,200,200);border-bottom: 2px solid rgb(200,200,200);height: 15px; width: 15px;  display: inline-block;"></span>
+                    </span>
+                    <span>{{ scope.row.device_name }}</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column label="固件版本" prop="firmware_version">
             <template #default="scope">
               <span v-if="judgeCurrentType(EDeviceTypeName.Dock)">
@@ -201,6 +205,7 @@ const treeProps = reactive({
   checkStrictly: true,
 })
 const loading = ref(true)
+const manualRepairing = ref(false)
 const deleteTip = ref<boolean>(false)
 const deleteSn = ref<string>()
 
@@ -410,21 +415,43 @@ function showHms (dock: Device) {
   currentDevice.value = dock
 }
 
-function manualRepairDeviceOnline () {
-  const dock = data.device.find((item: Device) => item.domain === EDeviceTypeName.Dock)
-  if (!dock) {
-    message.warning('请先切换到机场列表，并确认存在机场设备')
-    return
-  }
-  const child = Array.isArray(dock.children) ? dock.children[0] : undefined
-  repairDeviceOnline(workspaceId, dock.device_sn, child?.device_sn).then(res => {
+async function manualRepairDeviceOnline () {
+  if (manualRepairing.value) return
+  manualRepairing.value = true
+  const hide = message.loading('正在手动注册所有机场和无人机...', 0)
+  try {
+    const res = await getBindingDevices(workspaceId, { page: 1, page_size: 10000, total: 0 }, EDeviceTypeName.Dock)
     if (res.code !== 0) {
-      message.error(res.message || '手动注册失败')
+      message.error(res.message || '获取机场列表失败')
       return
     }
-    message.success('手动注册成功')
+
+    const docks = (res.data?.list || []).filter((item: Device) => item.domain === EDeviceTypeName.Dock)
+    if (!docks.length) {
+      message.warning('当前工作空间未查询到机场设备')
+      return
+    }
+
+    const failed: string[] = []
+    for (const dock of docks) {
+      const child = Array.isArray(dock.children) ? dock.children[0] : dock.children
+      const repairRes = await repairDeviceOnline(workspaceId, dock.device_sn, child?.device_sn)
+      if (repairRes.code !== 0) {
+        failed.push(`${dock.nickname || dock.device_name || dock.device_sn}：${repairRes.message || '手动注册失败'}`)
+      }
+    }
+
+    if (failed.length) {
+      message.warning(`手动注册完成，成功 ${docks.length - failed.length} 个，失败 ${failed.length} 个`)
+      console.warn('手动注册失败设备:', failed)
+    } else {
+      message.success(`手动注册成功，共注册 ${docks.length} 个机场`)
+    }
     getDevices(current.value[0], true)
-  })
+  } finally {
+    hide()
+    manualRepairing.value = false
+  }
 }
 
 onMounted(() => {

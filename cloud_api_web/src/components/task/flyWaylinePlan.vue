@@ -6,17 +6,18 @@
         <el-form-item label="计划名称:" prop="name">
           <el-input v-model="queryForm.name" placeholder="按飞行计划名称搜索" class="custom-input" ></el-input>
         </el-form-item>
-        <el-form-item label="计划ID:" prop="planId">
-          <el-input
-            v-model="queryForm.planId"
-            placeholder="请输入计划ID"
-            class="custom-input"
-          ></el-input>
+        <el-form-item label="航线名称:" prop="waylineName">
+          <el-input v-model="queryForm.waylineName" placeholder="请输入航线名称" class="custom-input"></el-input>
         </el-form-item>
-        <el-form-item label="计划类型:" prop="planId">
+        <el-form-item label="执行设备:" prop="deviceSn">
+          <el-select v-model="queryForm.deviceSn" placeholder="请选择执行设备" :teleported="false" class="select-operation">
+            <el-option v-for="device in deviceOptions" :key="device.sn" :value="device.sn" :label="device.name"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="执行方式:" prop="taskType">
           <el-select
             v-model="queryForm.taskType"
-            placeholder="请选择类型"
+            placeholder="请选择执行方式"
             :teleported='false'
             class="select-operation"
           >
@@ -61,12 +62,17 @@
               <div class="ellipsis">{{ scope.row.name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="航线编码" show-overflow-tooltip="true">
+          <el-table-column label="航线名称" show-overflow-tooltip="true">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.file_id }}</div>
+              <div class="ellipsis">{{ getPlanWaylineName(scope.row, displayRefs) }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="设备编码" show-overflow-tooltip="true">
+          <el-table-column label="设备名称" show-overflow-tooltip="true">
+            <template #default="scope">
+              <div class="ellipsis">{{ getPlanDeviceName(scope.row, displayRefs) }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="设备SN" show-overflow-tooltip="true">
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.dock_sn }}</div>
             </template>
@@ -76,23 +82,20 @@
               <div class="ellipsis">{{ scope.row.task_type == 0 ? "立即执行" : "定时执行" }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="时间方案" show-overflow-tooltip="true">
+          <el-table-column label="时间方案" align="center" show-overflow-tooltip="true">
             <template #default="scope">
               <div class="flex-row" style="white-space: pre-wrap">
                 <div class="ellipsis">
-                  <div>{{ new Date(scope.row.begin_time).toLocaleString()}}</div>
+                  <div class="time-plan-cell" style="width: 100%; text-align: center;">{{ new Date(scope.row.begin_time).toLocaleString()}}</div>
                 </div>
               </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="计划来源" show-overflow-tooltip="true">
-            <template #default="scope">
-              <div class="ellipsis">{{ scope.row.plan_source }}</div>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="300px">
             <template #default="scope">
               <div class="action-buttons">
+                <el-button size="small" type="primary" class="custom-execute-btn" link
+                  @click="editWayline(scope.row)">编辑航线</el-button>
                 <div v-if="scope.row.task_type === 0">
                     <el-button size="small" type="primary" class="custom-execute-btn" link
                       @click="executeNow(scope.row)">下发任务</el-button>
@@ -134,6 +137,8 @@ import { useRouter } from 'vue-router'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElDialog, ElInput, ElRadioButton, ElRadioGroup, ElTable, ElTableColumn, ElMessage } from 'element-plus'
 import { executePlanWithFrogJumpMode } from './useFrogJumpExecute'
+import { openCloudWaylineEdit } from '/@/components/cloudRenderer/useCloudWaylineEdit'
+import { loadPlanDisplayRefs, getPlanWaylineName, getPlanDeviceName, filterPlanRows, paginatePlanRows, buildDeviceOptions, type PlanDisplayRefs } from './planDisplay'
 
 const router = useRouter()
 
@@ -154,34 +159,46 @@ type Pagination = TableState['pagination']
 
 const queryForm = reactive({
   name: '',
-  planId: '',
+  waylineName: '',
+  deviceSn: '',
   taskType: '', // 计划类型 执行方式：0立即1定时
   plan_type: '0'
 })
 
 const selectedData = ref([]) // 表格批量删除暂存
+const displayRefs = reactive<PlanDisplayRefs>({ waylineNames: {}, deviceNames: {} })
+const deviceOptions = ref<{ sn: string; name: string }[]>([])
+const allPlanRows = ref<any[]>([])
+const workspaceId = localStorage.getItem('workspace_id') || ''
 
-onMounted(() => {
+onMounted(async () => {
+  const refs = await loadPlanDisplayRefs(workspaceId)
+  Object.assign(displayRefs.waylineNames, refs.waylineNames)
+  Object.assign(displayRefs.deviceNames, refs.deviceNames)
+  deviceOptions.value = buildDeviceOptions(refs.deviceNames)
   getPlan()
 })
 
 // 查询航线飞行计划  0普通航线计划  1 风机计划
 const tableData = ref([])
 function getPlan () {
-  getFlyWaylinePlan({ ...body, ...queryForm }).then(res => {
+  paginationProp.current = 1
+  getFlyWaylinePlan({ ...body, ...queryForm, page: 1, page_size: 10000 }).then(res => {
     if (res.code !== 0) {
       return
     }
-    tableData.value = res.data.list
-    paginationProp.total = res.data.pagination.total
-    paginationProp.current = res.data.pagination.page
+    allPlanRows.value = res.data.list
+    const filtered = filterPlanRows(allPlanRows.value, queryForm.waylineName, queryForm.deviceSn, displayRefs)
+    tableData.value = paginatePlanRows(filtered, paginationProp.current, paginationProp.pageSize)
+    paginationProp.total = filtered.length
   })
 }
 
 // 重置列表
 function reset () {
   queryForm.name = ''
-  queryForm.planId = ''
+  queryForm.waylineName = ''
+  queryForm.deviceSn = ''
   queryForm.taskType = ''
   getPlan()
 }
@@ -189,6 +206,10 @@ function reset () {
 // 下发任务
 function executeNow (data: any) {
   executePlanWithFrogJumpMode(data, () => router.push({ path: '/livestream' }))
+}
+
+function editWayline (data: any) {
+  openCloudWaylineEdit({ router, waylineId: data.file_id })
 }
 
 function handleSelectionChange (val:any) {
@@ -263,7 +284,8 @@ function handleCurrentChange (val: number) {
 function refreshData (page: Pagination) {
   body.page = page?.current!
   body.page_size = page?.pageSize!
-  getPlan()
+  const filtered = filterPlanRows(allPlanRows.value, queryForm.waylineName, queryForm.deviceSn, displayRefs)
+  tableData.value = paginatePlanRows(filtered, paginationProp.current, paginationProp.pageSize)
 }
 
 </script>

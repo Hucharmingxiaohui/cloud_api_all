@@ -132,6 +132,12 @@ function extractRouteName (wayline: Record<string, any>, fallback: string): stri
   return String(name || fallback).replace(/_/g, '-').trim() || fallback
 }
 
+function resolveRouteName (wayline: Record<string, any>, explicitName: string, fallback: string): string {
+  const normalizedExplicitName = String(explicitName || '').replace(/_/g, '-').trim()
+  if (normalizedExplicitName) return normalizedExplicitName
+  return extractRouteName(wayline, fallback)
+}
+
 function mapOnePlacemark (
   placemark: Record<string, any>,
   index: number,
@@ -271,7 +277,7 @@ export function mapParsedWaylineToCloudDraft (
 
   return {
     waylineId: options.waylineId,
-    routeName: extractRouteName(wayline, options.routeName || `wayline-${options.waylineId.slice(0, 8)}`),
+    routeName: resolveRouteName(wayline, options.routeName || '', `wayline-${options.waylineId.slice(0, 8)}`),
     selectedIndex: waypoints.length ? 0 : -1,
     waypoints,
     source: 'edit',
