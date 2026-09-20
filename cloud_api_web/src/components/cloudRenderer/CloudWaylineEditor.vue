@@ -31,22 +31,33 @@
         <strong>{{ waylineState.waypoints.length }}</strong>
       </div>
       <div class="waypoint-list">
-        <button
+        <div
           v-for="(point, index) in waylineState.waypoints"
           :key="`${point.point_name}-${index}`"
-          type="button"
           class="waypoint-card"
           :class="{ active: waylineState.selectedIndex === index }"
           @click="selectWaypoint(index)"
         >
           <span class="waypoint-card__index">{{ String(index + 1).padStart(2, '0') }}</span>
           <span class="waypoint-card__body">
-            <b>{{ point.point_name || `WP_${index + 1}` }}</b>
+            <el-input
+              v-if="editingNameIndex === index"
+              ref="nameInputRef"
+              v-model="editingNameValue"
+              size="small"
+              maxlength="64"
+              @keyup.enter="commitEditName(index)"
+              @blur="commitEditName(index)"
+              @click.stop
+            />
+            <b v-else class="waypoint-card__name" title="点击编辑名称" @click.stop="startEditName(index, point.point_name)">
+              {{ point.point_name || `WP_${index + 1}` }}
+            </b>
             <small>{{ formatCoordinate(point.longitude) }}, {{ formatCoordinate(point.latitude) }}</small>
             <small>高度 {{ formatNumber(point.height, 1) }} m · {{ captureModeLabel(point.capture_mode) }}</small>
           </span>
           <el-button link type="danger" @click.stop="removeWaypoint(index)">删除</el-button>
-        </button>
+        </div>
         <div v-if="!waylineState.waypoints.length" class="empty-list">
           <span>双击中间三维画面</span>
           <small>在 3DGS 模型表面添加航点</small>
@@ -127,6 +138,14 @@
           <section class="edit-section">
             <h3>位置</h3>
             <div class="form-grid">
+              <label class="name-field">航点名称
+                <el-input
+                  v-model="selectedWaypoint.point_name"
+                  maxlength="64"
+                  placeholder="同时用作照片文件名后缀"
+                  @change="renameSelected"
+                />
+              </label>
               <label>经度<el-input-number v-model="selectedWaypoint.longitude" :precision="7" :step="0.000001" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
               <label>纬度<el-input-number v-model="selectedWaypoint.latitude" :precision="7" :step="0.000001" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
               <label>绝对高度 (m)<el-input-number v-model="selectedWaypoint.height" :precision="2" :step="0.5" controls-position="right" :disabled="waylineState.followMode" @change="updatePosition" /></label>
@@ -202,7 +221,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import OutdoorRenderer from './OutdoorRenderer.vue'
@@ -237,6 +256,9 @@ const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
 const angleStep = ref(1)
 const buildingKmz = ref(false)
+const editingNameIndex = ref(-1)
+const editingNameValue = ref('')
+const nameInputRef = ref<any>(null)
 const editMeta = reactive({
   mode: 'create' as 'create' | 'edit',
   waylineId: '',
@@ -391,6 +413,38 @@ function handleStatusChange (status: string) {
 }
 function selectWaypoint (index: number) { waylineClient.sendWaylineCommand('select', { index }) }
 function removeWaypoint (index: number) { waylineClient.sendWaylineCommand('remove', { index }) }
+
+/** 航点名称净化：与 renderer 保存规则一致（trim → 64 字符 → 非法字符与空白转 _） */
+function sanitizePointName (raw: unknown) {
+  return String(raw ?? '').trim().slice(0, 64).replace(/[\\/:*?"<>|\s]+/g, '_')
+}
+function focusNameInput () {
+  nextTick(() => {
+    const instance = Array.isArray(nameInputRef.value) ? nameInputRef.value[0] : nameInputRef.value
+    instance?.focus?.()
+  })
+}
+function startEditName (index: number, name: string) {
+  editingNameIndex.value = index
+  editingNameValue.value = String(name || `WP_${index + 1}`)
+  focusNameInput()
+}
+function commitEditName (index: number) {
+  if (editingNameIndex.value !== index) return
+  editingNameIndex.value = -1
+  const name = sanitizePointName(editingNameValue.value)
+  const current = sanitizePointName(waylineState.waypoints[index]?.point_name)
+  // 净化后为空按协议忽略本次修改；未变化不发送；以 renderer 回推的 wayline-state 刷新列表
+  if (!name || name === current) return
+  waylineClient.sendWaylineCommand('update', { index, patch: { point_name: name } })
+}
+function renameSelected () {
+  const point = selectedWaypoint.value
+  if (!point || waylineState.selectedIndex < 0) return
+  const name = sanitizePointName(point.point_name)
+  if (!name) return
+  waylineClient.sendWaylineCommand('update', { index: waylineState.selectedIndex, patch: { point_name: name } })
+}
 function updateRouteName () {
   const value = routeNameInput.value.trim()
   if (!value) return ElMessage.warning('航线名称不能为空')
@@ -676,6 +730,8 @@ onBeforeUnmount(() => {
 .waypoint-card:hover, .waypoint-card.active { border-color: var(--cyan); background: linear-gradient(90deg, rgba(21, 111, 151, .56), rgba(13, 49, 78, .76)); }
 .waypoint-card__index { width: 32px; height: 32px; display: grid; place-items: center; flex-shrink: 0; color: #071d2c; font-weight: 700; background: #4fd8ff; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
 .waypoint-card__body { min-width: 0; flex: 1; display: grid; gap: 2px; } .waypoint-card__body b, .waypoint-card__body small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.waypoint-card__name { cursor: text; border-bottom: 1px dashed transparent; }
+.waypoint-card__name:hover { color: #9be7ff; border-bottom-color: rgba(155, 231, 255, .55); }
 .waypoint-card__body small { color: #83a9bd; font-size: 11px; } .empty-list, .empty-editor { display: grid; place-content: center; gap: 8px; text-align: center; color: #7094a6; }
 .empty-list { min-height: 180px; border: 1px dashed rgba(79, 165, 202, .28); } .left-actions { padding-top: 14px; display: grid; grid-template-columns: 1fr 1.35fr; gap: 8px; }
 .renderer-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid rgba(70, 192, 231, .62); background: #030b12; box-shadow: 0 0 28px rgba(10, 104, 151, .2); }
@@ -696,6 +752,7 @@ onBeforeUnmount(() => {
 .form-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 3px; } .edit-section { padding: 15px 0; border-bottom: 1px solid rgba(58, 165, 213, .22); }
 .form-scroll--disabled { pointer-events: none; opacity: .56; }
 .edit-section h3 { margin: 0 0 13px; color: #fff; font-size: 15px; } .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; }
+.name-field { grid-column: 1 / -1; }
 .form-grid label { min-width: 0; display: grid; gap: 6px; color: #88adbf; font-size: 12px; } .form-grid :deep(.el-input-number) { width: 100%; }
 .nudge-row { margin: 15px 0 10px; display: flex; align-items: center; gap: 8px; color: #88adbf; font-size: 12px; } .nudge-row :deep(.el-input-number) { width: 110px; }
 .control-caption { margin: 13px 0 8px; color: #79b8d0; font-size: 12px; text-align: center; }
