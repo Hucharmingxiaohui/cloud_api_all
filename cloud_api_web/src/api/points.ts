@@ -35,6 +35,15 @@ export const exportPointTemplate = async function (): Promise<any> {
   }
 }
 
+// 基于原始导入模板导出完整点位数据
+export const exportPointDataFile = async function (data): Promise<any> {
+  const result = await request.get('/api/point/exportData', {
+    params: data,
+    responseType: 'blob'
+  })
+  return result.data
+}
+
 // 导入点位
 export const importPointList = async function (file: {}): Promise<IWorkspaceResponse<any>> {
   const url = '/api/point/import'

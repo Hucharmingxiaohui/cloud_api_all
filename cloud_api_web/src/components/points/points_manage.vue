@@ -65,6 +65,15 @@
           >
             下载模板
           </el-button>
+          <el-button
+            class="new_btn"
+            type="primary"
+            :icon="Download"
+            :loading="exportingPointData"
+            @click="exportPointData()"
+          >
+            按模板导出
+          </el-button>
 
         </el-form-item>
       </el-form>
@@ -135,14 +144,34 @@
         v-model="waylineDetailVisible"
         title="航线详情"
         width="520px"
+        class="wayline-detail-dialog"
       >
         <div v-if="waylineDetail" class="wayline-detail">
-          <div class="detail-row"><span>航线ID：</span>{{ waylineDetail.id }}</div>
-          <div class="detail-row"><span>航线名称：</span>{{ waylineDetail.name || '-' }}</div>
-          <div class="detail-row"><span>更新时间：</span>{{ formatTime(waylineDetail.update_time) }}</div>
-          <div class="detail-row"><span>无人机：</span>{{ DEVICE_NAME[waylineDetail.drone_model_key] || waylineDetail.drone_model_key || '-' }}</div>
-          <div class="detail-row"><span>相机：</span>{{ formatPayloadNames(waylineDetail.payload_model_keys) }}</div>
-          <div class="detail-row"><span>创建人：</span>{{ waylineDetail.user_name || '-' }}</div>
+          <div class="detail-header">
+            <div class="detail-route-icon">航</div>
+            <div>
+              <div class="detail-route-name">{{ waylineDetail.name || '未命名航线' }}</div>
+              <div class="detail-route-id">ID：{{ waylineDetail.id || '-' }}</div>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div class="detail-card">
+              <span class="detail-label">更新时间</span>
+              <strong>{{ formatTime(waylineDetail.update_time) }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">创建人</span>
+              <strong>{{ waylineDetail.user_name || '-' }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">无人机</span>
+              <strong>{{ DEVICE_NAME[waylineDetail.drone_model_key] || waylineDetail.drone_model_key || '-' }}</strong>
+            </div>
+            <div class="detail-card">
+              <span class="detail-label">相机</span>
+              <strong>{{ formatPayloadNames(waylineDetail.payload_model_keys) }}</strong>
+            </div>
+          </div>
         </div>
       </el-dialog>
     </div>
@@ -154,7 +183,7 @@ import { reactive, ref, computed, onMounted } from 'vue'
 import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { downloadFile } from '/@/utils/common'
 import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
-import { getPointList, deletePointListapi, importPointList, exportPointTemplate } from '/@/api/points'
+import { getPointList, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile } from '/@/api/points'
 import { getWaylineDetail } from '/@/api/wayline'
 import { ELocalStorageKey } from '/@/types'
 import { DEVICE_NAME } from '/@/types/device'
@@ -193,6 +222,7 @@ const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
 const waylineDetailVisible = ref(false)
 const waylineDetailLoading = ref('')
 const waylineDetail = ref<WaylineFile | null>(null)
+const exportingPointData = ref(false)
 
 onMounted(() => {
   getPoinntList()
@@ -341,6 +371,24 @@ function handleCurrentChange (val: number) {
   paginationProp.pageNo = val
   getPoinntList()
 }
+
+/** 按模板导出当前筛选条件下的全部点位 */
+async function exportPointData () {
+  exportingPointData.value = true
+  try {
+    const result = await exportPointDataFile(queryForm)
+    if (!result) {
+      ElMessage.error('点位数据导出失败')
+      return
+    }
+    downloadFile(new Blob([result], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), '点位数据.xlsx')
+    ElMessage.success('点位数据导出成功')
+  } catch (error) {
+    ElMessage.error('点位数据导出失败')
+  } finally {
+    exportingPointData.value = false
+  }
+}
 </script>
 
 <style lang="scss" scoped>
@@ -437,6 +485,80 @@ function handleCurrentChange (val: number) {
     // background: rgba(59, 116, 255, 0.15);
     -webkit-box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
     box-shadow: inset 0px 0px 15px 1px rgba(34, 135, 255, 0.5);
+}
+
+::v-deep .wayline-detail-dialog .el-dialog__body {
+  padding: 8px 24px 24px;
+}
+
+.wayline-detail {
+  color: #e6f1ff;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0 20px;
+  border-bottom: 1px solid rgba(117, 173, 255, 0.22);
+}
+
+.detail-route-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #25a8ff, #2455cc);
+  box-shadow: 0 0 18px rgba(37, 168, 255, 0.42);
+}
+
+.detail-route-name {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.detail-route-id {
+  color: #8eafd9;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 18px;
+}
+
+.detail-card {
+  min-height: 62px;
+  padding: 12px 14px;
+  border: 1px solid rgba(83, 151, 231, 0.28);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(28, 79, 145, 0.52), rgba(9, 37, 84, 0.72));
+}
+
+.detail-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #8eafd9;
+  font-size: 12px;
+}
+
+.detail-card strong {
+  display: block;
+  color: #f4f8ff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  word-break: break-word;
 }
 
 .container {

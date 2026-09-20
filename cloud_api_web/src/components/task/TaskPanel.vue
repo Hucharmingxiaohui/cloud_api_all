@@ -2,18 +2,18 @@
   <div class="container">
     <!-- <div class="header1">任务管理</div> -->
     <div class="operation">
-      <el-form :inline="true" :model="queryForm" label-position="right">
-        <el-form-item label="任务名称">
+      <el-form :inline="true" :model="queryForm" label-position="right" class="task-query-form">
+        <el-form-item label="任务名称" class="query-item query-item-name">
           <el-input
             v-model="queryForm.name"
             placeholder="请输入任务名称"
             class="custom-input"
           ></el-input>
         </el-form-item>
-        <el-form-item label="计划类型:">
+        <el-form-item label="执行方式:" class="query-item query-item-select">
           <el-select
             v-model="queryForm.taskType"
-            placeholder="请选择类型"
+            placeholder="请选择执行方式"
             :teleported="false"
             class="select-operation"
           >
@@ -21,10 +21,10 @@
             <el-option value="1" label="定时执行"></el-option>
           </el-select>
         </el-form-item>
-        <el-form-item label="任务类型:">
+        <el-form-item label="计划类型:" class="query-item query-item-select">
           <el-select
             v-model="queryForm.planType"
-            placeholder="请选择任务类型"
+            placeholder="请选择计划类型"
             :teleported="false"
             class="select-operation"
           >
@@ -35,7 +35,37 @@
             <el-option value="2" label="兴趣点环绕计划"></el-option>
           </el-select>
         </el-form-item>
-        <el-form-item>
+        <el-form-item label="任务时间:" class="query-item query-item-time">
+          <el-date-picker
+            v-model="queryForm.startTime"
+            type="datetime"
+            placeholder="开始时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :teleported="false"
+            class="task-time-picker"
+          />
+          <span class="time-range-separator">至</span>
+          <el-date-picker
+            v-model="queryForm.endTime"
+            type="datetime"
+            placeholder="结束时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :teleported="false"
+            class="task-time-picker"
+          />
+        </el-form-item>
+        <el-form-item label="任务模式:" class="query-item query-item-select">
+          <el-select
+            v-model="queryForm.taskMode"
+            placeholder="请选择任务模式"
+            :teleported="false"
+            class="select-operation"
+          >
+            <el-option value="0" label="普通模式"></el-option>
+            <el-option value="1" label="蛙跳模式"></el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item class="query-actions">
           <!-- 查询按钮 -->
           <el-button
             class="new_btn"
@@ -48,7 +78,6 @@
           <el-button
             class="new_btn1"
             type="primary"
-            style="margin-left: 10px"
             :icon="Refresh"
             @click="reset"
             >重置
@@ -134,7 +163,7 @@
               <div class="ellipsis">{{ scope.row.job_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="任务类型">
+          <el-table-column label="执行方式">
             <template #default="scope">
               <div>{{ taskTypeLabels[scope.row.task_type] }}</div>
             </template>
@@ -203,7 +232,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="操作">
+          <el-table-column label="操作" width="150" fixed="right">
             <template #default="scope">
               <el-popconfirm
                 v-if="scope.row.status === TaskStatus.Wait "
@@ -327,8 +356,11 @@ let analysisTimer: number | null = null // 定时器引用
 
 const queryForm = reactive({
   name: '', // 任务名称
-  taskType: '', // 计划类型 执行方式：0立即1定时
-  planType: '' // 任务类型：0点位航线 1风机 2兴趣点环绕 3普通航线 4光伏
+  taskType: '', // 执行方式：0立即1定时
+  planType: '', // 计划类型：0点位航线 1风机 2兴趣点环绕 3普通航线 4光伏
+  startTime: '', // 任务开始时间
+  endTime: '', // 任务结束时间
+  taskMode: '' // 任务模式：0普通模式 1蛙跳模式
 })
 
 const taskTypeLabels = {
@@ -471,6 +503,9 @@ function reset () {
   queryForm.name = ''
   queryForm.taskType = ''
   queryForm.planType = ''
+  queryForm.startTime = ''
+  queryForm.endTime = ''
+  queryForm.taskMode = ''
   getPlans()
 }
 // ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------
@@ -860,6 +895,8 @@ function toTaskVideo (val: any) {
   /* 使子元素垂直排列 */
 }
 .select-operation {
+  width: 150px;
+
   :deep(.el-select__placeholder) {
     color: rgb(182, 182, 182);
     font-size: 14px;
@@ -875,7 +912,7 @@ function toTaskVideo (val: any) {
     // box-shadow: 0px 0px 2px 2px rgba(34, 135, 255, 0.5);
     // border: 1px solid #719fff;
     // border-radius: 4px;
-    width: 200px;
+    width: 100%;
     height: 30px;
   }
 
@@ -900,6 +937,15 @@ function toTaskVideo (val: any) {
 
     background-color: skyblue;
   }
+}
+
+.task-time-picker {
+  width: 148px;
+}
+
+.time-range-separator {
+  margin: 0 6px;
+  color: #c7dcff;
 }
 .content {
   margin: 15px 12px 0 12px;
@@ -983,16 +1029,66 @@ function toTaskVideo (val: any) {
 // 操作部分
 .operation {
   display: flex;
-  // justify-items: center; /* 这里可能是错误的，flexbox 中应该使用 justify-content */
-  align-items: center;
-  /* 这个会确保 label 在垂直方向居中 */
+  align-items: flex-start;
   background-color: rgba(1, 36, 98, 1);
   border-radius: 4px;
-  // width: 100%;
-  height: 60px;
+  min-height: 60px;
   margin: 31px 12px 0 12px;
-  padding-top: 15px;
-  padding-left: 15px;
+  padding: 12px 18px 4px 15px;
+
+  .task-query-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    width: 100%;
+  }
+
+  :deep(.el-form-item) {
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+
+  :deep(.el-form-item__label) {
+    height: 30px;
+    line-height: 30px;
+  }
+
+  .query-item-name {
+    :deep(.el-input) {
+      width: 160px;
+    }
+  }
+
+  .query-item-select {
+    width: 220px;
+  }
+
+  .query-item-time {
+    width: 398px;
+
+    :deep(.el-form-item__content) {
+      display: flex;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+  }
+
+  .query-actions {
+    margin-left: 4px;
+
+    :deep(.el-form-item__content) {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      gap: 10px;
+    }
+  }
+
+  :deep(.el-button + .el-button) {
+    margin-left: 0;
+  }
+
   .new_btn {
     background-image: linear-gradient(180deg,
         rgba(70, 145, 217, 1) 0,

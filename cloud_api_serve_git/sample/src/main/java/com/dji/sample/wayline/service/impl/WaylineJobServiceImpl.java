@@ -252,6 +252,26 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 }
             }
         }
+        // 动态添加任务时间范围条件，按任务开始时间筛选
+        if (map != null && map.containsKey("startTime")) {
+            String startTime = map.get("startTime").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(startTime)) {
+                queryWrapper.ge(WaylineJobEntity::getBeginTime, parseQueryTime(startTime));
+            }
+        }
+        if (map != null && map.containsKey("endTime")) {
+            String endTime = map.get("endTime").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(endTime)) {
+                queryWrapper.le(WaylineJobEntity::getBeginTime, parseQueryTime(endTime));
+            }
+        }
+        // 动态添加任务模式条件：0普通模式，1蛙跳模式
+        if (map != null && map.containsKey("taskMode")) {
+            String taskMode = map.get("taskMode").toString();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(taskMode)) {
+                queryWrapper.eq(WaylineJobEntity::getFrogJumpMode, "1".equals(taskMode));
+            }
+        }
         // 排序
         queryWrapper.orderByDesc(WaylineJobEntity::getId);
         // 执行分页查询
@@ -266,6 +286,15 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 
         return new PaginationData<WaylineJobDTO>(records,
                 new Pagination(pageData.getCurrent(), pageData.getSize(), pageData.getTotal()));
+    }
+
+    private Long parseQueryTime(String value) {
+        try {
+            return java.time.LocalDateTime.parse(value, java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (java.time.format.DateTimeParseException exception) {
+            return Long.parseLong(value);
+        }
     }
 
     private WaylineJobEntity dto2Entity(WaylineJobDTO dto) {

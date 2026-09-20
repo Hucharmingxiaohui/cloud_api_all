@@ -391,7 +391,10 @@ export const getWaylineJobs = async function (workspaceId: string, data: any): P
       page_size: data.page_size,
       name: data.name || '',
       taskType: data.taskType || '',
-      planType: data.planType || ''
+      planType: data.planType || '',
+      startTime: data.startTime || '',
+      endTime: data.endTime || '',
+      taskMode: data.taskMode || ''
     }
   })
   return result.data
