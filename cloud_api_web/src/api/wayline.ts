@@ -481,6 +481,21 @@ export async function taskFeedback (workspaceId: string, job_id: string): Promis
   const result = await request.get(url)
   return result.data
 }
+
+// 查询任务断点信息（断点续飞）
+export async function getWaylineBreakpoint (workspaceId: string, jobId: string): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs/${jobId}/breakpoint`
+  const result = await request.get(url)
+  return result.data
+}
+
+// 断点续飞：按断点重新下发任务并立即执行
+export async function breakpointResume (workspaceId: string, jobId: string): Promise<IWorkspaceResponse<{}>> {
+  const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/jobs/${jobId}/breakpoint-resume`
+  const result = await request.post(url)
+  return result.data
+}
+
 // 更新航线文件
 export const importKmzFile = async function (workspaceId: string, file: {}): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/workspaces/${workspaceId}/waylines/file/upload`

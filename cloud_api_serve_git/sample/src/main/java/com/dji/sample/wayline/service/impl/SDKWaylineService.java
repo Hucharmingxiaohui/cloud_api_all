@@ -34,6 +34,7 @@ import com.dji.sample.media.model.MediaFileEntity;
 import com.dji.sample.media.service.IMediaRedisService;
 import com.dji.sample.wayline.dao.IWaylineFileMapper;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
+import com.dji.sample.wayline.model.dto.WaylineBreakPointDTO;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineFileEntity;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
@@ -213,6 +214,8 @@ public class SDKWaylineService extends AbstractWaylineService {
         WaylineFileEntity waylineFileEntity = waylineFileMapper.selectOne(new LambdaQueryWrapper<WaylineFileEntity>().
                 eq(WaylineFileEntity::getWaylineId, waylineJobEntity.getFileId()));
         String name = waylineFileEntity.getName();
+//      断点续飞：任务被打断（航线中断或异常结束）时保存断点信息
+        saveWaylineBreakpoint(response.getGateway(), flightId, output, statusEnum, waylineJobEntity);
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
                 .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
         log.info("正在执行普通航线任务："+output.getExt().getFlightId()+"，当前航点号为"+currentWaypointIndex+"号");
@@ -325,6 +328,10 @@ public class SDKWaylineService extends AbstractWaylineService {
             waylineJobService.updateJob(job);
             waylineRedisService.delRunningWaylineJob(response.getGateway());
             waylineRedisService.delPausedWaylineJob(response.getBid());
+            // 任务正常执行完成时清理断点，避免残留可续飞断点
+            if (statusEnd && FlighttaskStatusEnum.OK == statusEnum) {
+                waylineRedisService.delWaylineJobBreakpoint(flightId);
+            }
         }
 
         webSocketMessageService.sendBatch(deviceOpt.get().getWorkspaceId(), UserTypeEnum.WEB.getVal(),
@@ -332,6 +339,42 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         return new TopicEventsResponse<>();
     }
+
+    /**
+     * 断点续飞：航线被打断（waylineMissionState=WAYLINE_BROKEN）或异常结束时，
+     * 把 flighttask_progress 事件里的 ext.break_point 持久化到 Redis，
+     * 供任务列表"断点续飞"重新下发 flighttask_prepare + break_point 使用。
+     */
+    private void saveWaylineBreakpoint(String dockSn, String flightId, FlighttaskProgress output,
+                                       FlighttaskStatusEnum statusEnum, WaylineJobEntity waylineJobEntity) {
+        FlighttaskProgressExt ext = output.getExt();
+        ProgressExtBreakPoint breakPoint = Objects.isNull(ext) ? null : ext.getBreakPoint();
+        if (Objects.isNull(breakPoint) || Objects.isNull(waylineJobEntity)) {
+            return;
+        }
+        boolean broken = ext.getWaylineMissionState() == WaylineMissionStateEnum.WAYLINE_BROKEN;
+        boolean failedEnd = Objects.nonNull(statusEnum) && statusEnum.isEnd() && FlighttaskStatusEnum.OK != statusEnum;
+        if (!broken && !failedEnd) {
+            return;
+        }
+        WaylineBreakPointDTO dto = WaylineBreakPointDTO.builder()
+                .jobId(flightId)
+                .dockSn(dockSn)
+                .fileId(waylineJobEntity.getFileId())
+                .index(breakPoint.getIndex())
+                .state(Objects.isNull(breakPoint.getState()) ? null : breakPoint.getState().getState())
+                .progress(breakPoint.getProgress())
+                .waylineId(breakPoint.getWaylineId())
+                .breakReason(Objects.isNull(breakPoint.getBreakReason()) ? null : breakPoint.getBreakReason().getReason())
+                .latitude(breakPoint.getLatitude())
+                .longitude(breakPoint.getLongitude())
+                .height(breakPoint.getHeight())
+                .createTime(System.currentTimeMillis())
+                .build();
+        waylineRedisService.setWaylineJobBreakpoint(dto);
+        log.info("Wayline breakpoint saved: jobId={}, breakPoint={}", flightId, JSON.toJSONString(dto));
+    }
+
 
     //  空中航线接收mqtt消息
     @Override

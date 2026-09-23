@@ -19,6 +19,7 @@ import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.media.model.MediaFileCountDTO;
 import com.dji.sample.media.service.IMediaRedisService;
 import com.dji.sample.wayline.model.dto.ConditionalWaylineJobKey;
+import com.dji.sample.wayline.model.dto.WaylineBreakPointDTO;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.dto.WaylineTaskConditionDTO;
 import com.dji.sample.wayline.model.enums.WaylineErrorCodeEnum;
@@ -404,6 +405,11 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
     }
 
     private Boolean prepareFlightTask(WaylineJobDTO waylineJob, String targetDockSn, String targetName) throws SQLException {
+        return prepareFlightTask(waylineJob, targetDockSn, targetName, null);
+    }
+
+    private Boolean prepareFlightTask(WaylineJobDTO waylineJob, String targetDockSn, String targetName,
+                                      FlighttaskBreakPoint breakPoint) throws SQLException {
         // get wayline file
         Optional<GetWaylineListResponse> waylineFile = waylineFileService.getWaylineByWaylineId(waylineJob.getWorkspaceId(), waylineJob.getFileId());
         if (waylineFile.isEmpty()) {
@@ -425,6 +431,10 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 .setFile(new FlighttaskFile()
                         .setUrl(url.toString())
                         .setFingerprint(waylineFile.get().getSign()));
+        // 断点续飞：携带断点信息，机场从断点位置继续执行
+        if (Objects.nonNull(breakPoint)) {
+            flightTask.setBreakPoint(breakPoint);
+        }
 
         if (TaskTypeEnum.CONDITIONAL == waylineJob.getTaskType()) {
             if (Objects.isNull(waylineJob.getConditions())) {
@@ -739,6 +749,57 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
         runningDataOpt.ifPresent(runningData -> waylineRedisService.setRunningWaylineJob(dockSn, runningData));
         waylineRedisService.delPausedWaylineJob(dockSn);
+    }
+
+    @Override
+    public HttpResultResponse breakpointResume(String workspaceId, String jobId) {
+        Optional<WaylineBreakPointDTO> breakpointOpt = waylineRedisService.getWaylineJobBreakpoint(jobId);
+        if (breakpointOpt.isEmpty()) {
+            return HttpResultResponse.error("该任务没有可续飞的断点信息。");
+        }
+        WaylineBreakPointDTO breakpoint = breakpointOpt.get();
+
+        Optional<WaylineJobDTO> waylineJobOpt = waylineJobService.getJobByJobId(workspaceId, jobId);
+        if (waylineJobOpt.isEmpty()) {
+            return HttpResultResponse.error("任务不存在。");
+        }
+        WaylineJobDTO waylineJob = waylineJobOpt.get();
+        String dockSn = waylineJob.getDockSn();
+
+        if (!deviceRedisService.checkDeviceOnline(dockSn)) {
+            return HttpResultResponse.error("机场离线，无法断点续飞。");
+        }
+        if (waylineRedisService.getRunningWaylineJob(dockSn).isPresent()) {
+            return HttpResultResponse.error("机场正在执行其他航线任务，无法断点续飞。");
+        }
+
+        // 沿用原任务 flightId，机场按断点继续执行；执行方式改为立即任务
+        waylineJob.setTaskType(TaskTypeEnum.IMMEDIATE);
+        waylineJob.setBeginTime(LocalDateTime.now());
+        waylineJob.setExecuteTime(LocalDateTime.now());
+
+        FlighttaskBreakPoint breakPoint = new FlighttaskBreakPoint()
+                .setIndex(breakpoint.getIndex())
+                .setState(BreakpointStateEnum.find(breakpoint.getState()))
+                .setProgress(breakpoint.getProgress())
+                .setWaylineId(breakpoint.getWaylineId());
+
+        try {
+            boolean prepared = this.prepareFlightTask(waylineJob, dockSn, "breakpointResume", breakPoint);
+            if (!prepared) {
+                return HttpResultResponse.error("断点续飞任务下发失败。");
+            }
+            if (!this.executeFlightTask(workspaceId, jobId)) {
+                return HttpResultResponse.error("断点续飞任务执行命令下发失败。");
+            }
+        } catch (SQLException e) {
+            log.error("Breakpoint resume failed. jobId={}", jobId, e);
+            return HttpResultResponse.error("断点续飞失败：" + e.getMessage());
+        }
+
+        // 续飞下发成功后清理断点，避免重复续飞
+        waylineRedisService.delWaylineJobBreakpoint(jobId);
+        return HttpResultResponse.success();
     }
 
     @Override

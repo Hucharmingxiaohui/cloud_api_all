@@ -1,11 +1,13 @@
 package com.dji.sample.wayline.controller;
 
 import com.dji.sample.common.model.CustomClaim;
+import com.dji.sample.wayline.model.dto.WaylineBreakPointDTO;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.param.CreateJobParam;
 import com.dji.sample.wayline.model.param.UpdateJobParam;
 import com.dji.sample.wayline.service.IFlightTaskService;
 import com.dji.sample.wayline.service.IWaylineJobService;
+import com.dji.sample.wayline.service.IWaylineRedisService;
 import com.dji.sdk.common.HttpResultResponse;
 import com.dji.sdk.common.PaginationData;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,9 @@ public class WaylineJobController {
 
     @Autowired
     private IFlightTaskService flighttaskService;
+
+    @Autowired
+    private IWaylineRedisService waylineRedisService;
 
     /**
      * Create a wayline task for the Dock.
@@ -114,5 +119,23 @@ public class WaylineJobController {
                                               @Valid @RequestBody UpdateJobParam param) {
         flighttaskService.updateJobStatus(workspaceId, jobId, param);
         return HttpResultResponse.success();
+    }
+
+    /**
+     * 查询任务的断点信息（断点续飞用），无断点时 data 为 null。
+     */
+    @GetMapping("/{workspace_id}/jobs/{job_id}/breakpoint")
+    public HttpResultResponse<WaylineBreakPointDTO> getJobBreakpoint(@PathVariable(name = "workspace_id") String workspaceId,
+                                                                     @PathVariable(name = "job_id") String jobId) {
+        return HttpResultResponse.success(waylineRedisService.getWaylineJobBreakpoint(jobId).orElse(null));
+    }
+
+    /**
+     * 断点续飞：按断点重新下发 flighttask_prepare + break_point 并立即执行。
+     */
+    @PostMapping("/{workspace_id}/jobs/{job_id}/breakpoint-resume")
+    public HttpResultResponse breakpointResume(@PathVariable(name = "workspace_id") String workspaceId,
+                                               @PathVariable(name = "job_id") String jobId) {
+        return flighttaskService.breakpointResume(workspaceId, jobId);
     }
 }

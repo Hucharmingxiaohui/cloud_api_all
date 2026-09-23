@@ -2,6 +2,7 @@ package com.dji.sample.wayline.service;
 
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.wayline.model.dto.ConditionalWaylineJobKey;
+import com.dji.sample.wayline.model.dto.WaylineBreakPointDTO;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
 
@@ -97,4 +98,22 @@ public interface IWaylineRedisService {
     Double getConditionalWaylineJobTime(ConditionalWaylineJobKey jobKey);
 
     Boolean removePrepareConditionalWaylineJob(ConditionalWaylineJobKey jobKey);
+
+    /**
+     * 保存航线任务断点信息（断点续飞用）。
+     * @param dto 断点信息
+     */
+    void setWaylineJobBreakpoint(WaylineBreakPointDTO dto);
+
+    /**
+     * 按任务 id 查询断点信息。
+     * @param jobId 任务 id
+     */
+    Optional<WaylineBreakPointDTO> getWaylineJobBreakpoint(String jobId);
+
+    /**
+     * 删除任务断点信息。
+     * @param jobId 任务 id
+     */
+    Boolean delWaylineJobBreakpoint(String jobId);
 }

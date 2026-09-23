@@ -47,6 +47,15 @@ public interface IFlightTaskService {
     Boolean executeFlightTask(String workspaceId, String jobId);
 
     /**
+     * 断点续飞：按持久化断点重新下发 flighttask_prepare + break_point，并立即执行。
+     * @param workspaceId 工作空间 id
+     * @param jobId 原任务 id
+     * @return
+     */
+    HttpResultResponse breakpointResume(String workspaceId, String jobId);
+
+
+    /**
      * Cancel the task Base on job Ids.
      *
      * @param workspaceId

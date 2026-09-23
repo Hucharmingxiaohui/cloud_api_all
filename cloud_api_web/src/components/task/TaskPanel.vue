@@ -250,12 +250,12 @@
                 </template>
               </el-popconfirm>
               <el-popconfirm
-                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || (scope.row.status === TaskStatus.Carrying && scope.row.progress=== '')"
+                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || scope.row.status === TaskStatus.Carrying"
                 width="220"
                 confirm-button-text="确定"
                 cancel-button-text="取消"
                 icon-color="#626AEF"
-                title="你确定要删除飞行任务吗？请确保飞行器未起飞。"
+                :title="scope.row.status === TaskStatus.Carrying ? '任务仍在执行中，确定删除吗' : '你确定要删除飞行任务吗？请确保飞行器未起飞。'"
                 @confirm="onDeleteOtherTask(scope.row.job_id, scope.row.status)"
               >
                 <template #reference>
@@ -278,12 +278,12 @@
                 confirm-button-text="确定"
                 cancel-button-text="取消"
                 icon-color="#626AEF"
-                title="你确定要挂起飞行任务吗？"
+                title="你确定要暂停航线吗？"
                 @confirm="onSuspendTask(scope.row.job_id)"
               >
                 <template #reference>
                   <el-button size="small" link type="primary" class="preview"
-                    >挂起</el-button
+                    >暂停航线</el-button
                   >
                 </template>
               </el-popconfirm>
@@ -293,12 +293,27 @@
                 confirm-button-text="确定"
                 cancel-button-text="取消"
                 icon-color="#626AEF"
-                title="你确定要继续吗？"
+                title="你确定要恢复航线吗？"
                 @confirm="onResumeTask(scope.row.job_id)"
               >
                 <template #reference>
                   <el-button size="small" link type="primary" class="preview"
-                    >继续</el-button
+                    >恢复航线</el-button
+                  >
+                </template>
+              </el-popconfirm>
+              <el-popconfirm
+                v-if="breakpointJobIds.has(scope.row.job_id)"
+                width="240"
+                confirm-button-text="确定"
+                cancel-button-text="取消"
+                icon-color="#626AEF"
+                title="检测到该任务存在断点，确定从断点位置继续飞行吗？"
+                @confirm="onBreakpointResume(scope.row)"
+              >
+                <template #reference>
+                  <el-button size="small" link type="warning" class="preview"
+                    >断点续飞</el-button
                   >
                 </template>
               </el-popconfirm>
@@ -329,7 +344,7 @@ import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-p
 import { TableState } from 'ant-design-vue/lib/table/interface'
 import { onMounted, watch, provide, reactive, ref, nextTick, onUnmounted } from 'vue'
 import { IPage } from '/@/api/http/type'
-import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, batchDeleteTaskApi, deleteOtherTask } from '/@/api/wayline'
+import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, batchDeleteTaskApi, deleteOtherTask, getWaylineBreakpoint, breakpointResume } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
 import { ELocalStorageKey, ERouterName } from '/@/types/enums'
 import { useFormatTask } from './use-format-task'
@@ -495,7 +510,46 @@ function getPlans () {
     plansData.data = res.data.list
     paginationProp.total = res.data.pagination.total
     paginationProp.current = res.data.pagination.page
+    loadBreakpointJobIds(res.data.list)
   })
+}
+
+// 存在断点可续飞的任务 id 集合
+const breakpointJobIds = ref(new Set<string>())
+
+/**
+ * 拉取列表内各任务的断点信息，标记可断点续飞的任务
+ */
+async function loadBreakpointJobIds (rows: any[]) {
+  const ids = new Set<string>()
+  await Promise.all((rows || []).map(async row => {
+    if (!row?.job_id) {
+      return
+    }
+    try {
+      const res = await getWaylineBreakpoint(workspaceId, row.job_id)
+      if (res.code === 0 && res.data) {
+        ids.add(row.job_id)
+      }
+    } catch (e) {
+      // 单个任务断点查询失败不影响列表
+    }
+  }))
+  breakpointJobIds.value = ids
+}
+
+/**
+ * 断点续飞
+ */
+async function onBreakpointResume (row: any) {
+  const res = await breakpointResume(workspaceId, row.job_id)
+  if (res.code !== 0) {
+    message.error(res.message || '断点续飞失败')
+    return
+  }
+  message.success('断点续飞任务下发成功')
+  breakpointJobIds.value.delete(row.job_id)
+  getPlans()
 }
 
 // 重置

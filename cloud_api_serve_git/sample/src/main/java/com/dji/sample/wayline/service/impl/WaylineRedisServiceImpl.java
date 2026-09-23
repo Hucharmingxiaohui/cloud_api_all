@@ -4,6 +4,7 @@ import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.wayline.model.dto.ConditionalWaylineJobKey;
+import com.dji.sample.wayline.model.dto.WaylineBreakPointDTO;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.service.IWaylineRedisService;
 import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
@@ -108,5 +109,24 @@ public class WaylineRedisServiceImpl implements IWaylineRedisService {
     @Override
     public Boolean removePrepareConditionalWaylineJob(ConditionalWaylineJobKey jobKey) {
         return RedisOpsUtils.zRemove(RedisConst.WAYLINE_JOB_CONDITION_PREPARE, jobKey.getKey());
+    }
+
+    @Override
+    public void setWaylineJobBreakpoint(WaylineBreakPointDTO dto) {
+        if (Objects.isNull(dto) || !StringUtils.hasText(dto.getJobId())) {
+            return;
+        }
+        RedisOpsUtils.setWithExpire(RedisConst.WAYLINE_JOB_BREAKPOINT_PREFIX + dto.getJobId(), dto,
+                RedisConst.WAYLINE_JOB_BREAKPOINT_ALIVE_SECOND);
+    }
+
+    @Override
+    public Optional<WaylineBreakPointDTO> getWaylineJobBreakpoint(String jobId) {
+        return Optional.ofNullable((WaylineBreakPointDTO) RedisOpsUtils.get(RedisConst.WAYLINE_JOB_BREAKPOINT_PREFIX + jobId));
+    }
+
+    @Override
+    public Boolean delWaylineJobBreakpoint(String jobId) {
+        return RedisOpsUtils.del(RedisConst.WAYLINE_JOB_BREAKPOINT_PREFIX + jobId);
     }
 }
