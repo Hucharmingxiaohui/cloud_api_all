@@ -46,6 +46,7 @@ export enum TaskStatus {
   CanCel = 4, // 取消
   Fail = 5, // 失败
   Paused = 6, // 暂停
+  Interrupted = 7 // 中断（可断点续飞）
 }
 
 export const TaskStatusMap = {
@@ -55,6 +56,7 @@ export const TaskStatusMap = {
   [TaskStatus.CanCel]: 'Task canceled',
   [TaskStatus.Fail]: 'Task failed',
   [TaskStatus.Paused]: 'Paused',
+  [TaskStatus.Interrupted]: 'Interrupted',
 }
 
 export const TaskStatusColor = {
@@ -64,6 +66,7 @@ export const TaskStatusColor = {
   [TaskStatus.CanCel]: commonColor.FAIL,
   [TaskStatus.Fail]: commonColor.FAIL,
   [TaskStatus.Paused]: commonColor.BLUE,
+  [TaskStatus.Interrupted]: commonColor.BLUE,
 }
 
 // 任务执行 ws 消息状态

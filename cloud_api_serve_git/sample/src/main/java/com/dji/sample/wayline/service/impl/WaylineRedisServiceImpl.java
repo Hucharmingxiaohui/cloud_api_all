@@ -129,4 +129,23 @@ public class WaylineRedisServiceImpl implements IWaylineRedisService {
     public Boolean delWaylineJobBreakpoint(String jobId) {
         return RedisOpsUtils.del(RedisConst.WAYLINE_JOB_BREAKPOINT_PREFIX + jobId);
     }
+
+    @Override
+    public void setWaylineJobMediaBase(String jobId, Integer mediaCount) {
+        if (!StringUtils.hasText(jobId) || Objects.isNull(mediaCount) || mediaCount <= 0) {
+            return;
+        }
+        RedisOpsUtils.setWithExpire(RedisConst.WAYLINE_JOB_MEDIA_BASE_PREFIX + jobId, mediaCount,
+                RedisConst.WAYLINE_JOB_BREAKPOINT_ALIVE_SECOND);
+    }
+
+    @Override
+    public Optional<Integer> getWaylineJobMediaBase(String jobId) {
+        return Optional.ofNullable((Integer) RedisOpsUtils.get(RedisConst.WAYLINE_JOB_MEDIA_BASE_PREFIX + jobId));
+    }
+
+    @Override
+    public Boolean delWaylineJobMediaBase(String jobId) {
+        return RedisOpsUtils.del(RedisConst.WAYLINE_JOB_MEDIA_BASE_PREFIX + jobId);
+    }
 }

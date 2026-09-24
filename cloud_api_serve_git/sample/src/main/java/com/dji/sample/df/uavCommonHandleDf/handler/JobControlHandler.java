@@ -198,7 +198,7 @@ public class JobControlHandler {
                 if (isCenterTask.equals("1") && !jobId.equals(taskCode)) {
                     sendWindTurbineTaskStatus(taskCode,taskName,0);
                 }
-            } else if (status == 3 || status == 1|| status == 5|| status == 4) {
+            } else if (status == 3 || status == 1|| status == 5|| status == 4 || status == 7) {
 //              上报任务状态
                 if (isCenterTask.equals("1")&& !jobId.equals(taskCode)) {
                     sendWindTurbineTaskStatus(taskCode,taskName,1);
@@ -207,7 +207,8 @@ public class JobControlHandler {
 //              任务完成，执行上报结果
                     handleUploadProgress(jobId, taskCode, taskName, waylineJobEntity, waylineJobDTO, isCenterTask);
                 }else {
-                    log.info("任务失败/取消/终止，停止监控: taskCode={}", taskCode);
+                    // status==7 为任务中断（可断点续飞），续飞下发成功后会重新启动监控
+                    log.info("任务失败/取消/中断/终止，停止监控: taskCode={}", taskCode);
                     clearMonitoringState(taskCode);
                 }
             }

@@ -76,4 +76,11 @@ public interface IWaylineJobService {
      * @return
      */
     WaylineJobStatusEnum getWaylineState(String dockSn);
+
+    /**
+     * 更新任务的分析标记（断点续飞时重置为未分析，任务完成后重新保存并分析全部媒体）。
+     * @param jobId 任务 id
+     * @param isAnalyzed 分析标记
+     */
+    void updateJobIsAnalyzed(String jobId, Integer isAnalyzed);
 }

@@ -24,6 +24,11 @@ public enum WaylineJobStatusEnum {
 
     PAUSED(6, false),
 
+    /**
+     * 任务中断（如返航打断，已保存断点可断点续飞）
+     */
+    INTERRUPTED(7, true),
+
     UNKNOWN(-1, true);
 
     int val;

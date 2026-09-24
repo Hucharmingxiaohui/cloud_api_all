@@ -358,6 +358,20 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         return WaylineJobStatusEnum.UNKNOWN;
     }
 
+    @Override
+    public void updateJobIsAnalyzed(String jobId, Integer isAnalyzed) {
+        if (!StringUtils.hasText(jobId)) {
+            return;
+        }
+        WaylineJobEntity entity = mapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId));
+        if (Objects.isNull(entity)) {
+            return;
+        }
+        entity.setIsAnalyzed(isAnalyzed);
+        mapper.updateById(entity);
+    }
+
     public WaylineJobDTO entity2Dto(WaylineJobEntity entity) {
         if (entity == null) {
             return null;
@@ -513,19 +527,22 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
             return;
         }
 
+        // 断点仍存在说明任务实际是被打断的（中断终态事件丢失），标记为中断以保留断点续飞，不能误标完成
+        boolean interruptedJob = waylineRedisService.getWaylineJobBreakpoint(entity.getJobId()).isPresent();
+        WaylineJobStatusEnum fallbackStatus = interruptedJob ? WaylineJobStatusEnum.INTERRUPTED : WaylineJobStatusEnum.SUCCESS;
         boolean updated = this.updateJob(WaylineJobDTO.builder()
                 .jobId(entity.getJobId())
-                .status(WaylineJobStatusEnum.SUCCESS.getVal())
+                .status(fallbackStatus.getVal())
                 .completedTime(LocalDateTime.now())
                 .build());
         if (updated) {
-            entity.setStatus(WaylineJobStatusEnum.SUCCESS.getVal());
+            entity.setStatus(fallbackStatus.getVal());
             entity.setCompletedTime(now);
             entity.setUpdateTime(now);
             waylineRedisService.delRunningWaylineJob(entity.getDockSn());
             redisUtils.delete(fallbackKey);
-            log.warn("Wayline job marked success by docked fallback. jobId={}, dockSn={}, progress={}, dockedMillis={}",
-                    entity.getJobId(), entity.getDockSn(), progress, now - firstDockedTime);
+            log.warn("Wayline job marked {} by docked fallback. jobId={}, dockSn={}, progress={}, dockedMillis={}",
+                    fallbackStatus, entity.getJobId(), entity.getDockSn(), progress, now - firstDockedTime);
         }
     }
 }

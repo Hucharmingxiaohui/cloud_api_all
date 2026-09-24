@@ -116,4 +116,23 @@ public interface IWaylineRedisService {
      * @param jobId 任务 id
      */
     Boolean delWaylineJobBreakpoint(String jobId);
+
+    /**
+     * 记录断点续飞前任务的媒体总数（续飞 OK 时累加，避免总数被单趟计数覆盖）。
+     * @param jobId 任务 id
+     * @param mediaCount 续飞前媒体总数
+     */
+    void setWaylineJobMediaBase(String jobId, Integer mediaCount);
+
+    /**
+     * 查询断点续飞前的媒体总数基数。
+     * @param jobId 任务 id
+     */
+    Optional<Integer> getWaylineJobMediaBase(String jobId);
+
+    /**
+     * 删除媒体总数基数（累加后消费）。
+     * @param jobId 任务 id
+     */
+    Boolean delWaylineJobMediaBase(String jobId);
 }

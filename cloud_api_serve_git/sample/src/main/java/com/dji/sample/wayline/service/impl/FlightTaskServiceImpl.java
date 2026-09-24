@@ -773,6 +773,12 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             return HttpResultResponse.error("机场正在执行其他航线任务，无法断点续飞。");
         }
 
+        // 断点续飞媒体处理：
+        // 1. 记录续飞前媒体总数作为基数，任务结束时累加，避免总数被续飞单趟计数覆盖
+        waylineRedisService.setWaylineJobMediaBase(jobId, waylineJob.getMediaCount());
+        // 2. 重置分析标记，续飞完成后重新保存并分析全部媒体（含断点前已拍照片）
+        waylineJobService.updateJobIsAnalyzed(jobId, 0);
+
         // 沿用原任务 flightId，机场按断点继续执行；执行方式改为立即任务
         waylineJob.setTaskType(TaskTypeEnum.IMMEDIATE);
         waylineJob.setBeginTime(LocalDateTime.now());
@@ -796,6 +802,13 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             log.error("Breakpoint resume failed. jobId={}", jobId, e);
             return HttpResultResponse.error("断点续飞失败：" + e.getMessage());
         }
+
+        // 续飞下发成功：任务回到执行中，并清掉上次中断遗留的错误码，完成后即为干净的成功记录
+        waylineJobService.updateJob(WaylineJobDTO.builder()
+                .jobId(jobId)
+                .status(WaylineJobStatusEnum.IN_PROGRESS.getVal())
+                .code(0)
+                .build());
 
         // 续飞下发成功后清理断点，避免重复续飞
         waylineRedisService.delWaylineJobBreakpoint(jobId);

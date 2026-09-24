@@ -49,6 +49,8 @@ public final class RedisConst {
 
     public static final Integer WAYLINE_JOB_BREAKPOINT_ALIVE_SECOND = 60 * 60 * 24 * 7;
 
+    public static final String WAYLINE_JOB_MEDIA_BASE_PREFIX = "wayline_job_media_base" + DELIMITER;
+
     public static final String FROG_JUMP_TASK_PREFIX = "frog_jump_task" + DELIMITER;
 
     public static final String OSD_PREFIX = "osd" + DELIMITER;

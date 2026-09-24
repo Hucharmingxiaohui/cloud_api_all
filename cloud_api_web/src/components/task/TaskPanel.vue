@@ -250,7 +250,7 @@
                 </template>
               </el-popconfirm>
               <el-popconfirm
-                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || scope.row.status === TaskStatus.Carrying"
+                v-if="scope.row.status === TaskStatus.Success || scope.row.status === TaskStatus.Fail || scope.row.status === TaskStatus.CanCel || scope.row.status === TaskStatus.Interrupted || scope.row.status === TaskStatus.Carrying"
                 width="220"
                 confirm-button-text="确定"
                 cancel-button-text="取消"
@@ -390,7 +390,8 @@ const taskStatusLabels = {
   'Task completed': '任务已完成',
   'Task canceled': '任务已取消',
   'Task failed': '任务执行失败',
-  'Paused ': '任务中止'
+  'Paused ': '任务中止',
+  Interrupted: '任务中断'
 }
 
 const outControlAcion = {
@@ -403,7 +404,8 @@ function isRowSelectable (row, index) {
   return (
     row.status === TaskStatus.Success ||
     row.status === TaskStatus.Fail ||
-    row.status === TaskStatus.CanCel
+    row.status === TaskStatus.CanCel ||
+    row.status === TaskStatus.Interrupted
   )
 }
 

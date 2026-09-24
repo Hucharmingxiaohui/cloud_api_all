@@ -192,6 +192,16 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         FlighttaskStatusEnum statusEnum = output.getStatus();
 
+        // 终态任务的迟到事件（MQTT 乱序/重传）：不写运行快照、不做后续处理，防止任务完成后进度被旧事件污染
+        String lateCheckFlightId = response.getData().getOutput().getExt().getFlightId();
+        WaylineJobEntity lateCheckJob = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, lateCheckFlightId));
+        if (Objects.nonNull(lateCheckJob) && WaylineJobStatusEnum.find(lateCheckJob.getStatus()).getEnd()) {
+            log.info("Ignore late wayline progress event for finished job: flightId={}, eventStatus={}, jobStatus={}",
+                    lateCheckFlightId, output.getStatus(), lateCheckJob.getStatus());
+            return new TopicEventsResponse<>();
+        }
+
         waylineRedisService.setRunningWaylineJob(response.getGateway(), eventsReceiver);
 
         Integer currentWaypointIndex = response.getData().getOutput().getExt().getCurrentWaypointIndex();
@@ -307,12 +317,17 @@ public class SDKWaylineService extends AbstractWaylineService {
 
         if (taskEnd) {
             Integer mediaCount = output.getExt().getMediaCount();
+            // 断点续飞场景：机场 mediaCount 为单趟计数，需累加续飞前基数，避免总数被覆盖
+            int baseMediaCount = waylineRedisService.getWaylineJobMediaBase(flightId).orElse(0);
             WaylineJobDTO job = WaylineJobDTO.builder()
                     .jobId(response.getBid())
                     .status(WaylineJobStatusEnum.SUCCESS.getVal())
                     .completedTime(LocalDateTime.now())
-                    .mediaCount((mediaCount == null ? 0 : mediaCount) + videoPointNum)
+                    .mediaCount(baseMediaCount + (mediaCount == null ? 0 : mediaCount) + videoPointNum)
                     .build();
+            if (baseMediaCount > 0) {
+                waylineRedisService.delWaylineJobMediaBase(flightId);
+            }
 
             // record the update of the media count.
             if (Objects.nonNull(job.getMediaCount()) && job.getMediaCount() != 0) {
@@ -323,7 +338,12 @@ public class SDKWaylineService extends AbstractWaylineService {
 
             if (statusEnd && FlighttaskStatusEnum.OK != statusEnum) {
                 job.setCode(eventsReceiver.getResult().getCode());
-                job.setStatus(WaylineJobStatusEnum.FAILED.getVal());
+                // 断点续飞场景：已保存断点的中断（如手动/低电返航打断）标记为"任务中断"，不算失败
+                if (waylineRedisService.getWaylineJobBreakpoint(flightId).isPresent()) {
+                    job.setStatus(WaylineJobStatusEnum.INTERRUPTED.getVal());
+                } else {
+                    job.setStatus(WaylineJobStatusEnum.FAILED.getVal());
+                }
             }
             waylineJobService.updateJob(job);
             waylineRedisService.delRunningWaylineJob(response.getGateway());
@@ -354,7 +374,9 @@ public class SDKWaylineService extends AbstractWaylineService {
         }
         boolean broken = ext.getWaylineMissionState() == WaylineMissionStateEnum.WAYLINE_BROKEN;
         boolean failedEnd = Objects.nonNull(statusEnum) && statusEnum.isEnd() && FlighttaskStatusEnum.OK != statusEnum;
-        if (!broken && !failedEnd) {
+        // 机场有时以 PAUSED（非终态）上报返航打断（breakReason=USER_TRIGGERED_RTH），同样需要保存断点
+        boolean pausedBreak = statusEnum == FlighttaskStatusEnum.PAUSED;
+        if (!broken && !failedEnd && !pausedBreak) {
             return;
         }
         WaylineBreakPointDTO dto = WaylineBreakPointDTO.builder()
