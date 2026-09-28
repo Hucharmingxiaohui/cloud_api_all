@@ -9,6 +9,9 @@ import com.df.framework.redis.RedisUtils;
 import com.dji.sample.component.mqtt.model.EventsReceiver;
 import com.dji.sample.component.redis.RedisConst;
 import com.dji.sample.component.redis.RedisOpsUtils;
+import com.dji.sample.component.websocket.model.BizCodeEnum;
+import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.manage.model.enums.UserTypeEnum;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.windDf.dao.FanWaylinePointsMapper;
@@ -84,6 +87,9 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 
     @Autowired
     private IWaylineRedisService waylineRedisService;
+
+    @Autowired
+    private IWebSocketMessageService webSocketMessageService;
 
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
@@ -481,6 +487,11 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                     entity.getJobId(), entity.getMediaCount(), uploadedCount);
             entity.setMediaCount(uploadedCount);
             builder.mediaCount(uploadedCount);
+            // 修正结果同步推送前端，避免 OK 丢失等场景下媒体数/上传状态只能刷新页面才更新
+            webSocketMessageService.sendBatch(entity.getWorkspaceId(), UserTypeEnum.WEB.getVal(),
+                    BizCodeEnum.FILE_UPLOAD_CALLBACK.getCode(),
+                    MediaFileCountDTO.builder().jobId(entity.getJobId())
+                            .mediaCount(uploadedCount).uploadedCount(uploadedCount).build());
         }
     }
 
@@ -541,6 +552,10 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
             entity.setUpdateTime(now);
             waylineRedisService.delRunningWaylineJob(entity.getDockSn());
             redisUtils.delete(fallbackKey);
+            // OK 丢失场景：兜底判定任务终结时同样消费媒体基数，否则"续飞上传中"的外部分析拦截会一直生效
+            if (!interruptedJob) {
+                waylineRedisService.delWaylineJobMediaBase(entity.getJobId());
+            }
             log.warn("Wayline job marked {} by docked fallback. jobId={}, dockSn={}, progress={}, dockedMillis={}",
                     fallbackStatus, entity.getJobId(), entity.getDockSn(), progress, now - firstDockedTime);
         }
