@@ -28,6 +28,7 @@ import com.dji.sample.df.solarDf.model.entity.SolarPanelArea;
 import com.dji.sample.df.solarDf.service.GfReportService;
 import com.dji.sample.df.uavCommonHandleDf.handler.PictureSaveHandler;
 import com.dji.sample.df.uavCommonHandleDf.dao.DefectEntityMapper;
+import com.dji.sample.wayline.service.IWaylineRedisService;
 import com.dji.sample.df.windDf.dao.FanWaylinePointsMapper;
 import com.dji.sample.df.windDf.config.FjFileConfig;
 import com.dji.sample.df.uavCommonHandleDf.model.entity.AnalysisRequest;
@@ -102,6 +103,8 @@ public class UavReportController {
     @Autowired
     IWaylineJobMapper waylineJobMapper;
     @Autowired
+    private IWaylineRedisService waylineRedisService;
+    @Autowired
     FanWaylinePointsMapper  fanWaylinePointsMapper;
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
@@ -132,6 +135,8 @@ public class UavReportController {
     public Result pictureSaveAndAnalysis(@RequestBody JSONObject jsonObject, HttpServletRequest httpRequest) throws Exception {
         String jobId = jsonObject.get("jobId").toString();
         boolean fromJobMonitor = jsonObject.getBooleanValue("fromJobMonitor");
+        log.info("图片保存分析请求: jobId={}, fromJobMonitor={}, caller={}", jobId, fromJobMonitor,
+                httpRequest == null ? "internal" : httpRequest.getRemoteAddr());
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         if (Boolean.TRUE.equals(waylineJobEntity == null ? null : waylineJobEntity.getFrogJumpMode())
                 && !fromJobMonitor && waylineJobEntity != null) {
@@ -142,6 +147,24 @@ public class UavReportController {
             if (waylineJobEntity.getIsAnalyzed() == null) {
                 log.info("任务已完成但媒体稳定等待未结束，外部图片分析请求暂不执行: jobId={}", jobId);
                 return Result.analyzing("任务媒体仍在稳定等待，请稍后尝试");
+            }
+        }
+        // 断点续飞媒体保护：
+        // 1) 媒体基数存在 = 续飞媒体尚未传完（未收到 OK）
+        // 2) 库内媒体数小于任务媒体总数 = 媒体仍在上传
+        // 此窗口内的分析必然不全，且会把任务提前标记为已分析，导致媒体传齐后的全量重析被跳过，非监控调用统一拦截
+        if (!fromJobMonitor && waylineJobEntity != null) {
+            boolean resumeUploading = waylineRedisService.getWaylineJobMediaBase(jobId).isPresent();
+            boolean mediaIncomplete = false;
+            if (!resumeUploading && Objects.nonNull(waylineJobEntity.getMediaCount()) && waylineJobEntity.getMediaCount() > 0) {
+                int dbMediaCount = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+                        .eq(MediaFileEntity::getJobId, jobId)).size();
+                mediaIncomplete = dbMediaCount < waylineJobEntity.getMediaCount();
+            }
+            if (resumeUploading || mediaIncomplete) {
+                log.info("任务媒体尚未上传完成，外部图片分析请求暂不执行: jobId={}, resumeUploading={}, mediaCount={}",
+                        jobId, resumeUploading, waylineJobEntity.getMediaCount());
+                return Result.analyzing("任务媒体仍在上传，请稍后尝试");
             }
         }
         waylineJobEntity.setIsReported(0);

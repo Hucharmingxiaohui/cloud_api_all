@@ -17,6 +17,10 @@ import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.mediaDf.controller.FileControllerDf;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
+import com.dji.sample.component.websocket.model.BizCodeEnum;
+import com.dji.sample.component.websocket.service.IWebSocketMessageService;
+import com.dji.sample.manage.model.enums.UserTypeEnum;
+import com.dji.sample.media.model.MediaFileCountDTO;
 import com.dji.sample.df.solarDf.dao.SolarStationPointsMapper;
 import com.dji.sample.df.solarDf.model.entity.SolarStationPoints;
 import com.dji.sample.df.uavCommonHandleDf.controller.UavReportController;
@@ -75,6 +79,8 @@ public class JobControlHandler {
     FileControllerDf fileControllerDf;
     @Autowired
     private IFileService fileService;
+    @Autowired
+    private IWebSocketMessageService webSocketMessageService;
     @Resource
     FanStationPointsMapper fanStationPointsMapper;
     @Autowired
@@ -249,6 +255,10 @@ public class JobControlHandler {
                     log.info("实际上传数超过媒体总数，已按实际上传数修正: jobId={}, 原总数={}, 实际上传={}", jobId, total, uploaded);
                 }
             }
+            // 上传完成：补推一条媒体进度 WS，前端"上传中 x/y"无需刷新即变为已上传（续飞场景计数从 0 起，可能停在补拍数上）
+            webSocketMessageService.sendBatch(waylineJobEntity.getWorkspaceId(), UserTypeEnum.WEB.getVal(),
+                    BizCodeEnum.FILE_UPLOAD_CALLBACK.getCode(),
+                    MediaFileCountDTO.builder().jobId(jobId).mediaCount(uploaded).uploadedCount(uploaded).build());
             handleUploadCompleted(planType, jobId, taskCode, taskName, waylineJobEntity, isCenterTask);
 //          只针对航点航线任务，如果拍照上传数停滞，则执行下面的逻辑
         }else if (planType == 0 && uploaded >= total - 2 && uploaded < total) {

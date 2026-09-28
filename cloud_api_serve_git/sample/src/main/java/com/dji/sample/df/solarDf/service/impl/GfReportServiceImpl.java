@@ -382,6 +382,11 @@ public class GfReportServiceImpl implements GfReportService {
             System.out.println("没有需要新增的缺陷数据");
             return;
         }
+        // 重新分析（如断点续飞补拍后全量重析）前，先清理该任务旧缺陷数据，避免同一任务缺陷重复累计
+        int deleted = defectEntityMapper.delete(new LambdaQueryWrapper<DefectEntity>().eq(DefectEntity::getJobId, jobId));
+        if (deleted > 0) {
+            log.info("已清理任务旧缺陷数据 {} 条: jobId={}", deleted, jobId);
+        }
         log.info("开始新增 " + defects.size() + " 条缺陷数据:");
 
         for (int i = 0; i < defects.size(); i++) {
