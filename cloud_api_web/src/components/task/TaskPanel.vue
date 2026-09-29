@@ -487,7 +487,8 @@ function onoTaskMediaHighestPriorityWS (data: TaskMediaHighestPriorityProgressIn
   }
 }
 function getCodeMessage (code: number) {
-  return getErrorMessage(code) + `（code: ${code}）`
+  // 按错误码展示中文错误信息，不再显示错误码
+  return getErrorMessage(code)
 }
 
 /**

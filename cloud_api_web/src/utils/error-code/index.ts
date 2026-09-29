@@ -5,306 +5,153 @@ export interface ErrorCode {
 
 /**
  * 根据错误码翻译错误信息
+ * 错误码与后端 cloud-sdk WaylineErrorCodeEnum 一一对应，文案为中文翻译
  * @param code
  * @param errorMsg
  * @returns
  */
 export function getErrorMessage (code: number, errorMsg?: string): string {
   const errorInfo = ERROR_CODE.find((item: ErrorCode) => item.code === code)
-  return errorInfo ? errorInfo.msg : errorMsg || 'Server error'
+  return errorInfo ? errorInfo.msg : errorMsg || '服务器错误'
 }
 
-// 暂时只添加航线错误
+// 航线任务错误码（对应后端 WaylineErrorCodeEnum）
 export const ERROR_CODE = [
-  {
-    code: 314001,
-    msg: 'The issued route task url is empty',
-  },
-  {
-    code: 314002,
-    msg: 'The issued route task md5 is empty',
-  },
-  {
-    code: 314003,
-    msg: 'MissionID is invalid',
-  },
-  {
-    code: 314004,
-    msg: 'Failed to send flight route task from cloud',
-  },
-  {
-    code: 314005,
-    msg: 'Route md5 check failed',
-  },
-  {
-    code: 314006,
-    msg: 'Timeout waiting for aircraft to upload route (waiting for gs_state)',
-  },
-  {
-    code: 314007,
-    msg: 'Failed to upload route to aircraft',
-  },
-  {
-    code: 314008,
-    msg: 'Timeout waiting for the aircraft to enter the route executable state',
-  },
-  {
-    code: 314009,
-    msg: 'Failed to open route mission',
-  },
-  {
-    code: 314010,
-    msg: 'Route execution failed',
-  },
-  {
-    code: 316001,
-    msg: 'Failed to set alternate point',
-  },
-  {
-    code: 316002,
-    msg: 'Alternate safety transfer altitude equipment failed',
-  },
-  {
-    code: 316003,
-    msg: 'Failed to set takeoff altitude. Remarks: The default safe takeoff height of the aircraft set by the current DJI Dock is: 1.8',
-  },
-  {
-    code: 316004,
-    msg: 'Failed to set runaway behavior',
-  },
-  {
-    code: 316005,
-    msg: 'Aircraft RTK convergence failed',
-  },
-  {
-    code: 316013,
-    msg: 'DJI Dock Moved',
-  },
-  {
-    code: 316015,
-    msg: 'The aircraft RTK convergence position is too far from the DJI Dock',
-  },
-  {
-    code: 316007,
-    msg: 'Set parameter timeout while waiting for aircraft to be ready',
-  },
-  {
-    code: 316008,
-    msg: 'Failed to gain control of aircraft',
-  },
-  {
-    code: 316009,
-    msg: 'Aircraft power is low',
-  },
-  {
-    code: 316010,
-    msg: 'After power on, the aircraft is not connected for more than 2 minutes (flight control OSD reception timeout)',
-  },
-  {
-    code: 316011,
-    msg: 'Landing Position Offset',
-  },
-
-  {
-    code: 317001,
-    msg: 'Failed to get the number of media files',
-  },
-
-  {
-    code: 319001,
-    msg: 'The task center is not currently idle',
-  },
-  {
-    code: 319002,
-    msg: 'dronenest communication timeout',
-  },
-  {
-    code: 319999,
-    msg: 'Unknown error, e.g. restart after crash',
-  },
-  {
-    code: 321000,
-    msg: 'Route execution failed, unknown error',
-  },
-  {
-    code: 321257,
-    msg: 'The route has already started and cannot be started again',
-  },
-  {
-    code: 321258,
-    msg: 'The route cannot be interrupted in this state',
-  },
-  {
-    code: 321259,
-    msg: 'The route has not started and cannot end the route',
-  },
-  {
-    code: 321513,
-    msg: 'Reach the height limit',
-  },
-  {
-    code: 321514,
-    msg: 'Reach the limit',
-  },
-  {
-    code: 321515,
-    msg: 'Crossing the restricted flight zone',
-  },
-  {
-    code: 321516,
-    msg: 'Low limit',
-  },
-
-  {
-    code: 321517,
-    msg: 'Obstacle Avoidance',
-  },
-  {
-    code: 321769,
-    msg: 'Weak GPS signal',
-  },
-  {
-    code: 321770,
-    msg: 'The current gear state cannot be executed, B control seizes the control, and the gear is switched',
-  },
-  {
-    code: 321771,
-    msg: 'The home point is not refreshed',
-  },
-  {
-    code: 321772,
-    msg: 'The current battery is too low to start the task',
-  },
-  {
-    code: 321773,
-    msg: 'Low battery return',
-  },
-  {
-    code: 321776,
-    msg: 'RTK not ready',
-  },
-  {
-    code: 321778,
-    msg: 'The aircraft is idling on the ground and is not allowed to start the route, thinking that the user is not ready.',
-  },
-  {
-    code: 322282,
-    msg: 'User interrupt (B control takeover)',
-  },
-  {
-    code: 514100,
-    msg: 'Command not supported',
-  },
-  {
-    code: 514101,
-    msg: 'Failed to close putter',
-  },
-  {
-    code: 514102,
-    msg: 'Failed to release putter',
-  },
-  {
-    code: 514103,
-    msg: 'Aircraft battery is low',
-  },
-  {
-    code: 514104,
-    msg: 'Failed to start charging',
-  },
-  {
-    code: 514105,
-    msg: 'Failed to stop charging',
-  },
-  {
-    code: 514106,
-    msg: 'Failed to restart the aircraft',
-  },
-  {
-    code: 514107,
-    msg: 'Failed to open hatch',
-  },
-  {
-    code: 514108,
-    msg: 'Failed to close hatch',
-  },
-  {
-    code: 514109,
-    msg: 'Failed to open the plane',
-  },
-  {
-    code: 514110,
-    msg: 'Failed to close the plane',
-  },
-  {
-    code: 514111,
-    msg: 'The aircraft failed to turn on the slow-rotating propeller in the cabin',
-  },
-  {
-    code: 514112,
-    msg: 'The aircraft failed to stop the slow-rotating propeller in the cabin',
-  },
-  {
-    code: 514113,
-    msg: 'Failed to establish wired connection with aircraft',
-  },
-  {
-    code: 514114,
-    msg: 'Get aircraft power status, command timed out, or return code is not 0',
-  },
-  {
-    code: 514116,
-    msg: 'The DJI Dock is busy and other control orders are being executed at the DJI Dock',
-  },
-  {
-    code: 514117,
-    msg: 'Check hatch status failed',
-  },
-  {
-    code: 514118,
-    msg: 'Check putter status failed',
-  },
-  {
-    code: 514120,
-    msg: 'DJI Dock and aircraft SDR connection failed',
-  },
-  {
-    code: 514121,
-    msg: 'Emergency stop state',
-  },
-  {
-    code: 514122,
-    msg: 'Failed to get the charging status of the aircraft (Failed to get the charging status, the flight mission can be executed, affecting charging and remote troubleshooting)',
-  },
-  {
-    code: 514123,
-    msg: 'Unable to power on due to low battery',
-  },
-  {
-    code: 514124,
-    msg: 'Failed to get battery information',
-  },
-  {
-    code: 514125,
-    msg: 'The battery is fully charged and cannot be charged',
-  },
-  {
-    code: 514145,
-    msg: 'Can not work while debugging on site',
-  },
-  {
-    code: 514146,
-    msg: 'Unable to work in remote debugging',
-  },
-  {
-    code: 514147,
-    msg: 'Unable to work in upgrade state',
-  },
-  {
-    code: 514148,
-    msg: 'Unable to execute new tasks in job state',
-  },
-  {
-    code: 514150,
-    msg: 'DJI Dock is automatically restarting',
-  },
+  // ===== 任务下发与准备（314xxx）=====
+  { code: 314001, msg: '下发任务失败，请稍后重试' },
+  { code: 314002, msg: '下发的航线任务 md5 为空' },
+  { code: 314003, msg: '航线文件格式不支持，请检查文件' },
+  { code: 314004, msg: '下发任务失败' },
+  { code: 314005, msg: '航线 md5 校验失败' },
+  { code: 314006, msg: '机场唤醒飞机失败，请重启机场后重试' },
+  { code: 314007, msg: '航线文件由机场下发至飞机失败' },
+  { code: 314008, msg: '飞机任务准备超时，请重启机场后重试' },
+  { code: 314009, msg: '机场唤醒飞机失败，请重启机场后重试' },
+  { code: 314010, msg: '无法执行任务' },
+  { code: 314011, msg: '航线执行结果查询超时' },
+  { code: 314012, msg: '飞机任务准备失败，无法执行任务，请重启机场后重试' },
+  { code: 314013, msg: '获取 KMZ 下载地址失败' },
+  { code: 314014, msg: '机场系统错误，任务执行失败，请稍后重试' },
+  { code: 314015, msg: 'AI 巡查航线由机场下发至飞机失败，无法执行任务，请稍后重试或重启机场' },
+  { code: 314016, msg: '航线文件处理失败，无法执行任务，请检查文件' },
+  { code: 314017, msg: 'AI 巡查 KMZ 文件修改失败' },
+  { code: 314018, msg: '飞机 RTK 定位错误，无法执行任务，请稍后重试或重启机场' },
+  { code: 314019, msg: '飞机 RTK 数据未收敛，无法执行任务，请稍后重试或重启机场' },
+  { code: 314020, msg: '飞机不在停机坪中心或机头朝向不正确，无法执行任务，请检查飞机位置和朝向' },
+  { code: 314021, msg: '飞机 RTK 定位错误，无法执行任务，请稍后重试或重启机场' },
+  { code: 314022, msg: '断点续飞 KMZ 文件修改失败' },
+  // ===== 起飞与返航控制（316xxx）=====
+  { code: 316001, msg: '备用降落点设置失败' },
+  { code: 316002, msg: '备用安全转移高度设置失败' },
+  { code: 316003, msg: '起飞高度设置失败（机场默认安全起飞高度为 1.8 米，起飞至 1.8 米过程不可中断）' },
+  { code: 316004, msg: '失控动作设置失败' },
+  { code: 316005, msg: '飞机 RTK 数据未收敛，无法执行任务，请重启机场后重试' },
+  { code: 316006, msg: '飞机无法降落至机场（舱盖未打开或推杆未到位），请到现场检查飞机状态' },
+  { code: 316007, msg: '机场唤醒飞机失败，请重启机场后重试' },
+  { code: 316008, msg: '机场获取飞机飞行控制权失败，无法执行任务，请确认遥控器未锁定飞行控制权' },
+  { code: 316009, msg: '飞机电量过低，无法执行任务，请等待充电至 50% 以上后重试' },
+  { code: 316010, msg: '未检测到飞机，无法执行任务，请确认飞机在机场内且已与机场连接，或重启机场后重试' },
+  { code: 316011, msg: '飞机降落在错误位置，请确认是否需要手动将飞机放回机场' },
+  { code: 316012, msg: '飞机任务准备失败（航线着色失败）' },
+  { code: 316013, msg: '查询飞机电量失败' },
+  { code: 316014, msg: '接收飞行控制推送超时' },
+  { code: 316015, msg: 'RTK 校准的飞机位置距机场过远，无法执行任务，请重启机场后重试' },
+  { code: 316016, msg: '飞机降落机场超时，飞机与机场可能已断连，请通过直播画面确认飞机是否已降落机场' },
+  { code: 316017, msg: '获取飞机媒体文件数量超时，飞机与机场可能已断连，请通过直播画面确认飞机是否已降落机场' },
+  { code: 316018, msg: '任务执行超时，飞机与机场可能已断连，请通过直播画面确认飞机是否已降落机场' },
+  { code: 316019, msg: '相机着色超时' },
+  { code: 316020, msg: '飞机 RTK 信号源错误' },
+  { code: 316021, msg: '检查飞机 RTK 信号源超时' },
+  { code: 316022, msg: '飞机无法返航，请确认飞机已开机且与机场连接后重试' },
+  { code: 316023, msg: '飞机被 B 遥控器控制无法返航，请通过 B 遥控器接管或关闭遥控器后重试' },
+  { code: 316024, msg: '飞机返航失败，请确认飞机是否已起飞后重试' },
+  { code: 316025, msg: '飞机参数配置失败，请稍后重试或重启机场' },
+  { code: 316026, msg: '机场急停按钮被按下，无法执行任务，请弹起急停按钮后重试' },
+  { code: 316027, msg: '设置飞机参数超时，请稍后重试或重启机场' },
+  { code: 316029, msg: '机场急停按钮被按下，飞机正在飞往备降点，请确认飞机安全降落后将其放回机场' },
+  { code: 316030, msg: '刷新返航点失败，请重试' },
+  { code: 316031, msg: '返航模式设置失败，请重试' },
+  { code: 316050, msg: '飞机因低电量已降落在机场外，请立即确认飞机是否安全降落，并将飞机放回机场' },
+  { code: 316051, msg: '航线任务异常，飞机已降落在机场外，请立即确认飞机是否安全降落，并将飞机放回机场' },
+  { code: 316052, msg: '航线任务异常，飞机正在飞往备降点，请立即确认飞机是否安全降落，并将飞机放回机场' },
+  { code: 316053, msg: '用户已控制飞机降落' },
+  // ===== 媒体与存储（317xxx）=====
+  { code: 317001, msg: '获取飞机媒体文件数量失败' },
+  { code: 317002, msg: '格式化飞机存储失败，请确认飞机已开机并与机场连接、相机可被检测到，或重启飞机后重试' },
+  { code: 317003, msg: '格式化飞机存储失败' },
+  { code: 317004, msg: '格式化媒体文件失败' },
+  { code: 317005, msg: '飞机录像异常终止，本次任务的媒体文件可能无法上传' },
+  // ===== 机场状态与任务控制（319xxx）=====
+  { code: 319001, msg: '机场正忙（执行任务或上传日志），无法执行任务，请等待完成后重试' },
+  { code: 319002, msg: '机场系统错误，请重启机场后重试' },
+  { code: 319003, msg: '机场中不存在该任务 ID' },
+  { code: 319004, msg: '任务已过期' },
+  { code: 319005, msg: '执行命令下发超时，无法执行任务' },
+  { code: 319006, msg: '取消任务失败，任务正在执行中' },
+  { code: 319007, msg: '编辑任务失败，任务正在执行中' },
+  { code: 319008, msg: '机场与云端时间未同步，机场无法执行任务' },
+  { code: 319009, msg: '下发任务失败，请稍后重试或重启机场' },
+  { code: 319010, msg: '机场固件版本过低，无法执行任务，请升级机场后重试' },
+  { code: 319015, msg: '机场初始化中，无法执行任务，请等待初始化完成' },
+  { code: 319016, msg: '机场正在执行其他任务，无法执行当前任务' },
+  { code: 319017, msg: '机场正在处理上次任务的媒体文件，无法执行当前任务，请稍后重试' },
+  { code: 319018, msg: '机场正在上传日志，无法执行任务，请稍后重试' },
+  { code: 319019, msg: '机场正在拉取日志，无法执行任务，请稍后重试' },
+  { code: 319020, msg: '暂停飞行任务失败' },
+  { code: 319021, msg: '关闭直播飞行控制失败' },
+  { code: 319022, msg: 'FlyTo 任务执行失败' },
+  { code: 319023, msg: '停止 FlyTo 任务失败' },
+  { code: 319024, msg: '一键起飞失败' },
+  { code: 319025, msg: '任务准备中，机场无法执行云端下发的任务，请稍后重试' },
+  { code: 319026, msg: '飞机电量低于设定值，无法执行任务，请等待充电完成后重试' },
+  { code: 319027, msg: '机场或飞机存储空间不足，无法执行任务，请等待媒体文件上传至云端后重试' },
+  { code: 319030, msg: '机场没有飞行控制权' },
+  { code: 319031, msg: '机场没有负载控制权' },
+  { code: 319032, msg: 'FlyTo 目标点序号错误' },
+  { code: 319033, msg: 'DRC 飞控失败：报文序号小于上一条' },
+  { code: 319034, msg: 'DRC 飞控失败：报文接收超时' },
+  { code: 319035, msg: '紧急停止失败，请重试' },
+  { code: 319036, msg: '设备处于远程调试模式' },
+  { code: 319037, msg: '设备处于现场调试模式' },
+  { code: 319038, msg: '设备正在升级，请稍后重试' },
+  { code: 319042, msg: '恢复飞行失败' },
+  { code: 319043, msg: '取消返航失败' },
+  { code: 319044, msg: '任务已完成，无法继续执行' },
+  { code: 319045, msg: 'DRC 飞控失败：飞机已暂停' },
+  { code: 319046, msg: '任务已完成或已暂停，无法暂停' },
+  { code: 319999, msg: '机场系统错误，请重启机场后重试' },
+  // ===== 航线执行异常（321xxx）=====
+  { code: 321000, msg: '任务异常，请稍后重试或重启机场' },
+  { code: 321004, msg: '航线文件处理失败，无法执行任务，请检查文件' },
+  { code: 321005, msg: '航线中缺少断点信息' },
+  { code: 321257, msg: '任务正在执行中，无法重复开始任务' },
+  { code: 321258, msg: '无法停止任务，请检查飞机状态' },
+  { code: 321259, msg: '任务未开始，无法停止任务' },
+  { code: 321260, msg: '任务未开始，无法暂停任务' },
+  { code: 321513, msg: '无法执行任务：航线高度超过飞机最大飞行高度' },
+  { code: 321514, msg: '任务执行失败：航线起止点在缓冲区内或超出距离限制' },
+  { code: 321515, msg: '无法执行任务：飞机将穿越禁飞区' },
+  { code: 321516, msg: '飞行高度过低，任务已停止' },
+  { code: 321517, msg: '检测到障碍物，任务已停止' },
+  { code: 321519, msg: '飞机接近禁飞区或达到最大飞行距离并自动返航，无法完成任务' },
+  { code: 321523, msg: '飞机桨叶检查失败，桨叶可能已损坏，请稍后重试；如问题持续请联系 DJI 售后更换桨叶' },
+  { code: 321524, msg: '飞机起飞前准备失败，可能是飞机无法定位或挡位错误，请检查飞机状态' },
+  { code: 321769, msg: '飞机卫星定位信号弱，无法执行任务，请重启机场后重试' },
+  { code: 321770, msg: '飞机飞行挡位错误，无法执行任务，请重启机场后重试' },
+  { code: 321771, msg: '飞机返航点未设置，无法执行任务，请重启机场后重试' },
+  { code: 321772, msg: '飞机电量过低，无法执行任务，请等待充电至 50% 以上后重试' },
+  { code: 321773, msg: '飞机电量过低并已返航，无法完成任务' },
+  { code: 321775, msg: '任务执行过程中飞机信号丢失' },
+  { code: 321776, msg: '飞机 RTK 数据未收敛，无法执行任务，请重启机场后重试' },
+  { code: 321777, msg: '飞机未处于悬停状态，无法开始任务' },
+  { code: 321778, msg: '无法执行任务：飞机被 B 遥控器控制且桨叶已启动' },
+  { code: 322282, msg: '任务已停止：控制权被云端用户或 B 遥控器接管' },
+  { code: 322283, msg: '用户下发了一键返航指令，任务无法继续执行' },
+  { code: 322539, msg: '断点信息错误，机场无法执行任务' },
+  { code: 322594, msg: '动作树层级不能为空' },
+  { code: 386535, msg: '任务异常，请稍后重试或重启机场' },
+  // ===== 媒体上传优先级（324xxx）=====
+  { code: 324030, msg: '设置媒体上传优先级失败：任务不在上传队列中' },
+  { code: 324031, msg: '设置媒体上传优先级失败：下发指令过快，上一条指令尚未响应结束' },
+  { code: 324032, msg: '设置媒体上传优先级失败：参数错误' },
 ]
