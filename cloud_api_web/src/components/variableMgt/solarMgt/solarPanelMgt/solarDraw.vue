@@ -66,6 +66,67 @@
           </div>
         </div>
 
+        <!-- 自动分区 -->
+        <div class="image-select-section auto-partition-section">
+          <h3>自动分区</h3>
+          <div class="partition-info">
+            <template v-if="selectedImageId">
+              <div class="partition-stat-grid">
+                <div class="partition-stat-card panel-count-card">
+                  <span class="partition-stat-label">光伏板</span>
+                  <div class="partition-stat-value" v-if="panelExtent.panelCount > 0">
+                    <strong>{{ panelExtent.panelCount }}</strong>
+                    <span>块</span>
+                  </div>
+                  <div class="partition-stat-empty" v-else>未识别</div>
+                </div>
+                <div class="partition-stat-card area-card">
+                  <span class="partition-stat-label">板区面积</span>
+                  <div class="partition-stat-area" v-if="panelExtent.panelCount > 0">
+                    {{ formatExtentArea || '暂无面积数据' }}
+                  </div>
+                  <div class="partition-stat-empty" v-else>--</div>
+                </div>
+              </div>
+              <el-button
+                v-if="panelExtent.panelCount === 0"
+                type="primary"
+                size="small"
+                :loading="identifying"
+                :disabled="isDrawing"
+                @click="identifyPanels"
+              >
+                识别光伏板
+              </el-button>
+            </template>
+            <div v-else class="partition-info-item">请先选择正射图</div>
+          </div>
+          <div class="partition-inputs">
+            <div class="partition-count-title">
+              <span class="partition-label">分区数</span>
+              <span class="partition-count-tip">按光伏板均匀划分</span>
+            </div>
+            <el-input-number
+              v-model="partitionCount"
+              :min="1"
+              :max="200"
+              size="small"
+              controls-position="right"
+              class="partition-number"
+              :disabled="isDrawing"
+            />
+            <el-button
+              class="auto-partition-button"
+              type="primary"
+              :loading="autoPartitioning"
+              :disabled="isDrawing || !selectedImageId || panelExtent.panelCount === 0"
+              @click="autoPartition"
+            >
+              一键分区
+            </el-button>
+          </div>
+        </div>
+
         <!-- 检测区域列表 -->
         <div class="area-list-section">
           <div class="section-header">
@@ -312,7 +373,8 @@ import { reactive, ref, onMounted, onUnmounted, computed, defineEmits, nextTick 
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture, Position, Back, ArrowRight, Loading } from '@element-plus/icons-vue'
-import { getOrthophotoListApi, getOrthophotoByUrlApi, insertSolarPanelApi, importSolarPanelImgApi } from '/@/api/turbine/turbineMgt'
+import { getOrthophotoListApi, getOrthophotoByUrlApi, insertSolarPanelApi, importSolarPanelImgApi, getDetectedSolarPanelsApi, detecSolarImgByIdApi } from '/@/api/turbine/turbineMgt'
+import { DetectedPanelGeometry, normalizeDetectedPanel, partitionPanelsIntoNonOverlappingRectangles } from './solarPartitionGeometry'
 
 const emit = defineEmits(['back'])
 
@@ -438,19 +500,27 @@ async function handleImageChange () {
     selectedImage.value = ''
     clearCanvas()
     detectionAreas.value = []
+    detectedPanels.value = []
+    panelExtent.panelCount = 0
     return
   }
 
   const selected = orthophotoList.value.find(item => item.id === selectedImageId.value)
   if (!selected) return
+  const requestImageId = selectedImageId.value
 
   currentImageInfo.value = selected
 
   imageLoading.value = true
+  fetchPanelExtent()
 
   try {
     // 👇 这里只会执行一次！
     const imageUrl = await getImageUrlFrom(selected.path)
+    if (selectedImageId.value !== requestImageId) {
+      URL.revokeObjectURL(imageUrl)
+      return
+    }
     //
     selectedImage.value = imageUrl
     detectionAreas.value = []
@@ -461,6 +531,192 @@ async function handleImageChange () {
     imageLoading.value = false
   }
 }
+
+// ===================== 自动分区 =====================
+const partitionCount = ref(9)
+const autoPartitioning = ref(false)
+const identifying = ref(false)
+const detectedPanels = ref<DetectedPanelGeometry[]>([])
+// 已识别光伏板的外包络（像素坐标 + 地理坐标）
+const panelExtent = reactive({
+  panelCount: 0,
+  minCol: 0,
+  maxCol: 0,
+  minRow: 0,
+  maxRow: 0,
+  minLng: 0,
+  maxLng: 0,
+  minLat: 0,
+  maxLat: 0
+})
+
+const formatExtentArea = computed(() => {
+  const m2 = extentAreaM2()
+  if (!m2) return ''
+  return `${m2.toFixed(0)} ㎡（${(m2 / 666.67).toFixed(1)} 亩）`
+})
+
+// 由光伏板地理外包络估算板区面积（㎡）
+function extentAreaM2 (): number {
+  if (panelExtent.panelCount <= 0) return 0
+  if (panelExtent.minLng === panelExtent.maxLng || panelExtent.minLat === panelExtent.maxLat) return 0
+  const midLat = (panelExtent.minLat + panelExtent.maxLat) / 2
+  const width = (panelExtent.maxLng - panelExtent.minLng) * 111320 * Math.cos(midLat * Math.PI / 180)
+  const height = (panelExtent.maxLat - panelExtent.minLat) * 110540
+  return Math.abs(width * height)
+}
+
+// 查询当前正射图已识别光伏板，计算像素/地理外包络
+async function fetchPanelExtent () {
+  const requestImageId = selectedImageId.value
+  detectedPanels.value = []
+  panelExtent.panelCount = 0
+  if (!requestImageId) return
+  try {
+    const res: any = await getDetectedSolarPanelsApi({
+      orthophoto_id: requestImageId
+    })
+    if (selectedImageId.value !== requestImageId) return
+    if (res.code !== 0) return
+    const arr = Array.isArray(res.data) ? res.data : (res.data?.list || [])
+    if (!arr.length) return
+
+    const validPanels = arr
+      .map((panel: any, index: number) => normalizeDetectedPanel(panel, index))
+      .filter((panel: DetectedPanelGeometry | null): panel is DetectedPanelGeometry => panel !== null)
+    if (!validPanels.length) return
+    detectedPanels.value = validPanels
+
+    const pixelPoints = validPanels.flatMap(panel => panel.points)
+    const minCol = Math.min(...pixelPoints.map(point => point.x))
+    const maxCol = Math.max(...pixelPoints.map(point => point.x))
+    const minRow = Math.min(...pixelPoints.map(point => point.y))
+    const maxRow = Math.max(...pixelPoints.map(point => point.y))
+    let minLng = Infinity; let maxLng = -Infinity; let minLat = Infinity; let maxLat = -Infinity
+    // 兼容两种序列化命名：本地新包 camelCase / 服务器旧包 snake_case
+    const pick = (obj: any, camel: string, snake: string) => {
+      const v = obj[camel] !== undefined ? obj[camel] : obj[snake]
+      return v === undefined || v === null ? NaN : Number(v)
+    }
+    for (const p of arr) {
+      const lngs = [pick(p, 'corner1Lng', 'corner1_lng'), pick(p, 'corner2Lng', 'corner2_lng'), pick(p, 'corner3Lng', 'corner3_lng'), pick(p, 'corner4Lng', 'corner4_lng')]
+      const lats = [pick(p, 'corner1Lat', 'corner1_lat'), pick(p, 'corner2Lat', 'corner2_lat'), pick(p, 'corner3Lat', 'corner3_lat'), pick(p, 'corner4Lat', 'corner4_lat')]
+      if (lngs.some(isNaN) || lats.some(isNaN)) continue
+      minLng = Math.min(minLng, ...lngs)
+      maxLng = Math.max(maxLng, ...lngs)
+      minLat = Math.min(minLat, ...lats)
+      maxLat = Math.max(maxLat, ...lats)
+    }
+    Object.assign(panelExtent, {
+      panelCount: validPanels.length,
+      minCol,
+      maxCol,
+      minRow,
+      maxRow,
+      minLng: isFinite(minLng) ? minLng : 0,
+      maxLng: isFinite(maxLng) ? maxLng : 0,
+      minLat: isFinite(minLat) ? minLat : 0,
+      maxLat: isFinite(maxLat) ? maxLat : 0
+    })
+    redrawAllAreas()
+  } catch (error) {
+    console.error('获取光伏板分布失败', error)
+  }
+}
+
+// 调用分割算法识别当前正射图中的光伏板（按板名 upsert，可重复执行）
+async function identifyPanels () {
+  if (!selectedImageId.value) return
+  identifying.value = true
+  try {
+    const res: any = await detecSolarImgByIdApi({
+      solar_area_name: currentImageInfo.value?.name || '',
+      orthophoto_id: selectedImageId.value
+    })
+    if (res.code === 0) {
+      ElMessage.success('光伏板识别完成')
+      await fetchPanelExtent()
+    } else {
+      ElMessage.error(res.message || '识别失败')
+    }
+  } catch (error) {
+    ElMessage.error('识别失败，请稍后重试')
+    console.error(error)
+  } finally {
+    identifying.value = false
+  }
+}
+
+// 一键分区：递归按行/列网格切分光伏板，各分区互不重叠且完整覆盖自己的板
+function autoPartition () {
+  if (!selectedImageId.value) {
+    ElMessage.warning('请先选择正射图')
+    return
+  }
+  if (panelExtent.panelCount === 0) {
+    ElMessage.warning('该正射图尚未识别光伏板，请先点击"识别光伏板"')
+    return
+  }
+  if (!imgSize.naturalWidth) {
+    ElMessage.warning('图片尚未加载完成，请稍候')
+    return
+  }
+  const n = Math.floor(Number(partitionCount.value))
+  if (!n || n < 1) {
+    ElMessage.warning('请输入有效的分区数')
+    return
+  }
+  if (n > detectedPanels.value.length) {
+    ElMessage.warning(`分区数不能超过已识别光伏板数量（${detectedPanels.value.length}）`)
+    return
+  }
+
+  const doPartition = () => {
+    autoPartitioning.value = true
+    try {
+      const toCanvasX = (col: number) => col * (CANVAS_WIDTH / imgSize.naturalWidth)
+      const toCanvasY = (row: number) => row * (CANVAS_HEIGHT / imgSize.naturalHeight)
+      const sourcePadding = AUTO_PARTITION_PADDING * Math.max(
+        imgSize.naturalWidth / CANVAS_WIDTH,
+        imgSize.naturalHeight / CANVAS_HEIGHT
+      )
+      const partitions = partitionPanelsIntoNonOverlappingRectangles(
+        detectedPanels.value,
+        n,
+        sourcePadding,
+        { minX: 0, minY: 0, maxX: imgSize.naturalWidth, maxY: imgSize.naturalHeight }
+      )
+      const areas: DetectionArea[] = partitions.map((partition, index) => ({
+        id: areaIdCounter++,
+        name: `分区${index + 1}`,
+        points: partition.points.map(point => ({ x: toCanvasX(point.x), y: toCanvasY(point.y) })),
+        params: { tilt_angle: '', area_height: '', panel_height: '' }
+      }))
+      if (areas.length !== n || areas.some(area => area.points.length !== 4)) {
+        ElMessage.error('光伏板分布范围无效')
+        return
+      }
+
+      detectionAreas.value = areas
+      activeAreaId.value = null
+      redrawAllAreas()
+      ElMessage.success(`已自动生成 ${areas.length} 个分区，请在下方填写各分区参数后保存`)
+    } finally {
+      autoPartitioning.value = false
+    }
+  }
+
+  if (detectionAreas.value.length > 0) {
+    ElMessageBox.confirm(
+      `将清除当前 ${detectionAreas.value.length} 个检测区域并按 ${n} 块重新分区，是否继续？`,
+      '自动分区',
+      { type: 'warning' }
+    ).then(doPartition).catch(() => {})
+  } else {
+    doPartition()
+  }
+}
+// ===================== 自动分区结束 =====================
 
 // 从API获取图片URL
 async function getImageUrlFrom (path: string): Promise<string> {
@@ -477,6 +733,7 @@ async function getImageUrlFrom (path: string): Promise<string> {
 // 固定画布尺寸
 const CANVAS_WIDTH = 1000
 const CANVAS_HEIGHT = 750
+const AUTO_PARTITION_PADDING = 10
 
 // 图片加载完成
 function onImageLoad () {
@@ -513,6 +770,8 @@ function redrawAllAreas () {
 
   clearCanvas()
 
+  drawDetectedPanelMasks()
+
   // 绘制所有区域
   detectionAreas.value.forEach(area => {
     drawArea(area, area.id === activeAreaId.value, area.id === hoveredAreaId.value)
@@ -524,37 +783,115 @@ function redrawAllAreas () {
   }
 }
 
+function drawDetectedPanelMasks () {
+  if (!ctx.value || !imgSize.naturalWidth || !imgSize.naturalHeight) return
+  const canvasScaleX = CANVAS_WIDTH / imgSize.naturalWidth
+  const canvasScaleY = CANVAS_HEIGHT / imgSize.naturalHeight
+  ctx.value.save()
+  ctx.value.fillStyle = 'rgba(0, 174, 255, 0.38)'
+  ctx.value.setLineDash([])
+  detectedPanels.value.forEach(panel => {
+    if (panel.points.length !== 4) return
+    ctx.value!.beginPath()
+    ctx.value!.moveTo(panel.points[0].x * canvasScaleX, panel.points[0].y * canvasScaleY)
+    for (let index = 1; index < panel.points.length; index++) {
+      ctx.value!.lineTo(panel.points[index].x * canvasScaleX, panel.points[index].y * canvasScaleY)
+    }
+    ctx.value!.closePath()
+    ctx.value!.fill()
+    ctx.value!.strokeStyle = 'rgba(0, 20, 35, 0.9)'
+    ctx.value!.lineWidth = 4
+    ctx.value!.stroke()
+    ctx.value!.strokeStyle = 'rgba(89, 225, 255, 1)'
+    ctx.value!.lineWidth = 2
+    ctx.value!.stroke()
+  })
+  // 板体全部画完后统一标注板名，避免标签被相邻板体覆盖
+  detectedPanels.value.forEach(panel => {
+    if (panel.points.length === 4) drawPanelName(panel)
+  })
+  ctx.value.restore()
+}
+
+// 标注板名：优先显示在板内居中，空间不足时缩小字号，仍放不下才标注到板上方
+function drawPanelName (panel: DetectedPanelGeometry) {
+  if (!ctx.value) return
+  const canvasScaleX = CANVAS_WIDTH / imgSize.naturalWidth
+  const canvasScaleY = CANVAS_HEIGHT / imgSize.naturalHeight
+  const canvasPoints = panel.points.map(point => ({
+    x: point.x * canvasScaleX,
+    y: point.y * canvasScaleY
+  }))
+  const centerX = panel.center.x * canvasScaleX
+  const centerY = panel.center.y * canvasScaleY
+  const panelWidth = Math.max(...canvasPoints.map(point => point.x)) - Math.min(...canvasPoints.map(point => point.x))
+  const panelHeight = Math.max(...canvasPoints.map(point => point.y)) - Math.min(...canvasPoints.map(point => point.y))
+  let fontSize = 11
+  ctx.value!.font = `bold ${fontSize}px Arial`
+  let textWidth = ctx.value!.measureText(panel.name).width
+  while (fontSize > 8 && textWidth > panelWidth - 6) {
+    fontSize -= 1
+    ctx.value!.font = `bold ${fontSize}px Arial`
+    textWidth = ctx.value!.measureText(panel.name).width
+  }
+  ctx.value!.textAlign = 'center'
+  ctx.value!.textBaseline = 'middle'
+  if (textWidth <= panelWidth - 6 && panelHeight >= fontSize + 4) {
+    ctx.value!.fillStyle = 'rgba(0, 20, 35, 0.95)'
+    ctx.value!.fillText(panel.name, centerX, centerY)
+  } else {
+    const labelY = Math.max(
+      Math.min(...canvasPoints.map(point => point.y)) - fontSize / 2 - 2,
+      fontSize / 2 + 2
+    )
+    ctx.value!.strokeStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.value!.lineWidth = 3
+    ctx.value!.strokeText(panel.name, centerX, labelY)
+    ctx.value!.fillStyle = 'rgba(0, 20, 35, 0.95)'
+    ctx.value!.fillText(panel.name, centerX, labelY)
+  }
+  ctx.value!.textAlign = 'left'
+  ctx.value!.textBaseline = 'top'
+}
+
 // 绘制单个区域（四边形）
 function drawArea (area: DetectionArea, isActive = false, isHovered = false) {
   if (!ctx.value || area.points.length !== 4) return
 
   const points = area.points
 
-  // 设置样式
-  ctx.value.strokeStyle = getAreaColor(area.id)
-  ctx.value.lineWidth = isActive ? 3 : 2
-  ctx.value.setLineDash(isActive ? [] : [5, 5])
-
-  // 绘制四边形
+  // 绘制四边形路径
   ctx.value.beginPath()
   ctx.value.moveTo(points[0].x, points[0].y)
   for (let i = 1; i < points.length; i++) {
     ctx.value.lineTo(points[i].x, points[i].y)
   }
   ctx.value.closePath()
+
+  // 深色底线确保在浅色正射图上仍清晰
+  ctx.value.strokeStyle = 'rgba(0, 0, 0, 0.9)'
+  ctx.value.lineWidth = isActive ? 7 : 6
+  ctx.value.setLineDash([])
   ctx.value.stroke()
 
-  // 如果被选中或悬停，绘制填充
-  if (isActive || isHovered) {
-    ctx.value.fillStyle = getAreaColor(area.id) + '20'
-    ctx.value.fill()
-  }
+  // 高亮虚线表示巡检区域边界
+  ctx.value.strokeStyle = getAreaColor(area.id)
+  ctx.value.lineWidth = isActive ? 4 : 3
+  ctx.value.setLineDash(isActive ? [12, 5] : [10, 6])
+  ctx.value.stroke()
+
+  ctx.value.fillStyle = getAreaColor(area.id) + (isActive || isHovered ? '30' : '14')
+  ctx.value.fill()
 
   // 绘制区域名称
+  ctx.value.setLineDash([])
+  ctx.value.font = 'bold 15px Arial'
+  const labelWidth = ctx.value.measureText(area.name).width + 12
+  ctx.value.fillStyle = 'rgba(0, 0, 0, 0.72)'
+  ctx.value.fillRect(points[0].x + 3, points[0].y + 3, labelWidth, 24)
   ctx.value.fillStyle = getAreaColor(area.id)
-  ctx.value.font = '14px Arial'
   ctx.value.textBaseline = 'top'
-  ctx.value.fillText(area.name, points[0].x + 5, points[0].y + 5)
+  ctx.value.fillText(area.name, points[0].x + 9, points[0].y + 7)
 
   // 绘制角点
   points.forEach(p => drawPoint(p.x, p.y, getAreaColor(area.id)))
@@ -1071,6 +1408,151 @@ const formatCoords = computed(() => (area: DetectionArea) => {
           margin: 0 0 15px 0;
           font-size: 16px;
           font-weight: 600;
+        }
+
+        // 自动分区
+        .partition-info {
+          margin-bottom: 12px;
+
+          .partition-info-item {
+            color: #a0aec0;
+            font-size: 12px;
+            line-height: 22px;
+          }
+
+          .partition-stat-grid {
+            display: grid;
+            grid-template-columns: 0.8fr 1.4fr;
+            gap: 10px;
+          }
+
+          .partition-stat-card {
+            min-height: 72px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(82, 205, 255, 0.7);
+            background: linear-gradient(135deg, rgba(0, 174, 255, 0.22), rgba(11, 45, 92, 0.92));
+            box-shadow: inset 0 0 14px rgba(0, 174, 255, 0.12), 0 3px 10px rgba(0, 0, 0, 0.22);
+          }
+
+          .area-card {
+            border-color: rgba(255, 194, 71, 0.75);
+            background: linear-gradient(135deg, rgba(255, 166, 0, 0.2), rgba(11, 45, 92, 0.92));
+            box-shadow: inset 0 0 14px rgba(255, 174, 0, 0.1), 0 3px 10px rgba(0, 0, 0, 0.22);
+          }
+
+          .partition-stat-label {
+            display: block;
+            margin-bottom: 5px;
+            color: #d8efff;
+            font-size: 13px;
+            font-weight: 600;
+          }
+
+          .partition-stat-value {
+            display: flex;
+            align-items: baseline;
+            gap: 5px;
+            color: #fff;
+
+            strong {
+              color: #55e4ff;
+              font-size: 28px;
+              line-height: 30px;
+              text-shadow: 0 0 10px rgba(85, 228, 255, 0.55);
+            }
+
+            span {
+              font-size: 13px;
+              font-weight: 600;
+            }
+          }
+
+          .partition-stat-area {
+            color: #ffd66e;
+            font-size: 16px;
+            font-weight: 700;
+            line-height: 28px;
+            white-space: nowrap;
+            text-shadow: 0 0 10px rgba(255, 194, 71, 0.4);
+          }
+
+          .partition-stat-empty {
+            color: #91a7c3;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 30px;
+          }
+        }
+
+        .partition-inputs {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 12px;
+          padding: 12px;
+          border: 1px solid rgba(64, 158, 255, 0.65);
+          border-radius: 8px;
+          background: linear-gradient(135deg, rgba(64, 158, 255, 0.18), rgba(6, 38, 90, 0.85));
+          box-shadow: inset 0 0 16px rgba(64, 158, 255, 0.08);
+
+          .partition-count-title {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            gap: 3px;
+          }
+
+          .partition-label {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            white-space: nowrap;
+          }
+
+          .partition-count-tip {
+            color: #8fcfff;
+            font-size: 11px;
+            white-space: nowrap;
+          }
+
+          .partition-number {
+            width: 105px;
+
+            :deep(.el-input__wrapper) {
+              min-height: 40px;
+              border: 1px solid #55dfff;
+              background: rgba(0, 16, 45, 0.86);
+              box-shadow: 0 0 10px rgba(85, 223, 255, 0.28);
+            }
+
+            :deep(.el-input__inner) {
+              color: #fff;
+              font-size: 18px;
+              font-weight: 700;
+            }
+          }
+
+          .auto-partition-button {
+            flex: 1;
+            min-width: 110px;
+            height: 42px;
+            border: 1px solid #7beaff;
+            border-radius: 7px;
+            background: linear-gradient(135deg, #1677ff, #00b8e6);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px rgba(0, 184, 230, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+
+            &:hover:not(.is-disabled) {
+              border-color: #d2f9ff;
+              background: linear-gradient(135deg, #338cff, #16cdec);
+              box-shadow: 0 0 20px rgba(22, 205, 236, 0.65);
+              transform: translateY(-1px);
+            }
+          }
         }
 
         .image-select-wrapper {

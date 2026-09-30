@@ -44,6 +44,14 @@
           >
             删除
           </el-button>
+          <el-button
+            class="new_btn iconfont icon-xinjianhangxian"
+            type="primary"
+            style="margin-left: 10px; width: 130px;"
+            @click="showSelectDialog = true"
+          >
+            <span style="margin-left: 5px; font-size: 14px;">二维航线</span>
+          </el-button>
           <router-link to="/wayline/cloud3d-editor">
             <el-button
               class="new_btn iconfont icon-xinjianhangxian"
@@ -206,10 +214,15 @@
                   @click="showBoundPlans(scope.row)"
                   >所属计划</el-button
                 >
-                <!-- <el-button size="small" link type="primary" class="waylipot"
-                  @click="openWaylinePoints(scope.row)">航点</el-button>
-                <el-button size="small" link type="primary" class="wayliedit"
-                  @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])">编辑</el-button> -->
+                <el-button
+                  size="small"
+                  link
+                  type="primary"
+                  class="wayliedit"
+                  :loading="editing2DId === scope.row.id"
+                  @click="editDrag(scope.row.id, scope.row.name, scope.row.template_types[0])"
+                  >编辑</el-button
+                >
                 <!-- <el-button size="small" type="text" @click="downloadWayline(scope.row.id, scope.row.name)">查看</el-button> -->
                 <el-popconfirm
                   width="220"
@@ -412,6 +425,20 @@ const droneOption = [
         label: 'DJI Matrice 3TD (M3TD)'
       }
     ]
+  },
+  {
+    value: 100,
+    label: 'M4D/M4TD',
+    children: [
+      {
+        value: 0,
+        label: 'DJI Matrice 4D(M4D)'
+      },
+      {
+        value: 1,
+        label: 'DJI Matrice 4TD(M4TD)'
+      }
+    ]
   }
 ]
 const selectedDroneModel = ref(77)
@@ -445,6 +472,97 @@ function openDrag (waylineId: string, Waylinetype: Number) {
     wayLineid.value.WaylineInfo(res.data)
   })
   // wayLineid.value.WaylineInfo(id) // 通过 ref.value 访问子组件的方法
+}
+
+// 编辑二维航线：拉取解析后的航点数据，转换为编辑器结构，经 localStorage 桥接进入二维航线编辑器
+const editing2DId = ref('')
+function editDrag (waylineId: string, name: string, templateType: number) {
+  if (templateType !== 0) {
+    ElMessage({
+      message: '暂不支持面状航线!.',
+      type: 'warning',
+    })
+    return
+  }
+  editing2DId.value = waylineId
+  editWaylineInfo(workspaceId, waylineId).then(res => {
+    if (res.code !== 0) {
+      editing2DId.value = ''
+      return
+    }
+    try {
+      const data = res.data || {}
+      const missionConfig = data.missionConfig || {}
+      const folder = data.folder || {}
+      const placeMarks = folder.placeMarks || []
+      const globalHeight = Number(folder.globalHeight)
+      const globalSpeed = Number(folder.autoFlightSpeed)
+      const elements = []
+      placeMarks.forEach((pm: any, index: number) => {
+        const coords = String(pm?.point?.coordinates || '').split(',')
+        const lng = Number(coords[0])
+        const lat = Number(coords[1])
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return
+        const placemark: any = {}
+        if (Number(pm.useGlobalHeight) === 1) {
+          placemark.useGlobalHeight = 1
+        } else {
+          placemark.height = Number.isFinite(Number(pm.height)) ? Number(pm.height) : globalHeight
+        }
+        if (Number(pm.useGlobalSpeed) === 1) {
+          placemark.useGlobalSpeed = 1
+        } else {
+          placemark.waypointSpeed = Number.isFinite(Number(pm.waypointSpeed)) ? Number(pm.waypointSpeed) : globalSpeed
+        }
+        if (Number(pm.useGlobalHeadingParam) === 1) {
+          placemark.useGlobalHeadingParam = 1
+        } else if (pm.waypointHeadingParam) {
+          placemark.waypointHeadingParam = pm.waypointHeadingParam
+        }
+        if (Number(pm.useGlobalTurnParam) === 1) {
+          placemark.useGlobalTurnParam = 1
+        } else if (pm.waypointTurnParam) {
+          placemark.waypointTurnParam = pm.waypointTurnParam
+        }
+        if (Number.isFinite(Number(pm.ellipsoidHeight))) placemark.ellipsoidHeight = Number(pm.ellipsoidHeight)
+        if (Number.isFinite(Number(pm.gimbalPitchAngle))) placemark.gimbalPitchAngle = Number(pm.gimbalPitchAngle)
+        if (pm.actionGroup && Array.isArray(pm.actionGroup.actionList) && pm.actionGroup.actionList.length) {
+          placemark.actionGroup = { actionList: pm.actionGroup.actionList }
+        }
+        elements.push({
+          id: uuidv4(),
+          name: '航点' + index,
+          is_distributed: true,
+          resource: generatePointContent({ lng, lat }),
+          Placemark: placemark
+        })
+      })
+      if (!elements.length) {
+        editing2DId.value = ''
+        ElMessage({
+          message: '该航线未解析到有效航点，无法编辑',
+          type: 'warning',
+        })
+        return
+      }
+      localStorage.setItem('wayline', JSON.stringify({
+        name,
+        elements,
+        missionConfig,
+        folder
+      }))
+      localStorage.setItem('wayline_edit_meta', JSON.stringify({ waylineId, originalName: name }))
+      router.push('/wayline/createWayline')
+    } catch (e) {
+      editing2DId.value = ''
+      ElMessage({
+        message: '航线数据解析失败，无法编辑',
+        type: 'error',
+      })
+    }
+  }).catch(() => {
+    editing2DId.value = ''
+  })
 }
 
 /**

@@ -34,95 +34,65 @@
                   ></el-option>
                 </el-select>
               </el-form-item>
-              <el-form-item
-                label="光伏板区域："
-                required
-                prop="solar_panel_id"
-              >
-                <el-select
-                  v-model="selectedSolarIds"
-                  multiple
-                  collapse-tags
+              <div class="auto-task-row">
+                <el-button
+                  class="auto-task-button"
                   :disabled="!selectedOrthophotoId"
-                  placeholder="请选择光伏板区域"
-                  @change="handleSolarPanelChange"
+                  @click="openAutoDialog"
                 >
-                  <el-option
-                    v-for="item in filteredSolarTable"
-                    :label="item.solar_panel_area_name"
-                    :value="item.id"
-                    :key="item.id"
-                  ></el-option>
-                </el-select>
-              </el-form-item>
-              <div
-                class="wayline-panel"
-                style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
-                v-if="planBody.file_id"
-              >
-                <div class="title">
-                  <el-tooltip :content="wayline.name">
-                    <div class="wayline-name">{{ wayline.name }}</div>
-                  </el-tooltip>
-                </div>
-                <div
-                  class="ml10 mt5"
-                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px; text-align: left;"
-                >
-                  <span><el-icon><Promotion /></el-icon></span>
-                  <span
-                    class="ml5"
-                    >{{ DEVICE_NAME[wayline.drone_model_key] }}</span
-                  >
-                  <span class="ml10"
-                    ><el-icon><Camera /></el-icon></span>
-                  <span
-                    class="ml5"
-                    v-for="payload in wayline.payload_model_keys"
-                    :key="payload.id"
-                  >
-                    {{ DEVICE_NAME[payload] }}
-                  </span>
-                </div>
-                <div
-                  class="mt5 ml10"
-                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
-                >
-                  <span class="mr10"
-                    >更新于{{ new Date(wayline.update_time).toLocaleString() }}</span
-                  >
-                </div>
+                  自动生成任务
+                </el-button>
+                <span class="auto-task-tip">按巡检面积推荐单机/多机协同，并就近分配在线机巢</span>
               </div>
 
-              <el-form-item label="执行设备：" required prop="dock_sn">
-                <el-button
-                  type="primary"
-                   style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
-                  @click="selectDevice"
-                >
-                  选择设备
-                </el-button>
-              </el-form-item>
-              <div
-                class="panel"
-                style="padding-top: 5px; background-color: #081B39; margin-bottom: 15px;"
-              >
-                <div class="title">
-                  <el-tooltip :content="dock.nickname">
-                    <div class="wayline-name">{{ dock.nickname }}</div>
-                  </el-tooltip>
-                </div>
-                <div
-                  class="ml10 mt5"
-                  style="color: rgba(65, 176, 255, 1); font-weight: 500; font-size: 14px;text-align: left;"
-                >
-                  <span><el-icon><Promotion /></el-icon></span>
-                  <span
-                    class="ml5"
-                    >{{ dock.children?.nickname ?? 'No drone' }}</span
+              <el-form-item label="任务分组：" required>
+                <div class="task-groups">
+                  <div
+                    v-for="(group, groupIndex) in taskGroups"
+                    :key="group.groupId"
+                    class="task-group-card"
                   >
+                    <div class="task-group-header">
+                      <span class="task-group-title">分组 {{ groupIndex + 1 }}</span>
+                      <el-button
+                        v-if="taskGroups.length > 1"
+                        link
+                        type="danger"
+                        @click="removeTaskGroup(group)"
+                        >删除
+                      </el-button>
+                    </div>
+                    <div class="task-group-row">
+                      <el-button
+                        type="primary"
+                        style="background-color: rgba(7, 75, 208, 1); border: 1px solid rgba(0, 64, 147, 1)"
+                        @click="selectDevice(group)"
+                      >
+                        {{ group.dock ? '更换设备' : '选择设备' }}
+                      </el-button>
+                      <span class="task-group-device-name">
+                        {{ group.dock ? `${group.dock.nickname}（${group.dock.children?.nickname ?? 'No drone'}）` : '未选择设备' }}
+                      </span>
+                    </div>
+                    <el-select
+                      :model-value="group.solarIds"
+                      multiple
+                      collapse-tags
+                      :disabled="!selectedOrthophotoId"
+                      placeholder="请选择光伏板区域"
+                      @change="(ids) => handleGroupAreasChange(group, ids)"
+                    >
+                      <el-option
+                        v-for="item in groupAreaOptions(group)"
+                        :label="item.solar_panel_area_name"
+                        :value="item.id"
+                        :key="item.id"
+                      ></el-option>
+                    </el-select>
+                  </div>
+                  <el-button class="add-group-button" @click="addTaskGroup">+ 添加分组</el-button>
                 </div>
-              </div>
+              </el-form-item>
               <el-form-item
                 label="时间方案："
                 required
@@ -186,70 +156,82 @@
                 </div>
             </div>
 
-            <!-- 第二步: 光伏参数配置 -->
-            <div v-if="currentStep === 2">
-              <!-- 红外/可见光选择 (uniform & auto 共有) -->
-              <el-form-item label="相机类型：" required prop="image_format_list">
-                <el-checkbox-group v-model="planBody.image_format_list" size="large">
-                  <el-checkbox value="visable">可见光</el-checkbox>
-                  <el-checkbox value="ir">红外</el-checkbox>
-                </el-checkbox-group>
-              </el-form-item>
-              <div
-                v-for="config in areaConfigs"
-                :key="config.solar_panel_id"
-                class="area-config-card"
-              >
-                <div class="area-config-title">{{ config.solar_panel_name }}</div>
-                <el-form-item label="航线高度：" required>
-                  <el-input v-model="config.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
+              <!-- 第二步: 光伏参数配置 -->
+              <div v-if="currentStep === 2">
+                <!-- 红外/可见光选择 (uniform & auto 共有) -->
+                <el-form-item label="相机类型：" required prop="image_format_list">
+                  <el-checkbox-group v-model="planBody.image_format_list" size="large">
+                    <el-checkbox value="visable">可见光</el-checkbox>
+                    <el-checkbox value="ir">红外</el-checkbox>
+                  </el-checkbox-group>
                 </el-form-item>
-                <el-form-item label="光伏板朝向：">
-                  <el-input v-model="config.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
-                </el-form-item>
+                <div
+                  v-for="group in taskGroups"
+                  :key="group.groupId"
+                  class="device-group-section"
+                >
+                  <div class="device-group-header">
+                    <span class="device-group-name">{{ group.dock?.nickname ?? '未选择设备' }}</span>
+                    <el-button
+                      size="small"
+                      type="primary"
+                      style="background-color: rgba(7, 75, 208, 1); border: 1px solid rgba(0, 64, 147, 1)"
+                      :disabled="group.submitted"
+                      @click="previewWayline(group)"
+                    >
+                      {{ group.submitted ? '已创建' : '预览航线' }}
+                    </el-button>
+                  </div>
+                  <div
+                    v-for="config in groupAreaConfigs(group)"
+                    :key="config.solar_panel_id"
+                    class="area-config-card"
+                  >
+                    <div class="area-config-title">{{ config.solar_panel_name }}</div>
+                    <el-form-item label="航线高度：" required>
+                      <el-input v-model="config.flight_altitude" type="number" placeholder="请输入航线高度(米)"></el-input>
+                    </el-form-item>
+                    <el-form-item label="光伏板朝向：">
+                      <el-input v-model="config.panel_heading" type="number" placeholder="请输入光伏板朝向"></el-input>
+                    </el-form-item>
 
-                <!-- uniform 模式下额外字段 -->
-                <template v-if="planBody.type === 'uniform'">
-                  <el-form-item label="横向航线数：" required>
-                    <el-input v-model="config.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
-                  </el-form-item>
-                  <el-form-item label="区域边距：" required>
-                    <el-input v-model="config.margin" type="number" placeholder="请输入区域边距"></el-input>
-                  </el-form-item>
-                  <el-form-item label="航线内点数：" required>
-                    <el-input v-model="config.points_per_line" type="number" placeholder="请输入航线内点数"></el-input>
-                  </el-form-item>
-                </template>
+                    <!-- uniform 模式下额外字段 -->
+                    <template v-if="planBody.type === 'uniform'">
+                      <el-form-item label="横向航线数：" required>
+                        <el-input v-model="config.horizontal_lines" type="number" placeholder="请输入横向航线数"></el-input>
+                      </el-form-item>
+                      <el-form-item label="区域边距：" required>
+                        <el-input v-model="config.margin" type="number" placeholder="请输入区域边距"></el-input>
+                      </el-form-item>
+                      <el-form-item label="航线内点数：" required>
+                        <el-input v-model="config.points_per_line" type="number" placeholder="请输入航线内点数"></el-input>
+                      </el-form-item>
+                    </template>
 
-                <!-- auto 模式下字段 -->
-                <template v-if="planBody.type === 'auto'">
-                  <el-form-item label="光伏板倾角：">
-                    <el-input v-model="config.panel_tilt" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
-                  </el-form-item>
-                </template>
+                    <!-- auto 模式下字段 -->
+                    <template v-if="planBody.type === 'auto'">
+                      <el-form-item label="光伏板倾角：">
+                        <el-input v-model="config.panel_tilt" type="number" placeholder="请输入光伏板倾角(度)"></el-input>
+                      </el-form-item>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- 第二步底部按钮 -->
+                <div class="footer footer-actions">
+                    <el-button
+                      style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
+                      @click="handlePrevStep"
+                      >上一步
+                    </el-button>
+                    <el-button
+                      type="primary"
+                      style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
+                      @click="onSubmit"
+                      >确认
+                    </el-button>
+                </div>
               </div>
-
-              <!-- 第二步底部按钮 -->
-              <div class="footer footer-actions">
-                  <el-button
-                    style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
-                    @click="handlePrevStep"
-                    >上一步
-                  </el-button>
-                  <el-button
-                    type="primary"
-                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
-                    @click="previewWayline"
-                    >航线预览
-                  </el-button>
-                  <el-button
-                    type="primary"
-                    style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
-                    @click="onSubmit"
-                    >确认
-                  </el-button>
-              </div>
-            </div>
           </el-form>
         </div>
       </div>
@@ -288,12 +270,89 @@
       <SelectDock />
     </div>
   </el-drawer>
+
+  <el-dialog
+    v-model="autoDialogVisible"
+    title="自动生成任务"
+    width="480px"
+    append-to-body
+  >
+    <div class="auto-task-body">
+      <el-select
+        v-model="autoAreaIds"
+        multiple
+        collapse-tags
+        placeholder="请选择巡检区域"
+        style="width: 100%"
+      >
+        <el-option
+          v-for="item in filteredSolarTable"
+          :label="item.solar_panel_area_name"
+          :value="item.id"
+          :key="item.id"
+        ></el-option>
+      </el-select>
+      <el-button
+        type="primary"
+        style="width: 100%; margin-top: 12px; background-color: rgba(7, 75, 208, 1); border: 1px solid rgba(0, 64, 147, 1)"
+        @click="generateAutoTask"
+      >
+        开始生成
+      </el-button>
+
+      <template v-if="autoResult">
+        <div class="auto-result-summary">
+          <div class="auto-result-item">
+            <span>执行方式：</span>
+            <strong>{{ autoResult.mode === 'single' ? '单机执行' : '多机协同' }}</strong>
+          </div>
+          <div class="auto-result-item">
+            <span>推荐无人机数量：</span>
+            <strong>{{ autoResult.droneCount }} 架</strong>
+          </div>
+          <div class="auto-result-item">
+            <span>巡检总面积：</span>
+            <strong>{{ autoResult.totalAreaMu.toFixed(1) }} 亩（{{ Math.round(autoResult.totalAreaM2) }} ㎡）</strong>
+          </div>
+          <div class="auto-result-item">
+            <span>预计巡检时间：</span>
+            <strong>约 {{ autoResult.estimatedMinutes }} 分钟</strong>
+          </div>
+        </div>
+        <div
+          v-for="assignment in autoResult.assignments"
+          :key="assignment.sn"
+          class="auto-result-card"
+        >
+          <div class="auto-result-dock">{{ assignment.nickname }}</div>
+          <div class="auto-result-areas">
+            {{ assignment.areaNames.length ? assignment.areaNames.join('、') : '（无分配区域）' }}
+          </div>
+          <div class="auto-result-distance">
+            负责区域距机巢最远约 {{ Number.isFinite(assignment.distanceM) ? Math.round(assignment.distanceM) + ' 米' : '--' }}
+          </div>
+        </div>
+        <div
+          v-for="(warning, index) in autoWarnings"
+          :key="index"
+          class="auto-result-warning"
+        >
+          {{ warning }}
+        </div>
+      </template>
+
+      <div class="auto-dialog-footer">
+        <el-button @click="autoDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!autoResult" @click="applyAutoTask">应用到任务分组</el-button>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, reactive, ref, toRaw, UnwrapRef, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, toRaw, UnwrapRef, nextTick, watch } from 'vue'
 import { Promotion, Camera, Close } from '@element-plus/icons-vue'
-import { ELocalStorageKey, ERouterName } from '/@/types'
+import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { useMyStore } from '/@/store'
 import { WaylineType, WaylineFile } from '/@/types/wayline'
 import { Device, DEVICE_NAME } from '/@/types/device'
@@ -308,6 +367,8 @@ import Solar3DRouteEditor from '/@/components/cesium/Solar3DRouteEditor.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi, getSolarPanelImgByIdApi, getOrthophotoListApi, getSolarPanelByIdApi } from '/@/api/turbine/turbineMgt'
+import { getBindingDevices } from '/@/api/manage'
+import { AutoTaskRecommendation, computeAreaGeometry, DockPosition, recommendAutoTask } from './solarAutoTask'
 const router = useRouter()
 const route = useRoute()
 const store = useMyStore()
@@ -326,26 +387,161 @@ console.log('新建光伏计划周期 planId:', solarCreatePlanId)
 
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 
-const wayline = computed<WaylineFile>(() => {
-  return store.state.waylineInfo
-})
-
-const dock = computed<Device>(() => {
-  return store.state.dockInfo
-})
 const orthophotoTable = ref([]) // 正射图列表
 const solarTable = ref([]) // 光伏板区域列表
 const selectedOrthophotoId = ref('')
 const selectedImagePath = ref('') // 选中光伏板区域对应的正射图path
-const selectedDetectAreas = ref<any[]>([]) // 选中光伏板区域的检测区域（支持多选）
-const selectedSolarIds = ref<string[]>([]) // 选中的光伏板区域ID数组
-const waylineInfo = ref()
+const waylineInfo = ref() // 当前预览分组的航线（2D）
 const filteredSolarTable = computed(() => {
   if (!selectedOrthophotoId.value) {
     return []
   }
   return solarTable.value.filter((item: any) => item.orthophoto_id === selectedOrthophotoId.value)
 })
+
+// 任务分组：每个分组绑定一个机场设备和该设备负责的光伏板区域
+interface DeviceTaskGroup {
+  groupId: string
+  planId: string
+  dock: Device | null
+  solarIds: string[]
+  submitted: boolean
+}
+
+function createTaskGroup (): DeviceTaskGroup {
+  return {
+    groupId: createSolarPlanId(),
+    planId: createSolarPlanId(),
+    dock: null,
+    solarIds: [],
+    submitted: false
+  }
+}
+
+const taskGroups = ref<DeviceTaskGroup[]>([createTaskGroup()])
+const activeDeviceGroupId = ref('') // 正在通过抽屉选择设备的分组
+// 所有分组已选区域的合集，用于 2D 叠加显示与参数配置同步
+const selectedDetectAreas = computed(() => {
+  const ids = taskGroups.value.flatMap(group => group.solarIds)
+  return solarTable.value.filter((item: any) => ids.includes(item.id) && item.orthophoto_id === selectedOrthophotoId.value)
+})
+
+// 抽屉打开期间，把用户在 SelectDock 中点击的设备赋给对应分组
+watch(() => store.state.dockInfo, (info) => {
+  if (!activeDeviceGroupId.value || !info?.device_sn) return
+  const group = taskGroups.value.find(item => item.groupId === activeDeviceGroupId.value)
+  if (group) {
+    group.dock = { ...toRaw(info) }
+  }
+})
+
+// ===================== 自动生成任务 =====================
+const boundDocks = ref<any[]>([]) // 绑定的机巢清单（自动生成任务用）
+const autoDialogVisible = ref(false)
+const autoAreaIds = ref<string[]>([])
+const autoResult = ref<AutoTaskRecommendation | null>(null)
+const autoWarnings = ref<string[]>([])
+
+// 有实时坐标的在线机巢（离线机巢无坐标，不参与就近分配）
+const onlineDockPositions = computed<DockPosition[]>(() => {
+  return boundDocks.value
+    .map((dock: any) => {
+      const osd = store.state.deviceState.dockInfo[dock.device_sn]
+      const lng = Number(osd?.basic_osd?.longitude)
+      const lat = Number(osd?.basic_osd?.latitude)
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null
+      return { sn: dock.device_sn, nickname: dock.nickname, lng, lat }
+    })
+    .filter((dock): dock is DockPosition => dock !== null)
+})
+
+async function loadBoundDocks () {
+  try {
+    const res = await getBindingDevices(workspaceId, { page: 1, page_size: 100, total: -1 }, EDeviceTypeName.Dock)
+    if (res.code === 0) {
+      boundDocks.value = res.data?.list ?? []
+    }
+  } catch (error) {
+    console.error('加载绑定机巢失败:', error)
+  }
+}
+
+function openAutoDialog () {
+  autoAreaIds.value = []
+  autoResult.value = null
+  autoWarnings.value = []
+  autoDialogVisible.value = true
+}
+
+function generateAutoTask () {
+  autoWarnings.value = []
+  if (!autoAreaIds.value.length) {
+    ElMessage.warning('请选择巡检区域')
+    return
+  }
+  const geometries = []
+  let missingGeoCount = 0
+  solarTable.value
+    .filter((item: any) => autoAreaIds.value.includes(item.id))
+    .forEach((item: any) => {
+      const geometry = computeAreaGeometry(item)
+      if (geometry) {
+        geometries.push(geometry)
+      } else {
+        missingGeoCount += 1
+      }
+    })
+  if (!geometries.length) {
+    ElMessage.warning('所选区域缺少经纬度数据，无法生成')
+    return
+  }
+  if (missingGeoCount > 0) {
+    autoWarnings.value.push(`${missingGeoCount} 个区域缺少经纬度数据，未参与分配`)
+  }
+  if (!onlineDockPositions.value.length) {
+    autoWarnings.value.push('当前没有在线机巢，无法自动分配')
+    autoResult.value = null
+    return
+  }
+  const result = recommendAutoTask(geometries, onlineDockPositions.value)
+  if (!result) {
+    ElMessage.warning('自动生成失败，请稍后重试')
+    return
+  }
+  if (result.degraded) {
+    autoWarnings.value.push(`在线机巢数量不足，推荐架数已降级为 ${result.droneCount}`)
+  }
+  autoResult.value = result
+}
+
+function applyAutoTask () {
+  if (!autoResult.value) return
+  const hasExisting = taskGroups.value.some(group => group.dock || group.solarIds.length > 0)
+  if (hasExisting) {
+    ElMessageBox.confirm('将覆盖当前已配置的任务分组，是否继续？', '自动生成任务', { type: 'warning' })
+      .then(() => {
+        applyAutoGroups()
+      })
+      .catch(() => {})
+    return
+  }
+  applyAutoGroups()
+}
+
+function applyAutoGroups () {
+  if (!autoResult.value) return
+  taskGroups.value = autoResult.value.assignments.map(assignment => ({
+    groupId: createSolarPlanId(),
+    planId: createSolarPlanId(),
+    dock: boundDocks.value.find((item: any) => item.device_sn === assignment.sn) ?? null,
+    solarIds: [...assignment.areaIds],
+    submitted: false
+  }))
+  syncAreaConfigs(selectedDetectAreas.value)
+  autoDialogVisible.value = false
+  ElMessage.success('已按推荐结果填充任务分组，可在下方微调')
+}
+// ===================== 自动生成任务结束 =====================
 
 interface AreaConfig {
   solar_panel_id: string
@@ -364,8 +560,6 @@ const planBody = reactive({
   plan_source: '系统创建',
   name: '',
   orthophoto_id: '',
-  file_id: computed(() => store?.state?.waylineInfo.id),
-  dock_sn: computed(() => store?.state?.dockInfo.device_sn),
   workspace_id: localStorage.getItem(ELocalStorageKey.WorkspaceId)!,
   task_type: TaskType.Immediate,
   begin_time: '',
@@ -373,7 +567,6 @@ const planBody = reactive({
   status: 1,
   fan_id: '',
   poi_id: '',
-  solar_panel_id: '',
   poi_orbit_num: 1,
   username: 'pilot',
   plan_type: '4',
@@ -383,8 +576,7 @@ const planBody = reactive({
   plan_priority: 1,
   type: 'auto',
   image_format_list: ['visable'], // 相机类型多选
-  image_format: computed(() => planBody.image_format_list.join(',')), // 提交时转为逗号分隔字符串
-  index: 0 // index为0时不会向数据库存航线且会返回wayline（航线的具体信息），为1时不返回wayline，会存入数据库
+  image_format: computed(() => planBody.image_format_list.join(',')) // 提交时转为逗号分隔字符串
 })
 
 const drawerVisible = ref(false)
@@ -435,19 +627,10 @@ const rules = {
   ],
   poi_id: [{ required: true, message: '请选择兴趣点', trigger: 'change' }],
   fan_id: [{ required: true, message: '请选择风机', trigger: 'blur' }],
-  solar_panel_id: [{ required: true, message: '请选择光伏板区域', trigger: 'blur' }],
   orthophoto_id: [{ required: true, message: '请选择正射图', trigger: 'change' }],
   name: [
     { required: true, message: '请输入计划名称', trigger: 'blur' },
     { min: 1, max: 50, message: '计划名称长度在1-50个字符', trigger: 'blur' }
-  ],
-
-  file_id: [
-    { required: true, message: '请选择航线', trigger: ['blur', 'change'] }
-  ],
-
-  dock_sn: [
-    { required: true, message: '请选择设备', trigger: ['blur', 'change'] }
   ],
 
   task_type: [
@@ -479,6 +662,7 @@ const rules = {
 onMounted(async () => {
   await getOrthophoto()
   getSolarPanel()
+  loadBoundDocks()
 })
 
 async function getOrthophoto () {
@@ -565,13 +749,39 @@ function isNumberValue (value: string) {
   return /^[0-9]+(\.[0-9]+)?$/.test(String(value))
 }
 
-function validateAreaConfigs () {
-  if (areaConfigs.value.length === 0) {
-    ElMessage.warning('请选择光伏板区域')
+// 校验任务分组：每组必须有设备、有区域，且设备不重复
+function validateTaskGroups () {
+  if (!taskGroups.value.length) {
+    ElMessage.warning('请至少保留一个任务分组')
+    return false
+  }
+  const usedDeviceSns = new Set<string>()
+  for (const group of taskGroups.value) {
+    if (!group.dock) {
+      ElMessage.warning('请为每个分组选择执行设备')
+      return false
+    }
+    if (usedDeviceSns.has(group.dock.device_sn)) {
+      ElMessage.warning(`执行设备重复：${group.dock.nickname}`)
+      return false
+    }
+    usedDeviceSns.add(group.dock.device_sn)
+    if (!group.solarIds.length) {
+      ElMessage.warning(`请选择光伏板区域：${group.dock.nickname}`)
+      return false
+    }
+  }
+  return true
+}
+
+function validateGroupAreaConfigs (group: DeviceTaskGroup) {
+  const configs = getGroupAreaConfigs(group)
+  if (!configs.length) {
+    ElMessage.warning(`请选择光伏板区域：${group.dock?.nickname ?? '未选择设备'}`)
     return false
   }
 
-  for (const config of areaConfigs.value) {
+  for (const config of configs) {
     if (isEmptyValue(config.flight_altitude) || !isPositiveInteger(config.flight_altitude)) {
       ElMessage.warning(`请填写有效的航线高度：${config.solar_panel_name}`)
       return false
@@ -599,69 +809,87 @@ function validateAreaConfigs () {
   return true
 }
 
-function getAreaConfigPayload () {
-  return areaConfigs.value.map(config => {
-    const baseConfig: any = {
-      solar_panel_id: config.solar_panel_id,
-      flight_altitude: Number(config.flight_altitude),
-      panel_heading: Number(config.panel_heading)
-    }
+function mapAreaConfig (config: AreaConfig) {
+  const baseConfig: any = {
+    solar_panel_id: config.solar_panel_id,
+    flight_altitude: Number(config.flight_altitude),
+    panel_heading: Number(config.panel_heading)
+  }
 
-    if (planBody.type === 'uniform') {
-      return {
-        ...baseConfig,
-        margin: Number(config.margin),
-        horizontal_lines: Number(config.horizontal_lines),
-        points_per_line: Number(config.points_per_line)
-      }
-    }
-
+  if (planBody.type === 'uniform') {
     return {
       ...baseConfig,
-      panel_tilt: Number(config.panel_tilt)
+      margin: Number(config.margin),
+      horizontal_lines: Number(config.horizontal_lines),
+      points_per_line: Number(config.points_per_line)
     }
-  })
+  }
+
+  return {
+    ...baseConfig,
+    panel_tilt: Number(config.panel_tilt)
+  }
 }
 
-function getSubmitPlanBody () {
+function getGroupAreaConfigs (group: DeviceTaskGroup): AreaConfig[] {
+  return areaConfigs.value.filter(config => group.solarIds.includes(config.solar_panel_id))
+}
+
+function getGroupAreaConfigPayload (group: DeviceTaskGroup) {
+  return getGroupAreaConfigs(group).map(mapAreaConfig)
+}
+
+// 按分组构造提交体：设备、区域、planId 均为该分组独立
+function getGroupPlanBody (group: DeviceTaskGroup, index: number) {
   return {
     ...toRaw(planBody),
-    file_id: planBody.file_id,
-    dock_sn: planBody.dock_sn,
+    name: `${planBody.name}-${group.dock.nickname}`,
+    dock_sn: group.dock.device_sn,
     image_format: planBody.image_format,
-    plan_id: solarCreatePlanId,
-    planId: solarCreatePlanId,
+    plan_id: group.planId,
+    planId: group.planId,
     orthophoto_id: planBody.orthophoto_id,
-    area_configs: getAreaConfigPayload()
+    solar_panel_id: group.solarIds.join(','),
+    area_configs: getGroupAreaConfigPayload(group),
+    index
   }
 }
 
-// 光伏板区域选择变化（支持多选）
-async function handleSolarPanelChange (ids: string[]) {
-  selectedImagePath.value = ''
-  selectedDetectAreas.value = []
+// 第二步模板：某分组下的区域参数卡片
+function groupAreaConfigs (group: DeviceTaskGroup) {
+  return getGroupAreaConfigs(group)
+}
 
-  if (!ids || ids.length === 0) {
-    planBody.solar_panel_id = ''
-    areaConfigs.value = []
-    return
-  }
+// 分组区域下拉选项：排除其他分组已选区域（组间互斥），保留本组已选项
+function groupAreaOptions (group: DeviceTaskGroup) {
+  const otherGroupIds = taskGroups.value
+    .filter(item => item.groupId !== group.groupId)
+    .flatMap(item => item.solarIds)
+  return filteredSolarTable.value.filter((item: any) => !otherGroupIds.includes(item.id))
+}
 
-  selectedSolarIds.value = ids
-  planBody.solar_panel_id = ids.join(',')
-  const items = solarTable.value.filter((item: any) => ids.includes(item.id) && item.orthophoto_id === selectedOrthophotoId.value)
-  syncAreaConfigs(items)
-  selectedDetectAreas.value = items
-  if (items.length > 0) {
-    selectedImagePath.value = await getOrthophotoPath(selectedOrthophotoId.value)
+function addTaskGroup () {
+  taskGroups.value.push(createTaskGroup())
+}
+
+function removeTaskGroup (group: DeviceTaskGroup) {
+  taskGroups.value = taskGroups.value.filter(item => item.groupId !== group.groupId)
+  if (activeDeviceGroupId.value === group.groupId) {
+    activeDeviceGroupId.value = ''
   }
+}
+
+// 光伏板区域选择变化（按分组维护，区域在分组间互斥）
+function handleGroupAreasChange (group: DeviceTaskGroup, ids: string[]) {
+  group.solarIds = ids || []
+  syncAreaConfigs(selectedDetectAreas.value)
 }
 
 async function handleOrthophotoChange (id: string) {
   planBody.orthophoto_id = id
-  planBody.solar_panel_id = ''
-  selectedSolarIds.value = []
-  selectedDetectAreas.value = []
+  taskGroups.value.forEach(group => {
+    group.solarIds = []
+  })
   areaConfigs.value = []
   waylineInfo.value = []
   selectedImagePath.value = ''
@@ -679,9 +907,11 @@ function closePlan () {
 function closePanel () {
   drawerVisible.value = false
   selectType.value = ''
+  activeDeviceGroupId.value = ''
 }
 
-function selectDevice () {
+function selectDevice (group: DeviceTaskGroup) {
+  activeDeviceGroupId.value = group.groupId
   drawerVisible.value = true
   selectType.value = '2'
 }
@@ -691,11 +921,12 @@ function selectDevice () {
  */
 async function handleNextStep () {
   try {
-    // 只校验第一步的字段
+    // 只校验第一步的表单字段，任务分组单独校验
     const valid = await valueRef.value.validateField([
-      'name', 'orthophoto_id', 'solar_panel_id', 'dock_sn', 'task_type', 'begin_time', 'rth_altitude', 'type'
+      'name', 'orthophoto_id', 'task_type', 'begin_time', 'rth_altitude', 'type'
     ])
-    if (valid) {
+    if (valid && validateTaskGroups()) {
+      syncAreaConfigs(selectedDetectAreas.value)
       currentStep.value = 2
     }
   } catch (error) {
@@ -711,14 +942,17 @@ function handlePrevStep () {
 }
 
 /**
- * 预览航线
+ * 预览航线（按分组，只预览当前组的航线）
  */
-async function previewWayline () {
+async function previewWayline (group: DeviceTaskGroup) {
   try {
+    if (!group.dock) {
+      ElMessage.warning('请先选择执行设备')
+      return
+    }
     const valid = await valueRef.value.validateField(['image_format_list'])
-    if (valid && validateAreaConfigs()) {
-      planBody.index = 0
-      const res = await createFlyPlan(getSubmitPlanBody())
+    if (valid && validateGroupAreaConfigs(group)) {
+      const res = await createFlyPlan(getGroupPlanBody(group, 0))
       if (res.code !== 0) {
         ElMessage.error('航线预览异常!')
         return
@@ -726,8 +960,8 @@ async function previewWayline () {
       waylineInfo.value = res.data.wayline.route_2d.area.points
       const threeDPayload = res.data.wayline.three_d_payload
       if (threeDPayload) {
-        threeDPayload.planId = solarCreatePlanId
-        threeDPayload.route_draft_id = solarCreatePlanId
+        threeDPayload.planId = group.planId
+        threeDPayload.route_draft_id = group.planId
         saveSolar3DPreviewPayload(threeDPayload)
         window.postMessage({
           type: 'SOLAR_3D_ROUTE_PREVIEW',
@@ -741,22 +975,45 @@ async function previewWayline () {
 }
 
 /**
- * 创建航线
+ * 创建航线：按分组顺序逐条创建，失败不中断，结束后汇总结果
  */
 async function onSubmit () {
   try {
     const valid = await valueRef.value.validateField(['image_format_list'])
-    if (valid && validateAreaConfigs()) {
-      // 1.创建飞行计划
-      planBody.index = 1
-      const res = await createFlyPlan(getSubmitPlanBody())
-      if (res.code !== 0) {
-        ElMessage.warning('请填写必填项!')
+    if (!valid || !validateTaskGroups()) {
+      return
+    }
+    const pendingGroups = taskGroups.value.filter(group => !group.submitted)
+    for (const group of pendingGroups) {
+      if (!validateGroupAreaConfigs(group)) {
         return
       }
-      ElMessage.success('创建成功!')
+    }
+    const failedGroups: DeviceTaskGroup[] = []
+    for (const group of pendingGroups) {
+      try {
+        const res = await createFlyPlan(getGroupPlanBody(group, 1))
+        if (res.code === 0) {
+          group.submitted = true
+        } else {
+          failedGroups.push(group)
+        }
+      } catch (error) {
+        failedGroups.push(group)
+      }
+    }
+    const successCount = pendingGroups.length - failedGroups.length
+    if (!failedGroups.length) {
+      ElMessage.success(`已创建 ${successCount} 条计划!`)
       // 返回飞行计划管理页面
       closePlan()
+    } else {
+      const failedNames = failedGroups.map(group => group.dock?.nickname ?? '未选择设备').join('、')
+      if (successCount > 0) {
+        ElMessage.warning(`成功创建 ${successCount} 条计划，失败：${failedNames}。可再次点击确认重试失败的分组`)
+      } else {
+        ElMessage.error(`创建失败：${failedNames}`)
+      }
     }
   } catch (error) {
     ElMessage.warning('请填写必填项!')
@@ -927,6 +1184,150 @@ async function onSubmit () {
   .footer-actions {
     width: 100%;
   }
+}
+
+.task-groups {
+  width: 100%;
+}
+
+.task-group-card {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(206, 227, 255, 0.18);
+  border-radius: 4px;
+}
+
+.task-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.task-group-title {
+  font-weight: 600;
+  color: #d8efff;
+}
+
+.task-group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.task-group-device-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(65, 176, 255, 1);
+  font-size: 13px;
+  text-align: left;
+}
+
+.add-group-button {
+  width: 100%;
+  border-style: dashed;
+}
+
+.device-group-section {
+  margin-bottom: 16px;
+}
+
+.device-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.device-group-name {
+  font-weight: 600;
+  color: #55e4ff;
+}
+
+.auto-task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.auto-task-button {
+  background-color: rgba(7, 75, 208, 1);
+  border: 1px solid rgba(0, 64, 147, 1);
+  color: #fff;
+}
+
+.auto-task-tip {
+  color: #8fcfff;
+  font-size: 12px;
+}
+
+.auto-task-body {
+  color: #fff;
+}
+
+.auto-result-summary {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(206, 227, 255, 0.18);
+  border-radius: 4px;
+}
+
+.auto-result-item {
+  line-height: 26px;
+  font-size: 13px;
+
+  span {
+    color: #a0aec0;
+  }
+
+  strong {
+    color: #55e4ff;
+  }
+}
+
+.auto-result-card {
+  padding: 10px 12px;
+  margin-top: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(206, 227, 255, 0.18);
+  border-radius: 4px;
+}
+
+.auto-result-dock {
+  font-weight: 600;
+  color: #d8efff;
+  margin-bottom: 4px;
+}
+
+.auto-result-areas {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.auto-result-distance {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8fcfff;
+}
+
+.auto-result-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ffd66e;
+}
+
+.auto-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .area-config-card {

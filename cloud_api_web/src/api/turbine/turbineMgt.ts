@@ -107,6 +107,13 @@ export const getAllSolarPanelApi = async function (data): Promise<IWorkspaceResp
   return result.data
 }
 
+// 获取正射图识别出的光伏板
+export const getDetectedSolarPanelsApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = `${HTTP_PREFIX_SOLAR1}/selectList?solarPanelName=${data.solar_panel_name || ''}&id=${data.id || ''}&orthophotoId=${data.orthophoto_id || data.orthophotoId || ''}`
+  const result = await request.get(url)
+  return result.data
+}
+
 // 新增光伏板区域配置
 export const addSolarPanelConfigApi = async function (data): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX_SOLAR}/save`

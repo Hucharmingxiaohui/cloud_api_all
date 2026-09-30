@@ -84,8 +84,10 @@ public class CreateWpml {
             folderElement.addElement("wpml:autoFlightSpeed").addText(autoFlightSpeed);
 
             //循环添加每一个Placemark节点，有几个坐标点就有几个Placemark节点，这里仅作示例
-            List<Placemark> placeMarks =folder.getPlaceMarks();
-            for (int i = 0; i <placeMarks.size(); i++) {
+             List<Placemark> placeMarks =folder.getPlaceMarks();
+             // 全局动作序号：保证 wpml:actionId 在整条航线内唯一（DJI 校验错误码 322595）
+             int actionGlobalIndex = 0;
+             for (int i = 0; i <placeMarks.size(); i++) {
                 Element placeMarkElement = folderElement.addElement("Placemark");
                 //航点坐标
                 Element Point = placeMarkElement.addElement("Point");
@@ -142,7 +144,7 @@ public class CreateWpml {
                     }                    //调整云台府仰角
                     Element actionElement0 = actionGroupElement.addElement("wpml:action");
                     {
-                        actionElement0.addElement("wpml:actionId").addText("0");
+                        actionElement0.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex++));
                         actionElement0.addElement("wpml:actionActuatorFunc").addText("gimbalRotate");
                         Element actionActuatorFuncParamElement0 = actionElement0.addElement("wpml:actionActuatorFuncParam");
                         {
@@ -161,7 +163,7 @@ public class CreateWpml {
                     //调整焦距
                     Element actionElement1 = actionGroupElement.addElement("wpml:action");
                     {
-                        actionElement1.addElement("wpml:actionId").addText("1");
+                        actionElement1.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex++));
                         actionElement1.addElement("wpml:actionActuatorFunc").addText("focus");
                         Element actionActuatorFuncParamElement1 = actionElement1.addElement("wpml:actionActuatorFuncParam");
                         {
@@ -179,7 +181,7 @@ public class CreateWpml {
                     for(int k = 0;k<actionGroup.size();k++ )
                     {
                         Element actionElement2 = actionTriggerElement.addElement("wpml:action");
-                        actionElement2.addElement("wpml:actionId").addText(Integer.toString(2+k));
+                        actionElement2.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex++));
                         actionElement2.addElement("wpml:actionActuatorFunc").addText("takePhoto");
                         Element actionActionActuatorFuncParam2 = actionElement2.addElement("wpml:actionActuatorFuncParam");
                         {

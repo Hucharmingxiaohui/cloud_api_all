@@ -126,6 +126,8 @@ public class CreateKml {
 
         //循环添加每一个Placemark节点，有几个坐标点就有几个Placemark节点，这里仅作示例
         List<Placemark> placeMarks =folder.getPlaceMarks();
+        // 全局动作序号：保证 wpml:actionId 在整条航线内唯一（DJI 校验错误码 322595）
+        int actionGlobalIndex = 0;
         for (int i = 0; i < placeMarks.size(); i++) {
             Element placeMarkElement = folderElement.addElement("Placemark");
             //航点坐标
@@ -186,7 +188,7 @@ public class CreateKml {
                 {
                     System.out.println("kkone");
                     Element actionElement =actionGroupElement.addElement("wpml:action");
-                    actionElement.addElement("wpml:actionId").addText("0");
+                    actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex++));
                     actionElement.addElement("wpml:actionActuatorFunc").addText("takePhoto");
                     Element actionActuatorFuncParamElement = actionElement.addElement("wpml:actionActuatorFuncParam");
                     String hangdian = "航点" + String.valueOf(j + 1);

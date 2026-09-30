@@ -146,6 +146,8 @@ public class CreateKml {
 
         //循环添加每一个Placemark节点，有几个坐标点就有几个Placemark节点，这里仅作示例
         List<Placemark> placeMarks =folder.getPlaceMarks();
+        // 全局动作序号：保证 wpml:actionId 在整条航线内唯一（DJI 校验错误码 322595）
+        int actionGlobalIndex = 0;
         for (int i = 0; i < placeMarks.size(); i++) {
             Element placeMarkElement = folderElement.addElement("Placemark");
             //航点坐标
@@ -230,10 +232,10 @@ public class CreateKml {
                 Element actionGroupElement = placeMarkElement.addElement("wpml:actionGroup");
                 //动作组id
                 actionGroupElement.addElement("wpml:actionGroupId").addText(String.valueOf(i));
-                //动作组开始生效的航点wpml:actionGroupStartIndex
-                actionGroupElement.addElement("wpml:actionGroupStartIndex").addText(Integer.toString(actionGroup.getActionGroupStartIndex()));
+                //动作组开始生效的航点wpml:actionGroupStartIndex（航点序号语义，非动作序号）
+                actionGroupElement.addElement("wpml:actionGroupStartIndex").addText(String.valueOf(i));
                 //动作组结束生效的航点wpml:actionGroupEndIndex
-                actionGroupElement.addElement("wpml:actionGroupEndIndex").addText(Integer.toString(actionGroup.getActionGroupEndIndex()));
+                actionGroupElement.addElement("wpml:actionGroupEndIndex").addText(String.valueOf(i));
                 //动作执行模式wpml:actionGroupMode
                 actionGroupElement.addElement("wpml:actionGroupMode").addText(actionGroup.getActionGroupMode());
 
@@ -256,7 +258,7 @@ public class CreateKml {
                     if("takePhoto".equals(action.getActionActuatorFunc()))
                     {
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("takePhoto");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         TakePhoto takePhoto = actionActuatorFuncParam.getTakePhoto();//获取拍照参数
@@ -285,7 +287,7 @@ public class CreateKml {
                     //定向拍照
                     if("orientedShoot".equals(action.getActionActuatorFunc())){
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("orientedShoot");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         OrientedShoot orientedShoot = actionActuatorFuncParam.getOrientedShoot();//获取定向拍照参数
@@ -328,7 +330,7 @@ public class CreateKml {
                     if("panoShot".equals(action.getActionActuatorFunc()))
                     {
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("panoShot");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         PanoShot panoShot = actionActuatorFuncParam.getPanoShot();//获取全景拍照参数
@@ -349,7 +351,7 @@ public class CreateKml {
                     if("startRecord".equals(action.getActionActuatorFunc()))
                     {
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("startRecord");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         StartRecord startRecord = actionActuatorFuncParam.getStartRecord();//获取开始录像参数
@@ -369,7 +371,7 @@ public class CreateKml {
                     //停止录像
                     if("stopRecord".equals(action.getActionActuatorFunc())){
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("stopRecord");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         StopRecord stopRecord = actionActuatorFuncParam.getStopRecord();//获取停止录像参数
@@ -380,7 +382,7 @@ public class CreateKml {
                     //云台府仰偏航角
                     if("gimbalRotate".equals(action.getActionActuatorFunc())){
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("gimbalRotate");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         GimbalRotate gimbalRotate = actionActuatorFuncParam.getGimbalRotate();//获取云台角度参数
@@ -400,7 +402,7 @@ public class CreateKml {
                     //相机变焦
                     if("zoom".equals(action.getActionActuatorFunc())){
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("zoom");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         Zoom zoom = actionActuatorFuncParam.getZoom();//获取云台角度参数
@@ -415,7 +417,7 @@ public class CreateKml {
                     if("customDirName".equals(action.getActionActuatorFunc()))
                     {
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("customDirName");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         CustomDirName customDirName = actionActuatorFuncParam.getCustomDirName();//获取文件夹参数
@@ -427,7 +429,7 @@ public class CreateKml {
                     //悬停
                     if("hover".equals(action.getActionActuatorFunc())){
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("hover");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         Hover hover = actionActuatorFuncParam.getHover();//获取悬停参数
@@ -439,7 +441,7 @@ public class CreateKml {
                     if("rotateYaw".equals(action.getActionActuatorFunc()))
                     {
                         Element actionElement =actionGroupElement.addElement("wpml:action");
-                        actionElement.addElement("wpml:actionId").addText(Integer.toString(j));
+                        actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex + j));
                         actionElement.addElement("wpml:actionActuatorFunc").addText("rotateYaw");
                         ActionActuatorFuncParam actionActuatorFuncParam=action.getActionActuatorFuncParam();//动作参数
                         RotateYaw rotateYaw = actionActuatorFuncParam.getRotateYaw();//获取飞行器偏航参数
@@ -451,6 +453,8 @@ public class CreateKml {
                     }
 
                 }
+                // 累加本组动作数，维护全局动作序号唯一
+                actionGlobalIndex += actionList.size();
             }
             //是否有风险
             placeMarkElement.addElement("wpml:isRisky").addText(Integer.toString(placemark.getIsRisky()));

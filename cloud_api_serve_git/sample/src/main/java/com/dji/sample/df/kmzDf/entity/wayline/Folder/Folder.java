@@ -21,7 +21,7 @@ public class Folder {
     @JsonProperty("waylineId")//航线id
     private int waylineId=0;
 
-    @JsonProperty("executeHeightMode")//高度模式
+    @JsonProperty("executeHeightMode")//高度模式：相对起飞点高度（实际执行语义，已实飞验证；如需椭球高改 WGS84 并同步前端标签）
     private String executeHeightMode="relativeToStartPoint";
 
     @JsonProperty("waylineCoordinateSysParam")//坐标系，有默认值

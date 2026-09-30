@@ -54,6 +54,8 @@
                         <div style="display: flex; justify-content:left;align-items: center; color: aliceblue;">
                           <span class="title">无人机机型:</span>
                           <span class="title" style="margin-left: 10px" v-if="lineState.droneEnumValue === 77">M3E/M3T/M3M</span>
+                          <span class="title" style="margin-left: 10px" v-else-if="lineState.droneEnumValue === 91">M3D/M3TD</span>
+                          <span class="title" style="margin-left: 10px" v-else-if="lineState.droneEnumValue === 100">M4D/M4TD</span>
                           <span class="title" style="margin-left: 10px" v-else>M30/M30T</span>
                         </div>
                         <!-- <el-select v-model="lineState.droneEnumValue" placeholder="Select" size="large" class="custom-select" @change="updateLine">
@@ -64,7 +66,7 @@
                     <el-divider class="divider-color" v-if="layerState.currentType === ''"></el-divider>
                     <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">安全起飞高度:</span>
+                          <span class="title">全局航点高度 (相对起飞点, m):</span>
                         </div>
                         <el-slider v-model="lineState.globalHeight" show-input   :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
                     </div>
@@ -78,7 +80,7 @@
                     <el-divider class="divider-color"  v-if="layerState.currentType === ''"></el-divider>
                     <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">相对起飞点高度:</span>
+                          <span class="title">安全起飞高度 (m):</span>
                         </div>
                         <el-slider v-model="lineState.takeOffSecurityHeight" show-input   :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
                     </div>
@@ -164,10 +166,10 @@
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
                     <div v-if="layerState.currentType != ''" style="margin-top: 30px;">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">相对起飞高度(m):</span>
+                          <span class="title">相对起飞点高度 (m):</span>
                           <el-checkbox  v-model="boolState.checked2" @change="changeLayer">跟随航线</el-checkbox>
                         </div>
-                        <el-input-number  class="custom-input-number" :disabled="boolState.checked2" v-model="pointState.flightHeight" :min="1" :max="200" @change="changeLayer"/>
+                        <el-input-number  class="custom-input-number" :disabled="boolState.checked2" v-model="pointState.flightHeight" :min="1" :max="1500" @change="changeLayer"/>
                     </div>
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
                     <div v-if="layerState.currentType != ''" style="margin-top: 10px">
@@ -360,7 +362,7 @@ import { MapDoodleColor, MapElementEnum } from '/@/constants/map'
 import { generatePoint } from '/@/utils/genjson'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
 import { ElMessage } from 'element-plus'
-import { commitWaylineFile, commitWaylineFile1 } from '/@/api/wayline'
+import { commitWaylineFile, commitWaylineFile1, deleteWaylineFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName, ELiveStatusValue, EStatusValue } from '/@/types'
 import { useMyStore } from '/@/store'
 import { useRouter } from 'vue-router'
@@ -396,7 +398,7 @@ const layerState = reactive({
 // 航线参数定义
 const lineState = reactive({
   finishAction: 'goHome', // 完成动作
-  takeOffSecurityHeight: 20, // 相对起飞高度
+  takeOffSecurityHeight: 20, // 安全起飞高度
   globalTransitionalSpeed: 4, // 飞向首航点的速度
   droneEnumValue: 77, // 无人机机型
   droneSubEnumValue: 0, // 无人机机型绑定的参数\负载,后续更换支持机型要改
@@ -404,11 +406,14 @@ const lineState = reactive({
   payloadSubEnumValue: 0,
   payloadPositionIndex: 0,
   autoFlightSpeed: 5, // 全局速度
-  globalHeight: 90, // 全局高度
+  globalHeight: 90, // 全局航点高度(相对起飞点)
   globalWaypointTurnMode: 'toPointAndStopWithDiscontinuityCurvature', // 航点类型
   globalWaypointHeadingMode: 'followWayline', // 偏航角模式
   gimbalPitchMode: 'usePointSetting' // 云台俯仰角控制模式
 })
+
+// 编辑态元信息（由航线列表页 editDrag 写入 localStorage 'wayline_edit_meta'）
+const editMeta = ref(null)
 
 // 云台俯仰角控制模式选项
 const gimbalPitchModeOption = [
@@ -496,7 +501,7 @@ const pointHeadingModeOption = [
 // 航点参数定义
 const pointState = reactive({
   speed: 5, // 航点速度设置
-  flightHeight: 100, // 相对起飞高度
+  flightHeight: 100, // 航点相对起飞点高度
   flightModel: '1', // 偏航角模式
   rotationDirction: '1', // 飞行器旋转方向
   mypointsType: 'toPointAndStopWithDiscontinuityCurvature', // 航点类型
@@ -609,6 +614,7 @@ onBeforeUnmount(() => {
   Layers[0].elements = []
   store.commit('SET_POINTS', Layers)
   localStorage.removeItem('wayline')
+  localStorage.removeItem('wayline_edit_meta')
 })
 function closeDiv () {
   visible1.value = false
@@ -627,6 +633,10 @@ const payloadMap = {
   91: {
     0: 80,
     1: 81,
+  },
+  100: {
+    0: 98,
+    1: 99,
   },
 }
 function commitWayline () {
@@ -650,13 +660,7 @@ function commitWayline () {
     }
     item.Placemark = {
       ...item.Placemark,
-      point: pointObj,
-      waypointHeadingParam: {
-        waypointHeadingAngle: item.Placemark.waypointHeadingAngle
-      },
-      waypointTurnParam: {
-        waypointTurnMode: item.Placemark.mypointsType
-      }
+      point: pointObj
     }
     if (item.Placemark.actionGroup && item.Placemark.actionGroup.actionList) {
       item.Placemark.actionGroup = {
@@ -702,11 +706,23 @@ function commitWayline () {
     if (res.code !== 0) {
       return
     }
-    router.push({ path: '/wayline' })
-    ElMessage({
-      message: '航线保存成功!',
-      type: 'success',
-      plain: true,
+    const finishCommit = () => {
+      router.push({ path: '/wayline' })
+      ElMessage({
+        message: '航线创建成功!.',
+        type: 'success',
+      })
+    }
+    const oldId = editMeta.value?.waylineId
+    if (!oldId) {
+      finishCommit()
+      return
+    }
+    // 编辑态覆盖：新文件创建成功后删除旧航线文件
+    deleteWaylineFile(workspaceId, oldId).finally(() => {
+      editMeta.value = null
+      localStorage.removeItem('wayline_edit_meta')
+      finishCommit()
     })
   })
 }
@@ -761,6 +777,26 @@ function init () {
     if (parsedData && typeof parsedData === 'object') {
       // 更新 Layers 的第一个元素
       Layers[0] = { ...Layers[0], ...parsedData }// 合并数据
+      // 编辑态：回填全局偏航角模式（提交时无条件取 lineState 该字段）
+      const headingMode = Layers[0].folder?.globalWaypointHeadingParam?.waypointHeadingMode
+      if (headingMode) {
+        lineState.globalWaypointHeadingMode = headingMode
+      }
+      // 读取编辑元信息（编辑已有航线时由航线列表页写入）
+      const editMetaRaw = localStorage.getItem('wayline_edit_meta')
+      if (editMetaRaw) {
+        try {
+          const meta = JSON.parse(editMetaRaw)
+          if (meta && meta.waylineId) {
+            editMeta.value = meta
+            ElMessage({
+              message: `正在编辑航线「${meta.originalName}」，提交后将覆盖原航线`,
+              type: 'info',
+              duration: 5000,
+            })
+          }
+        } catch (e) { /* 忽略非法元信息 */ }
+      }
       setTimeout(() => {
         useGMapCoverHook = useGMapCover()
         initMapCover(Layers[0])
