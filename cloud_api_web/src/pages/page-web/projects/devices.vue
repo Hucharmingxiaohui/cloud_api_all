@@ -133,7 +133,7 @@
                   </el-tooltip>
                 </div>
                 <div v-else class="flex-align-center flex-row" style="color: #2d8cf0">
-                  <el-button size="small" link type="primary" class="wayliedit" v-if="current.indexOf(EDeviceTypeName.Dock) !== -1"
+                  <el-button size="small" link type="primary" class="wayliedit" v-if="current.indexOf(EDeviceTypeName.Dock) !== -1 && scope.row.domain !== EDeviceTypeName.Aircraft"
                   @click="showDeviceLogUploadRecord(scope.row)">日志</el-button>
                   <el-button size="small" link type="primary" class="wayliedit" v-if="current.indexOf(EDeviceTypeName.Dock) !== -1"
                   @click="showHms(scope.row)">HMS</el-button>

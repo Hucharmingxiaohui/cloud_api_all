@@ -29,15 +29,14 @@
               label="上传时间"
               show-overflow-tooltip
             />
-         <el-table-column
+          <el-table-column
             prop="device_type"
             label="设备类型"
             show-overflow-tooltip
           >
             <template #default="scope">
               <div>
-              <div v-if="getDeviceInfo(scope.row).parents && getDeviceInfo(scope.row).parents.length > 0">{{ DEVICE_NAME[getDeviceInfo(scope.row).parents[0].device_model.device_model_key]}}</div>
-              <div v-if="getDeviceInfo(scope.row).hosts && getDeviceInfo(scope.row).hosts.length > 0">{{ DEVICE_NAME[getDeviceInfo(scope.row).hosts[0].device_model.device_model_key]}}</div>
+                <div v-for="dev in getRecordDevices(scope.row)" :key="dev.sn">{{ DEVICE_NAME[dev.device_model.device_model_key] || '未知设备' }}</div>
             </div>
             </template>
           </el-table-column>
@@ -49,11 +48,11 @@
           >
             <template #default="scope">
               <div>
-                <div v-if="getDeviceInfo(scope.row).parents && getDeviceInfo(scope.row).parents.length > 0">{{ getDeviceInfo(scope.row).parents[0].sn }}</div>
-                <div v-if="getDeviceInfo(scope.row).hosts && getDeviceInfo(scope.row).hosts.length > 0">{{ getDeviceInfo(scope.row).hosts[0].sn }}</div>
+                <div v-for="dev in getRecordDevices(scope.row)" :key="dev.sn">{{ dev.sn }}</div>
             </div>
             </template>
           </el-table-column>
+
           <el-table-column
             prop="status"
             label="上传状态"
@@ -117,7 +116,7 @@ import { IPage } from '/@/api/http/type'
 import { Device, DOMAIN, DEVICE_NAME } from '/@/types/device'
 import DeviceLogUploadModal from './DeviceLogUploadModal.vue'
 import DeviceLogDetailModal from './DeviceLogDetailModal.vue'
-import { getDeviceUploadLogList, GetDeviceUploadLogListRsp, cancelDeviceLogUpload, deleteDeviceLogUpload } from '/@/api/device-log'
+import { getDeviceUploadLogList, GetDeviceUploadLogListRsp, BriefDeviceInfo, cancelDeviceLogUpload, deleteDeviceLogUpload } from '/@/api/device-log'
 import { StopOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons-vue'
 import { DeviceLogUploadStatusEnum, DeviceLogUploadStatusMap, DeviceLogUploadStatusColor, DeviceLogUploadInfo, DeviceLogUploadWsStatusMap, DeviceLogProgressInfo } from '/@/types/device-log'
 import { useDeviceLogUploadProgressEvent } from './use-device-log-upload-progress-event'
@@ -196,6 +195,27 @@ type Pagination = TableState['pagination']
 function getDeviceInfo (deviceLogItem: GetDeviceUploadLogListRsp) {
   const { device_topo: deviceTopo } = deviceLogItem
   return deviceTopo
+}
+
+// 该条记录实际包含日志的设备：按日志文件所属 SN 过滤，避免只上传了机场日志却显示机巢+无人机两个设备
+function getRecordDevices (deviceLogItem: GetDeviceUploadLogListRsp): BriefDeviceInfo[] {
+  const topo = deviceLogItem.device_topo
+  if (!topo) {
+    return []
+  }
+  const fileSns = new Set<string>((deviceLogItem.device_logs?.files || []).map(file => file.device_sn))
+  const devices: BriefDeviceInfo[] = []
+  if (topo.parents?.length && fileSns.has(topo.parents[0].sn)) {
+    devices.push(topo.parents[0])
+  }
+  if (topo.hosts?.length && fileSns.has(topo.hosts[0].sn)) {
+    devices.push(topo.hosts[0])
+  }
+  // 无文件记录时兜底显示机巢（上传任务挂在机巢下）
+  if (devices.length === 0 && topo.parents?.length) {
+    devices.push(topo.parents[0])
+  }
+  return devices
 }
 
 // 获取上传状态

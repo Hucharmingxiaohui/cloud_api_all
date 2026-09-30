@@ -40,20 +40,9 @@
               </template>
             </el-table-column>
           </el-table>
-          <!-- <a-table  :columns="airportLogColumns"
-                    :scroll="{ x: '100%', y: 600 }"
-                    :data-source="airportTableLogState.logList?.list"
-                    :loading="airportTableLogState.tableLoading"
-                    :row-selection="airportTableLogState.rowSelection"
-                    rowKey="boot_index"
-                    :pagination = "false">
-            <template #log_time="{record}">
-              <div>{{getLogTime(record)}}</div>
-            </template>
-            <template #size="{record}">
-              <div>{{getLogSize(record.size)}}</div>
-            </template>
-          </a-table> -->
+          <div v-if="airportTableLogState.logList?.result && airportTableLogState.logList.result !== 0" class="log-list-error-tip">
+            {{ getLogListErrorTip(airportTableLogState.logList.result) }}
+          </div>
         </div>
         <div class="log-list-item">
           <el-table
@@ -81,6 +70,9 @@
               </template>
             </el-table-column>
           </el-table>
+          <div v-if="droneTableLogState.logList?.result && droneTableLogState.logList.result !== 0" class="log-list-error-tip">
+            {{ getLogListErrorTip(droneTableLogState.logList.result) }}
+          </div>
           <!-- <a-table  :columns="droneLogColumns"
                     :scroll="{ x: '100%', y: 600 }"
                     :data-source="droneTableLogState.logList?.list"
@@ -254,6 +246,17 @@ async function getDeviceLogInfo () {
   droneTableLogState.tableLoading = false
 }
 
+// 模块级错误提示（设备端返回非 0 时列表为空的原因）
+function getLogListErrorTip (result: number) {
+  if (result === 314000) {
+    return '设备正在上传日志或执行飞行任务，暂时无法获取日志列表，请稍后重新打开'
+  }
+  if (result === 324015) {
+    return '无人机关机或未连接，无法获取无人机日志'
+  }
+  return `获取日志列表失败（错误码 ${result}）`
+}
+
 // 日志上传
 async function uploadDeviceLog () {
   const body = {
@@ -296,6 +299,12 @@ const { getLogTime, getLogSize } = useDeviceLogUploadDetail()
     padding: 8px 0;
     .log-list-item{
       width: 420px;
+      .log-list-error-tip{
+        margin-top: 6px;
+        font-size: 12px;
+        color: #e6a23c;
+        line-height: 18px;
+      }
     }
   }
 }

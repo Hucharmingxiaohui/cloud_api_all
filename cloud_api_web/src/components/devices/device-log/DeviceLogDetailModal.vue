@@ -96,6 +96,7 @@
 
 <script lang="ts" setup>
 import { watchEffect, reactive, ref, defineProps, defineEmits } from 'vue'
+import { message } from 'ant-design-vue'
 import { ColumnProps, TableState } from 'ant-design-vue/lib/table/interface'
 import { IPage } from '/@/api/http/type'
 import { DOMAIN } from '/@/types/device'
@@ -170,9 +171,10 @@ async function onDownloadLog (fileId: string) {
     logs_id: props.deviceLog?.logs_id || ''
   })
   if (data) {
-    // download(data)
-    console.log('文件路径', data)
-  // download('https:/github.com/dji-sdk/Mobile-SDK-Android-V5/archive/refs/heads/dev-sdk-main.zip')
+    // 拿到对象存储临时下载地址后触发浏览器下载（机场/无人机共用此方法）
+    download(data)
+  } else {
+    message.error('获取日志下载地址失败，请确认日志已上传完成后重试')
   }
 }
 

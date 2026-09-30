@@ -163,7 +163,7 @@ export const DEVICE_NAME = {
   // dock
   [DEVICE_MODEL_KEY.Dock]: 'Dock',
   [DEVICE_MODEL_KEY.Dock2]: 'Dock2',
-  [DEVICE_MODEL_KEY.Dock2]: 'Dock3',
+  [DEVICE_MODEL_KEY.Dock3]: 'Dock3',
 }
 
 // 控制权
