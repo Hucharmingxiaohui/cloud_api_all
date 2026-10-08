@@ -36,6 +36,8 @@
                 and id = #{id}
             </if>
         </where>
+        <!-- 按点表树层级顺序排序，与左侧树展开一致；id 兜底保证分页顺序稳定 -->
+        ORDER BY sub_name, area_name, bay_name, device_name, component_name, point_name, id
         <if test="pageSize != null and pageSize != '' ">
             LIMIT ${startPos}, ${pageSize}
         </if>
