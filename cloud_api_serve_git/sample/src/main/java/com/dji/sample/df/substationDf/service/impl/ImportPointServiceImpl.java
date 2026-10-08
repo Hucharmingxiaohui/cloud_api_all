@@ -565,4 +565,38 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
         }
          return uniPointMapper2.deleteBatchIds(ids);
     }
+
+    @Override
+    public void updatePoint(Map<String, Object> params) {
+        Object idObj = params.get("id");
+        if (idObj == null || StringUtils.isBlank(String.valueOf(idObj))) {
+            throw new FastException("点位ID不能为空");
+        }
+        UniPoint point = new UniPoint();
+        point.setId(Long.valueOf(String.valueOf(idObj)));
+        // 层级名称与航线等信息按传入字段更新，未传字段保持原值
+        if (params.containsKey("areaName")) {
+            point.setAreaName(StringUtils.trimToNull((String) params.get("areaName")));
+        }
+        if (params.containsKey("bayName")) {
+            point.setBayName(StringUtils.trimToNull((String) params.get("bayName")));
+        }
+        if (params.containsKey("deviceName")) {
+            point.setDeviceName(StringUtils.trimToNull((String) params.get("deviceName")));
+        }
+        if (params.containsKey("componentName")) {
+            point.setComponentName(StringUtils.trimToNull((String) params.get("componentName")));
+        }
+        if (params.containsKey("waylineId")) {
+            // 允许传空字符串表示解除航线绑定（空串会更新，null 会被 updateById 跳过）
+            point.setWaylineId(StringUtils.trimToEmpty((String) params.get("waylineId")));
+        }
+        if (params.containsKey("waylinePointPos")) {
+            point.setWaylinePointPos(StringUtils.trimToNull((String) params.get("waylinePointPos")));
+        }
+        if (params.containsKey("picType") && params.get("picType") != null && !String.valueOf(params.get("picType")).isBlank()) {
+            point.setPicType(Integer.valueOf(String.valueOf(params.get("picType"))));
+        }
+        this.updateById(point);
+    }
 }

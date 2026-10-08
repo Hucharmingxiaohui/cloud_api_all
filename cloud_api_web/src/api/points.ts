@@ -81,6 +81,13 @@ export const deletePointListapi = async function (data): Promise<IWorkspaceRespo
   return result.data
 }
 
+// 编辑点位（层级名称、绑定航线、关联航点号、图片类型）
+export const updatePointApi = async function (data): Promise<IWorkspaceResponse<any>> {
+  const url = '/api/point/update'
+  const result = await request.post(url, data)
+  return result.data
+}
+
 // 点位标注区域绑定
 export const bindPointsApi = async function (data:any): Promise<IWorkspaceResponse<any>> {
   const url = '/tem/api/v1/workspace/bindPoint'

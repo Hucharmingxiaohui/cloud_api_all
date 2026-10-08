@@ -100,7 +100,7 @@
       </div>
       <div class="point-main-panel">
       <div class="table-container">
-        <el-table :data="tableData" stripe  @selection-change="handleSelectionChange">
+        <el-table :data="tableData" stripe class="point-table" @selection-change="handleSelectionChange">
           <el-table-column type="selection"  align="center" width="60"></el-table-column>
           <el-table-column
             type="index"
@@ -108,27 +108,37 @@
             label="序号"
             width="60"
           />
-          <el-table-column label="点位名称" prop="point_name" align="center">
+          <el-table-column label="点位名称" prop="point_name" align="center" min-width="110" show-overflow-tooltip>
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.point_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="变电站名称" prop="sub_name" align="center">
+          <el-table-column label="变电站名称" prop="sub_name" align="center" min-width="90" show-overflow-tooltip>
           </el-table-column>
-          <el-table-column label="区域名称" prop="area_name" align="center">
+          <el-table-column label="区域名称" prop="area_name" align="center" min-width="80" show-overflow-tooltip>
           </el-table-column>
-          <el-table-column label="间隔名称" prop="bay_name" align="center"></el-table-column>
-          <el-table-column label="主设备名称" prop="device_name" align="center"></el-table-column>
-          <el-table-column label="部件名称" prop="component_name" align="center"></el-table-column>
-          <el-table-column label="关联航线" prop="wayline_id" align="center"></el-table-column>
+          <el-table-column label="间隔名称" prop="bay_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
+          <el-table-column label="主设备名称" prop="device_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
+          <el-table-column label="部件名称" prop="component_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
+          <el-table-column label="关联航线名称" align="center" min-width="110" show-overflow-tooltip>
+            <template #default="scope">
+              {{ getWaylineName(scope.row.wayline_id) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="关联航线id" prop="wayline_id" align="center" width="90" show-overflow-tooltip></el-table-column>
           <el-table-column label="关联航点号" prop="wayline_point_pos" align="center" width="95"></el-table-column>
           <el-table-column label="图片类型" prop="pic_type" align="center" width="90">
             <template #default="scope">
               {{ scope.row.pic_type === 0? '可见光':'红外' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="120">
+          <el-table-column label="操作" align="center" width="160">
             <template #default="scope">
+              <el-button
+                link
+                type="primary"
+                @click="showPointEdit(scope.row)"
+              >编辑</el-button>
               <el-button
                 link
                 type="primary"
@@ -195,6 +205,68 @@
           </div>
         </div>
       </el-dialog>
+
+      <!-- 点位编辑弹窗 -->
+      <el-dialog
+        v-model="pointEditVisible"
+        title="编辑点位"
+        width="520px"
+        :close-on-click-modal="false"
+      >
+        <el-form :model="pointEditForm" label-width="100px">
+          <el-form-item label="区域名称" required>
+            <el-input v-model="pointEditForm.areaName" placeholder="请输入区域名称" maxlength="64" />
+          </el-form-item>
+          <el-form-item label="间隔名称" required>
+            <el-input v-model="pointEditForm.bayName" placeholder="请输入间隔名称" maxlength="64" />
+          </el-form-item>
+          <el-form-item label="主设备名称" required>
+            <el-input v-model="pointEditForm.deviceName" placeholder="请输入主设备名称" maxlength="64" />
+          </el-form-item>
+          <el-form-item label="部件名称" required>
+            <el-input v-model="pointEditForm.componentName" placeholder="请输入部件名称" maxlength="64" />
+          </el-form-item>
+          <el-form-item label="绑定航线">
+            <div style="display: flex; gap: 6px; margin-bottom: 6px; width: 100%;">
+              <el-input
+                v-model="waylineSearchInput"
+                placeholder="按名称筛选航线"
+                clearable
+                @keyup.enter="applyWaylineSearch"
+              />
+              <el-button type="primary" :icon="Search" @click="applyWaylineSearch">查询</el-button>
+            </div>
+            <el-select
+              v-model="pointEditForm.waylineId"
+              placeholder="请选择航线"
+              clearable
+              filterable
+              :loading="waylineOptionsLoading"
+              style="width: 100%;"
+            >
+              <el-option
+                v-for="wayline in filteredWaylineOptions"
+                :key="wayline.id"
+                :label="wayline.name || wayline.id"
+                :value="wayline.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="关联航点号">
+            <el-input v-model="pointEditForm.waylinePointPos" placeholder="请输入关联航点号" maxlength="32" />
+          </el-form-item>
+          <el-form-item label="图片类型">
+            <el-radio-group v-model="pointEditForm.picType">
+              <el-radio :label="0">可见光</el-radio>
+              <el-radio :label="1">红外</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="pointEditVisible = false">取消</el-button>
+          <el-button type="primary" :loading="pointEditSaving" @click="savePointEdit">保存</el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -203,9 +275,9 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { downloadFile } from '/@/utils/common'
-import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage } from 'element-plus'
-import { getPointList, getPointTree, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile } from '/@/api/points'
-import { getWaylineDetail } from '/@/api/wayline'
+import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage, ElRadioGroup, ElRadio } from 'element-plus'
+import { getPointList, getPointTree, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile, updatePointApi } from '/@/api/points'
+import { getWaylineDetail, getWaylineFiles } from '/@/api/wayline'
 import { ELocalStorageKey } from '/@/types'
 import { DEVICE_NAME } from '/@/types/device'
 import { WaylineFile } from '/@/types/wayline'
@@ -259,6 +331,7 @@ const pointTreeProps = {
 onMounted(() => {
   getPointTreeData()
   getPoinntList()
+  loadWaylineOptions()
 })
 
 async function getPointTreeData () {
@@ -338,6 +411,123 @@ async function showWaylineDetail (row) {
     waylineDetailVisible.value = true
   } finally {
     waylineDetailLoading.value = ''
+  }
+}
+
+// ================ 点位编辑 ================
+const pointEditVisible = ref(false)
+const pointEditSaving = ref(false)
+const waylineOptions = ref<any[]>([])
+const waylineOptionsLoading = ref(false)
+const editingPointId = ref<number | null>(null)
+const pointEditForm = reactive({
+  areaName: '',
+  bayName: '',
+  deviceName: '',
+  componentName: '',
+  waylineId: '',
+  waylinePointPos: '',
+  picType: 0
+})
+
+// 航线 id → 名称映射，列表"关联航线名称"列使用
+const waylineNameMap = computed(() => {
+  const map: Record<string, string> = {}
+  waylineOptions.value.forEach(wayline => {
+    map[wayline.id] = wayline.name || wayline.id
+  })
+  return map
+})
+
+function getWaylineName (waylineId?: string) {
+  if (!waylineId) {
+    return ''
+  }
+  // 找不到映射时回退显示 id，避免空白
+  return waylineNameMap.value[waylineId] || waylineId
+}
+
+const waylineSearchInput = ref('')
+const waylineSearch = ref('')
+
+// 点击"查询"或回车后才应用筛选
+function applyWaylineSearch () {
+  waylineSearch.value = waylineSearchInput.value.trim()
+}
+
+// 按名称（或 id）筛选航线
+const filteredWaylineOptions = computed(() => {
+  const keyword = waylineSearch.value.trim().toLowerCase()
+  if (!keyword) {
+    return waylineOptions.value
+  }
+  return waylineOptions.value.filter(wayline =>
+    (wayline.name || '').toLowerCase().includes(keyword) ||
+    (wayline.id || '').toLowerCase().includes(keyword)
+  )
+})
+
+// 拉取全部航线供下拉选择（大分页一次取全）
+async function loadWaylineOptions () {
+  if (!workspaceId) {
+    return
+  }
+  waylineOptionsLoading.value = true
+  try {
+    const res = await getWaylineFiles(workspaceId, { page: 1, page_size: 200 })
+    if (res.code === 0) {
+      waylineOptions.value = res.data?.list || []
+    }
+  } finally {
+    waylineOptionsLoading.value = false
+  }
+}
+
+function showPointEdit (row) {
+  editingPointId.value = row.id
+  pointEditForm.areaName = row.area_name || ''
+  pointEditForm.bayName = row.bay_name || ''
+  pointEditForm.deviceName = row.device_name || ''
+  pointEditForm.componentName = row.component_name || ''
+  pointEditForm.waylineId = row.wayline_id || ''
+  pointEditForm.waylinePointPos = row.wayline_point_pos || ''
+  pointEditForm.picType = row.pic_type ?? 0
+  waylineSearchInput.value = ''
+  waylineSearch.value = ''
+  pointEditVisible.value = true
+  if (waylineOptions.value.length === 0) {
+    loadWaylineOptions()
+  }
+}
+
+async function savePointEdit () {
+  if (!editingPointId.value) {
+    return
+  }
+  if (!pointEditForm.areaName.trim() || !pointEditForm.bayName.trim() || !pointEditForm.deviceName.trim() || !pointEditForm.componentName.trim()) {
+    ElMessage.warning('层级名称不能为空')
+    return
+  }
+  pointEditSaving.value = true
+  try {
+    const res = await updatePointApi({
+      id: editingPointId.value,
+      areaName: pointEditForm.areaName.trim(),
+      bayName: pointEditForm.bayName.trim(),
+      deviceName: pointEditForm.deviceName.trim(),
+      componentName: pointEditForm.componentName.trim(),
+      waylineId: pointEditForm.waylineId || '',
+      waylinePointPos: pointEditForm.waylinePointPos.trim(),
+      picType: pointEditForm.picType
+    })
+    if (res.code !== 0) {
+      return
+    }
+    ElMessage.success('更新成功')
+    pointEditVisible.value = false
+    getPoinntList()
+  } finally {
+    pointEditSaving.value = false
   }
 }
 
@@ -641,7 +831,28 @@ async function exportPointData () {
     flex-grow: 1;
     overflow: hidden;
     height: 100%;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+// 表格撑满容器纵向：内部包装层 flex 拉伸，行数不足时空区域仍属于表格
+.point-table {
+    flex: 1;
+    min-height: 0;
+    // el-table 默认白底，行数不足时拉伸区域会露白，统一为主题底色
+    background-color: #011C4B;
+
+    :deep(.el-table__inner-wrapper) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    :deep(.el-table__body-wrapper) {
+        flex: 1;
+        overflow-y: auto;
+        background-color: #011C4B;
+    }
 }
 
 .ellipsis {

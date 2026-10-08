@@ -261,4 +261,17 @@ public class ImportPointController {
         }
     }
 
+    /**
+     * 编辑点位：层级名称、绑定航线、关联航点号、图片类型
+     */
+    @PostMapping("update")
+    public Result<String> updatePoint(@RequestBody Map<String, Object> params) {
+        try {
+            importPointService.updatePoint(params);
+            return Result.success("更新成功");
+        } catch (Exception e) {
+            return Result.error("更新失败: " + e.getMessage());
+        }
+    }
+
 }

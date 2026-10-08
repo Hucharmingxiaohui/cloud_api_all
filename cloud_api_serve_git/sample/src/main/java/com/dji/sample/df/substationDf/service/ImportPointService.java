@@ -16,5 +16,7 @@ public interface ImportPointService {
 
     public int batchDelete(List<Integer> ids);
 
+    void updatePoint(Map<String, Object> params);
+
     public UniPoint getPointByCode(String subCode, String pointCode);
 }
