@@ -333,6 +333,11 @@ cq-dock:
   assign-task-path: /machineNest/noauth/third/task/assign_task
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
+  picture-local-path: /ftpdir/admin_files/eua-picture/
+  # 本地联调：mock图片目录（CqDockMockController picture/list 返回的图片从该目录读取，放 visible1/2.jpg 和 ir1/2.jpg）
+  mock-picture-path: /ftpdir/admin_files/test-pictures/
+  # 本地联调：中心FTP不可达时置 true（跳过真实FTP，Type=61 的 file_path 为 mock 路径）
+  mock-skip-ftp: false
 
 #导入巡视点位配置
 importPoint:

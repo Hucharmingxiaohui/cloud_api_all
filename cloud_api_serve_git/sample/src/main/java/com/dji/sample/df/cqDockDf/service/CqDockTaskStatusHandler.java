@@ -104,6 +104,7 @@ public class CqDockTaskStatusHandler {
                 if ("7".equals(euaStatus)) {
                     // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
 //                  todo 后续需让EUA平台规定7为图片上传结束标志
+//                  图片上传结束主动调用图片接口进行巡视上报
                     cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);

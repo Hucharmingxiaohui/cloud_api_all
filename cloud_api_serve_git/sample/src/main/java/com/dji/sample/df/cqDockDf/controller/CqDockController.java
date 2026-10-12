@@ -6,6 +6,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqPictureReportTestRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqTaskIdRequest;
 import com.dji.sample.df.cqDockDf.service.CqDockApiService;
 import com.dji.sample.df.cqDockDf.service.CqDockPictureReportService;
+import com.dji.sample.df.uavCommonHandleDf.handler.CenterTaskHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.Map;
 
 /**
  * 重庆电力下级无人机平台对接接口（转发调用下级 HTTP）
@@ -28,6 +30,9 @@ public class CqDockController {
 
     @Resource
     private CqDockPictureReportService cqDockPictureReportService;
+
+    @Resource
+    private CenterTaskHandler centerTaskHandler;
 
     /**
      * 机场任务下发
@@ -72,7 +77,34 @@ public class CqDockController {
         cqDockPictureReportService.fetchSaveAndReport(request.getTaskCode(), request.getTaskName(), request.getEuaTaskId());
         response.setCode(200);
         response.setSuccess(true);
-        response.setMsg("EUA图片列表获取、入库、本地保存、FTP上传、TCP上报逻辑已触发");
+        response.setMsg("EUA图片列表获取、入库、本地保存、分析调度已触发");
+        return response;
+    }
+
+    /**
+     * 本地联调：模拟上级下发间隔任务（真实走 Redis 定时调度 -> CenterTaskHandler 60秒扫描 -> EUA下发）。
+     * 入参：bayId（间隔ID，点位表的bay_id）、taskCode、taskName、delaySeconds（延迟执行秒数，默认5）。
+     */
+    @PostMapping("/test/schedule-task")
+    public CqApiResponse scheduleTask(@RequestBody Map<String, Object> params) {
+        log.info("[cq-dock] controller scheduleTask body={}", params);
+        CqApiResponse response = new CqApiResponse();
+        String bayId = params.get("bayId") == null ? null : String.valueOf(params.get("bayId"));
+        String taskCode = params.get("taskCode") == null ? null : String.valueOf(params.get("taskCode"));
+        String taskName = params.get("taskName") == null ? "本地联调EUA任务" : String.valueOf(params.get("taskName"));
+        int delaySeconds = params.get("delaySeconds") == null ? 5 : Integer.parseInt(String.valueOf(params.get("delaySeconds")));
+        if (!StringUtils.hasText(bayId) || !StringUtils.hasText(taskCode)) {
+            response.setCode(400);
+            response.setSuccess(false);
+            response.setMsg("bayId和taskCode不能为空");
+            return response;
+        }
+        String fixedStartTime = java.time.LocalDateTime.now().plusSeconds(delaySeconds)
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
+        response.setCode(200);
+        response.setSuccess(true);
+        response.setMsg("定时任务已加入Redis调度，" + fixedStartTime + " 到点后由扫描器执行EUA下发");
         return response;
     }
 }

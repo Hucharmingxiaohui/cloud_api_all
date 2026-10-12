@@ -24,5 +24,15 @@ public class CqDockProperties {
 
     private String taskStatusPath = "/machineNest/noauth/third/task/status";
 
-    private String pictureLocalPath = "D:/Temp/eua-picture";
+    private String pictureLocalPath = "/ftpdir/admin_files/eua-picture/";
+
+    /**
+     * 本地联调：mock 图片所在目录（EUA picture/list 返回的图片由该目录提供）
+     */
+    private String mockPicturePath = "/ftpdir/admin_files/test-pictures/";
+
+    /**
+     * 本地联调：true 时跳过真实 FTP 上传，直接返回 mock 路径（无中心 FTP 环境时保证 Type=61 链路可验证）
+     */
+    private Boolean mockSkipFtp = false;
 }

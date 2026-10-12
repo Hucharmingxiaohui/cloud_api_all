@@ -28,6 +28,7 @@ import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
 import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.service.ResultService;
+import com.dji.sample.df.cqDockDf.service.CqDockPictureReportService;
 import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
 import com.dji.sample.df.windDf.config.FjFileConfig;
@@ -109,6 +110,8 @@ public class ResultServiceImpl implements ResultService {
     private TemMeasureService temMeasureService;
     @Autowired
     private AnalyseStandardConfig analyseStandardConfig;
+    @Autowired
+    private CqDockPictureReportService cqDockPictureReportService;
     //      只针对一个航点对应一个点位（因为点位导入的时候就是点位与一个航点预置位号绑定）
     @Override
     public void handleUavResult(Map<String,String> map,String workspaceId,String jobId) throws Exception {
@@ -338,6 +341,12 @@ public class ResultServiceImpl implements ResultService {
 
         log.info("【收到智能分析结果】 ：{}", JSONObject.toJSONString(analyseParamsRecReq));
         String requestId = analyseParamsRecReq.getRequestId();
+
+//      重庆EUA图片分析回调：按 requestId 路由到 CQ 处理（更新分析结果、检查全部完成后统一上报），不走本类 recg 流程
+        if (cqDockPictureReportService.isCqAnalyseRequest(requestId)) {
+            cqDockPictureReportService.handleAnalyseCallback(analyseParamsRecReq);
+            return;
+        }
 
         RecgFileEntity recgFileEntity = recgFileEntityMapper.selectOne(new LambdaQueryWrapper<RecgFileEntity>().eq(RecgFileEntity::getRequestId, requestId));
         RecgPointsEntity recgPointsEntity = recgPointsEntityMapper.selectOne(new LambdaQueryWrapper<RecgPointsEntity>().eq(RecgPointsEntity::getRequestId, requestId));

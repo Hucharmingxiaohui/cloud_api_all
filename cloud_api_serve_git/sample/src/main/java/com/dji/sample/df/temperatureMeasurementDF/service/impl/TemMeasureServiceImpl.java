@@ -334,6 +334,135 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         }
     }
 
+    /**
+     * 重庆EUA红外图片测温：直接使用本地已下载的红外图片（R-JPEG）调用大疆测温SDK，
+     * 不经过平台媒体库（media_file）查找。测温完成后保留原图（后续还需FTP上传上报）。
+     */
+    @Override
+    public TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity) {
+        log.info("EUA红外测温开始，imagePath={}", imagePath);
+        TemResultEntity temResultEntity = new TemResultEntity();
+        DeleteFile deleteFile = new DeleteFile();
+        File imageFile = new File(imagePath);
+        if (!imageFile.exists()) {
+            temResultEntity.setError("本地红外图片不存在: " + imagePath);
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        String targetFolder = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/temTest";
+        //2根据图像生成raw图像（与getTemByLocalFile同一套测温SDK）
+        String command = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp";
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("windows")) {
+            command = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/utility/bin/windows/release_x64/dji_irp.exe";
+        }
+        String outputFilePath = targetFolder + "/" + "measure.raw";
+        String[] cmd = {
+                command,
+                "-s", imagePath,
+                "-a", "measure",
+                "-o", outputFilePath
+        };
+        try {
+            Files.createDirectories(Path.of(targetFolder));
+            ProcessBuilder processBuilder = new ProcessBuilder(cmd);
+            processBuilder.redirectErrorStream(true);
+            Process process = processBuilder.start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                while (reader.readLine() != null) {
+                    // 丢弃SDK过程输出
+                }
+            }
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                temResultEntity.setError("生成raw格式温度图出错");
+                deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+                log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+                return temResultEntity;
+            }
+        } catch (Exception e) {
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            temResultEntity.setError("生成raw格式温度图出错");
+            log.error("EUA红外生成raw格式温度图出错", e);
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        //3根据raw文件生成温度矩阵（红外图固定 640x512）
+        int width = 640;
+        int height = 512;
+        double[][] temperatureMatrix = new double[height][width];
+        try {
+            File rawFile = new File(outputFilePath);
+            long expectedSize = (long) width * height * 2;
+            if (rawFile.length() != expectedSize) {
+                throw new IOException("File size mismatch. Expected: " + expectedSize + " bytes, but found: " + rawFile.length() + " bytes.");
+            }
+            FileInputStream fis = new FileInputStream(rawFile);
+            byte[] buffer = new byte[(int) rawFile.length()];
+            fis.read(buffer);
+            fis.close();
+            ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
+            byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            for (int i = 0; i < height; i++) {
+                for (int j = 0; j < width; j++) {
+                    if (!byteBuffer.hasRemaining()) {
+                        throw new IOException("Unexpected end of file. Data might be corrupted.");
+                    }
+                    double temperature = byteBuffer.getShort() / 10.0;
+                    temperatureMatrix[i][j] = temperature;
+                }
+            }
+        } catch (IOException e) {
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            temResultEntity.setError("温度处理异常");
+            log.error("EUA红外温度处理异常", e);
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        //4点测温 / 区域测温（保留EUA本地原图，只清理measure.raw）
+        if (temParamEntity.getPoint_x() != null && temParamEntity.getPoint_y() != null) {
+            double roundedNum = Math.round(temperatureMatrix[temParamEntity.getPoint_y()][temParamEntity.getPoint_x()] * 10) / 10.0;
+            temResultEntity.setPoint_tem(roundedNum);
+            temResultEntity.setPoint_position("(" + temParamEntity.getPoint_x() + "," + temParamEntity.getPoint_y() + ")");
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        if (temParamEntity.getLeft_top_x() > temParamEntity.getRight_bottom_x() ||
+                temParamEntity.getLeft_top_y() > temParamEntity.getRight_bottom_y()) {
+            temResultEntity.setError("区域测温参数设置错误");
+            deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+            return temResultEntity;
+        }
+        temResultEntity.setLeft_top_position("(" + temParamEntity.getLeft_top_x() + "," + temParamEntity.getLeft_top_y() + ")");
+        temResultEntity.setRight_bottum_position("(" + temParamEntity.getRight_bottom_x() + "," + temParamEntity.getRight_bottom_y() + ")");
+        int width1 = temParamEntity.getRight_bottom_x() - temParamEntity.getLeft_top_x() + 1;
+        int height1 = temParamEntity.getRight_bottom_y() - temParamEntity.getLeft_top_y() + 1;
+        Double sumTem = 0.0;
+        Double temMax = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
+        Double temMin = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
+        for (int i1 = 0; i1 < height1; i1++) {
+            for (int j1 = 0; j1 < width1; j1++) {
+                double value = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
+                sumTem = sumTem + value;
+                if (value > temMax) {
+                    temMax = value;
+                }
+                if (value < temMin) {
+                    temMin = value;
+                }
+            }
+        }
+        Double avarengeTem = sumTem / (width1 * height1);
+        temResultEntity.setAverage_tem(Math.round(avarengeTem * 10) / 10.0);
+        temResultEntity.setMax_tem(Math.round(temMax * 10) / 10.0);
+        temResultEntity.setMin_tem(Math.round(temMin * 10) / 10.0);
+        deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+        log.info("测温结束，结果={}", formatTemResult(temResultEntity));
+        return temResultEntity;
+    }
+
     private String formatTemResult(TemResultEntity result) {
         if (result.getError() != null) {
             return "失败，error=" + result.getError();
