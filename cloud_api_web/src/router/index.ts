@@ -314,6 +314,16 @@ const routes: Array<RouteRecordRaw> = [
             }
           },
 
+          {
+            path: '/taskManage/euaPlan',
+            name: 'euaPlan',
+            component: () => import('/@/components/task/euaPlan/euaPlanMgt.vue'),
+            meta: {
+              showInMenu: true,
+              label: 'EUA平台计划',
+              cache: true
+            }
+          },
           // 子菜单 - 飞行任务
           {
             path: '/' + ERouterName.TASK,

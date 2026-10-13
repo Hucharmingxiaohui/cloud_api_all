@@ -117,6 +117,14 @@ public class CqDockPictureReportService {
     }
 
     /**
+     * 平台内EUA计划入口：HTTP查图 -> 落库+本地保存 -> 可见光分析/红外测温，不向上级巡视系统上报Type=61。
+     */
+    public void fetchSaveAndAnalyseOnly(String taskCode, String taskName, String euaTaskId) {
+        fetchAndSavePictures(taskCode, taskName, euaTaskId);
+        startAnalysisOnly(taskCode, euaTaskId);
+    }
+
+    /**
      * MQTT主动推送链路：只入库和下载到本地，分析上报统一走主动查图链路。
      */
     public void saveMqttPicture(String topic, JSONObject picture) {
@@ -221,11 +229,13 @@ public class CqDockPictureReportService {
         log.info("CQ可见光分析回调完成: taskCode={}, euaTaskId={}, pictureName={}, code={}, resImageUrl={}",
                 row.getBusinessId(), row.getEuaTaskId(), row.getPictureName(), code, resImageUrl);
 
-        if (analyseOk && StringUtils.hasText(row.getAnalysisImageUrl())) {
+        if (analyseOk && StringUtils.hasText(row.getAnalysisImageUrl()) && shouldReportToPatrol(row)) {
             reportSingleAnalysisResult(row);
         } else if (!analyseOk) {
             log.warn("CQ可见光分析失败，仅记录状态不再阻塞原图上报: taskCode={}, pictureName={}, pointValUnit={}",
                     row.getBusinessId(), row.getPictureName(), row.getPointValUnit());
+        } else if (!shouldReportToPatrol(row)) {
+            log.info("CQ平台内EUA任务可见光分析完成，不上报巡视: taskCode={}, pictureName={}", row.getBusinessId(), row.getPictureName());
         }
     }
 
@@ -254,6 +264,14 @@ public class CqDockPictureReportService {
      * 分析调度：红外同步测温，可见光提交智能分析服务等回调；无待分析项时直接上报。
      */
     private void startAnalysisAndReport(String taskCode, String taskName, String euaTaskId) {
+        startAnalysis(taskCode, taskName, euaTaskId, true);
+    }
+
+    private void startAnalysisOnly(String taskCode, String euaTaskId) {
+        startAnalysis(taskCode, null, euaTaskId, false);
+    }
+
+    private void startAnalysis(String taskCode, String taskName, String euaTaskId, boolean reportToPatrol) {
 //      查询到此任务数据库里的图片
         List<CqDockTaskPictureEntity> rows = cqDockTaskPictureMapper.selectList(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
                 .eq(CqDockTaskPictureEntity::getBusinessId, taskCode)
@@ -278,7 +296,7 @@ public class CqDockPictureReportService {
                 }
                 if (row.getPointType() != null && row.getPointType() == POINT_TYPE_INFRARED) {
 //                  红外图片测温
-                    measureInfrared(row, uniPoint);
+                    measureInfrared(row, uniPoint, reportToPatrol);
                 } else {
 //                  可见光图片对接分析
                     if (submitVisibleAnalysis(row, uniPoint, taskName, euaTaskId)) {
@@ -313,6 +331,10 @@ public class CqDockPictureReportService {
      * 红外：大疆测温SDK同步测温（需要点位红外坐标，前期可以手动先填入测试）。
      */
     private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint) {
+        measureInfrared(row, uniPoint, true);
+    }
+
+    private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint, boolean reportToPatrol) {
         String coordinate = uniPoint.getInfraredImageCoordinate();
         TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
         if (temParamEntity == null) {
@@ -330,7 +352,16 @@ public class CqDockPictureReportService {
         row.setUpdateTime(new Date());
         cqDockTaskPictureMapper.updateById(row);
         log.info("CQ红外测温完成: taskCode={}, pictureName={}, pointVal={}", row.getBusinessId(), row.getPictureName(), row.getPointVal());
-        reportSingleAnalysisResult(row);
+        if (reportToPatrol) {
+            reportSingleAnalysisResult(row);
+        } else {
+            log.info("CQ平台内EUA任务红外测温完成，不上报巡视: taskCode={}, pictureName={}", row.getBusinessId(), row.getPictureName());
+        }
+    }
+
+    private boolean shouldReportToPatrol(CqDockTaskPictureEntity row) {
+        CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
+        return record == null || record.getReportToPatrol() == null || record.getReportToPatrol() == 1;
     }
 
     private TemParamEntity parseInfraredCoordinate(String coordinate) {

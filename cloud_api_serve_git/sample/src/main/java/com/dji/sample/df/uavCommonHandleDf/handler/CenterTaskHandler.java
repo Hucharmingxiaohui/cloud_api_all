@@ -2,18 +2,13 @@ package com.dji.sample.df.uavCommonHandleDf.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.alibaba.fastjson.JSONObject;
 import com.df.framework.redis.RedisUtils;
 import com.dji.sample.df.substationDf.dao.UniPointMapper2;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.common.model.CustomClaim;
-import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
-import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
-import com.dji.sample.df.cqDockDf.model.dto.CqAssignTaskRequest;
-import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
-import com.dji.sample.df.cqDockDf.service.CqDockApiService;
-import com.dji.sample.df.cqDockDf.service.CqDockTaskStatusHandler;
+import com.dji.sample.df.cqDockDf.model.dto.CqDockTaskDispatchResult;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskDispatchService;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
@@ -32,7 +27,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 /*
 主要负责对接巡视上级的任务下发，根据不同场景分发执行不同通道飞行任务
@@ -53,11 +47,7 @@ public class CenterTaskHandler {
     @Autowired
     UniPointMapper2 uniPointMapper2;
     @Autowired
-    private CqDockApiService cqDockApiService;
-    @Autowired
-    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
-    @Autowired
-    private CqDockTaskStatusHandler cqDockTaskStatusHandler;
+    private CqDockTaskDispatchService cqDockTaskDispatchService;
 
     @Value("${solar.center-plan-prefix:上级}")
     private String solarCenterPlanPrefix;
@@ -428,90 +418,8 @@ public class CenterTaskHandler {
      * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
      */
     private TaskExecutionResult executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
-        log.info("开始执行EUA定时任务: taskCode={}, bayId={}, taskName={}, fixedStartTime={}",
-                taskCode, bayId, taskName, fixedStartTime);
-        String routeId = resolveCqDockRouteId(bayId);
-        log.info("EUA定时任务匹配航线: taskCode={}, bayId={}, routeId={}", taskCode, bayId, routeId);
-        if (!StringUtils.hasText(routeId)) {
-            log.error("EUA定时任务执行失败，未在df_uni_point中匹配到航线: taskCode={}, bayId={}", taskCode, bayId);
-            saveCqDockTaskRecord(taskCode, taskName, bayId, null, null, null, "未在df_uni_point中匹配到航线", null, false);
-            return TaskExecutionResult.failed();
-        }
-
-        CqAssignTaskRequest request = new CqAssignTaskRequest();
-        request.setTaskName(taskName);
-        request.setBusinessId(taskCode);
-        request.setRouteId(routeId);
-        // todo EUA接口当前只需要任务名称、业务ID和航线ID，deviceIdList根据实际情况补充，到定时时间后再真正调用下级下发
-        log.info("EUA定时任务准备调用下级任务下发: taskCode={}, bayId={}, routeId={}, request={}",
-                taskCode, bayId, routeId, JSONObject.toJSONString(request));
-        CqApiResponse response = cqDockApiService.assignTask(request);
-        log.info("EUA定时任务下级接口返回: taskCode={}, code={}, success={}, msg={}",
-                taskCode, response == null ? null : response.getCode(),
-                response == null ? null : response.getSuccess(), response == null ? null : response.getMsg());
-        boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
-        String euaTaskId = extractEuaTaskId(response);
-        saveCqDockTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId,
-                response == null ? null : response.getCode(),
-                response == null ? "EUA接口无响应" : response.getMsg(),
-                response == null ? null : response.getRawBody(), success);
-        if (success) {
-            log.info("EUA定时任务下发成功: taskCode={}, bayId={}, routeId={}, taskId={}", taskCode, bayId, routeId, euaTaskId);
-            cqDockTaskStatusHandler.startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime);
-            return TaskExecutionResult.success(euaTaskId);
-        }
-        log.error("EUA定时任务下发失败: taskCode={}, bayId={}, routeId={}, code={}, msg={}",
-                taskCode, bayId, routeId, response == null ? null : response.getCode(),
-                response == null ? "EUA接口无响应" : response.getMsg());
-        return TaskExecutionResult.failed();
-    }
-
-    /**
-     * 通过上级间隔ID查询df_uni_point，按一个间隔对应一个航线的规则获取EUA routeId。
-     */
-    private String resolveCqDockRouteId(String bayId) {
-        if (!StringUtils.hasText(bayId)) {
-            return null;
-        }
-        return uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()
-                        .eq(UniPoint::getBayId, bayId)
-                        .isNotNull(UniPoint::getWaylineId))
-                .stream()
-                .map(UniPoint::getWaylineId)
-                .filter(StringUtils::hasText)
-                .distinct()
-                .findFirst()
-                .orElse(null);
-    }
-
-    private String extractEuaTaskId(CqApiResponse response) {
-        if (response == null || response.getData() == null) {
-            return null;
-        }
-        JSONObject data = response.getData();
-        return data.getString("taskId");
-    }
-
-    /**
-     * 保存上级业务ID与EUA任务ID映射，后续任务状态、结果查询通过该记录关联。
-     */
-    private void saveCqDockTaskRecord(String taskCode, String taskName, String bayId, String routeId,
-                                      String euaTaskId, Integer responseCode, String responseMsg,
-                                      String rawResponse, boolean success) {
-        CqDockTaskRecordEntity record = new CqDockTaskRecordEntity();
-        record.setBusinessId(taskCode);
-        record.setTaskName(taskName);
-        record.setBayId(bayId);
-        record.setRouteId(routeId);
-        record.setEuaTaskId(euaTaskId);
-        record.setResponseCode(responseCode);
-        record.setResponseMsg(responseMsg);
-        record.setSuccess(success ? 1 : 0);
-        record.setRawResponse(rawResponse);
-        Date now = new Date();
-        record.setCreateTime(now);
-        record.setUpdateTime(now);
-        cqDockTaskRecordMapper.insert(record);
+        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByBay(bayId, taskCode, taskName, fixedStartTime, true);
+        return result.isSuccess() ? TaskExecutionResult.success(result.getEuaTaskId()) : TaskExecutionResult.failed();
     }
 
     private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {

@@ -45,6 +45,10 @@ public class CqDockTaskRecordEntity {
     @TableField("raw_response")
     private String rawResponse;
 
+    /** 是否向上级巡视系统上报状态和图片：1上报 0不上报 */
+    @TableField("report_to_patrol")
+    private Integer reportToPatrol;
+
     @TableField("create_time")
     private Date createTime;
 

@@ -2,11 +2,14 @@ package com.dji.sample.df.cqDockDf.service;
 
 import com.alibaba.fastjson.JSONObject;
 import com.df.framework.redis.RedisUtils;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.config.CenterNormalConfig;
 import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
+import com.dji.sample.df.cqDockDf.dao.CqEuaPlanMapper;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
+import com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,11 +39,17 @@ public class CqDockTaskStatusHandler {
     @Autowired
     private CqDockPictureReportService cqDockPictureReportService;
     @Autowired
+    private CqEuaPlanMapper cqEuaPlanMapper;
+    @Autowired
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
 
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
+        startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, true);
+    }
+
+    public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime, boolean reportToPatrol) {
         if (!StringUtils.hasText(euaTaskId)) {
             log.warn("EUA任务下发成功但未返回taskId，无法启动状态查询: taskCode={}", taskCode);
             return;
@@ -49,12 +58,13 @@ public class CqDockTaskStatusHandler {
         detail.put("taskName", taskName);
         detail.put("euaTaskId", euaTaskId);
         detail.put("fixedStartTime", fixedStartTime);
+        detail.put("reportToPatrol", String.valueOf(reportToPatrol));
         detail.put("lastState", "");
         detail.put("lastProgress", "");
         redisUtils.sSet(MONITOR_SET, taskCode);
         redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
         redisUtils.expire(MONITOR_HASH + ":" + taskCode, 2 * 60 * 60L);
-        log.info("开始监控EUA任务状态: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+        log.info("开始监控EUA任务状态: taskCode={}, euaTaskId={}, reportToPatrol={}", taskCode, euaTaskId, reportToPatrol);
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -94,8 +104,11 @@ public class CqDockTaskStatusHandler {
             String euaStatus = extractStatus(data);
             String mappedState = mapEuaState(euaStatus);
             int progress = extractProgress(data, mappedState);
-            sendTaskStatus(taskCode, detail.get("taskName"), euaTaskId, mappedState, progress,
-                    detail.get("fixedStartTime"), euaStatus);
+            boolean reportToPatrol = Boolean.parseBoolean(detail.getOrDefault("reportToPatrol", "true"));
+            if (reportToPatrol) {
+                sendTaskStatus(taskCode, detail.get("taskName"), euaTaskId, mappedState, progress,
+                        detail.get("fixedStartTime"), euaStatus);
+            }
             detail.put("lastState", mappedState);
             detail.put("lastProgress", String.valueOf(progress));
             redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
@@ -105,7 +118,16 @@ public class CqDockTaskStatusHandler {
                     // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
 //                  todo 后续需让EUA平台规定7为图片上传结束标志
 //                  图片上传结束主动调用图片接口进行巡视上报
-                    cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
+                    if (reportToPatrol) {
+                        cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
+                    } else {
+                        cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
+                    }
+                    if (!reportToPatrol) {
+                        updateEuaPlanExecuteStatus(taskCode, true, "EUA任务完成");
+                    }
+                } else if (!reportToPatrol) {
+                    updateEuaPlanExecuteStatus(taskCode, false, "EUA任务结束，状态=" + euaStatus);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);
@@ -125,6 +147,22 @@ public class CqDockTaskStatusHandler {
             }
         }
         return result;
+    }
+
+    private void updateEuaPlanExecuteStatus(String taskCode, boolean success, String message) {
+        if (!StringUtils.hasText(taskCode)) {
+            return;
+        }
+        CqEuaPlanEntity plan = cqEuaPlanMapper.selectOne(new LambdaQueryWrapper<CqEuaPlanEntity>()
+                .eq(CqEuaPlanEntity::getLastTaskCode, taskCode)
+                .last("LIMIT 1"));
+        if (plan == null) {
+            return;
+        }
+        plan.setLastExecuteStatus(success ? 1 : 0);
+        plan.setLastExecuteMsg(message);
+        plan.setUpdateTime(new Date());
+        cqEuaPlanMapper.updateById(plan);
     }
 
     private String extractStatus(JSONObject data) {
