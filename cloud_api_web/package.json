@@ -23,6 +23,7 @@
     "agora-rtc-sdk-ng": "^4.12.1",
     "ant-design-vue": "^2.2.8",
     "axios": "^0.21.1",
+    "dfcode": "^3.3.19",
     "docx-preview": "^0.3.7",
     "element-plus": "^2.6.3",
     "eventemitter3": "^5.0.0",

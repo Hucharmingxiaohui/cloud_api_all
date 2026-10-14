@@ -173,6 +173,11 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
 
     @Transient
     @TableField(exist = false)
+    @JsonAlias("inspectSupport")
+    private Boolean inspectSupport;//可选支架巡检，不持久化
+
+    @Transient
+    @TableField(exist = false)
     @JsonProperty("frog_jump_mode")
     private Boolean frogJumpMode;//是否蛙跳模式，不持久化
 

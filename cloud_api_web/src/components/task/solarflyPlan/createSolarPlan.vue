@@ -165,6 +165,9 @@
                     <el-checkbox value="ir">红外</el-checkbox>
                   </el-checkbox-group>
                 </el-form-item>
+                <el-form-item label="巡检内容：">
+                  <el-checkbox v-model="planBody.inspectSupport">同时巡检支架（默认仅巡检组件）</el-checkbox>
+                </el-form-item>
                 <div
                   v-for="group in taskGroups"
                   :key="group.groupId"
@@ -575,6 +578,7 @@ const planBody = reactive({
   enable_status: 0,
   plan_priority: 1,
   type: 'auto',
+  inspectSupport: false,
   image_format_list: ['visable'], // 相机类型多选
   image_format: computed(() => planBody.image_format_list.join(',')) // 提交时转为逗号分隔字符串
 })
@@ -841,8 +845,11 @@ function getGroupAreaConfigPayload (group: DeviceTaskGroup) {
 
 // 按分组构造提交体：设备、区域、planId 均为该分组独立
 function getGroupPlanBody (group: DeviceTaskGroup, index: number) {
+  // 后端全局 SNAKE_CASE 命名策略，camelCase 键不会被绑定，需按规范名提交
+  const { inspectSupport, ...planBodyRest } = toRaw(planBody)
   return {
-    ...toRaw(planBody),
+    ...planBodyRest,
+    inspect_support: planBody.inspectSupport,
     name: `${planBody.name}-${group.dock.nickname}`,
     dock_sn: group.dock.device_sn,
     image_format: planBody.image_format,

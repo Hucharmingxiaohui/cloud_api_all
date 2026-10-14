@@ -1120,6 +1120,7 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
 //      构建整体json
         JSONObject root = new JSONObject();
+        root.put("inspectSupport", Boolean.TRUE.equals(pubWaylineJobPlanDfEntity.getInspectSupport()));
         if(pubWaylineJobPlanDfEntity.getImageFormat() != null){
             root.put("imageFormat", pubWaylineJobPlanDfEntity.getImageFormat());
         }

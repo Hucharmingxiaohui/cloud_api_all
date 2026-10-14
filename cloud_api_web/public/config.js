@@ -3,6 +3,9 @@ const CURRENT_CONFIG = {
   baseURL: 'http://172.20.63.157:6789/',
   kmzURL: 'http://172.20.63.157:6789/',
   websocketURL: 'ws://172.20.63.157:6789/api/v1/ws',
+  // baseURL: 'http://127.0.0.1:6789/',
+  // kmzURL: 'http://127.0.0.1:6789/',
+  // websocketURL: 'ws://127.0.0.1:6789/api/v1/ws',
   rtmpURL: 'rtmp://172.20.63.157:2035/live/', // 视频请求推流地址
   rtcURL: 'http://172.20.63.157:2085/rtc/v1/whip/?app=live&stream=', // 视频请求推流地址
   flvURL: 'http://172.20.63.157:9080/live/',  // 视频流地址

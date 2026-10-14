@@ -1,5 +1,6 @@
 import vue from '@vitejs/plugin-vue'
 // config alias
+import fs from 'fs'
 import path from 'path'
 import { ConfigEnv, defineConfig, UserConfigExport } from 'vite'
 import ViteComponents, { AntDesignVueResolver } from 'vite-plugin-components'
@@ -15,6 +16,31 @@ import cesium from 'vite-plugin-cesium'
 export default ({ command, mode }: ConfigEnv): UserConfigExport =>
   defineConfig({
     plugins: [
+      {
+        // 开发期本地瓦片缓存：内网瓦片服务(192.168.160.1:19922)不可达时，
+        // 优先从 map_xyz_9/{z}/{x}/{y}.png 读取；本地没有的仍走 /api 代理。
+        // 仅 dev server 生效，不进构建产物；回内网后删除本插件即可恢复原状。
+        name: 'local-tile-cache-dev-api',
+        configureServer (server) {
+          const tileRoot = path.resolve(__dirname, 'map_xyz_9')
+          server.middlewares.use((req, res, next) => {
+            const match = /^\/api\/(\d{1,2})\/(\d+)\/(\d+)\.png$/.exec(req.url || '')
+            if (!match) {
+              next()
+              return
+            }
+            const file = path.join(tileRoot, match[1], match[2], `${match[3]}.png`)
+            if (!fs.existsSync(file)) {
+              next()
+              return
+            }
+            res.statusCode = 200
+            res.setHeader('Content-Type', 'image/png')
+            res.setHeader('Cache-Control', 'public, max-age=86400')
+            fs.createReadStream(file).pipe(res)
+          })
+        }
+      },
       {
         name: 'solar-3d-preview-dev-api',
         configureServer (server) {
