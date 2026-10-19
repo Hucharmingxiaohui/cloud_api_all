@@ -4,18 +4,33 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskPictureMapper;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
 import com.dji.sample.df.cqDockDf.dao.CqEuaPlanMapper;
 import com.dji.sample.df.cqDockDf.model.dto.CqDockTaskDispatchResult;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaBayOption;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanAddRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanPageRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanUpdateRequest;
+import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskPictureListRequest;
+import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskRecordPageRequest;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskPictureEntity;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
 import com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity;
 import com.dji.sample.df.substationDf.dao.UniPointMapper2;
+import com.dji.sample.df.windDf.config.FjFileConfig;
+import com.dji.sample.df.windDf.utils.FileNameUtils;
+import com.dji.sample.df.cqDockDf.config.CqDockProperties;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
 import javax.annotation.Resource;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -29,6 +44,12 @@ import java.util.Map;
 public class CqEuaPlanService {
 
     @Resource
+    private FjFileConfig fjFileConfig;
+
+    @Resource
+    private CqDockProperties cqDockProperties;
+
+    @Resource
     private CqEuaPlanMapper cqEuaPlanMapper;
 
     @Resource
@@ -36,6 +57,12 @@ public class CqEuaPlanService {
 
     @Resource
     private CqDockTaskDispatchService cqDockTaskDispatchService;
+
+    @Resource
+    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
+
+    @Resource
+    private CqDockTaskPictureMapper cqDockTaskPictureMapper;
 
     public IPage<CqEuaPlanEntity> page(CqEuaPlanPageRequest request) {
         int page = request.getPage() == null || request.getPage() <= 0 ? 1 : request.getPage();
@@ -146,6 +173,71 @@ public class CqEuaPlanService {
             });
         }
         return new ArrayList<>(optionMap.values());
+    }
+
+    public IPage<CqDockTaskRecordEntity> taskRecordPage(CqEuaTaskRecordPageRequest request) {
+        int page = request.getPage() == null || request.getPage() <= 0 ? 1 : request.getPage();
+        int pageSize = request.getPageSize() == null || request.getPageSize() <= 0 ? 10 : request.getPageSize();
+        String businessPrefix = request.getPlanId() == null ? null : "EUA_PLAN_" + request.getPlanId() + "_";
+        LambdaQueryWrapper<CqDockTaskRecordEntity> wrapper = new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                .likeRight(CqDockTaskRecordEntity::getBusinessId, "EUA_PLAN_")
+                .likeRight(StringUtils.hasText(businessPrefix), CqDockTaskRecordEntity::getBusinessId, businessPrefix)
+                .like(StringUtils.hasText(request.getTaskName()), CqDockTaskRecordEntity::getTaskName, request.getTaskName())
+                .like(StringUtils.hasText(request.getEuaTaskId()), CqDockTaskRecordEntity::getEuaTaskId, request.getEuaTaskId())
+                .orderByDesc(CqDockTaskRecordEntity::getCreateTime)
+                .orderByDesc(CqDockTaskRecordEntity::getId);
+        return cqDockTaskRecordMapper.selectPage(new Page<>(page, pageSize), wrapper);
+    }
+
+    public List<CqDockTaskPictureEntity> taskPictureList(CqEuaTaskPictureListRequest request) {
+        if (!StringUtils.hasText(request.getBusinessId()) && !StringUtils.hasText(request.getEuaTaskId())) {
+            throw new IllegalArgumentException("任务编码或EUA任务ID不能为空");
+        }
+        LambdaQueryWrapper<CqDockTaskPictureEntity> wrapper = new LambdaQueryWrapper<CqDockTaskPictureEntity>()
+                .eq(StringUtils.hasText(request.getBusinessId()), CqDockTaskPictureEntity::getBusinessId, request.getBusinessId())
+                .eq(StringUtils.hasText(request.getEuaTaskId()), CqDockTaskPictureEntity::getEuaTaskId, request.getEuaTaskId())
+                .orderByAsc(CqDockTaskPictureEntity::getPointId)
+                .orderByAsc(CqDockTaskPictureEntity::getPictureId)
+                .orderByAsc(CqDockTaskPictureEntity::getId);
+        return cqDockTaskPictureMapper.selectList(wrapper);
+    }
+
+    public org.springframework.core.io.Resource taskPictureImage(Long id, boolean analysis) {
+        CqDockTaskPictureEntity row = cqDockTaskPictureMapper.selectById(id);
+        if (row == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "图片记录不存在");
+        }
+        String storedPath = analysis ? row.getAnalysisImageUrl() : row.getLocalPath();
+        if (!StringUtils.hasText(storedPath) || !StringUtils.hasText(fjFileConfig.getRecfilePath())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "图片尚未生成或不可用");
+        }
+        try {
+            Path root = Paths.get(fjFileConfig.getRecfilePath()).toRealPath();
+            String value = storedPath.replace('\\', '/');
+            Path path;
+            if (value.startsWith("http://") || value.startsWith("https://")) {
+                // 复用回调下载的结果图，不代理远程URL，避免预览触发服务端任意请求。
+                String name = FileNameUtils.convertChineseToPinyinInitials(row.getPictureName());
+                String analysisName = name.contains(".") ? name.replaceAll("(\\.[^.]+)$", "_analysis$1") : name + "_analysis.jpg";
+                path = Paths.get(cqDockProperties.getPictureLocalPath(), row.getBusinessId(), "analysis", analysisName);
+            } else {
+                Path stored = Paths.get(value);
+                if (stored.isAbsolute() && stored.normalize().startsWith(root)) {
+                    path = stored;
+                } else if (analysis) {
+                    path = root.resolve(value.replaceFirst("^/+", ""));
+                } else {
+                    throw new ResponseStatusException(HttpStatus.NOT_FOUND, "原图不在图片存储目录");
+                }
+            }
+            path = path.toRealPath();
+            if (!path.startsWith(root) || !Files.isRegularFile(path)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "图片路径无效");
+            }
+            return new FileSystemResource(path);
+        } catch (java.io.IOException | java.nio.file.InvalidPathException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "图片文件不存在", e);
+        }
     }
 
     private CqEuaBayOption findBayOption(String bayId) {

@@ -23,11 +23,28 @@ export const deleteEuaPlan = async function (id: number | string): Promise<IWork
 }
 
 export const executeEuaPlan = async function (planId: number | string): Promise<IWorkspaceResponse<any>> {
-  const result = await request.post(`${HTTP_PREFIX}/execute`, { planId })
+  const result = await request.post(`${HTTP_PREFIX}/execute`, { planId, plan_id: planId, id: planId })
   return result.data
 }
 
 export const getEuaBayOptions = async function (): Promise<IWorkspaceResponse<any>> {
   const result = await request.get(`${HTTP_PREFIX}/bay-options`)
+  return result.data
+}
+
+export const getEuaTaskRecordPage = async function (data: any): Promise<IWorkspaceResponse<any>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-record/page`, data)
+  return result.data
+}
+
+export const getEuaTaskPictureList = async function (data: any): Promise<IWorkspaceResponse<any>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-picture/list`, data)
+  return result.data
+}
+
+export const getEuaTaskPictureImage = async function (id: number | string, analysis = false): Promise<Blob> {
+  const result = await request.get(`${HTTP_PREFIX}/task-picture/image`, {
+    params: { id, analysis }, responseType: 'blob'
+  })
   return result.data
 }

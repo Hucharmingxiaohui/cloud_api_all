@@ -65,6 +65,14 @@ public class CqDockTaskStatusHandler {
         redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
         redisUtils.expire(MONITOR_HASH + ":" + taskCode, 2 * 60 * 60L);
         log.info("开始监控EUA任务状态: taskCode={}, euaTaskId={}, reportToPatrol={}", taskCode, euaTaskId, reportToPatrol);
+        try {
+            Set<Object> taskCodes = redisUtils.members(MONITOR_SET);
+            Map<Object, Object> storedDetail = redisUtils.getHashEntries(MONITOR_HASH + ":" + taskCode);
+            log.info("EUA任务状态监控已写入Redis: monitorSetSize={}, taskCode={}, detailKeys={}",
+                    taskCodes == null ? 0 : taskCodes.size(), taskCode, storedDetail == null ? null : storedDetail.keySet());
+        } catch (Exception e) {
+            log.warn("EUA任务状态监控写入后读取Redis确认失败: taskCode={}", taskCode, e);
+        }
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -74,6 +82,7 @@ public class CqDockTaskStatusHandler {
             if (taskCodes == null || taskCodes.isEmpty()) {
                 return;
             }
+            log.info("扫描EUA任务状态监控列表: count={}, taskCodes={}", taskCodes.size(), taskCodes);
             for (Object taskCodeObj : taskCodes) {
                 if (taskCodeObj != null) {
                     processTaskStatus(taskCodeObj.toString());
@@ -87,13 +96,20 @@ public class CqDockTaskStatusHandler {
     private void processTaskStatus(String taskCode) {
         Map<Object, Object> raw = redisUtils.getHashEntries(MONITOR_HASH + ":" + taskCode);
         if (raw == null || raw.isEmpty()) {
+            log.warn("EUA任务状态监控详情不存在，移除监控任务: taskCode={}, hashKey={}", taskCode, MONITOR_HASH + ":" + taskCode);
             redisUtils.remove(MONITOR_SET, taskCode);
             return;
         }
 
         Map<String, String> detail = toStringMap(raw);
         String euaTaskId = detail.get("euaTaskId");
+        if (!StringUtils.hasText(euaTaskId)) {
+            log.warn("EUA任务状态监控缺少euaTaskId，跳过本轮查询: taskCode={}, detail={}", taskCode, detail);
+            return;
+        }
         try {
+            log.info("准备查询EUA任务状态: taskCode={}, euaTaskId={}, lastState={}, lastProgress={}",
+                    taskCode, euaTaskId, detail.get("lastState"), detail.get("lastProgress"));
             CqApiResponse response = cqDockApiService.taskStatus(euaTaskId);
             if (response == null || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
                 log.warn("EUA任务状态查询失败: taskCode={}, euaTaskId={}, msg={}", taskCode, euaTaskId, response == null ? null : response.getMsg());
@@ -105,22 +121,29 @@ public class CqDockTaskStatusHandler {
             String mappedState = mapEuaState(euaStatus);
             int progress = extractProgress(data, mappedState);
             boolean reportToPatrol = Boolean.parseBoolean(detail.getOrDefault("reportToPatrol", "true"));
+            log.info("EUA任务状态查询结果: taskCode={}, euaTaskId={}, euaStatus={}, mappedState={}, progress={}, reportToPatrol={}, data={}",
+                    taskCode, euaTaskId, euaStatus, mappedState, progress, reportToPatrol, data);
             if (reportToPatrol) {
                 sendTaskStatus(taskCode, detail.get("taskName"), euaTaskId, mappedState, progress,
                         detail.get("fixedStartTime"), euaStatus);
             }
-            detail.put("lastState", mappedState);
-            detail.put("lastProgress", String.valueOf(progress));
-            redisUtils.add(MONITOR_HASH + ":" + taskCode, detail);
+            log.info("准备更新EUA任务状态监控进度: taskCode={}, mappedState={}, progress={}", taskCode, mappedState, progress);
+            redisUtils.addOneValue(MONITOR_HASH + ":" + taskCode, "lastState", mappedState);
+            redisUtils.addOneValue(MONITOR_HASH + ":" + taskCode, "lastProgress", String.valueOf(progress));
+            log.info("EUA任务状态监控进度更新完成: taskCode={}, mappedState={}, progress={}", taskCode, mappedState, progress);
 
             if (isTerminalEuaStatus(euaStatus)) {
+                log.info("EUA任务进入终态处理: taskCode={}, euaTaskId={}, euaStatus={}, reportToPatrol={}",
+                        taskCode, euaTaskId, euaStatus, reportToPatrol);
                 if ("7".equals(euaStatus)) {
                     // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
 //                  todo 后续需让EUA平台规定7为图片上传结束标志
 //                  图片上传结束主动调用图片接口进行巡视上报
                     if (reportToPatrol) {
+                        log.info("EUA任务完成，开始查图并上报巡视: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
                         cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
                     } else {
+                        log.info("EUA计划任务完成，开始查图并分析: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
                         cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
                     }
                     if (!reportToPatrol) {

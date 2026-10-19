@@ -334,7 +334,23 @@ const routes: Array<RouteRecordRaw> = [
               cache: true
             }
           },
+          {
+            path: '/taskManage/euaTaskRecord',
+            name: 'euaTaskRecord',
+            component: () => import('/@/components/task/euaPlan/euaTaskRecord.vue'),
+            meta: {
+              showInMenu: true,
+              label: 'EUA执行记录',
+              cache: true
+            }
+          },
           // 子菜单 - 飞行任务
+          {
+            path: '/taskManage/euaTaskResult',
+            name: 'euaTaskResult',
+            component: () => import('/@/components/task/euaPlan/euaTaskResult.vue'),
+            meta: { showInMenu: false, label: 'EUA任务结果', cache: false }
+          },
           {
             path: '/' + ERouterName.TASK,
             name: ERouterName.TASK,
