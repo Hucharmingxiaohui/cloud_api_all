@@ -108,6 +108,16 @@ public class RoutePlanServiceImpl implements RoutePlanService {
     @Autowired
     private OrthophotoEntityMapper orthophotoEntityMapper;
 
+    @Autowired
+    private com.dji.sample.df.solarDf.service.SolarAccessoryService solarAccessoryService;
+
+    @Autowired
+    private com.dji.sample.df.solarDf.service.SolarAccessoryCoordinateService solarAccessoryCoordinateService;
+
+    @org.springframework.beans.factory.annotation.Value("${solar.route.edited-url:http://172.20.63.157:5001/solar/edited}")
+    private String solarEditedUrl;
+
+
     private static final Logger log = LoggerFactory.getLogger(RoutePlanServiceImpl.class);
 
     // 最大重试次数，防止无限循环
@@ -1120,7 +1130,11 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String url = waylineUrlConfig.getBuildKmzUrl().getSolarPanelWayline();
 //      构建整体json
         JSONObject root = new JSONObject();
+        root.put("inspectComponents", !Boolean.FALSE.equals(pubWaylineJobPlanDfEntity.getInspectComponents()));
         root.put("inspectSupport", Boolean.TRUE.equals(pubWaylineJobPlanDfEntity.getInspectSupport()));
+        root.put("supportRelAlt", pubWaylineJobPlanDfEntity.getSupportRelAlt() == null ? 10.0 : pubWaylineJobPlanDfEntity.getSupportRelAlt());
+        root.put("supportPitch", pubWaylineJobPlanDfEntity.getSupportPitch() == null ? -50.0 : pubWaylineJobPlanDfEntity.getSupportPitch());
+        root.put("supportMargin", pubWaylineJobPlanDfEntity.getSupportMargin() == null ? 1.0 : pubWaylineJobPlanDfEntity.getSupportMargin());
         if(pubWaylineJobPlanDfEntity.getImageFormat() != null){
             root.put("imageFormat", pubWaylineJobPlanDfEntity.getImageFormat());
         }
@@ -1164,12 +1178,32 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String jsonString = root.toString();
         log.info("调用光伏航线接口, 请求参数: {}", jsonString);
         String response = httpUtils.sendPostJson(url, jsonString);
-        if(pubWaylineJobPlanDfEntity.getIndex() == 0){
+        // ===== 附属设备航点合成（设备点追加在组件+支架主航线之后）=====
+        String effectiveOrthophotoId = orthophotoId != null && !orthophotoId.trim().isEmpty()
+                ? orthophotoId
+                : (firstSolarPanelArea != null ? firstSolarPanelArea.getOrthophotoId() : null);
+        java.util.List<com.dji.sample.df.solarDf.model.entity.SolarAccessory> accessoryDevices =
+                solarAccessoryService.listEnabledByIds(pubWaylineJobPlanDfEntity.getAccessoryDeviceIds(), effectiveOrthophotoId);
+        if (pubWaylineJobPlanDfEntity.getIndex() == 0){
             JSONObject previewWayline = JSON.parseObject(response);
             JSONObject threeDPayload = previewWayline.getJSONObject("three_d_payload");
             if (threeDPayload != null) {
                 threeDPayload.put("planId", pubWaylineJobPlanDfEntity.getPlanId());
                 threeDPayload.put("route_draft_id", pubWaylineJobPlanDfEntity.getPlanId());
+            }
+            if (!accessoryDevices.isEmpty()) {
+                // 像素批量换算：前 N 个为设备航点，其后为设备自身位置（2D 分段着色与设备标记用）
+                java.util.List<com.alibaba.fastjson.JSONObject> pixels =
+                        resolveAccessoryPixels(effectiveOrthophotoId, accessoryDevices);
+                int waypointCount = accessoryDevices.stream()
+                        .mapToInt(device -> device.getWaypoints().size()).sum();
+                java.util.List<com.alibaba.fastjson.JSONObject> waypointPixels =
+                        pixels == null ? null : pixels.subList(0, Math.min(waypointCount, pixels.size()));
+                java.util.List<com.alibaba.fastjson.JSONObject> devicePixels =
+                        pixels == null ? null : pixels.subList(Math.min(waypointCount, pixels.size()), pixels.size());
+                int appendedAccessory = com.dji.sample.df.solarDf.service.SolarAccessoryRouteMerger
+                        .appendPreviewWaypoints(previewWayline, accessoryDevices, waypointPixels, devicePixels);
+                log.info("附属设备航点已并入预览, 设备数={}, 航点数={}", accessoryDevices.size(), appendedAccessory);
             }
             map.put("result",true);
             map.put("wayline", previewWayline);
@@ -1186,7 +1220,15 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         String kmzDir = projectPath + File.separator + "file" + File.separator + "kmz" + File.separator;
         String editedFilePath = kmzDir + routeName + "edited.kmz";
         String originalFilePath = kmzDir + routeName + ".kmz";
+        // 用户在 3D 编辑器保存过的航线已含设备航点（预览载荷已并入），直接使用；
+        // 未编辑过且选了设备时，由服务器在主航线后合成设备航点生成 edited 航线文件。
+        if (!accessoryDevices.isEmpty() && !new File(editedFilePath).exists()) {
+            synthesizeAccessoryEditedRoute(jsonResponse, accessoryDevices, pubWaylineJobPlanDfEntity.getPlanId(), editedFilePath);
+        }
         String filePath = new File(editedFilePath).exists() ? editedFilePath : originalFilePath;
+        if (!accessoryDevices.isEmpty() && filePath.equals(originalFilePath)) {
+            throw new RuntimeException("已选择附属设备巡检，但未能生成包含设备航点的编辑航线，请重新预览后再创建");
+        }
         log.info("光伏航线KMZ文件选择, routeName={}, editedFilePath={}, originalFilePath={}, selectedFilePath={}",
                 routeName, editedFilePath, originalFilePath, filePath);
         MultipartFile file = null;
@@ -1223,6 +1265,73 @@ public class RoutePlanServiceImpl implements RoutePlanService {
         map.put("result", true);
         map.put("plan", pubWaylineJobPlanDfEntity);
         return map;
+    }
+
+    /**
+     * 设备航点与设备位置的地理坐标批量换算为正射图像素坐标（用于 2D 预览叠加）。
+     * 返回顺序：先全部设备航点、后各设备自身位置；与 C++ /solar 处理方式一致，失败仅记日志返回 null。
+     */
+    private java.util.List<com.alibaba.fastjson.JSONObject> resolveAccessoryPixels(
+            String orthophotoId,
+            java.util.List<com.dji.sample.df.solarDf.model.entity.SolarAccessory> devices) {
+        try {
+            com.alibaba.fastjson.JSONObject request = new com.alibaba.fastjson.JSONObject();
+            request.put("orthophoto_id", orthophotoId);
+            request.put("direction", "geo_to_pixel");
+            com.alibaba.fastjson.JSONArray points = new com.alibaba.fastjson.JSONArray();
+            devices.forEach(device -> device.getWaypoints().forEach(point -> {
+                com.alibaba.fastjson.JSONObject p = new com.alibaba.fastjson.JSONObject();
+                p.put("lon", point.getLongitude());
+                p.put("lat", point.getLatitude());
+                points.add(p);
+            }));
+            devices.forEach(device -> {
+                com.alibaba.fastjson.JSONObject p = new com.alibaba.fastjson.JSONObject();
+                p.put("lon", device.getLongitude());
+                p.put("lat", device.getLatitude());
+                points.add(p);
+            });
+            request.put("points", points);
+            com.alibaba.fastjson.JSONObject converted = solarAccessoryCoordinateService.convert(request);
+            return converted.getJSONArray("points").toJavaList(com.alibaba.fastjson.JSONObject.class);
+        } catch (Exception e) {
+            log.warn("附属设备像素坐标换算失败，2D 预览将不叠加设备点: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 服务器合成：主航线（组件+支架）航点在前、设备航点在后，提交 /solar/edited 生成 edited 航线文件。
+     * 仅在用户未做过 3D 编辑（edited 文件不存在）时调用，避免覆盖用户编辑。
+     */
+    private void synthesizeAccessoryEditedRoute(
+            JSONObject jsonResponse,
+            java.util.List<com.dji.sample.df.solarDf.model.entity.SolarAccessory> devices,
+            String planId,
+            String editedFilePath) {
+        com.alibaba.fastjson.JSONArray waypoints =
+                com.dji.sample.df.solarDf.service.SolarAccessoryRouteMerger.buildEditedWaypoints(jsonResponse, devices);
+        if (waypoints.isEmpty()) {
+            throw new RuntimeException("附属设备航线合成失败：主航线未返回航点");
+        }
+        com.alibaba.fastjson.JSONObject body = new com.alibaba.fastjson.JSONObject();
+        body.put("route_draft_id", planId);
+        body.put("waypoints", waypoints);
+        log.info("服务器合成附属设备航线, planId={}, 设备数={}, 航点数={}", planId, devices.size(), waypoints.size());
+        String editedResponse = httpUtils.sendPostJson(solarEditedUrl, body.toJSONString());
+        Integer code = null;
+        try {
+            code = com.alibaba.fastjson.JSON.parseObject(editedResponse).getInteger("code");
+        } catch (Exception ignored) {
+            // 响应非 JSON 时保持 null，走下方失败分支
+        }
+        if (code == null || code != 0) {
+            log.error("附属设备航线合成失败, planId={}, response={}", planId, editedResponse);
+            throw new RuntimeException("附属设备航线合成失败: " + editedResponse);
+        }
+        if (!new File(editedFilePath).exists()) {
+            throw new RuntimeException("附属设备航线合成后未找到编辑航线文件: " + editedFilePath);
+        }
     }
 
 

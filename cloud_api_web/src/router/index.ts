@@ -138,6 +138,16 @@ const routes: Array<RouteRecordRaw> = [
                 }
               },
               {
+                path: '/variableMgt/solarMgt/solarAccessoryMgt',
+                name: 'solarAccessoryMgt',
+                component: () => import('/@/components/variableMgt/solarMgt/solarAccessoryMgt/index.vue'),
+                meta: {
+                  showInMenu: true,
+                  label: '光伏附属设备管理',
+                  cache: false
+                }
+              },
+              {
                 path: '/variableMgt/solarMgt/solarDeviceMgt',
                 name: 'solarDeviceMgt',
                 component: () => import('/@/components/variableMgt/solarMgt/solarDeviceMgt/index.vue'),

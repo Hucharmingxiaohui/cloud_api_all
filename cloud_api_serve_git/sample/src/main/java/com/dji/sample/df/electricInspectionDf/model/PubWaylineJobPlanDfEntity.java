@@ -178,6 +178,31 @@ public class PubWaylineJobPlanDfEntity  implements Serializable {
 
     @Transient
     @TableField(exist = false)
+    @JsonAlias("inspectComponents")
+    private Boolean inspectComponents;//可选组件巡检，不持久化
+
+    @Transient
+    @TableField(exist = false)
+    @JsonAlias("supportRelAlt")
+    private Double supportRelAlt;//支架航线相对板面高度，米
+
+    @Transient
+    @TableField(exist = false)
+    @JsonAlias("supportPitch")
+    private Double supportPitch;//支架云台俯仰角，度
+
+    @Transient
+    @TableField(exist = false)
+    @JsonAlias("supportMargin")
+    private Double supportMargin;//支架航线后向余量，米
+
+    @Transient
+    @TableField(exist = false)
+    @JsonAlias({"accessory_device_ids", "accessoryDeviceIds"})
+    private List<String> accessoryDeviceIds;//选中的附属设备ID（不持久化，合成同一条任务航线）
+
+    @Transient
+    @TableField(exist = false)
     @JsonProperty("frog_jump_mode")
     private Boolean frogJumpMode;//是否蛙跳模式，不持久化
 

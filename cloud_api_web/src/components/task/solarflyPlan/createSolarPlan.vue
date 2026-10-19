@@ -165,9 +165,47 @@
                     <el-checkbox value="ir">红外</el-checkbox>
                   </el-checkbox-group>
                 </el-form-item>
-                <el-form-item label="巡检内容：">
-                  <el-checkbox v-model="planBody.inspectSupport">同时巡检支架（默认仅巡检组件）</el-checkbox>
+                <el-form-item label="巡检内容：" required>
+                  <el-checkbox-group v-model="planBody.inspection_targets" size="large">
+                    <el-checkbox value="components">光伏组件</el-checkbox>
+                    <el-checkbox value="support">组件支架</el-checkbox>
+                  </el-checkbox-group>
                 </el-form-item>
+                <div v-if="planBody.inspection_targets.includes('support')" class="support-inspection-params">
+                  <el-form-item label="支架相对高度：">
+                    <el-input-number v-model="planBody.support_rel_alt" :min="1" :max="50" :precision="1" />
+                    <span class="unit-text">m</span>
+                  </el-form-item>
+                  <el-form-item label="支架云台俯仰：">
+                    <el-input-number v-model="planBody.support_pitch" :min="-89" :max="-1" :precision="1" />
+                    <span class="unit-text">°</span>
+                  </el-form-item>
+                  <el-form-item label="支架后向余量：">
+                    <el-input-number v-model="planBody.support_margin" :min="0" :max="20" :precision="1" />
+                    <span class="unit-text">m</span>
+                  </el-form-item>
+                </div>
+                <!-- 附属设备巡检：勾选后设备预置航点追加到负责机巢的航线末尾 -->
+                <el-form-item v-if="planBody.orthophoto_id && usableAccessories.length" label="附属设备：">
+                  <div class="accessory-select">
+                    <div class="accessory-hint">
+                      已选 {{ selectedAccessoryIds.length }} 台 / 共 {{ selectedAccessoryWaypointCount }} 个航点，将追加到负责机巢的航线末尾拍摄
+                    </div>
+                    <el-checkbox-group v-if="accessoryTypeOptions.length > 1" v-model="accessoryTypeFilter" class="accessory-type-filter">
+                      <el-checkbox v-for="type in accessoryTypeOptions" :key="type.value" :value="type.value" size="small">
+                        {{ type.label }}
+                      </el-checkbox>
+                    </el-checkbox-group>
+                    <el-checkbox-group v-model="selectedAccessoryIds" class="accessory-list">
+                      <el-checkbox v-for="device in filteredAccessories" :key="device.id" :value="device.id!" size="small">
+                        {{ device.name }}（{{ deviceTypeLabel(device.device_type) }} · {{ accessoryWaypointTotal(device) }} 个航点 · 由「{{ accessoryGroupNames[device.id!] || '未分配' }}」巡检）
+                      </el-checkbox>
+                    </el-checkbox-group>
+                  </div>
+                </el-form-item>
+                <div v-else-if="planBody.orthophoto_id" class="accessory-empty-hint">
+                  当前正射图暂无可用附属设备，可在「光伏管理 → 光伏附属设备管理」采集后重新进入本页
+                </div>
                 <div
                   v-for="group in taskGroups"
                   :key="group.groupId"
@@ -175,15 +213,10 @@
                 >
                   <div class="device-group-header">
                     <span class="device-group-name">{{ group.dock?.nickname ?? '未选择设备' }}</span>
-                    <el-button
-                      size="small"
-                      type="primary"
-                      style="background-color: rgba(7, 75, 208, 1); border: 1px solid rgba(0, 64, 147, 1)"
-                      :disabled="group.submitted"
-                      @click="previewWayline(group)"
-                    >
-                      {{ group.submitted ? '已创建' : '预览航线' }}
-                    </el-button>
+                    <span v-if="devicesForGroup(group).length" class="device-group-accessory">
+                      附属设备 {{ devicesForGroup(group).length }} 台
+                    </span>
+                    <span v-if="group.submitted" class="device-group-accessory">已创建</span>
                   </div>
                   <div
                     v-for="config in groupAreaConfigs(group)"
@@ -228,6 +261,11 @@
                       >上一步
                     </el-button>
                     <el-button
+                      style="background-color: rgba(255, 255, 255, 0.05); width: 100px; border: 1px solid rgba(206, 227, 255, 0.42);"
+                      @click="onPreviewAll"
+                      >预览航线
+                    </el-button>
+                    <el-button
                       type="primary"
                       style="background-color: rgba(7, 75, 208, 1); width: 100px; border: 1px solid rgba(0, 64, 147, 1)"
                       @click="onSubmit"
@@ -248,7 +286,7 @@
         <el-button v-if="viewMode === '3d'" type="warning" @click="viewMode = '2d'" size="small" style="margin-left: 10px;">返回二维</el-button>
       </div>
       <div class="view-content">
-        <loadSolarPanel v-if="viewMode === '2d'" :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo"/>
+        <loadSolarPanel v-if="viewMode === '2d'" :imagePath="selectedImagePath" :detectAreas="selectedDetectAreas" :waylineInfo="waylineInfo" :deviceMarkers="accessoryDeviceMarkers"/>
         <keep-alive>
           <Solar3DRouteEditor v-if="viewMode === '3d'" container-id="solar3dPreviewContainer" :embedded="true" :plan-id="solarCreatePlanId" />
         </keep-alive>
@@ -366,12 +404,16 @@ import { TaskType, OutOfControlActionOptions, OutOfControlAction, TaskTypeOption
 import moment, { Moment } from 'moment'
 import { ElTable, ElTableColumn, ElFormItem, ElForm, ElInput, ElButton, ElSelect, ElOption, ElPagination, ElContainer, ElHeader, ElMain, ElFooter, ElDialog, ElMessage, ElMessageBox, ElText, ElLink, ElTag, ElTooltip } from 'element-plus'
 import loadSolarPanel from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
+import type { AccessoryDeviceMarker } from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
 import Solar3DRouteEditor from '/@/components/cesium/Solar3DRouteEditor.vue'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi, getSolarPanelImgByIdApi, getOrthophotoListApi, getSolarPanelByIdApi } from '/@/api/turbine/turbineMgt'
 import { getBindingDevices } from '/@/api/manage'
 import { AutoTaskRecommendation, computeAreaGeometry, DockPosition, recommendAutoTask } from './solarAutoTask'
+import { listSolarAccessories } from '/@/api/solar-accessory'
+import type { SolarAccessory } from '/@/api/solar-accessory'
+import { deviceTypes } from '/@/components/variableMgt/solarMgt/solarAccessoryMgt/accessoryModel'
 const router = useRouter()
 const route = useRoute()
 const store = useMyStore()
@@ -423,11 +465,107 @@ function createTaskGroup (): DeviceTaskGroup {
 
 const taskGroups = ref<DeviceTaskGroup[]>([createTaskGroup()])
 const activeDeviceGroupId = ref('') // 正在通过抽屉选择设备的分组
+// ===== 附属设备巡检：当前正射图下的可用设备与勾选，就近分配到任务组 =====
+const accessoryTable = ref<SolarAccessory[]>([])
+const selectedAccessoryIds = ref<string[]>([])
+const accessoryTypeFilter = ref<string[]>([])
+const previewedGroupIds = ref<Set<string>>(new Set()) // 已预览过航线的分组（含设备航点时创建前必须预览）
+const accessoryDeviceMarkers = ref<AccessoryDeviceMarker[]>([]) // 预览响应中的附属设备位置标记（2D 着色标注用）
 // 所有分组已选区域的合集，用于 2D 叠加显示与参数配置同步
 const selectedDetectAreas = computed(() => {
   const ids = taskGroups.value.flatMap(group => group.solarIds)
   return solarTable.value.filter((item: any) => ids.includes(item.id) && item.orthophoto_id === selectedOrthophotoId.value)
 })
+
+// ===== 附属设备：可用性、类型筛选、就近分配 =====
+const usableAccessories = computed(() =>
+  accessoryTable.value.filter(device => device.enabled && (device.waypoints || []).some(point => point.enabled)))
+const accessoryTypeOptions = computed(() => {
+  const present = new Set(usableAccessories.value.map(device => device.device_type))
+  return deviceTypes.filter(type => present.has(type.value))
+})
+const filteredAccessories = computed(() => accessoryTypeFilter.value.length
+  ? usableAccessories.value.filter(device => accessoryTypeFilter.value.includes(device.device_type))
+  : usableAccessories.value)
+const selectedAccessoryWaypointCount = computed(() =>
+  usableAccessories.value
+    .filter(device => device.id && selectedAccessoryIds.value.includes(device.id))
+    .reduce((sum, device) => sum + device.waypoints.filter(point => point.enabled).length, 0))
+
+function deviceTypeLabel (value: string) {
+  return deviceTypes.find(type => type.value === value)?.label ?? value
+}
+
+function accessoryWaypointTotal (device: SolarAccessory) {
+  return device.waypoints.filter(point => point.enabled).length
+}
+
+function areaCentroid (areaId: string): { lng: number, lat: number } | null {
+  const area = solarTable.value.find((item: any) => item.id === areaId)
+  const geometry = area ? computeAreaGeometry(area) : null
+  return geometry ? { lng: geometry.centroidLng, lat: geometry.centroidLat } : null
+}
+
+// 设备归属：取与该组已选区域质心的最小距离；无任何组选区域时回落到第一组
+function assignedGroupId (deviceId: string): string {
+  const device = accessoryTable.value.find(item => item.id === deviceId)
+  if (!device || typeof device.longitude !== 'number' || typeof device.latitude !== 'number' || !taskGroups.value.length) {
+    return taskGroups.value[0]?.groupId ?? ''
+  }
+  let bestGroupId = ''
+  let bestDistance = Infinity
+  for (const group of taskGroups.value) {
+    let minDistance = Infinity
+    for (const areaId of group.solarIds) {
+      const centroid = areaCentroid(areaId)
+      if (!centroid) continue
+      const dx = (device.longitude - centroid.lng) * 111320 * Math.cos(centroid.lat * Math.PI / 180)
+      const dy = (device.latitude - centroid.lat) * 110540
+      minDistance = Math.min(minDistance, Math.sqrt(dx * dx + dy * dy))
+    }
+    if (minDistance < bestDistance) {
+      bestDistance = minDistance
+      bestGroupId = group.groupId
+    }
+  }
+  return bestGroupId || taskGroups.value[0].groupId
+}
+
+const accessoryGroupNames = computed(() => {
+  const names: Record<string, string> = {}
+  usableAccessories.value.forEach(device => {
+    if (!device.id) return
+    const group = taskGroups.value.find(item => item.groupId === assignedGroupId(device.id!))
+    names[device.id] = group ? (group.dock?.nickname ?? '未选择设备') : ''
+  })
+  return names
+})
+
+function devicesForGroup (group: DeviceTaskGroup) {
+  return usableAccessories.value
+    .filter(device => device.id && selectedAccessoryIds.value.includes(device.id))
+    .filter(device => assignedGroupId(device.id!) === group.groupId)
+}
+
+async function loadPlanAccessories (id: string) {
+  accessoryTable.value = []
+  selectedAccessoryIds.value = []
+  accessoryTypeFilter.value = []
+  if (!id) return
+  const requestId = id
+  try {
+    const list = await listSolarAccessories(id)
+    // 异步期间用户已切换正射图时丢弃
+    if (planBody.orthophoto_id === requestId) {
+      accessoryTable.value = list
+    }
+  } catch (error) {
+    console.error('加载附属设备失败:', error)
+    if (planBody.orthophoto_id === requestId) {
+      ElMessage.error('附属设备列表加载失败')
+    }
+  }
+}
 
 // 抽屉打开期间，把用户在 SelectDock 中点击的设备赋给对应分组
 watch(() => store.state.dockInfo, (info) => {
@@ -578,7 +716,10 @@ const planBody = reactive({
   enable_status: 0,
   plan_priority: 1,
   type: 'auto',
-  inspectSupport: false,
+  inspection_targets: ['components'],
+  support_rel_alt: 10,
+  support_pitch: -50,
+  support_margin: 1,
   image_format_list: ['visable'], // 相机类型多选
   image_format: computed(() => planBody.image_format_list.join(',')) // 提交时转为逗号分隔字符串
 })
@@ -779,6 +920,15 @@ function validateTaskGroups () {
 }
 
 function validateGroupAreaConfigs (group: DeviceTaskGroup) {
+  if (!planBody.inspection_targets.length) {
+    ElMessage.warning('请至少选择一种巡检内容')
+    return false
+  }
+  if (planBody.inspection_targets.includes('support') &&
+    (Number(planBody.support_rel_alt) <= 0 || Number(planBody.support_pitch) >= 0 || Number(planBody.support_margin) < 0)) {
+    ElMessage.warning('请填写有效的支架拍摄参数')
+    return false
+  }
   const configs = getGroupAreaConfigs(group)
   if (!configs.length) {
     ElMessage.warning(`请选择光伏板区域：${group.dock?.nickname ?? '未选择设备'}`)
@@ -845,11 +995,11 @@ function getGroupAreaConfigPayload (group: DeviceTaskGroup) {
 
 // 按分组构造提交体：设备、区域、planId 均为该分组独立
 function getGroupPlanBody (group: DeviceTaskGroup, index: number) {
-  // 后端全局 SNAKE_CASE 命名策略，camelCase 键不会被绑定，需按规范名提交
-  const { inspectSupport, ...planBodyRest } = toRaw(planBody)
+  const { inspection_targets, ...planBodyRest } = toRaw(planBody)
   return {
     ...planBodyRest,
-    inspect_support: planBody.inspectSupport,
+    inspect_components: planBody.inspection_targets.includes('components'),
+    inspect_support: planBody.inspection_targets.includes('support'),
     name: `${planBody.name}-${group.dock.nickname}`,
     dock_sn: group.dock.device_sn,
     image_format: planBody.image_format,
@@ -857,6 +1007,7 @@ function getGroupPlanBody (group: DeviceTaskGroup, index: number) {
     planId: group.planId,
     orthophoto_id: planBody.orthophoto_id,
     solar_panel_id: group.solarIds.join(','),
+    accessory_device_ids: devicesForGroup(group).map(device => device.id!),
     area_configs: getGroupAreaConfigPayload(group),
     index
   }
@@ -899,6 +1050,8 @@ async function handleOrthophotoChange (id: string) {
   })
   areaConfigs.value = []
   waylineInfo.value = []
+  accessoryDeviceMarkers.value = []
+  loadPlanAccessories(id)
   selectedImagePath.value = ''
   if (!id) {
     return
@@ -965,6 +1118,8 @@ async function previewWayline (group: DeviceTaskGroup) {
         return
       }
       waylineInfo.value = res.data.wayline.route_2d.area.points
+      accessoryDeviceMarkers.value = res.data.wayline.route_2d.accessory_devices ?? []
+      previewedGroupIds.value.add(group.groupId)
       const threeDPayload = res.data.wayline.three_d_payload
       if (threeDPayload) {
         threeDPayload.planId = group.planId
@@ -982,6 +1137,20 @@ async function previewWayline (group: DeviceTaskGroup) {
 }
 
 /**
+ * 底部统一预览：按分组顺序逐条预览未创建的航线（含附属设备航点）
+ */
+async function onPreviewAll () {
+  const pendingGroups = taskGroups.value.filter(group => !group.submitted)
+  if (!pendingGroups.length) {
+    ElMessage.warning('没有待预览的任务分组')
+    return
+  }
+  for (const group of pendingGroups) {
+    await previewWayline(group)
+  }
+}
+
+/**
  * 创建航线：按分组顺序逐条创建，失败不中断，结束后汇总结果
  */
 async function onSubmit () {
@@ -993,6 +1162,13 @@ async function onSubmit () {
     const pendingGroups = taskGroups.value.filter(group => !group.submitted)
     for (const group of pendingGroups) {
       if (!validateGroupAreaConfigs(group)) {
+        return
+      }
+    }
+    // 含附属设备航点的航线依赖预览载荷生成，必须先预览再创建
+    for (const group of pendingGroups) {
+      if (devicesForGroup(group).length && !previewedGroupIds.value.has(group.groupId)) {
+        ElMessage.warning(`请先为「${group.dock?.nickname ?? '未选择设备'}」预览航线（含附属设备航点），再创建任务`)
         return
       }
     }
@@ -1254,6 +1430,41 @@ async function onSubmit () {
 .device-group-name {
   font-weight: 600;
   color: #55e4ff;
+}
+
+.device-group-accessory {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #8fb7ff;
+}
+
+.accessory-select {
+  width: 100%;
+}
+
+.accessory-hint {
+  font-size: 12px;
+  color: #8ca0b3;
+  margin-bottom: 8px;
+}
+
+.accessory-type-filter {
+  margin-bottom: 6px;
+}
+
+.accessory-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 6px 10px;
+}
+
+.accessory-empty-hint {
+  font-size: 12px;
+  color: #8ca0b3;
+  margin: 0 0 12px;
 }
 
 .auto-task-row {

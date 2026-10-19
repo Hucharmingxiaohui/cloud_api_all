@@ -14,6 +14,7 @@ import com.dji.sample.df.solarDf.model.entity.SolarPanel;
 import com.dji.sample.df.solarDf.model.entity.SolarPanelArea;
 import com.dji.sample.df.solarDf.model.entity.SolarPanelComponent;
 import com.dji.sample.df.solarDf.service.OrthophotoEntityService;
+import com.dji.sample.df.solarDf.service.SolarAccessoryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,8 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
     private SolarPanelComponentMapper solarPanelComponentMapper;
     @Resource
     private SolarPanelAreaMapper solarPanelAreaMapper;
+    @Resource
+    private SolarAccessoryService solarAccessoryService;
 
     /**
      * 导入正射图
@@ -137,6 +140,7 @@ public class OrthophotoEntityServiceImpl extends ServiceImpl<OrthophotoEntityMap
         solarPanelComponentMapper.delete(new LambdaQueryWrapper<SolarPanelComponent>().eq(SolarPanelComponent::getOrthophotoId,id));
         solarPanelMapper.delete(new LambdaQueryWrapper<SolarPanel>().eq(SolarPanel::getOrthophotoId,id));
         solarPanelAreaMapper.delete(new LambdaQueryWrapper<SolarPanelArea>().eq(SolarPanelArea::getOrthophotoId,id));
+        solarAccessoryService.deleteByOrthophoto(id);
         int rows = orthophotoMapper.deleteById(id);
         if (rows == 0) {
             throw new RuntimeException("删除数据库记录失败，ID: " + id);

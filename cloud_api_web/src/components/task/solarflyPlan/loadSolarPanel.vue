@@ -65,13 +65,38 @@ interface WaylinePoint {
   height: number
   heading: number
   pitch: number
+  // 附属设备航点标识（主航线航点无此字段）
+  device_id?: string
+  device_name?: string
+  waypoint_name?: string
+}
+
+// 附属设备位置标记（route_2d.accessory_devices）
+export interface AccessoryDeviceMarker {
+  id: string
+  name: string
+  device_type?: string
+  lon?: number
+  lat?: number
+  row?: number
+  col?: number
 }
 
 const props = defineProps<{
   imagePath: string
   detectAreas: DetectArea[],
-  waylineInfo: WaylinePoint[]
+  waylineInfo: WaylinePoint[],
+  deviceMarkers?: AccessoryDeviceMarker[]
 }>()
+
+// 设备分段配色：主航线固定绿色，各设备按出现顺序取色
+const DEVICE_COLORS = ['#FF6B6B', '#4DA6FF', '#FFD24D', '#C77DFF', '#FF9F43', '#4DD0E1', '#F06292', '#AED581', '#FF8A65', '#9FA8DA']
+const MAIN_ROUTE_COLOR = '#4ADE80'
+
+function deviceColor (deviceId: string, orderedIds: string[]) {
+  const index = orderedIds.indexOf(deviceId)
+  return DEVICE_COLORS[(index < 0 ? 0 : index) % DEVICE_COLORS.length]
+}
 
 const selectedImage = ref<string>('')
 const imageRef = ref<HTMLImageElement>()
@@ -83,7 +108,7 @@ const CANVAS_WIDTH = 1000
 const CANVAS_HEIGHT = 750
 
 // 监听 props 变化
-watch(() => [props.imagePath, props.detectAreas, props.waylineInfo], async ([newPath, newAreas, newWayline]) => {
+watch(() => [props.imagePath, props.detectAreas, props.waylineInfo, props.deviceMarkers], async ([newPath, newAreas, newWayline]) => {
   if (newPath) {
     await loadImage(newPath as string)
     // loadTestImage()
@@ -92,8 +117,10 @@ watch(() => [props.imagePath, props.detectAreas, props.waylineInfo], async ([new
     clearCanvas()
   }
 
-  // waylineInfo 变化时重新绘制
+  // 航线/设备标记变化时先清空重绘区域，避免残留旧颜色航线
   if (newWayline && Array.isArray(newWayline) && newWayline.length > 0 && imageRef.value?.complete) {
+    clearCanvas()
+    drawAreas()
     drawWayline()
   }
 }, { deep: true, immediate: true })
@@ -271,7 +298,7 @@ function drawPoint (x: number, y: number, color: string) {
   ctx2d.fill()
 }
 
-// 绘制航线
+// 绘制航线：主航线绿色；不同附属设备航段不同颜色，旁边标注设备/航点名，并标出设备位置
 function drawWayline () {
   if (!ctx.value || !imageRef.value || !props.waylineInfo || props.waylineInfo.length === 0) return
 
@@ -280,50 +307,104 @@ function drawWayline () {
 
   const scaleX = CANVAS_WIDTH / naturalWidth
   const scaleY = CANVAS_HEIGHT / naturalHeight
+  const toX = (point: WaylinePoint) => Math.round(Number(point.col) * scaleX)
+  const toY = (point: WaylinePoint) => Math.round(Number(point.row) * scaleY)
 
-  const waylineColor = '#4ADE80'
-  const textColor = '#FFFFFF'
-
-  // 连线
-  ctx.value.strokeStyle = waylineColor
-  ctx.value.lineWidth = 2
-  ctx.value.setLineDash([])
-  ctx.value.beginPath()
-
-  props.waylineInfo.forEach((point: WaylinePoint, index: number) => {
-    const x = Math.round(point.col * scaleX)
-    const y = Math.round(point.row * scaleY)
-
-    if (index === 0) {
-      ctx.value!.moveTo(x, y)
-    } else {
-      ctx.value!.lineTo(x, y)
-    }
+  // 同一设备保持同一颜色（主航线绿色）；按出现顺序分配
+  const orderedDeviceIds: string[] = []
+  props.waylineInfo.forEach(point => {
+    if (point.device_id && !orderedDeviceIds.includes(point.device_id)) orderedDeviceIds.push(point.device_id)
   })
-  ctx.value.stroke()
+  const colorOf = (point: WaylinePoint) => (point.device_id ? deviceColor(point.device_id, orderedDeviceIds) : MAIN_ROUTE_COLOR)
 
-  // 航点标记和名称
+  console.log('[loadSolarPanel] drawWayline', {
+    points: props.waylineInfo.length,
+    first: props.waylineInfo[0],
+    devices: orderedDeviceIds,
+    canvas: { w: canvasRef.value?.width, h: canvasRef.value?.height }
+  })
+
+  // 逐段两点式连线：与圆点使用完全相同的数据与坐标，任何一段异常都不影响其余段
+  ctx.value.lineWidth = 3
+  ctx.value.setLineDash([])
+  ctx.value.lineCap = 'round'
+  for (let i = 1; i < props.waylineInfo.length; i++) {
+    const prev = props.waylineInfo[i - 1]
+    const curr = props.waylineInfo[i]
+    const x1 = toX(prev)
+    const y1 = toY(prev)
+    const x2 = toX(curr)
+    const y2 = toY(curr)
+    if (![x1, y1, x2, y2].every(Number.isFinite)) {
+      console.warn('[loadSolarPanel] 跳过无效坐标线段', { i, prev, curr })
+      continue
+    }
+    ctx.value.strokeStyle = colorOf(curr)
+    ctx.value.beginPath()
+    ctx.value.moveTo(x1, y1)
+    ctx.value.lineTo(x2, y2)
+    ctx.value.stroke()
+  }
+  ctx.value.setLineDash([])
+
+  // 航点标记和名称：主航线只标首尾（扫描点密集，逐点标注的底框会盖住连线）；设备航点逐个标注
+  const lastIndex = props.waylineInfo.length - 1
   props.waylineInfo.forEach((point: WaylinePoint, index: number) => {
-    const x = Math.round(point.col * scaleX)
-    const y = Math.round(point.row * scaleY)
+    const x = toX(point)
+    const y = toY(point)
+    const color = colorOf(point)
 
-    // 绘制航点圆圈
-    const radius = 5
     ctx.value!.beginPath()
-    ctx.value!.arc(x, y, radius, 0, Math.PI * 2)
-    ctx.value!.fillStyle = waylineColor
+    ctx.value!.arc(x, y, 5, 0, Math.PI * 2)
+    ctx.value!.fillStyle = color
     ctx.value!.fill()
     ctx.value!.strokeStyle = '#FFFFFF'
     ctx.value!.lineWidth = 1.5
     ctx.value!.stroke()
 
-    // 绘制航点名称
-    const name = `航点${index + 1}`
-    ctx.value!.fillStyle = textColor
-    ctx.value!.font = 'bold 12px Arial'
-    ctx.value!.textBaseline = 'bottom'
-    ctx.value!.fillText(name, x + 8, y - 5)
+    if (point.device_id) {
+      drawLabel(`${point.device_name} · ${point.waypoint_name ?? `航点${index + 1}`}`, x + 8, y - 5, '#FFFFFF')
+    } else if (index === 0 || index === lastIndex) {
+      drawLabel(index === 0 ? '起点' : `终点（航点${lastIndex + 1}）`, x + 8, y - 5, '#FFFFFF')
+    }
   })
+
+  // 附属设备位置标记（菱形 + 设备名）
+  ;(props.deviceMarkers ?? []).forEach(marker => {
+    if (typeof marker.row !== 'number' || typeof marker.col !== 'number') return
+    const x = Math.round(marker.col * scaleX)
+    const y = Math.round(marker.row * scaleY)
+    const color = deviceColor(marker.id, orderedDeviceIds)
+    const size = 9
+    ctx.value!.beginPath()
+    ctx.value!.moveTo(x, y - size)
+    ctx.value!.lineTo(x + size, y)
+    ctx.value!.lineTo(x, y + size)
+    ctx.value!.lineTo(x - size, y)
+    ctx.value!.closePath()
+    ctx.value!.fillStyle = color
+    ctx.value!.fill()
+    ctx.value!.strokeStyle = '#FFFFFF'
+    ctx.value!.lineWidth = 1.5
+    ctx.value!.stroke()
+    ctx.value!.beginPath()
+    ctx.value!.arc(x, y, 2, 0, Math.PI * 2)
+    ctx.value!.fillStyle = '#FFFFFF'
+    ctx.value!.fill()
+    drawLabel(marker.name, x + 12, y + 5, color)
+  })
+}
+
+// 带半透明底色的文字标注，保证在正射图上可读
+function drawLabel (text: string, x: number, y: number, color: string) {
+  if (!ctx.value) return
+  ctx.value.font = 'bold 12px Arial'
+  const width = ctx.value.measureText(text).width
+  ctx.value.fillStyle = 'rgba(0, 0, 0, 0.55)'
+  ctx.value.fillRect(x - 2, y - 11, width + 6, 15)
+  ctx.value.fillStyle = color
+  ctx.value.textBaseline = 'bottom'
+  ctx.value.fillText(text, x + 1, y + 1)
 }
 </script>
 
