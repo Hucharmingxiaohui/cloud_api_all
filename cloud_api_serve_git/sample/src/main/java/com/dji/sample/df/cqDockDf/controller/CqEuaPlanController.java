@@ -5,8 +5,12 @@ import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanAddRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanExecuteRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanPageRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanUpdateRequest;
+import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskPictureListRequest;
+import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskRecordPageRequest;
 import com.dji.sample.df.cqDockDf.service.CqEuaPlanService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -69,5 +73,31 @@ public class CqEuaPlanController {
     @GetMapping("/bay-options")
     public Result bayOptions() {
         return Result.success(cqEuaPlanService.bayOptions());
+    }
+
+    @PostMapping("/task-record/page")
+    public Result taskRecordPage(@RequestBody CqEuaTaskRecordPageRequest request) {
+        return Result.success(cqEuaPlanService.taskRecordPage(request));
+    }
+
+    @PostMapping("/task-picture/list")
+    public Result taskPictureList(@RequestBody CqEuaTaskPictureListRequest request) {
+        try {
+            return Result.success(cqEuaPlanService.taskPictureList(request));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @GetMapping("/task-picture/image")
+    public ResponseEntity<org.springframework.core.io.Resource> taskPictureImage(@RequestParam Long id,
+                                                    @RequestParam(defaultValue = "false") boolean analysis) throws java.io.IOException {
+        org.springframework.core.io.Resource image = cqEuaPlanService.taskPictureImage(id, analysis);
+        String type = java.nio.file.Files.probeContentType(image.getFile().toPath());
+        MediaType mediaType = type != null && type.startsWith("image/")
+                ? MediaType.parseMediaType(type) : MediaType.IMAGE_JPEG;
+        return ResponseEntity.ok().contentType(mediaType)
+                .header("Cache-Control", "private, no-store")
+                .header("X-Content-Type-Options", "nosniff").body(image);
     }
 }
