@@ -5,6 +5,16 @@ import { getCloudRendererConfig } from './cloudRendererConfig'
 
 export type CaptureMode = 'none' | 'visable' | 'ir' | 'visable,ir'
 
+export type PhotoActionLens = 'visable' | 'ir' | 'visable,ir'
+
+export interface WaypointPhotoAction {
+  imageFormat: PhotoActionLens
+  focalLength: number
+  pitch: number
+  /** 可选云台偏航：真实北向 0-360（顺时针）；缺省跟随航点机头（对接文档 4.6.4） */
+  yaw?: number
+}
+
 export interface WaypointCamera {
   heading: number
   pitch: number
@@ -21,6 +31,11 @@ export interface CloudKmzWaypoint {
   speed: number
   headingTrue: number
   camera_params: WaypointCamera
+  /**
+   * 多拍照动作（对接文档 4.6.4）：存在且非空时按项生成拍照动作（KMZ actionIndex 从 1 顺延），
+   * 覆盖 capture_mode 单动作模式；空数组 = 过渡点；缺省 = 回退单动作（向后兼容）。
+   */
+  photo_actions?: WaypointPhotoAction[]
 }
 
 export interface BuildWaylineKmzOptions {
@@ -60,8 +75,33 @@ export function normalizeCaptureMode (mode: unknown): CaptureMode {
   return 'visable'
 }
 
+/**
+ * 规范化多拍照动作（对接文档 4.6.4）：剔除焦距非法/镜头组合非法的项，最多保留 10 个。
+ * 缺省（非数组）返回 undefined，保持单动作向后兼容语义。
+ */
+export function normalizePhotoActions (value: unknown): WaypointPhotoAction[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const actions: WaypointPhotoAction[] = []
+  for (const raw of value.slice(0, 10)) {
+    const item = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+    const lens = normalizeCaptureMode(item.imageFormat ?? item.image_format)
+    const focalLength = Number(item.focalLength ?? item.focal_length)
+    if (lens === 'none' || !Number.isFinite(focalLength) || focalLength <= 0) continue
+    const pitchRaw = Number(item.pitch)
+    const pitch = Number.isFinite(pitchRaw) ? Math.min(0, Math.max(-90, pitchRaw)) : -45
+    const action: WaypointPhotoAction = { imageFormat: lens, focalLength, pitch }
+    const rawYaw = item.yaw
+    if (rawYaw !== null && rawYaw !== undefined && String(rawYaw).trim() !== '') {
+      const yaw = Number(rawYaw)
+      if (Number.isFinite(yaw)) action.yaw = ((yaw % 360) + 360) % 360
+    }
+    actions.push(action)
+  }
+  return actions
+}
+
 export function normalizeWaypoint (point: Partial<CloudKmzWaypoint>, index: number): CloudKmzWaypoint {
-  const camera = point.camera_params || {}
+  const camera: Partial<WaypointCamera> = point.camera_params || {}
   const headingFromCamera = Number(camera.heading)
   const headingFromTrue = Number(point.headingTrue)
   const heading = normalizeHeading(Number.isFinite(headingFromCamera) ? headingFromCamera : (Number.isFinite(headingFromTrue) ? headingFromTrue : 0))
@@ -78,7 +118,8 @@ export function normalizeWaypoint (point: Partial<CloudKmzWaypoint>, index: numb
       pitch: Number(camera.pitch ?? -45),
       roll: Number(camera.roll ?? 0),
       focalLength: Number(camera.focalLength ?? 75)
-    }
+    },
+    photo_actions: normalizePhotoActions(point.photo_actions)
   }
 }
 
@@ -86,6 +127,8 @@ export function validateWaypoints (points: Array<Partial<CloudKmzWaypoint>>) {
   if (!points.length) return '请至少添加一个航点'
   if (points.length > 2000) return '航点数量不能超过 2000'
   for (let index = 0; index < points.length; index += 1) {
+    const rawMulti = points[index]?.photo_actions
+    if (Array.isArray(rawMulti) && rawMulti.length > 10) return `航点 ${index + 1} 拍照动作不能超过 10 个`
     const point = normalizeWaypoint(points[index], index)
     if (!Number.isFinite(point.longitude) || point.longitude < -180 || point.longitude > 180) return `航点 ${index + 1} 经度无效`
     if (!Number.isFinite(point.latitude) || point.latitude < -90 || point.latitude > 90) return `航点 ${index + 1} 纬度无效`
@@ -93,6 +136,7 @@ export function validateWaypoints (points: Array<Partial<CloudKmzWaypoint>>) {
     if (!Number.isFinite(point.speed) || point.speed <= 0) return `航点 ${index + 1} 速度无效`
     if (!Number.isFinite(point.camera_params.heading)) return `航点 ${index + 1} 缺少偏航角`
     if (point.capture_mode !== 'none' && (!Number.isFinite(point.camera_params.focalLength) || point.camera_params.focalLength <= 0)) return `航点 ${index + 1} 焦距无效`
+    if (point.photo_actions && point.photo_actions.length > 10) return `航点 ${index + 1} 拍照动作不能超过 10 个`
   }
   return ''
 }
@@ -121,7 +165,36 @@ export function buildWaylineRequest (routeName: string, points: Array<Partial<Cl
     routePointList: waypoints.map((point, index) => {
       const heading = normalizeHeading(point.camera_params.heading)
       const actions: Record<string, unknown>[] = [{ actionIndex: 0, aircraftHeading: heading, aircraftPathMode: 'counterClockwise' }]
-      if (point.capture_mode !== 'none') {
+      const photoActions = point.photo_actions
+      if (photoActions !== undefined) {
+        // photo_actions 存在时优先使用：空数组表示过渡点；每个动作的 actionIndex 从 1 连续顺延。
+        photoActions.forEach((photoAction, actionIndex) => {
+          const actionYaw = Number(photoAction.yaw)
+          actions.push({
+            actionIndex: actionIndex + 1,
+            takePhotoType: 2,
+            useGlobalImageFormat: 0,
+            imageFormat: photoAction.imageFormat,
+            orientedPhotoMode: 'normalPhoto',
+            focalLength: photoAction.focalLength,
+            gimbalYawRotateAngle: Number.isFinite(actionYaw) ? normalizeHeading(actionYaw) : heading,
+            gimbalPitchRotateAngle: photoAction.pitch,
+            imageWidth: 960,
+            imageHeight: 720,
+            orientedCameraApertue: 440,
+            orientedCameraLuminance: 3800,
+            orientedCameraShutterTime: 0.003,
+            orientedCameraISO: 100,
+            AFPos: 159,
+            focusX: 480,
+            focusY: 360,
+            focusRegionWidth: 480,
+            focusRegionHeight: 360,
+            orientedFileSuffix: point.point_name || `WP_${index + 1}`
+          })
+        })
+      } else if (point.capture_mode !== 'none') {
+        // 向后兼容：旧单动作航点仍从 capture_mode/camera_params 组装。
         actions.push({
           actionIndex: 1,
           takePhotoType: 2,
