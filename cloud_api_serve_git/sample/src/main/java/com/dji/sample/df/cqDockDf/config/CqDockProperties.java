@@ -26,6 +26,9 @@ public class CqDockProperties {
 
     private String pictureLocalPath = "/ftpdir/admin_files/eua-picture/";
 
+    /** EUA巡视报告及生成状态的独立存储目录。 */
+    private String reportLocalPath = "/home/uav_server/report/eua/";
+
     /**
      * 本地联调：mock 图片所在目录（EUA picture/list 返回的图片由该目录提供）
      */

@@ -334,6 +334,8 @@ cq-dock:
   picture-list-path: /machineNest/noauth/third/picture/list
   task-status-path: /machineNest/noauth/third/task/status
   picture-local-path: /ftpdir/admin_files/eua-picture/
+  # EUA巡视Word报告及生成状态存储目录，需有读写权限
+  report-local-path: /home/uav_server/report/eua/
   # 本地联调：mock图片目录（CqDockMockController picture/list 返回的图片从该目录读取，放 visible1/2.jpg 和 ir1/2.jpg）
   mock-picture-path: /ftpdir/admin_files/test-pictures/
   # 本地联调：中心FTP不可达时置 true（跳过真实FTP，Type=61 的 file_path 为 mock 路径）

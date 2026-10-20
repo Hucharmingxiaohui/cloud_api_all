@@ -5,8 +5,8 @@ import lombok.Data;
 
 @Data
 public class CqEuaTaskPictureListRequest {
-    @JsonAlias({"business_id", "taskCode", "task_code"})
+    @JsonAlias({"businessId", "business_id", "taskCode", "task_code"})
     private String businessId;
-    @JsonAlias({"eua_task_id", "taskId", "task_id"})
+    @JsonAlias({"euaTaskId", "eua_task_id", "taskId", "task_id"})
     private String euaTaskId;
 }

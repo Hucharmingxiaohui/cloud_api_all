@@ -23,6 +23,9 @@ public class CqDockTaskRecordEntity {
     @TableField("task_name")
     private String taskName;
 
+    @TableField(exist = false)
+    private String planName;
+
     @TableField("bay_id")
     private String bayId;
 

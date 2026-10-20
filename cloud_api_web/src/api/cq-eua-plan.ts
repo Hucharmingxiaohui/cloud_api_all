@@ -48,3 +48,32 @@ export const getEuaTaskPictureImage = async function (id: number | string, analy
   })
   return result.data
 }
+
+export interface EuaTaskReportStatus {
+  status: 'NOT_GENERATED' | 'GENERATING' | 'COMPLETED' | 'FAILED'
+  message?: string
+  fileName?: string
+}
+
+export const generateEuaTaskReport = async function (data: any): Promise<IWorkspaceResponse<EuaTaskReportStatus>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-report/generate`, data)
+  return normalizeReportResponse(result.data)
+}
+
+export const getEuaTaskReportStatus = async function (params: any): Promise<IWorkspaceResponse<EuaTaskReportStatus>> {
+  const result = await request.get(`${HTTP_PREFIX}/task-report/status`, { params })
+  return normalizeReportResponse(result.data)
+}
+
+function normalizeReportResponse (response: any): IWorkspaceResponse<EuaTaskReportStatus> {
+  return {
+    ...response,
+    message: response.message || response.msg || '',
+    data: response.data ? { ...response.data, fileName: response.data.fileName || response.data.file_name || '' } : response.data
+  }
+}
+
+export const downloadEuaTaskReport = async function (params: any): Promise<Blob> {
+  const result = await request.get(`${HTTP_PREFIX}/task-report/download`, { params, responseType: 'blob' })
+  return result.data
+}

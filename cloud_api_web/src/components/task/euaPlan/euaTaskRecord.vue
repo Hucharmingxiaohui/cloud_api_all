@@ -18,7 +18,8 @@
     <div class="content">
       <el-table :data="taskRecordData" v-loading="recordLoading" border style="width: 100%">
         <el-table-column type="index" label="序号" width="70" align="center" />
-        <el-table-column prop="taskName" label="任务名称" show-overflow-tooltip />
+        <el-table-column prop="taskName" label="任务名称" min-width="230" show-overflow-tooltip />
+        <el-table-column prop="planName" label="所属计划名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="businessId" label="本地任务编码" width="230" show-overflow-tooltip />
         <el-table-column prop="euaTaskId" label="EUA任务ID" width="180" show-overflow-tooltip />
         <el-table-column prop="bayId" label="间隔ID" width="170" show-overflow-tooltip />
@@ -110,7 +111,7 @@ function reset () {
 function openTaskResult (row: any) {
   const businessId = row.businessId || row.business_id || row.taskCode || row.task_code || ''
   const euaTaskId = row.euaTaskId || row.eua_task_id || row.taskId || row.task_id || ''
-  router.push({ name: 'euaTaskResult', query: { businessId, euaTaskId, taskName: row.taskName } })
+  router.push({ name: 'euaTaskResult', query: { businessId, euaTaskId, taskName: row.taskName, planName: row.planName } })
 }
 
 function normalizeTaskRecordRow (item: any) {
@@ -119,6 +120,7 @@ function normalizeTaskRecordRow (item: any) {
     businessId: item.businessId || item.business_id || item.taskCode || item.task_code || '',
     taskCode: item.taskCode || item.task_code || item.businessId || item.business_id || '',
     taskName: item.taskName || item.task_name || '',
+    planName: item.planName || item.plan_name || '',
     bayId: item.bayId || item.bay_id || '',
     routeId: item.routeId || item.route_id || '',
     euaTaskId: item.euaTaskId || item.eua_task_id || item.taskId || item.task_id || '',

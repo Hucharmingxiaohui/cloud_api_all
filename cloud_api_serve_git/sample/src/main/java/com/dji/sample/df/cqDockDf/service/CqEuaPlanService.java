@@ -38,6 +38,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -72,7 +73,18 @@ public class CqEuaPlanService {
                 .like(StringUtils.hasText(request.getBayName()), CqEuaPlanEntity::getBayName, request.getBayName())
                 .orderByDesc(CqEuaPlanEntity::getCreateTime)
                 .orderByDesc(CqEuaPlanEntity::getId);
-        return cqEuaPlanMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        IPage<CqEuaPlanEntity> result = cqEuaPlanMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        List<String> taskCodes = result.getRecords().stream().map(CqEuaPlanEntity::getLastTaskCode)
+                .filter(StringUtils::hasText).distinct().collect(Collectors.toList());
+        if (!taskCodes.isEmpty()) {
+            Map<String, String> names = new LinkedHashMap<>();
+            cqDockTaskRecordMapper.selectList(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                    .in(CqDockTaskRecordEntity::getBusinessId, taskCodes)
+                    .orderByDesc(CqDockTaskRecordEntity::getId))
+                    .forEach(record -> names.putIfAbsent(record.getBusinessId(), record.getTaskName()));
+            result.getRecords().forEach(plan -> plan.setLastTaskName(names.get(plan.getLastTaskCode())));
+        }
+        return result;
     }
 
     public CqEuaPlanEntity add(CqEuaPlanAddRequest request) {
@@ -139,9 +151,11 @@ public class CqEuaPlanService {
         if (plan.getEnabled() != null && plan.getEnabled() == 0) {
             throw new IllegalArgumentException("计划已停用");
         }
-        String taskCode = "EUA_PLAN_" + plan.getId() + "_" + System.currentTimeMillis();
+        long timestamp = System.currentTimeMillis();
+        String taskCode = "EUA_PLAN_" + plan.getId() + "_" + timestamp;
+        String taskName = plan.getPlanName() + "_" + timestamp;
         String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByBay(plan.getBayId(), taskCode, plan.getPlanName(), fixedStartTime, false);
+        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByBay(plan.getBayId(), taskCode, taskName, fixedStartTime, false);
         plan.setLastTaskCode(taskCode);
         plan.setLastEuaTaskId(result.getEuaTaskId());
         plan.setLastExecuteTime(new Date());
@@ -186,7 +200,24 @@ public class CqEuaPlanService {
                 .like(StringUtils.hasText(request.getEuaTaskId()), CqDockTaskRecordEntity::getEuaTaskId, request.getEuaTaskId())
                 .orderByDesc(CqDockTaskRecordEntity::getCreateTime)
                 .orderByDesc(CqDockTaskRecordEntity::getId);
-        return cqDockTaskRecordMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        IPage<CqDockTaskRecordEntity> result = cqDockTaskRecordMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        Map<Long, List<CqDockTaskRecordEntity>> byPlan = new LinkedHashMap<>();
+        for (CqDockTaskRecordEntity record : result.getRecords()) {
+            String code = record.getBusinessId();
+            if (code != null && code.matches("EUA_PLAN_[0-9]+_[0-9]+")) {
+                try {
+                    Long planId = Long.valueOf(code.split("_")[2]);
+                    byPlan.computeIfAbsent(planId, key -> new ArrayList<>()).add(record);
+                } catch (NumberFormatException ignored) {
+                    // 非法历史编码不关联计划。
+                }
+            }
+        }
+        if (!byPlan.isEmpty()) {
+            cqEuaPlanMapper.selectBatchIds(byPlan.keySet()).forEach(plan ->
+                    byPlan.get(plan.getId()).forEach(record -> record.setPlanName(plan.getPlanName())));
+        }
+        return result;
     }
 
     public List<CqDockTaskPictureEntity> taskPictureList(CqEuaTaskPictureListRequest request) {

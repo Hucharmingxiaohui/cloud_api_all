@@ -330,7 +330,7 @@ const routes: Array<RouteRecordRaw> = [
             component: () => import('/@/components/task/euaPlan/euaPlanMgt.vue'),
             meta: {
               showInMenu: true,
-              label: 'EUA平台计划',
+              label: 'EUA飞行计划',
               cache: true
             }
           },
@@ -340,7 +340,7 @@ const routes: Array<RouteRecordRaw> = [
             component: () => import('/@/components/task/euaPlan/euaTaskRecord.vue'),
             meta: {
               showInMenu: true,
-              label: 'EUA执行记录',
+              label: 'EUA飞行任务',
               cache: true
             }
           },

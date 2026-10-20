@@ -8,6 +8,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqEuaPlanUpdateRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskPictureListRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskRecordPageRequest;
 import com.dji.sample.df.cqDockDf.service.CqEuaPlanService;
+import com.dji.sample.df.cqDockDf.service.CqEuaTaskReportService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
@@ -17,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 
 import javax.annotation.Resource;
 
@@ -25,8 +28,50 @@ import javax.annotation.Resource;
 @RequestMapping("/api/cqDock/eua/plan")
 public class CqEuaPlanController {
 
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Result> handleTaskReportStatus(ResponseStatusException exception) {
+        return ResponseEntity.status(exception.getStatus())
+                .body(Result.error(exception.getReason()));
+    }
+
     @Resource
     private CqEuaPlanService cqEuaPlanService;
+
+    @Resource
+    private CqEuaTaskReportService cqEuaTaskReportService;
+
+    @PostMapping("/task-report/generate")
+    public Result generateTaskReport(@RequestBody CqEuaTaskPictureListRequest request) {
+        return Result.success(cqEuaTaskReportService.generate(request));
+    }
+
+    @GetMapping("/task-report/status")
+    public Result taskReportStatus(@RequestParam(required = false) String businessId,
+                                   @RequestParam(required = false) String euaTaskId) {
+        return Result.success(cqEuaTaskReportService.status(reportRequest(businessId, euaTaskId)));
+    }
+
+    @GetMapping("/task-report/download")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadTaskReport(
+            @RequestParam(required = false) String businessId,
+            @RequestParam(required = false) String euaTaskId) {
+        org.springframework.core.io.Resource file = cqEuaTaskReportService.download(reportRequest(businessId, euaTaskId));
+        String fileName = file.getFilename();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment()
+                        .filename(fileName, java.nio.charset.StandardCharsets.UTF_8).build().toString())
+                .header("Cache-Control", "private, no-store")
+                .header("X-Content-Type-Options", "nosniff")
+                .body(file);
+    }
+
+    private CqEuaTaskPictureListRequest reportRequest(String businessId, String euaTaskId) {
+        CqEuaTaskPictureListRequest request = new CqEuaTaskPictureListRequest();
+        request.setBusinessId(businessId);
+        request.setEuaTaskId(euaTaskId);
+        return request;
+    }
 
     @PostMapping("/page")
     public Result page(@RequestBody CqEuaPlanPageRequest request) {

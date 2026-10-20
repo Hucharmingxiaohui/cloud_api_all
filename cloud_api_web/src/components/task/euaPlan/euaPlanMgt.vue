@@ -31,6 +31,7 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
+        <el-table-column prop="lastTaskName" label="最近任务名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="lastEuaTaskId" label="最近EUA任务ID" show-overflow-tooltip />
         <el-table-column prop="lastExecuteTime" label="最近执行时间" width="180" show-overflow-tooltip />
         <el-table-column label="操作" width="260" fixed="right" align="center">
@@ -57,7 +58,7 @@
 
     <el-dialog
       v-model="planDialogVisible"
-      :title="planForm.id ? '编辑EUA平台计划' : '新建EUA平台计划'"
+      :title="planForm.id ? '编辑EUA飞行计划' : '新建EUA飞行计划'"
       width="720px"
       :close-on-click-modal="false"
       class="eua-plan-dialog"
@@ -199,6 +200,7 @@ function normalizePlanRow (item: any) {
     routeId: item.routeId || item.route_id || item.waylineId || item.wayline_id || '',
     lastExecuteStatus: item.lastExecuteStatus ?? item.last_execute_status,
     lastEuaTaskId: item.lastEuaTaskId || item.last_eua_task_id || '',
+    lastTaskName: item.lastTaskName || item.last_task_name || '',
     lastExecuteTime: item.lastExecuteTime || item.last_execute_time || ''
   }
 }

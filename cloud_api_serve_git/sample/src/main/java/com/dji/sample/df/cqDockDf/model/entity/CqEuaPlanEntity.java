@@ -36,6 +36,9 @@ public class CqEuaPlanEntity {
     @TableField("last_task_code")
     private String lastTaskCode;
 
+    @TableField(exist = false)
+    private String lastTaskName;
+
     @TableField("last_eua_task_id")
     private String lastEuaTaskId;
 
