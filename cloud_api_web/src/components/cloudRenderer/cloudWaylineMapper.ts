@@ -1,5 +1,7 @@
 /** KMZ 解析结果 → 云渲染三维航线 waypoints */
 
+import type { WaypointPhotoAction } from './cloudWaylineKmz'
+
 export type CaptureMode = 'none' | 'visable' | 'ir' | 'visable,ir'
 
 export interface CloudWaypointCamera {
@@ -18,6 +20,8 @@ export interface CloudWaypoint {
   speed: number
   headingTrue: number
   camera_params: CloudWaypointCamera
+  /** 多拍照动作：KMZ 中同一航点含 ≥2 个 orientedShoot 动作时重建（对接文档 4.6.11 环节5） */
+  photo_actions?: WaypointPhotoAction[]
 }
 
 export interface CloudWaylineDraft {
@@ -165,6 +169,8 @@ function mapOnePlacemark (
   let captureMode: CaptureMode = 'none'
   let parsedYaw = NaN
   let kmzPointName = ''
+  // 同一航点的全部精准复拍动作；≥2 个时重建 photo_actions（对接文档 4.6.4 多拍照动作）
+  const orientedShots: Array<{ pitch: number; focalLength: number; lens: unknown; yaw: number }> = []
 
   const actions = listActions(placemark)
   for (const action of actions) {
@@ -186,6 +192,8 @@ function mapOnePlacemark (
       if (Number.isFinite(p)) pitch = p
       if (Number.isFinite(f)) focalLength = f
       captureMode = normalizeCaptureMode(lens || 'visable')
+      // 云台偏航 KMZ 原生逐动作；真实北向 0-360，与航点机头一致时省略（跟随语义）
+      orientedShots.push({ pitch: p, focalLength: f, lens, yaw })
       // KMZ 无独立航点名称字段，名称搭拍照动作 orientedFileSuffix 往返（对接文档 4.6.11 环节5）
       if (!kmzPointName) kmzPointName = String(oriented.orientedFileSuffix ?? oriented.oriented_file_suffix ?? '').trim()
       continue
@@ -232,6 +240,20 @@ function mapOnePlacemark (
   const idx = toNumber(placemark.index, index)
   const suffix = String(idx + 1).padStart(3, '0')
 
+  const normalizedShots = orientedShots
+    .filter(shot => Number.isFinite(shot.focalLength) && shot.focalLength > 0)
+    .map(shot => {
+      // 偏航与机头一致时省略（跟随语义），不同才显式保留
+      const shotYaw = Number.isFinite(shot.yaw) ? normalizeHeading(shot.yaw) : NaN
+      const differsFromHeading = Number.isFinite(shotYaw) && normalizeHeading(headingTrue) !== shotYaw
+      return {
+        imageFormat: normalizeCaptureMode(shot.lens || 'visable') === 'none' ? 'visable' as const : normalizeCaptureMode(shot.lens || 'visable') as Exclude<CaptureMode, 'none'>,
+        focalLength: shot.focalLength,
+        pitch: Number.isFinite(shot.pitch) ? normalizePitch(shot.pitch) : normalizePitch(pitch),
+        ...(differsFromHeading ? { yaw: shotYaw } : {})
+      }
+    })
+
   return {
     point_name: kmzPointName || String(placemark.point_name || placemark.name || `WP_${suffix}`),
     longitude: coords.longitude,
@@ -246,7 +268,9 @@ function mapOnePlacemark (
       pitch: normalizePitch(pitch),
       roll: toNumber(placemark.roll, 0) || 0,
       focalLength: focalLength > 0 ? focalLength : 75
-    }
+    },
+    // 多动作 KMZ 回读重建；单动作维持 undefined，旧编辑流程不变
+    photo_actions: normalizedShots.length > 1 ? normalizedShots.slice(0, 10) : undefined
   }
 }
 

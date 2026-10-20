@@ -201,13 +201,53 @@
               </div>
             </div>
             <label class="select-label">拍摄镜头
-              <el-select v-model="selectedWaypoint.capture_mode" :disabled="waylineState.followMode" @change="updateCaptureMode">
+              <el-select v-model="selectedWaypoint.capture_mode" :disabled="waylineState.followMode || multiActionsEnabled" @change="updateCaptureMode">
                 <el-option label="不拍照（过渡点）" value="none" />
                 <el-option label="可见光" value="visable" />
                 <el-option label="红外" value="ir" />
                 <el-option label="可见光 + 红外" value="visable,ir" />
               </el-select>
             </label>
+            <div class="multi-action-block">
+              <div class="multi-action-head">
+                <el-switch
+                  :model-value="multiActionsEnabled"
+                  :disabled="waylineState.followMode"
+                  @change="toggleMultiActions"
+                />
+                <span>多拍照动作</span>
+                <small>{{ multiActionsEnabled ? `已启用（${selectedWaypoint.photo_actions.length}/10）` : '单镜头模式' }}</small>
+              </div>
+              <template v-if="multiActionsEnabled">
+                <div
+                  v-for="(action, actionIndex) in selectedWaypoint.photo_actions"
+                  :key="actionIndex"
+                  class="photo-action-row"
+                  :class="{ 'photo-action-row--fpv': waylineState.selectedActionIndex === actionIndex }"
+                  @click="selectAction(actionIndex)"
+                >
+                  <span class="photo-action-row__index" :style="{ background: photoActionColor(actionIndex) }" :title="`场景中该颜色的视锥即此动作`">{{ actionIndex + 1 }}</span>
+                  <el-select v-model="action.imageFormat" size="small" :disabled="waylineState.followMode" @change="updatePhotoActions">
+                    <el-option label="可见光" value="visable" />
+                    <el-option label="红外" value="ir" />
+                    <el-option label="可见光 + 红外" value="visable,ir" />
+                  </el-select>
+                  <el-input-number v-model="action.focalLength" size="small" :min="1" :max="500" :step="1" controls-position="right" :disabled="waylineState.followMode" @change="updatePhotoActions" />
+                  <el-input-number v-model="action.pitch" size="small" :min="-90" :max="0" :step="1" controls-position="right" :disabled="waylineState.followMode" @change="updatePhotoActions" />
+                  <el-input-number v-model="action.yaw" size="small" :min="0" :max="359.99" :step="1" :precision="1" controls-position="right" placeholder="跟随机头" :disabled="waylineState.followMode" @change="updatePhotoActions" />
+                  <el-button
+                    size="small"
+                    text
+                    :type="waylineState.selectedActionIndex === actionIndex ? 'primary' : 'default'"
+                    :disabled="waylineState.followMode"
+                    @click.stop="selectAction(actionIndex)"
+                  >FPV</el-button>
+                  <el-button size="small" text type="danger" :disabled="waylineState.followMode" @click.stop="removePhotoAction(actionIndex)">删除</el-button>
+                </div>
+                <el-button size="small" :disabled="waylineState.followMode || selectedWaypoint.photo_actions.length >= 10" @click="addPhotoAction">添加动作</el-button>
+                <div class="multi-action-hint">按动作顺序拍摄（actionIndex 顺延），照片文件名使用航点名称；偏航为真实北向角，留空跟随航点机头。序号颜色与场景视锥一一对应；点击动作行或 FPV 按钮切换画中画预览源。</div>
+              </template>
+            </div>
           </section>
         </div>
       </template>
@@ -237,20 +277,29 @@ import {
   normalizeCaptureMode,
   normalizeHeading,
   normalizeRouteName,
+  normalizePhotoActions,
   validateWaypoints,
   type CaptureMode,
   type CloudKmzWaypoint,
-  type WaypointCamera
+  type WaypointCamera,
+  type WaypointPhotoAction
 } from './cloudWaylineKmz'
 
 type Waypoint = CloudKmzWaypoint
-interface WaylineState { routeName: string; selectedIndex: number; followMode: boolean; waypoints: Waypoint[] }
+interface WaylineState { routeName: string; selectedIndex: number; selectedActionIndex: number; followMode: boolean; waypoints: Waypoint[] }
+
+// 与 renderer FRUSTUM_PALETTE 一致（wayline-renderer.js）：动作 N 的视锥颜色
+const PHOTO_ACTION_COLORS = ['#ffd86b', '#39d9ff', '#ff6bd6', '#8dff6b', '#ff9f43', '#b28dff']
+
+function photoActionColor (index: number) {
+  return PHOTO_ACTION_COLORS[index % PHOTO_ACTION_COLORS.length]
+}
 
 const router = useRouter()
 const route = useRoute()
 const cloudRendererEnabled = isCloudRendererEnabled()
 const waylineClient = new CloudRendererClient()
-const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, followMode: false, waypoints: [] })
+const waylineState = reactive<WaylineState>({ routeName: `wayline-${formatDate(new Date())}`, selectedIndex: -1, selectedActionIndex: 0, followMode: false, waypoints: [] })
 const routeNameInput = ref(waylineState.routeName)
 const statusText = ref('云渲染航线会话连接中...')
 const nudgeMeters = ref(1)
@@ -323,7 +372,10 @@ function cloneWaypoints (points: CloudWaylineDraft['waypoints'] | Waypoint[]): W
         pitch: Number(point.camera_params?.pitch ?? -45),
         roll: Number(point.camera_params?.roll ?? 0),
         focalLength: Number(point.camera_params?.focalLength ?? 75)
-      }
+      },
+      photo_actions: point.photo_actions
+        ? normalizePhotoActions(point.photo_actions)
+        : undefined
     }
   })
 }
@@ -363,8 +415,23 @@ function applyRemoteWaylineState (raw: unknown) {
   const routeName = normalizeRouteName(payload.routeName || waylineState.routeName)
   waylineState.routeName = routeName
   waylineState.selectedIndex = Number.isInteger(payload.selectedIndex) ? payload.selectedIndex : -1
+  waylineState.selectedActionIndex = Number.isInteger(payload.selectedActionIndex) && payload.selectedActionIndex >= 0
+    ? payload.selectedActionIndex
+    : 0
   waylineState.followMode = payload.followMode === true
-  waylineState.waypoints = remotePoints
+  const previousPoints = waylineState.waypoints
+  // 新版 renderer 会回推 photo_actions（含逐动作偏航）；仍优先继承本地编辑值（兼容旧版不回推的情况），
+  // 显式关闭（undefined）同样按名保留，避免回推数组把开关顶回开启。
+  const previousByName = new Map<string, WaypointPhotoAction[] | undefined>()
+  previousPoints.forEach(point => {
+    if (!previousByName.has(point.point_name)) previousByName.set(point.point_name, point.photo_actions)
+  })
+  waylineState.waypoints = remotePoints.map(point => ({
+    ...point,
+    photo_actions: previousByName.has(point.point_name)
+      ? previousByName.get(point.point_name)
+      : (point.photo_actions?.length ? point.photo_actions : undefined)
+  }))
   routeNameInput.value = routeName
   if (payload.routeName !== routeName) {
     waylineClient.sendWaylineCommand('set-route-name', { value: routeName })
@@ -411,7 +478,20 @@ function handleStatusChange (status: string) {
   // 连接成功（状态清空）时尝试推送编辑草稿
   if (prev && !status) flushPendingEditDraft()
 }
-function selectWaypoint (index: number) { waylineClient.sendWaylineCommand('select', { index }) }
+function selectWaypoint (index: number) {
+  // renderer 收到 select 会把动作预览重置为第一个
+  waylineState.selectedActionIndex = 0
+  waylineClient.sendWaylineCommand('select', { index })
+}
+/** 切换 FPV 预览源：选中当前航点的第 N 个拍照动作（actionIndex 从 0） */
+function selectAction (actionIndex: number) {
+  if (waylineState.selectedIndex < 0) return
+  const point = waylineState.waypoints[waylineState.selectedIndex]
+  if (!point?.photo_actions?.length) return
+  const clamped = Math.min(Math.max(0, actionIndex), point.photo_actions.length - 1)
+  waylineState.selectedActionIndex = clamped
+  waylineClient.sendWaylineCommand('select-action', { index: waylineState.selectedIndex, actionIndex: clamped })
+}
 function removeWaypoint (index: number) { waylineClient.sendWaylineCommand('remove', { index }) }
 
 /** 航点名称净化：与 renderer 保存规则一致（trim → 64 字符 → 非法字符与空白转 _） */
@@ -463,13 +543,88 @@ function updateCamera () {
   const heading = unifyHeading(selectedWaypoint.value)
   selectedWaypoint.value.camera_params.heading = heading
   selectedWaypoint.value.headingTrue = heading
-  updateSelected({
+  const patch: Record<string, unknown> = {
     headingTrue: heading,
     camera_params: { ...selectedWaypoint.value.camera_params }
-  })
+  }
+  // 单动作模式下刷新等效数组，保持 renderer 场景视锥与最新姿态/焦距一致
+  if (!multiActionsEnabled.value) patch.photo_actions = singleActionArrayFor(selectedWaypoint.value)
+  updateSelected(patch)
 }
+const multiActionsEnabled = computed(() => selectedWaypoint.value?.photo_actions !== undefined)
+
+/**
+ * 单动作等效数组：renderer 的 update patch 没有"清除 photo_actions"语义
+ * （undefined/null 保留旧值），关闭多动作或单动作编辑时用它保持场景视锥同步。
+ */
+function singleActionArrayFor (point: Waypoint): WaypointPhotoAction[] {
+  if (point.capture_mode === 'none') return []
+  return [{
+    imageFormat: point.capture_mode,
+    focalLength: point.camera_params.focalLength,
+    pitch: point.camera_params.pitch
+  }]
+}
+
+function toggleMultiActions (enabled: string | number | boolean) {
+  const point = selectedWaypoint.value
+  if (!point) return
+  if (enabled) {
+    if (!point.photo_actions) {
+      const mode: Exclude<CaptureMode, 'none'> = point.capture_mode === 'none' ? 'visable' : point.capture_mode
+      point.photo_actions = [{
+        imageFormat: mode,
+        focalLength: point.camera_params.focalLength,
+        pitch: point.camera_params.pitch
+      }]
+    }
+    updatePhotoActions()
+    return
+  }
+  point.photo_actions = undefined
+  updateSelected({ capture_mode: point.capture_mode, photo_actions: singleActionArrayFor(point) })
+}
+
+function updatePhotoActions () {
+  const point = selectedWaypoint.value
+  if (!point?.photo_actions) return
+  const normalized = normalizePhotoActions(point.photo_actions) ?? []
+  point.photo_actions = normalized
+  // photo_actions 存在时覆盖 capture_mode；保留首个动作镜头作旧字段兼容显示。
+  point.capture_mode = normalized.length ? normalized[0].imageFormat : 'none'
+  updateSelected({ photo_actions: normalized, capture_mode: point.capture_mode })
+}
+
+function addPhotoAction () {
+  const point = selectedWaypoint.value
+  if (!point) return
+  if (!point.photo_actions) point.photo_actions = []
+  if (point.photo_actions.length >= 10) return
+  point.photo_actions.push({
+    imageFormat: 'visable',
+    focalLength: point.camera_params.focalLength,
+    pitch: point.camera_params.pitch
+  })
+  updatePhotoActions()
+}
+
+function removePhotoAction (index: number) {
+  const point = selectedWaypoint.value
+  if (!point?.photo_actions) return
+  point.photo_actions.splice(index, 1)
+  // 删除的是当前 FPV 预览动作时，本地索引收敛（renderer 侧越界也会自动回落到第一个）
+  if (waylineState.selectedActionIndex >= point.photo_actions.length) {
+    waylineState.selectedActionIndex = Math.max(0, point.photo_actions.length - 1)
+  }
+  updatePhotoActions()
+}
+
 function updateCaptureMode () {
-  if (selectedWaypoint.value) updateSelected({ capture_mode: selectedWaypoint.value.capture_mode })
+  const point = selectedWaypoint.value
+  if (!point) return
+  if (multiActionsEnabled.value) return
+  point.photo_actions = undefined
+  updateSelected({ capture_mode: point.capture_mode, photo_actions: singleActionArrayFor(point) })
 }
 function nudgeGeo (east: number, north: number) {
   if (waylineState.followMode) return waylineClient.sendFollowAdjust({ eastM: east, northM: north })
@@ -658,15 +813,18 @@ function normalizeWaylineState (value: unknown): WaylineState | null {
         pitch: Number(camera.pitch ?? -45),
         roll: Number(camera.roll ?? 0),
         focalLength: Number(camera.focalLength ?? 75)
-      }
+      },
+      photo_actions: normalizePhotoActions(point.photo_actions)
     }
     if (![normalized.longitude, normalized.latitude, normalized.height, normalized.speed, normalized.headingTrue, normalized.camera_params.heading, normalized.camera_params.pitch, normalized.camera_params.roll, normalized.camera_params.focalLength].every(Number.isFinite)) return null
     waypoints.push(normalized)
   }
   const selectedIndex = Number(payload.selectedIndex)
+  const selectedActionIndex = Number(payload.selectedActionIndex)
   return {
     routeName: String(payload.routeName || waylineState.routeName),
     selectedIndex: Number.isInteger(selectedIndex) && selectedIndex >= -1 && selectedIndex < waypoints.length ? selectedIndex : -1,
+    selectedActionIndex: Number.isInteger(selectedActionIndex) && selectedActionIndex >= 0 ? selectedActionIndex : 0,
     followMode: payload.followMode === true,
     waypoints
   }
@@ -768,7 +926,16 @@ onBeforeUnmount(() => {
 .attitude-nudge { display: grid; grid-template-columns: 62px 1fr 1fr; gap: 7px; align-items: center; }
 .attitude-nudge span { color: #88adbf; font-size: 12px; }
 .attitude-nudge :deep(.el-button) { margin: 0; padding: 7px 5px; }
-.select-label { margin-top: 14px; } .empty-editor { height: 100%; padding: 25px; }
+.select-label { margin-top: 14px; }
+.multi-action-block { margin-top: 14px; padding: 11px; border: 1px solid rgba(75, 217, 255, .25); border-radius: 8px; background: rgba(5, 23, 43, .45); }
+.multi-action-head { display: flex; align-items: center; gap: 9px; color: #e3f8ff; font-size: 13px; }
+.multi-action-head small { margin-left: auto; color: #88adbf; font-size: 11px; }
+.photo-action-row { display: grid; grid-template-columns: 20px minmax(74px, 1fr) minmax(58px, .75fr) minmax(58px, .75fr) minmax(68px, .85fr) 34px 36px; align-items: center; gap: 4px; margin-top: 9px; cursor: pointer; border-radius: 6px; }
+.photo-action-row--fpv { background: rgba(75, 217, 255, .13); outline: 1px solid rgba(75, 217, 255, .5); }
+.photo-action-row :deep(.el-button) { padding: 5px 2px; margin: 0; }
+.photo-action-row__index { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; color: #14243a; font-size: 11px; font-weight: 700; }
+.multi-action-hint { margin-top: 8px; color: #88adbf; font-size: 11px; line-height: 1.5; }
+.empty-editor { height: 100%; padding: 25px; }
 .empty-editor__mark { width: 64px; height: 64px; margin: 0 auto; display: grid; place-items: center; color: #4bd9ff; font-size: 38px; border: 1px solid rgba(75, 217, 255, .45); border-radius: 50%; }
 .empty-editor h3 { margin: 8px 0 0; color: #dff6ff; } .empty-editor p { margin: 0; line-height: 1.7; }
 :deep(.el-input__wrapper), :deep(.el-select__wrapper), :deep(.el-input-number) { background: rgba(5, 23, 43, .76); box-shadow: 0 0 0 1px rgba(68, 142, 177, .45) inset; }
