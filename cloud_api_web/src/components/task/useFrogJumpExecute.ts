@@ -1,8 +1,11 @@
 import { h, ref } from 'vue'
-import { ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { DistributeFlyPlan } from '/@/api/wayline'
 import { getBindingDevices } from '/@/api/manage'
 import { ELocalStorageKey } from '/@/types/enums'
+import { getLandingRecommendation, LandingCandidate } from '/@/api/frogJump'
+import FrogJumpLandingChooser from './FrogJumpLandingChooser.vue'
+import { bindingDevicesToCandidates, normalizeRecommendation } from './frogJumpLanding'
 
 const DOCK_DOMAIN = 3
 
@@ -56,7 +59,7 @@ async function executeNormalPlan (plan: any, onSuccess: () => void) {
 }
 
 async function executeFrogJumpPlan (plan: any, onSuccess: () => void) {
-  const landingDockSn = await selectLandingDock(plan.dock_sn)
+  const landingDockSn = await selectLandingDock(plan)
   if (!landingDockSn) {
     return
   }
@@ -72,60 +75,56 @@ async function executeFrogJumpPlan (plan: any, onSuccess: () => void) {
   onSuccess()
 }
 
-async function selectLandingDock (takeoffDockSn: string) {
-  const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
+async function selectLandingDock (plan: any) {
+  const takeoffDockSn = plan.dock_sn
   const selectedLandingDockSn = ref('')
-  const res = await getBindingDevices(workspaceId, { page: 1, total: 0, page_size: 1000 }, DOCK_DOMAIN)
-  if (res.code !== 0) {
-    ElMessage.error(res.message || '获取机场列表失败')
-    return ''
+  let candidates: LandingCandidate[] = []
+  let recommendedDockSn = ''
+  let warning = ''
+  const loading = ElMessage({ message: '正在获取降落机场推荐…', type: 'info', duration: 0 })
+  try {
+    const fileId = plan.file_id || plan.fileId
+    if (!fileId) throw new Error('计划缺少航线文件 ID，无法确定航线终点')
+    const res = await getLandingRecommendation(fileId, takeoffDockSn)
+    if (res.code !== 0) throw new Error(res.message || '获取降落机场推荐失败')
+    if (!res.data || !Array.isArray(res.data.candidates)) throw new Error('推荐响应缺少候选机场列表')
+    const recommendation = normalizeRecommendation(res.data, takeoffDockSn)
+    if (!recommendation.endpoint) throw new Error(recommendation.message || '无法确定唯一航线终点')
+    candidates = recommendation.candidates
+    recommendedDockSn = recommendation.recommended_dock_sn
+    selectedLandingDockSn.value = recommendedDockSn
+    warning = recommendation.message
+  } catch (error: any) {
+    warning = `推荐不可用：${error.response?.data?.message || error.message || '请求失败'}。请手动选择，距离无法计算。`
+    try {
+      const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
+      const res = await getBindingDevices(workspaceId, { page: 1, total: 0, page_size: 1000 }, DOCK_DOMAIN)
+      if (res.code !== 0) throw new Error(res.message || '获取机场列表失败')
+      candidates = bindingDevicesToCandidates(res.data?.list || [], takeoffDockSn)
+    } catch (fallbackError: any) {
+      warning += ` 机场列表加载失败：${fallbackError.response?.data?.message || fallbackError.message || '请求失败'}`
+    }
+  } finally {
+    loading.close()
   }
-  const allDockList = res.data?.list || []
-  const takeoffDock = allDockList.find((item: any) => item.device_sn === takeoffDockSn)
-  const takeoffDockName = takeoffDock?.nickname || takeoffDock?.device_name || takeoffDockSn
-  const dockList = allDockList.filter((item: any) => item.device_sn && item.device_sn !== takeoffDockSn)
-  if (dockList.length === 0) {
-    ElMessage.warning('没有可选择的降落机场')
-    return ''
-  }
-  selectedLandingDockSn.value = dockList[0].device_sn
-
   try {
     await ElMessageBox.confirm(
-      h('div', { style: 'width: 356px; padding: 4px 0 0; box-sizing: border-box;' }, [
-        h('div', {
-          style: 'display: flex; align-items: stretch; gap: 12px; width: 100%; box-sizing: border-box;',
-        }, [
-          h('div', {
-            style: 'width: 130px; flex: 0 0 130px; min-width: 0; padding: 12px 14px; border-radius: 7px; background: #f7f8fa; border: 1px solid #d9dee7; box-sizing: border-box;',
-          }, [
-            h('div', { style: 'font-size: 12px; color: #8a919d; margin-bottom: 6px;' }, '起飞机场'),
-            h('div', { style: 'font-size: 15px; font-weight: 600; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;' }, takeoffDockName),
-          ]),
-          h('div', { style: 'width: 18px; flex: 0 0 18px; display: flex; align-items: center; justify-content: center; color: #8b96a3; font-size: 18px; line-height: 1;' }, '→'),
-          h('div', { style: 'width: 184px; flex: 0 0 184px; min-width: 0;' }, [
-            h('div', { style: 'font-size: 12px; color: #8a919d; margin: 0 0 6px 1px;' }, '降落机场'),
-            h(ElSelect, {
-              modelValue: selectedLandingDockSn.value,
-              'onUpdate:modelValue': (value: string) => { selectedLandingDockSn.value = value },
-              placeholder: '请选择降落机场',
-              style: 'width: 184px;',
-            }, () => dockList.map((item: any) => h(ElOption, {
-              key: item.device_sn,
-              label: item.nickname || item.device_name || item.device_sn,
-              value: item.device_sn,
-            }))),
-          ]),
-        ]),
-      ]),
+      () => h(FrogJumpLandingChooser, {
+        modelValue: selectedLandingDockSn.value,
+        'onUpdate:modelValue': (value: string) => { selectedLandingDockSn.value = value },
+        takeoffDockSn,
+        candidates,
+        recommendedDockSn,
+        warning,
+      }),
       '选择降落机场',
       {
         confirmButtonText: '确认下发',
         cancelButtonText: '取消',
-        width: '420px',
+        width: 'min(720px, calc(100vw - 40px))',
         beforeClose: (action, _instance, done) => {
-          if (action === 'confirm' && !selectedLandingDockSn.value) {
-            ElMessage.warning('请选择降落机场')
+          if (action === 'confirm' && !candidates.some(item => item.dock_sn === selectedLandingDockSn.value && item.selectable)) {
+            ElMessage.warning('请选择可用的降落机场')
             return
           }
           done()

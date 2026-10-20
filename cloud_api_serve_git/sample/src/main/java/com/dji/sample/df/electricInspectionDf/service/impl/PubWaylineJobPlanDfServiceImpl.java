@@ -6,6 +6,7 @@ import com.df.server.dto.JobPlan.JobPlanItemPointDTO;
 import com.df.server.mapper.uni.UniPointMapper;
 import com.dji.sample.center.utils.StringUtils;
 import com.dji.sample.common.model.CustomClaim;
+import com.dji.sample.df.frogJumpDf.service.FrogJumpLandingRecommendationService;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.component.redis.RedisConst;
@@ -53,6 +54,8 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     //创建计划
     @Autowired
     private IFlightTaskService flightTaskService;
+    @Autowired
+    private FrogJumpLandingRecommendationService frogJumpLandingRecommendationService;
     @Autowired
     private UniPointMapper uniPointMapper;
     @Autowired
@@ -221,6 +224,14 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     @Override
     public HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
+        if (Boolean.TRUE.equals(pubWaylineJobPlanDfEntity.getFrogJumpMode())) {
+            String workspace = customClaim == null ? null : customClaim.getWorkspaceId();
+            boolean originAllowed = frogJumpLandingRecommendationService.isWorkspaceDock(workspace, pubWaylineJobPlanDfEntity.getDockSn());
+            boolean landingAllowed = frogJumpLandingRecommendationService.isWorkspaceDock(workspace, pubWaylineJobPlanDfEntity.getLandingDockSn());
+            if (!originAllowed || !landingAllowed) {
+                return HttpResultResponse.error("蛙跳任务的起飞机场和降落机场均须绑定到当前登录工作空间。");
+            }
+        }
         CreateJobParam param =new CreateJobParam();
 
         //设置param参数
