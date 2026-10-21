@@ -193,7 +193,7 @@ const handleResize = () => {
 }
 onMounted(() => {
   activeIndex.value = localStorage.getItem(STORAGE_KEY) || '2'
-  router.push(selected.value)
+  // The current route is already active. Re-pushing only its path drops job_id/demo_task on refresh.
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
@@ -331,8 +331,9 @@ function findMenuIndexByPath (items, targetPath) {
 
 // 监听路由变化，自动更新激活菜单
 watch(() => route.path, (newPath) => {
+  const menuPath = typeof route.meta.activeMenu === 'string' ? route.meta.activeMenu : newPath
   // 在左侧菜单中查找
-  const leftIndex = findMenuIndexByPath(menuOptions.value, newPath)
+  const leftIndex = findMenuIndexByPath(menuOptions.value, menuPath)
   if (leftIndex) {
     activeIndex.value = leftIndex
     localStorage.setItem(STORAGE_KEY, leftIndex)
@@ -340,7 +341,7 @@ watch(() => route.path, (newPath) => {
   }
 
   // 在右侧菜单中查找
-  const rightIndex = findMenuIndexByPath(menuRightOptions.value, newPath)
+  const rightIndex = findMenuIndexByPath(menuRightOptions.value, menuPath)
   if (rightIndex) {
     activeIndex.value = rightIndex
     localStorage.setItem(STORAGE_KEY, rightIndex)

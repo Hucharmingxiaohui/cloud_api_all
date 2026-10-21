@@ -400,7 +400,12 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
             }
         }
 
+        PubWaylineJobPlanDfEntity businessPlan = entity.getPlanId() == null ? null : pubWaylineJobPlanDfMapper.selectOne(
+                new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                        .eq(PubWaylineJobPlanDfEntity::getPlanId, entity.getPlanId())
+                        .eq(PubWaylineJobPlanDfEntity::getWorkspaceId, entity.getWorkspaceId()));
         WaylineJobDTO.WaylineJobDTOBuilder builder = WaylineJobDTO.builder()
+                .planType(businessPlan == null ? null : businessPlan.getPlanType())
                 .jobId(entity.getJobId())
                 .jobName(entity.getName())
                 .fileId(entity.getFileId())

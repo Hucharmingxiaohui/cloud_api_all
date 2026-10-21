@@ -328,11 +328,21 @@ public class JobControlHandler {
     /**
      * 上传数已达到总数（uploaded == total）时，按计划类型执行分析/上报并停止监控
      */
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.dji.sample.df.constructionDf.ConstructionTaskService constructionTasks;
+
     private void handleUploadCompleted(Integer planType, String jobId, String taskCode, String taskName, WaylineJobEntity waylineJobEntity, String isCenterTask) throws Exception {
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("jobId", jobId);
         jsonObject.put("fromJobMonitor", true);
 
+        if (com.dji.sample.df.constructionDf.ConstructionType.matches(planType)) {
+            // Persist originals only. Failed archival remains retryable; never start analysis here.
+            constructionTasks.archive(waylineJobEntity);
+            clearMonitoringState(taskCode);
+            log.info("工地照片已归档，等待手动分析: jobId={}", jobId);
+            return;
+        }
         if(planType==1){
             log.info("处理风机任务结果----");
             startAsyncAnalysisAndStopMonitoring(jobId, taskCode, taskName);

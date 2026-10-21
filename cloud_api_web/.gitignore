@@ -50,3 +50,6 @@ vite.config.ts.*
 *.sln
 *.sw?
 .history
+
+# 定向编译/浏览器验证临时工作区，不入库
+.construction-backend/

@@ -26,6 +26,9 @@ public class WaylineJobDTO {
 
     private String jobName;
 
+    @JsonProperty("plan_type")
+    private Integer planType;
+
     private String fileId;
 
     private String fileName;

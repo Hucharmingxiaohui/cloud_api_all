@@ -33,6 +33,7 @@
             <el-option value="4" label="光伏板计划"></el-option>
             <el-option value="1" label="风机计划"></el-option>
             <el-option value="2" label="兴趣点环绕计划"></el-option>
+            <el-option :value="String(CONSTRUCTION_PLAN_TYPE)" label="工地巡检计划"></el-option>
           </el-select>
         </el-form-item>
         <el-form-item label="任务时间:" class="query-item query-item-time">
@@ -228,6 +229,7 @@
                     />
                   </a-tooltip>
                 </div>
+                <span v-if="isConstructionTask(scope.row)" style="margin-left: 8px; color: #8fcaff">工地巡检 · 手动分析（结果页查看）</span>
                 <!-- 显示分析状态 -->
               </div>
             </template>
@@ -354,6 +356,7 @@ import { getErrorMessage } from '/@/utils/error-code/index'
 import { commonColor } from '/@/utils/color'
 import { ExclamationCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
+import { CONSTRUCTION_PLAN_TYPE, isConstructionTask } from '../construction/constructionTaskType'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
@@ -499,7 +502,7 @@ const root = getRoot()
 function toTaskResult (val) {
   localStorage.setItem('TaskInfo', JSON.stringify(val))
   localStorage.setItem('TaskResultFromTaskList', '1')
-  router.push({ path: '/task/taskResult' })
+  router.push({ path: '/task/taskResult', query: { job_id: val.job_id } })
 }
 
 /**
@@ -571,6 +574,7 @@ function reset () {
  * 保存任务图片并分析
  */
 async function anaysisTaskResult (row) {
+  if (isConstructionTask(row)) return
   try {
     const res = await startTaskAnasisyApi({ jobId: row.job_id })
 
@@ -595,6 +599,7 @@ async function anaysisTaskResult (row) {
  * 判断是否已经分析过, 并更新状态  后续这部分要优化，分析状态要写入任务结果表格中
  */
 async function checkAnaysisStaus (row) {
+  if (isConstructionTask(row)) return
   try {
     const res = await isAnalyzedApi(row.job_id)
 
@@ -659,6 +664,7 @@ function startAnalysisTimer () {
  * 检查单个任务的分析状态
  */
 async function checkSingleTaskAnalysisStatus (task) {
+  if (isConstructionTask(task)) { analyzingTasks.value.delete(task.job_id); return }
   try {
     const res = await isAnalyzedApi(task.job_id)
 
@@ -690,7 +696,7 @@ function initAnalysisStatusCheck () {
   // 初始检查所有已上传媒体文件的任务
   plansData.data.forEach(row => {
     const statusInfo = formatMediaTaskStatus(row)
-    if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
+    if (!isConstructionTask(row) && statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
       analyzedTasks.value.add(row.job_id)
       checkAnaysisStaus(row)
     }
@@ -713,7 +719,7 @@ watch(
       const statusInfo = formatMediaTaskStatus(row)
 
       // 当状态为"已上传"且未分析过时，执行分析
-      if (statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
+      if (!isConstructionTask(row) && statusInfo.text === '已上传' && !analyzedTasks.value.has(row.job_id)) {
         analyzedTasks.value.add(row.job_id)
 
         // 使用nextTick确保DOM更新完成后再执行

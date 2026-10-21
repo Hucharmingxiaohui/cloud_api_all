@@ -357,6 +357,7 @@ export const createPlan = async function (workspaceId: string, plan: CreatePlan)
 }
 
 export interface Task {
+  plan_type?: number,
   job_id: string,
   job_name: string,
   task_type: TaskType, // 任务类型

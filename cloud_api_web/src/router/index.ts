@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory, RouteRecordRaw, RouteLocation } from 'vue-router'
 import { ERouterName } from '/@/types/index'
 import { ref } from 'vue'
 
@@ -15,6 +15,7 @@ declare module 'vue-router' {
     label?: string
     /** 菜单位置（left/right，子路由继承父路由） */
     position?: 'left' | 'right'
+    activeMenu?: string
   }
 }
 
@@ -46,6 +47,13 @@ const routes: Array<RouteRecordRaw> = [
       }
     ]
   },
+  // Standalone demo entry: no workspace device/WebSocket lifecycle is mounted.
+  {
+    path: '/construction-preview/:page(areas|plans|tasks)?',
+    name: 'constructionPreview',
+    component: () => import('/@/components/construction/ConstructionWorkspace.vue'),
+    meta: { showInMenu: false, cache: false }
+  },
   // workspace（主菜单所在路由）
   {
     path: '/' + ERouterName.WORKSPACE,
@@ -54,6 +62,12 @@ const routes: Array<RouteRecordRaw> = [
     redirect: '/' + ERouterName.NEW_WAYLINE,
     meta: { showInMenu: false, cache: false },
     children: [
+      { path: '/construction', redirect: '/variableMgt/constructionAreas', meta: { showInMenu: false } },
+      ...['areas', 'plans', 'tasks'].map(page => ({
+        path: `/construction/${page}`,
+        redirect: (to: RouteLocation) => ({ path: page === 'areas' ? '/variableMgt/constructionAreas' : page === 'plans' ? '/taskManage/construction/plans' : '/task/taskResult', query: page === 'tasks' ? { demo_task: typeof to.query.task === 'string' ? to.query.task : 'select' } : to.query }),
+        meta: { showInMenu: false }
+      })),
       // 左侧菜单 - 变量管理（父菜单，含子路由）
       {
         path: '/variableMgt',
@@ -65,6 +79,12 @@ const routes: Array<RouteRecordRaw> = [
           cache: false
         },
         children: [
+          {
+            path: '/variableMgt/constructionAreas',
+            name: 'constructionAreas',
+            component: () => import('/@/components/construction/ConstructionAreas.vue'),
+            meta: { showInMenu: true, label: '施工区域', cache: false, constructionPage: 'areas' }
+          },
           {
             path: '/variableMgt/fanMgt',
             name: 'fanMgt',
@@ -261,6 +281,15 @@ const routes: Array<RouteRecordRaw> = [
         },
         children: [
           // 子菜单 - 普通点位计划
+          { path: '/taskManage/construction', redirect: '/taskManage/construction/plans', meta: { showInMenu: false } },
+          { path: '/taskManage/construction/areas', redirect: '/variableMgt/constructionAreas', meta: { showInMenu: false } },
+          { path: '/taskManage/construction/tasks', redirect: to => ({ path: '/task/taskResult', query: { demo_task: typeof to.query.task === 'string' ? to.query.task : 'select' } }), meta: { showInMenu: false } },
+          {
+            path: '/taskManage/construction/plans',
+            name: 'constructionPlans',
+            component: () => import('/@/components/construction/ConstructionWorkspace.vue'),
+            meta: { showInMenu: true, label: '工地巡检计划', cache: false, constructionPage: 'plans' }
+          },
           {
             path: '/taskManage/' + ERouterName.FLY_WAYLINE_PLAN,
             name: ERouterName.FLY_WAYLINE_PLAN,
@@ -531,8 +560,8 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/task/taskResult',
         name: 'taskResult',
-        component: () => import('/@/components/task/task_result.vue'),
-        meta: { showInMenu: false, cache: true }
+        component: () => import('/@/components/task/TaskResultEntry.vue'),
+        meta: { showInMenu: false, cache: false, activeMenu: '/' + ERouterName.TASK }
       },
       {
         path: '/wayline/Model',

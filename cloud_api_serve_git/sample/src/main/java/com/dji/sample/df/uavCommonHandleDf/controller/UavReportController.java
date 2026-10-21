@@ -75,6 +75,13 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("fjReport/api/v1/")
 public class UavReportController {
 
+    private boolean isConstruction(WaylineJobEntity job) {
+        if (job == null || job.getPlanId() == null) return false;
+        PubWaylineJobPlanDfEntity plan = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, job.getPlanId()));
+        return plan != null && com.dji.sample.df.constructionDf.ConstructionType.matches(plan.getPlanType());
+    }
+
     private String buildReportFileName(String taskName, String jobId) {
         return taskName + "_" + jobId + ".docx";
     }
@@ -134,6 +141,8 @@ public class UavReportController {
     @PostMapping("/pictureSave")
     public Result pictureSaveAndAnalysis(@RequestBody JSONObject jsonObject, HttpServletRequest httpRequest) throws Exception {
         String jobId = jsonObject.get("jobId").toString();
+        WaylineJobEntity constructionCandidate = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        if (isConstruction(constructionCandidate)) return Result.warn("工地任务仅允许通过工地结果页手动提交分析");
         boolean fromJobMonitor = jsonObject.getBooleanValue("fromJobMonitor");
         log.info("图片保存分析请求: jobId={}, fromJobMonitor={}, caller={}", jobId, fromJobMonitor,
                 httpRequest == null ? "internal" : httpRequest.getRemoteAddr());
@@ -307,6 +316,7 @@ public class UavReportController {
     @GetMapping("/isAnalyzed")
     public Result isAnalyzed(@RequestParam String jobId) {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        if (isConstruction(waylineJobEntity)) return Result.success(5); // manual construction workflow; never auto-submit
         Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
         if(isAnalyzed == null){
             return Result.success(0);
@@ -330,6 +340,9 @@ public class UavReportController {
      */
     @PostMapping("/createTaskReport")
     public Result createHisTaskReport(@RequestBody JSONObject jsonObject) {
+        WaylineJobEntity candidate = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jsonObject.getString("jobId")));
+        if (isConstruction(candidate)) return Result.warn("工地报告服务尚未接入，请在工地任务结果中查看分析状态");
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
