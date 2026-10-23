@@ -1,11 +1,11 @@
 <template>
-    <div class="container">
+    <div class="container" :class="{ 'construction-editor': !!constructionAreaId }">
         <div class="left-sidebar">
             <!-- 左侧内容 -->
             <div style="height: 50px; line-height: 50px; border-bottom: 1px solid #4f4f4f; font-weight: 450;">
                 <a-row>
                     <a-col :span="1"></a-col>
-                    <a-col :span="22">航点标注</a-col>
+                    <a-col :span="22">{{ constructionAreaId ? '区域内航点标注' : '航点标注' }}</a-col>
                     <a-col :span="1"></a-col>
                 </a-row>
             </div>
@@ -25,7 +25,7 @@
                     <el-input v-model="waylineName" style="width: 200px;height: 20px; font-size: 16px;"></el-input>
                 </div> -->
                 <div class="flex-row flex-justify-around flex-align-center mt20">
-                    <a-button type="primary" @click="commitWayline">提交</a-button>
+                    <a-button type="primary" :loading="constructionSaving" :disabled="!!constructionAreaId && !constructionArea" @click="commitWayline">提交</a-button>
                 </div>
             </div>
             <a-drawer
@@ -348,7 +348,8 @@
         </div>
         <div class="main-content">
             <!-- 右侧内容 -->
-            <showMap ref="myMap" />
+            <div v-if="constructionAreaId" class="construction-editor-banner">{{ constructionArea ? `${constructionArea.name} · v${constructionArea.version}：巡检航点和航段须在蓝色边界内` : constructionError || '正在加载区域边界…' }}<button @click="router.push({ path: '/variableMgt/constructionAreas', query: { area: constructionAreaId } })">返回区域</button></div>
+            <showMap ref="myMap" :construction-mode="!!constructionAreaId" :construction-boundary="constructionArea?.boundary || []" :draft-storage-key="draftStorageKey" />
         </div>
     </div>
 </template>
@@ -361,16 +362,41 @@ import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
 import { MapDoodleColor, MapElementEnum } from '/@/constants/map'
 import { generatePoint } from '/@/utils/genjson'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getConstructionArea, createConstructionWayline } from '/@/api/construction'
+import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
+import { uuidv4 } from '/@/utils/uuid'
 import { commitWaylineFile, commitWaylineFile1, deleteWaylineFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName, ELiveStatusValue, EStatusValue } from '/@/types'
 import { useMyStore } from '/@/store'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import { getApp, getRoot } from '/@/root'
 import { useGMapManage } from '/@/hooks/use-g-map'
 import Layer from '/@/pages/page-web/projects/layer.vue'
 import pin19be6b from '/@/assets/icons/pin-19be6b.svg'
 const router = useRouter()
+const editorRoute = useRoute()
+const constructionAreaId = typeof editorRoute.query.construction_area === 'string' ? editorRoute.query.construction_area : ''
+const draftStorageKey = constructionAreaId ? `construction_wayline_draft_${constructionAreaId}` : 'wayline'
+const constructionArea = ref(null)
+const constructionError = ref('')
+const constructionSaving = ref(false)
+let constructionSaved = false
+let constructionRequest = ''
+let constructionPayload = ''
+if (constructionAreaId) {
+  getConstructionArea(constructionAreaId).then(area => {
+    if (area.archived || !area.enabled) throw new Error('区域已归档或暂停')
+    if (String(area.version) !== String(editorRoute.query.area_version)) throw new Error('区域已更新，请返回区域页面刷新后创建')
+    constructionArea.value = area
+  }).catch(error => { constructionError.value = error.message; ElMessage.error(error.message) })
+}
+onBeforeRouteLeave(async () => {
+  if (!constructionAreaId || constructionSaved) return true
+  if (constructionSaving.value) { ElMessage.info('航线正在保存，请稍候'); return false }
+  if (!store.state.Points[0]?.elements?.length) return true
+  try { await ElMessageBox.confirm('航线尚未保存，是否放弃编辑？', '离开航线编辑'); return true } catch { return false }
+})
 // 响应参数定义
 const scorllHeight = ref() // 左侧容器滚动高度
 const store = useMyStore()
@@ -601,7 +627,7 @@ const gimbalOption = reactive({
 // 方法定义
 onMounted(() => {
   const app = getApp()
-  useGMapManageHook.globalPropertiesConfig(app)
+  if (!constructionAreaId) useGMapManageHook.globalPropertiesConfig(app)
   nextTick()
   // mapLayers.value =
   init()
@@ -613,8 +639,8 @@ onBeforeUnmount(() => {
   const Layers = store.state.Points
   Layers[0].elements = []
   store.commit('SET_POINTS', Layers)
-  localStorage.removeItem('wayline')
-  localStorage.removeItem('wayline_edit_meta')
+  localStorage.removeItem(draftStorageKey)
+  if (!constructionAreaId) localStorage.removeItem('wayline_edit_meta')
 })
 function closeDiv () {
   visible1.value = false
@@ -639,7 +665,8 @@ const payloadMap = {
     1: 99,
   },
 }
-function commitWayline () {
+async function commitWayline () {
+  if (constructionSaving.value) return
   const points = store.state.Points
   const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)
   const myPlacemark = []
@@ -650,6 +677,12 @@ function commitWayline () {
 
   const point = points[0]
   const elements = point.elements
+  if (constructionAreaId) {
+    if (!constructionArea.value) { ElMessage.error(constructionError.value || '请等待区域加载'); return }
+    if (elements.length < 2) { ElMessage.error('请至少添加两个航点'); return }
+    const issue = routeBoundaryError(elements.map(item => ({ lng: Number(item.resource.content.geometry.coordinates[0]), lat: Number(item.resource.content.geometry.coordinates[1]) })), constructionArea.value.boundary || [])
+    if (issue) { ElMessage.error(issue); return }
+  }
   const missionConfig = point.missionConfig
   const folder = point.folder
 
@@ -702,6 +735,19 @@ function commitWayline () {
 
   console.log('提交的数据', data)
 
+  if (constructionAreaId) {
+    const payload = JSON.stringify(data)
+    if (payload !== constructionPayload) { constructionPayload = payload; constructionRequest = uuidv4() }
+    constructionSaving.value = true
+    try {
+      const saved = await createConstructionWayline(constructionAreaId, constructionArea.value.version, data, constructionRequest)
+      constructionSaved = true
+      ElMessage.success('航线已保存并关联当前区域')
+      await router.push({ path: '/variableMgt/constructionAreas', query: { area: constructionAreaId, wayline: saved.wayline_id } })
+    } catch (error) { ElMessage.error(error instanceof Error ? error.message : '航线保存失败，请重试') } finally { constructionSaving.value = false }
+    return
+  }
+
   commitWaylineFile1(workspaceId, data).then(res => {
     if (res.code !== 0) {
       return
@@ -733,7 +779,7 @@ function commitWayline () {
 const updateLayerData = (newData) => {
   // layerData.value = newData;
   // console.log('我i正在被拖动', newData)
-  localStorage.setItem('wayline', JSON.stringify(newData[0]))
+  localStorage.setItem(draftStorageKey, JSON.stringify(newData[0]))
   mapLayers.value = newData
   myMap.value.drawLinebyDrag(newData) // 绘制航线drawLinebyDrag
 }
@@ -768,7 +814,7 @@ function deleteAction (val) {
 // 初始化,在仓库中添加航线参数
 function init () {
   // 判断是否能是页面刷新，刷新时，从浏览器内存中获取数据
-  const waylineData = localStorage.getItem('wayline')
+  const waylineData = localStorage.getItem(draftStorageKey)
   const Layers = JSON.parse(JSON.stringify(store.state.Points))// 深拷贝，避免直接引用
 
   if (waylineData) {
@@ -783,7 +829,7 @@ function init () {
         lineState.globalWaypointHeadingMode = headingMode
       }
       // 读取编辑元信息（编辑已有航线时由航线列表页写入）
-      const editMetaRaw = localStorage.getItem('wayline_edit_meta')
+      const editMetaRaw = constructionAreaId ? null : localStorage.getItem('wayline_edit_meta')
       if (editMetaRaw) {
         try {
           const meta = JSON.parse(editMetaRaw)
@@ -816,6 +862,12 @@ function init () {
       store.commit('SET_POINTS', Layers)
     }
   } else {
+    if (constructionAreaId) {
+      const fresh = JSON.parse(JSON.stringify(store.state.Points))
+      fresh[0].elements = []; fresh[0].name = '工地巡检航线'
+      fresh[0].folder.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
+      store.commit('SET_POINTS', fresh)
+    }
     // 从航线编辑界面过来
     console.log('我被执行')
     setTimeout(() => {
@@ -823,7 +875,7 @@ function init () {
       mapLayers.value = Layers
       lineState.droneEnumValue = Layers[0].missionConfig.droneInfo.droneEnumValue
       myMap.value.drawWayline() // 绘制航线
-      localStorage.setItem('wayline', JSON.stringify(Layers[0]))
+      localStorage.setItem(draftStorageKey, JSON.stringify(Layers[0]))
     }, 500)
   }
 }
@@ -1034,7 +1086,7 @@ function changeLayer (val) {
   }
   // 每次修改，都保存一份数据在浏览器内存，放置刷新
   const Layers = store.state.Points
-  localStorage.setItem('wayline', JSON.stringify(Layers[0]))
+  localStorage.setItem(draftStorageKey, JSON.stringify(Layers[0]))
 }
 // 修改航线信息
 function updateWayline () {
@@ -1225,6 +1277,9 @@ function closeDrawer () {
 </script>
 
 <style lang="scss" >
+.container.construction-editor { position: relative; height: 100%; min-height: 0; }
+.construction-editor-banner { position: absolute; z-index: 220; top: 12px; left: 315px; right: 20px; padding: 10px 14px; color: #d9f4ff; background: #0b284a; border: 1px solid #3989b7; font-size: 13px; }
+.construction-editor-banner button { float: right; color: #8cdbff; background: transparent; border: 0; cursor: pointer; }
 .container {
   display: flex;
   height: 100vh; /* 设置整个容器占据整个视窗高度 */

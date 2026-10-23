@@ -18,7 +18,10 @@
   </template>
 
 <script lang="ts">
-import { computed, defineComponent, onMounted, reactive, ref, watch, defineExpose } from 'vue'
+import { computed, defineComponent, onMounted, onBeforeUnmount, reactive, ref, watch, defineExpose, PropType } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { ConstructionPoint } from '/@/api/construction'
+import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
 import {
   generateLineContent,
   generatePointContent,
@@ -84,12 +87,23 @@ export default defineComponent({
     FlightAreaActionIcon,
   },
   name: 'GMap',
-  props: {},
-  setup () {
+  props: { constructionMode: Boolean, constructionBoundary: { type: Array as PropType<ConstructionPoint[]>, default: () => [] }, draftStorageKey: { type: String, default: 'wayline' } },
+  setup (props) {
     const useMouseToolHook = useMouseTool()
     const useGMapManageHook = useGMapManage()
     const deviceTsaUpdateHook = deviceTsaUpdate()
     const root = getRoot()
+    let constructionPolygon: any = null
+    function renderConstructionBoundary () {
+      if (!root.$map || !props.constructionMode) return
+      if (constructionPolygon) root.$map.remove(constructionPolygon)
+      if (props.constructionBoundary.length < 3) return
+      constructionPolygon = new root.$aMap.Polygon({ path: props.constructionBoundary.map(p => wgs84togcj02(p.lng, p.lat)), strokeColor: '#39d9ff', strokeWeight: 3, fillColor: '#39d9ff', fillOpacity: 0.12, zIndex: 30 })
+      root.$map.add(constructionPolygon)
+      root.$map.setFitView([constructionPolygon], false, [70, 70, 70, 70])
+    }
+    watch(() => props.constructionBoundary, renderConstructionBoundary, { deep: true })
+    onBeforeUnmount(() => { if (constructionPolygon) root.$map?.remove(constructionPolygon) })
 
     const mouseMode = ref(false)
     const store = useMyStore()
@@ -279,7 +293,35 @@ export default defineComponent({
     const markers = [] // 用于存储所有标注的引用
     let polylines = [] // 用于存储折线的引用
     let points = [] // 存放所有的航点
+    const draggableConstructionMarkers = new WeakSet<object>()
+    function drawConstructionLine () {
+      if (!root.$map || !root.$aMap) return
+      useGMapCoverHook = useGMapCover()
+      polylines.forEach(line => root.$map.remove(line)); polylines = []
+      const elements = store.state.Points[0].elements
+      elements.forEach(ele => {
+        const coords = ele.resource.content.geometry.coordinates
+        const gcj = wgs84togcj02(coords[0], coords[1])
+        if (!store.state.coverMap[ele.id]) useGMapCoverHook.init2DPin(ele.name, gcj, ele.resource.content.properties.color, { id: ele.id, name: ele.name })
+        const marker = store.state.coverMap[ele.id]?.[0]
+        if (!marker || draggableConstructionMarkers.has(marker)) return
+        draggableConstructionMarkers.add(marker); marker.setDraggable(true)
+        marker.on('dragend', () => {
+          const pos = marker.getPosition(); const [lng, lat] = gcj02towgs84(pos.lng, pos.lat)
+          const all = store.state.Points[0].elements
+          const path = all.map(item => item.id === ele.id ? { lng, lat } : { lng: item.resource.content.geometry.coordinates[0], lat: item.resource.content.geometry.coordinates[1] })
+          const issue = routeBoundaryError(path, props.constructionBoundary)
+          if (issue) { marker.setPosition(wgs84togcj02(coords[0], coords[1])); ElMessage.warning(issue); return }
+          coords[0] = lng; coords[1] = lat
+          store.commit('SET_POINTS', store.state.Points)
+          localStorage.setItem(props.draftStorageKey, JSON.stringify(store.state.Points[0]))
+          drawConstructionLine()
+        })
+      })
+      showWayline(elements.map(ele => wgs84togcj02(ele.resource.content.geometry.coordinates[0], ele.resource.content.geometry.coordinates[1])))
+    }
     function showWayline (lineArr: string[]) {
+      if (props.constructionMode && lineArr.length < 2) return
       console.log('ceshi')
       const AMap = root.$aMap
       if (!AMap) {
@@ -314,7 +356,7 @@ export default defineComponent({
         new AMap.LngLat(Math.min(...convertedLineArr.map(coord => coord[0])), Math.min(...convertedLineArr.map(coord => coord[1]))),
         new AMap.LngLat(Math.max(...convertedLineArr.map(coord => coord[0])), Math.max(...convertedLineArr.map(coord => coord[1])))
       )
-      root.$map.setBounds(bounds)
+      if (!props.constructionMode) root.$map.setBounds(bounds)
       // const iconUrl = IconPoint // 替换为你的图标路径
       // convertedLineArr.forEach((position) => {
       //   const marker = new AMap.Marker({
@@ -334,6 +376,7 @@ export default defineComponent({
     }
     let edit = true // 判断用户是在编辑航线还是新建航线
     function drawWayline () {
+      if (props.constructionMode) { drawConstructionLine(); return }
       const layerData = store.state.Points
       // 绘制航线
       if (points.length < 1 && layerData[0].elements.length < 1) {
@@ -373,6 +416,7 @@ export default defineComponent({
     //  航点位置交换时，绘制航线
 
     function drawLinebyDrag (val:any) {
+      if (props.constructionMode) { drawConstructionLine(); return }
       // 删除航线
       if (polylines) {
         polylines.forEach(marker => {
@@ -418,6 +462,7 @@ export default defineComponent({
     }
     // ------------------------------------------------------------------------------------------结束-------------------------------------------------------------------------------
     function draw (type: MapDoodleType, bool: boolean, flightAreaType?: EFlightAreaType) {
+      if (props.constructionMode) root.$mouseTool?.off('draw')
       state.currentType = type
       mouseMode.value = bool
       state.isFlightArea = !!flightAreaType
@@ -437,6 +482,9 @@ export default defineComponent({
     onMounted(() => {
       const app = getApp()
       useGMapManageHook.globalPropertiesConfig(app)
+      useGMapCoverHook = useGMapCover()
+      if (props.constructionMode) root.$map.setStatus({ doubleClickZoom: false })
+      renderConstructionBoundary()
       // console.log('初始化')
     })
 
@@ -468,6 +516,18 @@ export default defineComponent({
     }
     async function postPinPositionResource (obj) {
       const req = getPinPositionResource(obj)
+      if (props.constructionMode) {
+        const coordinates = req.resource.content.geometry.coordinates
+        const [lng, lat] = gcj02towgs84(coordinates[0], coordinates[1])
+        const path = store.state.Points[0].elements.map(item => ({ lng: Number(item.resource.content.geometry.coordinates[0]), lat: Number(item.resource.content.geometry.coordinates[1]) }))
+        const issue = routeBoundaryError([...path, { lng, lat }], props.constructionBoundary)
+        if (issue) { root.$map.remove(obj); ElMessage.warning(issue); return }
+        updateCoordinates('gcj02-wgs84', req)
+        store.state.coverMap[req.id] = [obj]
+        setLayers(req)
+        localStorage.setItem(props.draftStorageKey, JSON.stringify(store.state.Points[0]))
+        return
+      }
       setLayers(req)
       const coordinates = req.resource.content.geometry.coordinates
       updateCoordinates('gcj02-wgs84', req);
@@ -480,7 +540,7 @@ export default defineComponent({
       // console.log(req.name)
       useGMapCoverHook.updatePinElementTitle(req.id, req.name)
       const Layers = store.state.Points
-      localStorage.setItem('wayline', JSON.stringify(Layers[0]))
+      localStorage.setItem(props.draftStorageKey, JSON.stringify(Layers[0]))
     }
     async function postPolylineResource (obj) {
       const req = getPolylineResource(obj)
