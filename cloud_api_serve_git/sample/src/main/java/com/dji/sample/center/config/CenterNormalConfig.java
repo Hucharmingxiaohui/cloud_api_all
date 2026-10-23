@@ -18,4 +18,14 @@ public class CenterNormalConfig {
     private String stationCode;
     /** 上级系统唯一标识，对应无人机系统给上级中心端发送报文中的ReceiveCode */
     private String serverCode;
+
+    /** 仅控制发送根节点；接收兼容 PatrolHost 和 PatrolDevice，修改配置后需重启。 */
+    private String xmlRootName = "PatrolHost";
+
+    public void setXmlRootName(String xmlRootName) {
+        if (!"PatrolHost".equals(xmlRootName) && !"PatrolDevice".equals(xmlRootName)) {
+            throw new IllegalArgumentException("centernormal.xmlRootName must be exactly PatrolHost or PatrolDevice");
+        }
+        this.xmlRootName = xmlRootName;
+    }
 }

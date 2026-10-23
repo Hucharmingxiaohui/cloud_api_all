@@ -220,8 +220,11 @@ switch:
 centernormal:
   serverIp: 172.20.63.105
   serverPort: 10019
+# 实际是系统编码
   stationCode: uav01
   serverCode: Server01
+  # 发送XML根节点：PatrolHost / PatrolDevice；接收兼容两者，修改后需重启
+  xmlRootName: PatrolHost
 
 #国网规范对接上级ftp
 centerftpsnormal:
@@ -322,7 +325,7 @@ windFarm:
 # 上报场站（用于对接巡视上报的场站编码，可能是变电站也可能是风电场或者光伏场站，根据实际情况配置）
 normalStation:
   stationCode: "Sub_WeiLan"
-  stationName: "光伏电站1"
+  stationName: "测试变电站"
 
 # 重庆电力下级无人机平台（机场对接 HTTP）
 cq-dock:
@@ -345,10 +348,6 @@ cq-dock:
 importPoint:
 #  D:/importPoint/  /home/importPoint/
   modelfilePath: D:/importPoint/模版.xlsx
-  subName: "尹夏储能电站"
-  systemCode: "UavPatrolSystem"
-  # 点位编码前缀
-  pointCodePrefix: "YIXIA-"
 
 # x86 服务器 SSH 配置(用于大疆sdk测温）
 remote:

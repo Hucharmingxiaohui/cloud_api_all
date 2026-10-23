@@ -61,6 +61,11 @@ public class CenterTaskHandler {
      */
     public void addScheduledTask(Integer planType,String taskCode, String fixedStartTime,
                                  String deviceId, String taskName) {
+        addScheduledTask(planType, taskCode, fixedStartTime, deviceId, taskName, null);
+    }
+
+    public void addScheduledTask(Integer planType, String taskCode, String fixedStartTime,
+                                 String deviceId, String taskName, String subCode) {
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
             Date scheduledTime = sdf.parse(fixedStartTime);
@@ -73,6 +78,9 @@ public class CenterTaskHandler {
             // 2. 存储任务详情到Hash
             Map<String, String> taskDetail = new HashMap<>();
             taskDetail.put("deviceId", deviceId);
+            if (StringUtils.hasText(subCode)) {
+                taskDetail.put("subCode", subCode);
+            }
             taskDetail.put("planType", String.valueOf(planType));
             taskDetail.put("taskCode", taskCode);
             taskDetail.put("taskName", taskName);
@@ -200,7 +208,9 @@ public class CenterTaskHandler {
         String taskName = taskDetail.get("taskName");
         String planType = taskDetail.get("planType");
         String fixedStartTime = taskDetail.get("fixedStartTime");
-        int result = executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
+        int result = "5".equals(planType)
+                ? executeCqDockTask(singleDeviceId, taskDetail.get("subCode"), taskCode, taskName, fixedStartTime).getCode()
+                : executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
 //      执行成功了才加入监控；EUA任务由下级平台执行，不复用本地航线任务监控。
         if (result == 0) {
             updateTaskStatus(taskCode, taskDetail, "success", result, null);
@@ -284,11 +294,17 @@ public class CenterTaskHandler {
      * 立即执行上级任务，复用定时任务到点后的真实执行逻辑。
      */
     public TaskExecutionResult executeImmediateTask(Integer planType, String deviceId, String taskCode, String taskName) {
+        return executeImmediateTask(planType, deviceId, taskCode, taskName, null);
+    }
+
+    public TaskExecutionResult executeImmediateTask(Integer planType, String deviceId, String taskCode, String taskName, String subCode) {
         String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
         String planTypeText = String.valueOf(planType);
         log.info("开始执行上级立即任务: taskCode={}, planType={}, deviceId={}, taskName={}",
                 taskCode, planTypeText, deviceId, taskName);
-        TaskExecutionResult result = executeTaskForImmediate(planTypeText, deviceId, taskCode, taskName, fixedStartTime);
+        TaskExecutionResult result = "5".equals(planTypeText)
+                ? executeCqDockTask(deviceId, subCode, taskCode, taskName, fixedStartTime)
+                : executeTaskForImmediate(planTypeText, deviceId, taskCode, taskName, fixedStartTime);
         if (result.isSuccess()) {
             if ("5".equals(planTypeText)) {
                 log.info("EUA立即任务已完成下发，无需启动本地任务监控: taskCode={}, actualTaskId={}", taskCode, result.getTaskId());
@@ -312,7 +328,7 @@ public class CenterTaskHandler {
             } else if ("4".equals(planType)) {
                 return executeSolarTaskResult(singleDeviceId, taskCode, taskName);
             } else if ("5".equals(planType)) {
-                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime);
+                return executeCqDockTask(singleDeviceId, null, taskCode, taskName, fixedStartTime);
             }
             return TaskExecutionResult.failed();
         } catch (Exception e) {
@@ -335,7 +351,7 @@ public class CenterTaskHandler {
             }else if ("4".equals(planType)){
                 return executeSolarTask(singleDeviceId, taskCode, taskName);
             }else if ("5".equals(planType)){
-                return executeCqDockTask(singleDeviceId, taskCode, taskName, fixedStartTime).getCode();
+                return executeCqDockTask(singleDeviceId, null, taskCode, taskName, fixedStartTime).getCode();
             }
             return -1;
         } catch (Exception e) {
@@ -415,11 +431,16 @@ public class CenterTaskHandler {
     }
 
     /**
-     * 执行重庆EUA任务（planType=5，传入间隔id），由定时扫描到点后调用下级下发接口。
+     * 执行重庆EUA任务（planType=5，传入规范化点位列表），执行时再次校验航线。
      */
-    private TaskExecutionResult executeCqDockTask(String bayId, String taskCode, String taskName, String fixedStartTime) {
-        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByBay(bayId, taskCode, taskName, fixedStartTime, true);
-        return result.isSuccess() ? TaskExecutionResult.success(result.getEuaTaskId()) : TaskExecutionResult.failed();
+    private TaskExecutionResult executeCqDockTask(String pointCodes, String subCode, String taskCode, String taskName, String fixedStartTime) {
+        try {
+            CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByPoints(pointCodes, subCode, taskCode, taskName, fixedStartTime, true);
+            return result.isSuccess() ? TaskExecutionResult.success(result.getEuaTaskId()) : TaskExecutionResult.failed();
+        } catch (Exception e) {
+            log.error("EUA点位任务执行失败: taskCode={}", taskCode, e);
+            return TaskExecutionResult.failed();
+        }
     }
 
     private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {

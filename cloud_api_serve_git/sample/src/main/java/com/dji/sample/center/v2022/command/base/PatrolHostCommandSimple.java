@@ -7,7 +7,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.Serializable;
 
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlRootElement(name = "PatrolDevice")
+@XmlRootElement(name = "PatrolHost")
 public class PatrolHostCommandSimple implements Serializable {
     private static final long serialVersionUID = -4770113769299694976L;
 

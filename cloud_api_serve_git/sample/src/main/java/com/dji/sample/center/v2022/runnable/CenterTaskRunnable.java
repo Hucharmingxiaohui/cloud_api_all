@@ -17,6 +17,7 @@ import com.dji.sample.df.manageDf.model.entity.UniTaskPlanEntity;
 import com.dji.sample.df.windDf.dao.WindTurbineMapper;
 import com.dji.sample.df.windDf.model.entity.WindTurbine;
 import com.dji.sample.df.uavCommonHandleDf.handler.CenterTaskHandler;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskDispatchService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     private CenterTaskHandler centerTaskHandler = AppContext.getBean(CenterTaskHandler.class);
     private UniPointMapper2 uniPointMapper2 = AppContext.getBean(UniPointMapper2.class);
     private SwitchConfig switchConfig = AppContext.getBean(SwitchConfig.class);
+    private CqDockTaskDispatchService cqDockTaskDispatchService = AppContext.getBean(CqDockTaskDispatchService.class);
 
     public CenterTaskRunnable(CenterProtocolData protocolData) {
         super(protocolData);
@@ -63,6 +65,8 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
             this.responseMessageOtherCommand();
         } catch (Exception e) {
             log.error("【巡视上级任务下发指令】处理异常，巡视上级IP：{}，异常信息：{}", this.centerIp, e.getMessage());
+            PatrolHostCommand response = patrolHostSocketClient.getBaseCommand("251", "4", "500");
+            patrolHostSocketClient.responseCommand(response, PatrolHostCommand.class, requestSerialNum);
         }
     }
 
@@ -71,15 +75,20 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     public void taskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
        log.info("开始处理下发任务");
 //      需要区分不同任务类型：风机任务、航点航线任务、光伏任务、EUA任务
-//      暂定风机任务设备层级设备id匹配风机；航点航线任务、光伏任务、EUA任务 间隔层级间隔id匹配航线
-//      todo 对接第三方无人机平台下发任务，暂定先只能安间隔下发，根据配置开关位区分和其他任务的逻辑
+//      风机按设备、原生航线/光伏按间隔、EUA按点位下发。
         String taskCode = taskCommandItem.getTask_code();
         String taskName = taskCommandItem.getTask_name();
         int deviceLevel = taskCommandItem.getDevice_level();
         String deviceList = taskCommandItem.getDevice_list();
         String fixedStartTime = taskCommandItem.getFixed_start_time();
+        String normalizedPoints = deviceLevel == 3 && isCqDockTaskEnabled()
+                ? cqDockTaskDispatchService.validatePointDispatch(deviceList, sub_code) : null;
         saveOrUpdateTaskPlan(taskCommandItem, sub_code);
         try {
+            if (normalizedPoints != null) {
+                centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, normalizedPoints, taskName, sub_code);
+                return;
+            }
 //          规定选一个设备：风机任务
             if (deviceLevel == 2) {
                 // 2. 检查设备列表是否只有一个ID
@@ -101,7 +110,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     }
                 }
             }else if (deviceLevel == 1) {
-//              规定选一个间隔：航点航线任务、光伏任务、EUA任务
+//              规定选一个间隔：航点航线任务、光伏任务
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
@@ -109,12 +118,6 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     if (bayId.endsWith("-bay")) {
                         String orthophotoId = bayId.substring(0, bayId.length() - 4);
                         centerTaskHandler.addScheduledTask(4, taskCode, fixedStartTime, orthophotoId, taskName);
-                        return;
-                    }
- //                 重庆下级对接开关开了为EUA任务
-                    if (isCqDockTaskEnabled()) {
-                        // EUA平台任务同样复用原有Redis定时任务，到fixedStartTime后再调用下级下发接口。
-                        centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
                         return;
                     }
 //                  其他为航点航线任务
@@ -172,7 +175,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     }
 
     /**
-     * 是否开启上级间隔任务转重庆EUA平台；支持true/1两种配置值。
+     * 是否开启上级点位任务转重庆EUA平台；支持true/1两种配置值。
      */
     private boolean isCqDockTaskEnabled() {
         String enable = switchConfig.getCenterCqDockTaskEnable();

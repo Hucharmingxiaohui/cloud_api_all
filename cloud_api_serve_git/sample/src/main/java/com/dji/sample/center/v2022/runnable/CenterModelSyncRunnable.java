@@ -36,7 +36,7 @@ public class CenterModelSyncRunnable extends CenterMessageBaseRunnable {
             PatrolUavModelItem item = null;
             String file_path = "";
             //巡视系统无人机模型
-            if (command.equals("1")) {
+            if ("1".equals(command) || "4".equals(command)) {
                 items = modelBuilder.genPatrolUavFile(subCode);
                 item = (PatrolUavModelItem) items.get(0);
                 file_path = item.getDevice_file_path();

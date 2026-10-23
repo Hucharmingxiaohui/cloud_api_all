@@ -31,7 +31,7 @@ public class SwitchConfig {
     private String centerOtherTcpMsgEnable;
 
     /**
-     * 是否开启上级间隔任务转下级EUA平台下发
+     * 是否开启上级点位任务转下级EUA平台下发
      */
     private String centerCqDockTaskEnable;
 

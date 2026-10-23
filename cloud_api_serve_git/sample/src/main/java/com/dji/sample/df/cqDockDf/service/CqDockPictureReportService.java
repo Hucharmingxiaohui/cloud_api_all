@@ -47,8 +47,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -58,6 +60,11 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class CqDockPictureReportService {
+
+    private static final com.fasterxml.jackson.databind.ObjectReader POINT_SNAPSHOT_READER =
+            new com.fasterxml.jackson.databind.ObjectMapper()
+                    .readerFor(com.fasterxml.jackson.databind.JsonNode.class)
+                    .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     /**
      * 图片类型：可见光
@@ -135,11 +142,19 @@ public class CqDockPictureReportService {
         }
 
         CqDockTaskRecordEntity record = findTaskRecord(euaTaskId);
-        String taskCode = record == null ? firstText(picture, "businessId", "taskCode", "task_code") : record.getBusinessId();
-        if (!StringUtils.hasText(taskCode)) {
-            taskCode = euaTaskId;
+        if (record == null) {
+            log.warn("EUA MQTT图片任务记录不存在，忽略: topic={}, euaTaskId={}, kept=0, ignored=1", topic, euaTaskId);
+            return;
         }
-        String taskName = record == null ? firstText(picture, "taskName", "task_name") : record.getTaskName();
+        String taskCode = record.getBusinessId();
+        String taskName = record.getTaskName();
+        Set<String> allowedPointCodes = loadAllowedPointCodes(record);
+        String pointId = firstText(picture, "pointId", "deviceId", "photoPointId");
+        if (allowedPointCodes == null || !StringUtils.hasText(pointId) || !allowedPointCodes.contains(pointId.trim())) {
+            log.warn("EUA MQTT图片不属于任务间隔，忽略: topic={}, taskCode={}, euaTaskId={}, bayId={}, pointId={}, kept=0, ignored=1",
+                    topic, taskCode, euaTaskId, record.getBayId(), pointId);
+            return;
+        }
 //      目前MQTT推送图片没有上报上级，只通过主动调用图片接口进行上报
         savePicture(taskCode, taskName, euaTaskId, picture, "mqtt");
         log.info("EUA MQTT图片已入库/本地保存: topic={}, taskCode={}, euaTaskId={}, pictureName={}, totalNum={}",
@@ -250,14 +265,77 @@ public class CqDockPictureReportService {
             log.info("EUA图片列表为空: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
             return 0;
         }
+        CqDockTaskRecordEntity record = StringUtils.hasText(taskCode) && StringUtils.hasText(euaTaskId)
+                ? cqDockTaskRecordMapper.selectOne(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                .eq(CqDockTaskRecordEntity::getBusinessId, taskCode)
+                .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId)
+                .last("LIMIT 1")) : null;
+        Set<String> allowedPointCodes = loadAllowedPointCodes(record);
+        if (allowedPointCodes == null) {
+            String bayId = record == null ? null : record.getBayId();
+            log.warn("EUA图片间隔过滤失败，忽略本次列表: taskCode={}, euaTaskId={}, bayId={}, reason={}, kept=0, ignored={}",
+                    taskCode, euaTaskId, bayId, record == null ? "任务记录不存在" : "任务间隔为空", pictures.size());
+            return 0;
+        }
+        if (allowedPointCodes.isEmpty()) {
+            String bayId = record.getBayId();
+            log.warn("EUA图片间隔无有效点位，忽略本次列表: taskCode={}, euaTaskId={}, bayId={}, kept=0, ignored={}",
+                    taskCode, euaTaskId, bayId, pictures.size());
+            return 0;
+        }
         int count = 0;
+        int kept = 0;
         for (JSONObject picture : pictures) {
+            String pointId = firstText(picture, "pointId", "deviceId", "photoPointId");
+            if (!StringUtils.hasText(pointId) || !allowedPointCodes.contains(pointId.trim())) {
+                continue;
+            }
+            kept++;
 //          保存图片
             if (savePicture(taskCode, taskName, euaTaskId, picture, "http") != null) {
                 count++;
             }
         }
+        log.info("EUA图片间隔过滤完成: taskCode={}, euaTaskId={}, bayId={}, kept={}, ignored={}",
+                taskCode, euaTaskId, record.getBayId(), kept, pictures.size() - kept);
         return count;
+    }
+
+    private Set<String> loadAllowedPointCodes(CqDockTaskRecordEntity record) {
+        if (record == null) {
+            return null;
+        }
+        if (record.getPointCodes() != null) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode parsed = POINT_SNAPSHOT_READER.readValue(record.getPointCodes());
+                if (parsed == null || !parsed.isArray()) {
+                    return Collections.emptySet();
+                }
+                Set<String> snapshot = new HashSet<>();
+                for (com.fasterxml.jackson.databind.JsonNode code : parsed) {
+                    if (!code.isTextual() || !StringUtils.hasText(code.textValue())) {
+                        return Collections.emptySet();
+                    }
+                    snapshot.add(code.textValue().trim());
+                }
+                return snapshot;
+            } catch (java.io.IOException | RuntimeException e) {
+                log.warn("EUA任务点位快照无效，拒绝接收图片: taskCode={}, euaTaskId={}", record.getBusinessId(), record.getEuaTaskId());
+                return Collections.emptySet();
+            }
+        }
+        if (!StringUtils.hasText(record.getBayId())) {
+            return null;
+        }
+        Set<String> allowedPointCodes = new HashSet<>();
+        List<UniPoint> bayPoints = uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()
+                .eq(UniPoint::getBayId, record.getBayId()));
+        for (UniPoint point : bayPoints) {
+            if (StringUtils.hasText(point.getPointCode())) {
+                allowedPointCodes.add(point.getPointCode().trim());
+            }
+        }
+        return allowedPointCodes;
     }
 
     /**
@@ -695,7 +773,7 @@ public class CqDockPictureReportService {
         String pointId = firstText(picture, "pointId", "deviceId", "photoPointId");
         String pointName = firstText(picture, "pointName", "deviceName", "photoPointName");
         if (StringUtils.hasText(pointId)) {
-            entity.setPointId(pointId);
+            entity.setPointId(pointId.trim());
         }
         if (StringUtils.hasText(pointName)) {
             entity.setPointName(pointName);

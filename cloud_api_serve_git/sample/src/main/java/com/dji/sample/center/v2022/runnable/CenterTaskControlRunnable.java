@@ -92,7 +92,7 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
         }
 
         TaskExecutionResult result = centerTaskHandler.executeImmediateTask(immediateTask.planType, immediateTask.deviceId,
-                entity.getPlanNo(), entity.getPlanName());
+                entity.getPlanNo(), entity.getPlanName(), entity.getSubCode());
         if (result.isSuccess()) {
             String taskPatrolledId = result.getTaskId();
 //          取消redis定时任务
@@ -111,6 +111,9 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
     private ImmediateTask resolveImmediateTask(UniTaskPlanEntity entity) {
         if (entity.getDeviceLevel() == null || StringUtil.isEmpty(entity.getDeviceList())) {
             return null;
+        }
+        if (entity.getDeviceLevel() == 3 && isCqDockTaskEnabled()) {
+            return new ImmediateTask(5, entity.getDeviceList());
         }
         String[] deviceIds = entity.getDeviceList().split(",");
         if (deviceIds.length != 1) {
@@ -131,7 +134,7 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
             if (deviceId.endsWith("-bay")) {
                 return new ImmediateTask(4, deviceId.substring(0, deviceId.length() - 4));
             }
-            return new ImmediateTask(isCqDockTaskEnabled() ? 5 : 0, deviceId);
+            return new ImmediateTask(0, deviceId);
         }
         return null;
     }
