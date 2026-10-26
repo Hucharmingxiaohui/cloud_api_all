@@ -42,14 +42,13 @@ public class ConstructionWaylineServiceChecks {
             }
         };
         Map<String,GetWaylineListResponse> catalog=new HashMap<>();
-        IWaylineFileService files=(IWaylineFileService)Proxy.newProxyInstance(IWaylineFileService.class.getClassLoader(),new Class[]{IWaylineFileService.class},(p,m,args)-> {
-            if(m.getName().equals("saveWaylineFile")) {
-                WaylineFileDTO dto=(WaylineFileDTO)args[1];check(args[0].equals("w"));
+        com.dji.sample.wayline.service.impl.WaylineFileServiceImpl files=new com.dji.sample.wayline.service.impl.WaylineFileServiceImpl() {
+            @Override public Integer saveWaylineFile(String workspace,WaylineFileDTO dto) {
+                check(workspace.equals("w"));
                 catalog.put("real-wayline-id",new GetWaylineListResponse().setId("real-wayline-id").setName(dto.getName()).setSign(dto.getSign()).setObjectKey(dto.getObjectKey()));return 42;
             }
-            if(m.getName().equals("getWaylineByWaylineId")) return Optional.ofNullable(catalog.get(args[1]));
-            throw new UnsupportedOperationException(m.getName());
-        });
+            @Override public Optional<GetWaylineListResponse> getWaylineByWaylineId(String workspace,String id) { return "w".equals(workspace)?Optional.ofNullable(catalog.get(id)):Optional.empty(); }
+        };
         IWaylineFileMapper mapper=(IWaylineFileMapper)Proxy.newProxyInstance(IWaylineFileMapper.class.getClassLoader(),new Class[]{IWaylineFileMapper.class},(p,m,args)-> {
             check(m.getName().equals("selectById")&&args[0].equals(42));return WaylineFileEntity.builder().waylineId("real-wayline-id").build();
         });
@@ -60,6 +59,10 @@ public class ConstructionWaylineServiceChecks {
             @Override public InputStream getObject(String bucket,String key) { return objects.containsKey(key)?new ByteArrayInputStream(objects.get(key)):null; }
             @Override public Boolean deleteObject(String bucket,String key) { objects.remove(key);return true; }
         };
+        for(String field:List.of("mapper","ossService")) {
+            java.lang.reflect.Field f=com.dji.sample.wayline.service.impl.WaylineFileServiceImpl.class.getDeclaredField(field);
+            f.setAccessible(true);f.set(files,field.equals("mapper")?mapper:oss);
+        }
         ConstructionWaylineService service=new ConstructionWaylineService(areas,db,files,mapper,oss);
         TransactionSynchronizationManager.initSynchronization();
         try {
@@ -75,7 +78,22 @@ public class ConstructionWaylineServiceChecks {
             area.put("enabled",true);catalog.get("real-wayline-id").setSign("changed");check(service.list("w","a").get(0).get("status").equals("STALE"));
             try { service.validate("w","a","real-wayline-id");throw new AssertionError(); } catch(RuleException expected) { check(expected.getMessage().contains("签名")); }
             service.unlink("w","a","real-wayline-id");check(rows.isEmpty()&&catalog.size()==1&&objects.size()==1);
-            System.out.println("Construction service checks passed: shared ID, idempotency, cross-workspace denial, stale version/sign, revalidation, disabled area and unlink preserves shared file. In-memory collaborators; no database integration.");
+            catalog.get("real-wayline-id").setSign(org.springframework.util.DigestUtils.md5DigestAsHex(bytes));
+            check(service.bind("w","a","real-wayline-id",2).get("source").equals("existing"));
+            service.bind("w","a","real-wayline-id",2);
+            check(rows.size()==1&&catalog.size()==1&&objects.size()==1);
+            try { service.bind("w","a","missing",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==404); }
+            try { service.bind("w","a","real-wayline-id",1);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==409); }
+            area.put("enabled",false);
+            try { service.bind("w","a","real-wayline-id",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==400); }
+            area.put("enabled",true);
+            try { service.bind("other","a","real-wayline-id",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==404); }
+            area.put("boundary",List.of(Map.of("lng",121d,"lat",36d),Map.of("lng",121.01,"lat",36d),Map.of("lng",121.01,"lat",36.01),Map.of("lng",121d,"lat",36.01)));
+            try { service.bind("w","a","real-wayline-id",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==400); }
+            check(rows.size()==1&&objects.size()==1);
+            for(org.springframework.transaction.support.TransactionSynchronization sync:TransactionSynchronizationManager.getSynchronizations()) sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
+            check(objects.isEmpty());
+            System.out.println("Shared upload and binding passed: shared ID, idempotency, scope, stale version/sign, disabled area, unlink preserves file, repeated binding creates no file. In-memory storage; no database integration.");
         } finally { TransactionSynchronizationManager.clearSynchronization(); }
     }
 }

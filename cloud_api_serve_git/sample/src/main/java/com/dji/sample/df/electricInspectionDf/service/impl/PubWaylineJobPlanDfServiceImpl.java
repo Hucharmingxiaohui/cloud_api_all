@@ -46,6 +46,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfService {
     @Autowired
+    private com.dji.sample.df.constructionDf.ConstructionPlanGuard constructionPlanGuard;
+    @Autowired
     private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
     @Autowired
     private IFileMapper fileMapper;
@@ -73,6 +75,7 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     //创建计划
     @Override
     public Map<String,Object> createWaylineJObPlan(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) {
+        if (com.dji.sample.df.constructionDf.ConstructionPlanGuard.construction(pubWaylineJobPlanDfEntity)) throw new IllegalArgumentException("请在工地巡检计划页面按区域创建计划");
         Map map=new HashMap();
         Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
         if(planType==1){
@@ -224,6 +227,12 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     @Override
     public HttpResultResponse expressPlan(CustomClaim customClaim, PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
+        try {
+            pubWaylineJobPlanDfEntity = constructionPlanGuard.resolve(customClaim.getWorkspaceId(), pubWaylineJobPlanDfEntity);
+            if (com.dji.sample.df.constructionDf.ConstructionPlanGuard.construction(pubWaylineJobPlanDfEntity)) jobName = pubWaylineJobPlanDfEntity.getName();
+        } catch (com.dji.sample.df.constructionDf.ConstructionAreaGeometry.RuleException e) {
+            return HttpResultResponse.error(e.getCode(), e.getMessage());
+        }
         if (Boolean.TRUE.equals(pubWaylineJobPlanDfEntity.getFrogJumpMode())) {
             String workspace = customClaim == null ? null : customClaim.getWorkspaceId();
             boolean originAllowed = frogJumpLandingRecommendationService.isWorkspaceDock(workspace, pubWaylineJobPlanDfEntity.getDockSn());
@@ -358,6 +367,7 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
     @Override
     public boolean deletePlanById(Integer id) {
         PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(id);
+        if (com.dji.sample.df.constructionDf.ConstructionPlanGuard.construction(pubWaylineJobPlanDfEntity)) throw new IllegalArgumentException("工地计划请使用归档，以保留任务关联");
         List<WaylineJobEntity> waylineJobEntities = waylineJobMapper.selectList(new LambdaQueryWrapper<WaylineJobEntity>().
                 eq(WaylineJobEntity::getPlanId, pubWaylineJobPlanDfEntity.getPlanId()));
         if(!waylineJobEntities.isEmpty()){
@@ -375,6 +385,9 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
 
     @Override
     public boolean batchDeletePlanByIds(List<Integer> ids) {
+        for (Integer id : ids) {
+            if (com.dji.sample.df.constructionDf.ConstructionPlanGuard.construction(pubWaylineJobPlanDfMapper.selectById(id))) throw new IllegalArgumentException("工地计划请使用归档，以保留任务关联");
+        }
         for (Integer id : ids) {
             PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectById(id);
             List<WaylineJobEntity> waylineJobEntities = waylineJobMapper.selectList(new LambdaQueryWrapper<WaylineJobEntity>().

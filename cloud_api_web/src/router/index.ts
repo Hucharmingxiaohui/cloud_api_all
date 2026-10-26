@@ -287,7 +287,7 @@ const routes: Array<RouteRecordRaw> = [
           {
             path: '/taskManage/construction/plans',
             name: 'constructionPlans',
-            component: () => import('/@/components/construction/ConstructionWorkspace.vue'),
+            component: () => import('/@/components/construction/ConstructionPlans.vue'),
             meta: { showInMenu: true, label: '工地巡检计划', cache: false, constructionPage: 'plans' }
           },
           {

@@ -72,6 +72,8 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class FlightTaskServiceImpl extends AbstractWaylineService implements IFlightTaskService {
+    @Autowired
+    private com.dji.sample.df.constructionDf.ConstructionPlanGuard constructionPlanGuard;
 
     @Autowired
     private ObjectMapper mapper;
@@ -284,6 +286,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 WaylineJobDTO waylineJob = waylineJobOpt.get();
                 //20241204修改返回job_id
                 job_id=waylineJob.getJobId();
+                constructionPlanGuard.attachJob(customClaim.getWorkspaceId(), job_id);
 //              三维需要，跟三维发任务开始状态
                 if ("true".equals(ueSwitch)){
                     Map<String, String> map = new HashMap<>();
@@ -465,6 +468,7 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
 
     @Override
     public Boolean executeFlightTask(String workspaceId, String jobId) {
+        constructionPlanGuard.beforeExecute(workspaceId, jobId);
         // get job
         Optional<WaylineJobDTO> waylineJob = waylineJobService.getJobByJobId(workspaceId, jobId);
         if (waylineJob.isEmpty()) {

@@ -91,6 +91,8 @@ public interface IWaylineFileService {
      * @return
      */
     void importKmzFile(MultipartFile file, String workspaceId, String creator);
+    /** Shared import pipeline; returns the exact newly inserted wayline id. */
+    String importKmzFileWithId(MultipartFile file, String workspaceId, String creator);
 
     /**
      * Replace an existing KMZ without changing its wayline id.

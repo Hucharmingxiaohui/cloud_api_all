@@ -94,23 +94,17 @@ public class ConstructionWaylineService {
         if(name==null||name.isBlank()||name.length()>100) throw bad("航线名称需为1–100字");
         ConstructionKmz parsed=ConstructionKmz.parse(bytes);
         ConstructionWaylineGeometry.validate(parsed.points,boundary(area));
-        String drone,payload;
-        try {
-            drone=DeviceEnum.find(DeviceDomainEnum.DRONE,DeviceTypeEnum.find(parsed.drone),DeviceSubTypeEnum.find(parsed.droneSub)).getDevice();
-            payload=DeviceEnum.find(DeviceDomainEnum.PAYLOAD,DeviceTypeEnum.find(parsed.payload),DeviceSubTypeEnum.find(parsed.payloadSub)).getDevice();
-        } catch(Exception e) { throw bad("平台暂不支持 KMZ 指定的机型或负载"); }
-        String key=OssConfiguration.objectDirPrefix+"/"+w+"/construction/"+UUID.randomUUID()+".kmz";
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override public void afterCompletion(int status) { if(status!=STATUS_COMMITTED) { try { oss.deleteObject(OssConfiguration.bucket,key); } catch(RuntimeException ignored) { } } }
-        });
-        oss.putObject(OssConfiguration.bucket,key,new ByteArrayInputStream(bytes));
-        try(InputStream read=oss.getObject(OssConfiguration.bucket,key)) {
-            if(read==null||!hash(bytes).equals(hash(ConstructionKmz.readBounded(read)))) throw bad("航线文件保存校验失败，请重试");
-        } catch(IOException e) { throw bad("航线文件保存失败"); }
-        Integer id=files.saveWaylineFile(w,WaylineFileDTO.builder().name(name.trim()).objectKey(key).sign(hash(bytes)).username(user)
-            .droneModelKey(drone).payloadModelKeys(List.of(payload)).templateTypes(List.of(0)).favorited(false).build());
-        if(id==null||id<=0) throw bad("航线入库失败");
-        String waylineId=mapper.selectById(id).getWaylineId();
+        org.springframework.web.multipart.MultipartFile upload=new org.springframework.web.multipart.MultipartFile() {
+            public String getName() { return "file"; }
+            public String getOriginalFilename() { return name.trim()+".kmz"; }
+            public String getContentType() { return "application/vnd.google-earth.kmz"; }
+            public boolean isEmpty() { return bytes.length==0; }
+            public long getSize() { return bytes.length; }
+            public byte[] getBytes() { return bytes.clone(); }
+            public InputStream getInputStream() { return new ByteArrayInputStream(bytes); }
+            public void transferTo(File file) throws IOException { Files.write(file.toPath(),bytes); }
+        };
+        String waylineId=files.importKmzFileWithId(upload,w,user);
         db.update("INSERT INTO construction_area_wayline (id,workspace_id,area_id,wayline_id,area_version,file_sign,source,request_id,request_hash,points_json,height_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             UUID.randomUUID().toString(),w,a,waylineId,area.get("version"),hash(bytes),source,request,digest,encode(parsed.preview),parsed.heightMode);
         return detail(w,a,waylineId);
@@ -119,6 +113,23 @@ public class ConstructionWaylineService {
         Map<String,Object> area=areas.detail(w,a); List<Map<String,Object>> out=new ArrayList<>();
         for(Map<String,Object> row:db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? ORDER BY created_at DESC",w,a)) out.add(present(w,area,row,false));
         return out;
+    }
+    @Transactional(rollbackFor=Exception.class)
+    public Map<String,Object> bind(String w,String a,String id,int version) throws IOException {
+        Map<String,Object> area=lock(w,a);writable(area,version);
+        GetWaylineListResponse file=files.getWaylineByWaylineId(w,id).orElseThrow(()->new RuleException(404,"当前工作空间不存在该航线"));
+        byte[] bytes;
+        try(InputStream input=oss.getObject(OssConfiguration.bucket,file.getObjectKey())) { if(input==null) throw bad("航线文件缺失"); bytes=ConstructionKmz.readBounded(input); }
+        if(!hash(bytes).equals(file.getSign())) throw bad("航线文件与记录签名不一致");
+        ConstructionKmz parsed=ConstructionKmz.parse(bytes);ConstructionWaylineGeometry.validate(parsed.points,boundary(area));
+        List<Map<String,Object>> existing=db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND wayline_id=?",w,a,id);
+        if(existing.isEmpty()) {
+            db.update("INSERT INTO construction_area_wayline (id,workspace_id,area_id,wayline_id,area_version,file_sign,source,request_id,request_hash,points_json,height_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID().toString(),w,a,id,version,file.getSign(),"existing",UUID.randomUUID().toString(),requestHash(id),encode(parsed.preview),parsed.heightMode);
+        } else {
+            db.update("UPDATE construction_area_wayline SET area_version=?,file_sign=?,points_json=?,height_mode=? WHERE workspace_id=? AND area_id=? AND wayline_id=?",version,file.getSign(),encode(parsed.preview),parsed.heightMode,w,a,id);
+        }
+        return detail(w,a,id);
     }
     private Map<String,Object> require(String w,String a,String id) {
         areas.detail(w,a);

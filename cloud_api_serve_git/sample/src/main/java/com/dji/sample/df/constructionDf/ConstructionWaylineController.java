@@ -21,6 +21,12 @@ public class ConstructionWaylineController {
         catch(ConstructionAreaGeometry.RuleException e) { return HttpResultResponse.error(e.getCode(),e.getMessage()); }
     }
     @GetMapping public HttpResultResponse<Object> list(HttpServletRequest req,@PathVariable String area) throws Exception { return run(req,c->service.list(c.getWorkspaceId(),area)); }
+    @PostMapping("/bind") public HttpResultResponse<Object> bind(HttpServletRequest req,@PathVariable String area,@RequestBody Map<String,Object> body) throws Exception {
+        return run(req,c->{
+            if(!(body.get("expected_version") instanceof Number)||!(body.get("wayline_id") instanceof String)||((String)body.get("wayline_id")).isBlank()) throw new ConstructionAreaGeometry.RuleException(400,"请选择航线并提供区域版本");
+            return service.bind(c.getWorkspaceId(),area,(String)body.get("wayline_id"),((Number)body.get("expected_version")).intValue());
+        });
+    }
     @GetMapping("/{id}") public HttpResultResponse<Object> detail(HttpServletRequest req,@PathVariable String area,@PathVariable String id) throws Exception { return run(req,c->service.detail(c.getWorkspaceId(),area,id)); }
     @PostMapping public HttpResultResponse<Object> create(HttpServletRequest req,@PathVariable String area,@RequestBody Map<String,Object> body) throws Exception { return run(req,c->service.create(c.getWorkspaceId(),area,body,c.getUsername())); }
     @PostMapping("/upload") public HttpResultResponse<Object> upload(HttpServletRequest req,@PathVariable String area,@RequestParam("expected_version") int version,@RequestParam("request_id") String request,@RequestParam("file") MultipartFile file) throws Exception {

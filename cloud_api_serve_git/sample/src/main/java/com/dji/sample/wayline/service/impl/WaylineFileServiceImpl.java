@@ -187,19 +187,34 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
 
     @Override
     public void importKmzFile(MultipartFile file, String workspaceId, String creator) {
+        importKmzFileWithId(file, workspaceId, creator);
+    }
+
+    @Override
+    public String importKmzFileWithId(MultipartFile file, String workspaceId, String creator) {
         Optional<WaylineFileDTO> waylineFileOpt = validKmzFile(file);
         if (waylineFileOpt.isEmpty()) {
             throw new RuntimeException("The file format is incorrect.");
         }
 
+        String objectKey = buildVersionedObjectKey(workspaceId, UUID.randomUUID().toString());
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCompletion(int status) { if (status != STATUS_COMMITTED) deleteObjectQuietly(objectKey); }
+            });
+        }
         try {
             WaylineFileDTO waylineFile = waylineFileOpt.get();
             waylineFile.setUsername(creator);
-
-            ossService.putObject(OssConfiguration.bucket, waylineFile.getObjectKey(), file.getInputStream());
-            this.saveWaylineFile(workspaceId, waylineFile);
-        } catch (IOException e) {
-            e.printStackTrace();
+            waylineFile.setObjectKey(objectKey);
+            try (InputStream input = file.getInputStream()) { ossService.putObject(OssConfiguration.bucket, objectKey, input); }
+            if (!isUploadedObjectValid(objectKey, waylineFile.getSign())) throw new RuntimeException("航线文件保存校验失败");
+            Integer id = this.saveWaylineFile(workspaceId, waylineFile);
+            if (id == null || id <= 0) throw new RuntimeException("航线入库失败");
+            return mapper.selectById(id).getWaylineId();
+        } catch (IOException | RuntimeException e) {
+            deleteObjectQuietly(objectKey);
+            throw new RuntimeException("航线导入失败", e);
         }
     }
 
@@ -280,7 +295,7 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
 
     private Optional<WaylineFileDTO> validKmzFile(MultipartFile file) {
         String filename = file.getOriginalFilename();
-        if (Objects.nonNull(filename) && !filename.endsWith(WAYLINE_FILE_SUFFIX)) {
+        if (filename == null || !filename.toLowerCase(Locale.ROOT).endsWith(WAYLINE_FILE_SUFFIX)) {
             throw new RuntimeException("The file format is incorrect.");
         }
         try (ZipInputStream unzipFile = new ZipInputStream(file.getInputStream(), StandardCharsets.UTF_8)) {
@@ -293,6 +308,9 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
                     continue;
                 }
                 SAXReader reader = new SAXReader();
+                reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
                 Document document = reader.read(unzipFile);
                 if (!StandardCharsets.UTF_8.name().equals(document.getXMLEncoding())) {
                     throw new RuntimeException("The file encoding format is incorrect.");
@@ -307,20 +325,24 @@ public class WaylineFileServiceImpl implements IWaylineFileService {
                 DeviceTypeEnum type = DeviceTypeEnum.find(Integer.parseInt(droneNode.valueOf(KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_DRONE_ENUM_VALUE)));
                 DeviceSubTypeEnum subType = DeviceSubTypeEnum.find(Integer.parseInt(droneNode.valueOf(KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_DRONE_SUB_ENUM_VALUE)));
                 DeviceTypeEnum payloadType = DeviceTypeEnum.find(Integer.parseInt(payloadNode.valueOf(KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_PAYLOAD_ENUM_VALUE)));
-                DeviceSubTypeEnum payloadSubType = DeviceSubTypeEnum.find(Integer.parseInt(payloadNode.valueOf(KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_PAYLOAD_SUB_ENUM_VALUE)));
+                List<Node> payloadSubs = payloadNode.selectNodes(KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_PAYLOAD_SUB_ENUM_VALUE);
+                if (payloadSubs.size() > 1) throw new RuntimeException("重复的 payloadSubEnumValue");
+                DeviceSubTypeEnum payloadSubType = DeviceSubTypeEnum.find(payloadSubs.isEmpty() ? 0 : Integer.parseInt(payloadSubs.get(0).getText().trim()));
                 String templateType = document.valueOf("//" + KmzFileProperties.TAG_WPML_PREFIX + KmzFileProperties.TAG_TEMPLATE_TYPE);
+                String sign;
+                try (InputStream input = file.getInputStream()) { sign = DigestUtils.md5DigestAsHex(input); }
 
                 return Optional.of(WaylineFileDTO.builder()
                         .droneModelKey(DeviceEnum.find(DeviceDomainEnum.DRONE, type, subType).getDevice())
                         .payloadModelKeys(List.of(DeviceEnum.find(DeviceDomainEnum.PAYLOAD, payloadType, payloadSubType).getDevice()))
                         .objectKey(OssConfiguration.objectDirPrefix + File.separator + filename)
-                        .name(filename.substring(0, filename.lastIndexOf(WAYLINE_FILE_SUFFIX)))
-                        .sign(DigestUtils.md5DigestAsHex(file.getInputStream()))
+                        .name(filename.substring(0, filename.length() - WAYLINE_FILE_SUFFIX.length()))
+                        .sign(sign)
                         .templateTypes(List.of(WaylineTypeEnum.find(templateType).getValue()))
                         .build());
             }
 
-        } catch (IOException | DocumentException e) {
+        } catch (IOException | DocumentException | org.xml.sax.SAXException e) {
             e.printStackTrace();
         }
         return Optional.empty();
