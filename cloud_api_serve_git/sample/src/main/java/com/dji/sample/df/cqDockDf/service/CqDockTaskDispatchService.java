@@ -16,6 +16,12 @@ import org.springframework.util.StringUtils;
 import javax.annotation.Resource;
 import java.util.Date;
 import java.util.Objects;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -96,6 +102,98 @@ public class CqDockTaskDispatchService {
                 .orElse(null);
     }
 
+    public String validatePointDispatch(String pointCodes, String subCode) {
+        List<String> codes = normalizePointCodes(pointCodes);
+        resolvePointRoute(codes, subCode);
+        return String.join(",", codes);
+    }
+
+    public CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
+                                                    String taskName, String fixedStartTime, boolean reportToPatrol) {
+        List<String> codes = normalizePointCodes(pointCodes);
+        String snapshot = JSONObject.toJSONString(codes);
+        String routeId;
+        try {
+            routeId = resolvePointRoute(codes, subCode);
+        } catch (IllegalArgumentException e) {
+            savePointTaskRecord(taskCode, taskName, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot);
+            return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, e.getMessage());
+        }
+        CqAssignTaskRequest request = new CqAssignTaskRequest();
+        request.setTaskName(taskName);
+        request.setBusinessId(taskCode);
+        request.setRouteId(routeId);
+        CqApiResponse response;
+        try {
+            response = cqDockApiService.assignTask(request);
+        } catch (Exception e) {
+            log.error("EUA点位任务下发异常: taskCode={}, pointCodes={}", taskCode, snapshot, e);
+            savePointTaskRecord(taskCode, taskName, routeId, null, null, e.getMessage(), null, false, reportToPatrol, snapshot);
+            return CqDockTaskDispatchResult.failed(taskCode, taskName, null, routeId, e.getMessage());
+        }
+        boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
+        String euaTaskId = extractEuaTaskId(response);
+        String msg = response == null ? "EUA接口无响应" : response.getMsg();
+        savePointTaskRecord(taskCode, taskName, routeId, euaTaskId, response == null ? null : response.getCode(),
+                msg, response == null ? null : response.getRawBody(), success, reportToPatrol, snapshot);
+        CqDockTaskDispatchResult result = new CqDockTaskDispatchResult();
+        result.setSuccess(success);
+        result.setTaskCode(taskCode);
+        result.setTaskName(taskName);
+        result.setRouteId(routeId);
+        result.setEuaTaskId(euaTaskId);
+        result.setResponseCode(response == null ? null : response.getCode());
+        result.setResponseMsg(msg);
+        if (success) {
+            cqDockTaskStatusHandler.startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, reportToPatrol);
+        }
+        return result;
+    }
+
+    private List<String> normalizePointCodes(String pointCodes) {
+        Set<String> codes = new LinkedHashSet<>();
+        if (pointCodes != null) {
+            for (String code : pointCodes.split(",")) {
+                if (StringUtils.hasText(code)) {
+                    codes.add(code.trim());
+                }
+            }
+        }
+        return new ArrayList<>(codes);
+    }
+
+    private String resolvePointRoute(List<String> codes, String subCode) {
+        if (codes.isEmpty()) {
+            throw new IllegalArgumentException("EUA任务点位不能为空");
+        }
+        List<UniPoint> points = uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()
+                .in(UniPoint::getPointCode, codes)
+                .eq(StringUtils.hasText(subCode), UniPoint::getSubCode, subCode));
+        Map<String, UniPoint> mappings = new HashMap<>();
+        for (UniPoint point : points) {
+            String code = point.getPointCode();
+            if (mappings.putIfAbsent(code, point) != null) {
+                throw new IllegalArgumentException("EUA点位映射不唯一: " + code);
+            }
+        }
+        String route = null;
+        for (String code : codes) {
+            UniPoint point = mappings.get(code);
+            if (point == null) {
+                throw new IllegalArgumentException("EUA点位不存在: " + code);
+            }
+            if (!StringUtils.hasText(point.getWaylineId())) {
+                throw new IllegalArgumentException("EUA点位未配置航线: " + code);
+            }
+            String pointRoute = point.getWaylineId().trim();
+            if (route != null && !route.equals(pointRoute)) {
+                throw new IllegalArgumentException("EUA任务所有点位必须属于同一航线");
+            }
+            route = pointRoute;
+        }
+        return route;
+    }
+
     private String extractEuaTaskId(CqApiResponse response) {
         if (response == null || response.getData() == null) {
             return null;
@@ -106,10 +204,25 @@ public class CqDockTaskDispatchService {
     private void saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
                                 String euaTaskId, Integer responseCode, String responseMsg,
                                 String rawResponse, boolean success, boolean reportToPatrol) {
+        saveTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId, responseCode, responseMsg,
+                rawResponse, success, reportToPatrol, null);
+    }
+
+    private void savePointTaskRecord(String taskCode, String taskName, String routeId, String euaTaskId,
+                                     Integer responseCode, String responseMsg, String rawResponse, boolean success,
+                                     boolean reportToPatrol, String snapshot) {
+        saveTaskRecord(taskCode, taskName, null, routeId, euaTaskId, responseCode, responseMsg,
+                rawResponse, success, reportToPatrol, snapshot);
+    }
+
+    private void saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
+                                String euaTaskId, Integer responseCode, String responseMsg,
+                                String rawResponse, boolean success, boolean reportToPatrol, String pointCodes) {
         CqDockTaskRecordEntity record = new CqDockTaskRecordEntity();
         record.setBusinessId(taskCode);
         record.setTaskName(taskName);
         record.setBayId(bayId);
+        record.setPointCodes(pointCodes);
         record.setRouteId(routeId);
         record.setEuaTaskId(euaTaskId);
         record.setResponseCode(responseCode);
@@ -120,6 +233,9 @@ public class CqDockTaskDispatchService {
         Date now = new Date();
         record.setCreateTime(now);
         record.setUpdateTime(now);
-        cqDockTaskRecordMapper.insert(record);
+        int inserted = cqDockTaskRecordMapper.insert(record);
+        if (pointCodes != null && inserted != 1) {
+            throw new IllegalStateException("EUA任务记录保存失败");
+        }
     }
 }

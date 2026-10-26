@@ -26,10 +26,10 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
     @Autowired
     UniPointMapper2 uniPointMapper2;
 
-    @Value("${importPoint.subName}")
+    @Value("${normalStation.stationName}")
     String subName;
 
-    @Value("${importPoint.systemCode}")
+    @Value("${centernormal.stationCode}")
     String systemCode;
 
     @Autowired
@@ -240,6 +240,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 component.setComponentName(componentName);
                 component.setDeviceId(deviceId);
                 component.setComponentId(UUID.randomUUID().toString());
+                component.setSysCode(systemCode);
                 uniComponentService.save(component);
             }
             return component;
@@ -268,6 +269,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 deviceEntity.setSubCode(subCode);
                 deviceEntity.setBayId(bayId);
                 deviceEntity.setDeviceName(deviceName);
+                deviceEntity.setSysCode(systemCode);
             }
             deviceEntity.setDeviceType(CustomStringUtils.isPositiveInteger(deviceType) ? Integer.parseInt(deviceType) : null);
             uniDeviceService.saveOrUpdate(deviceEntity);
@@ -297,6 +299,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 bayEntity.setSubCode(subCode);
                 bayEntity.setBayName(bayName);
                 bayEntity.setAreaId(areaId);
+                bayEntity.setSysCode(systemCode);
                 uniBayService.save(bayEntity);
             }
             return bayEntity;
@@ -319,6 +322,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 area.setAreaId(UUID.randomUUID().toString());
                 area.setAreaName(pointExcel.getAreaName());
                 area.setSubCode(pointExcel.getSubCode());
+                area.setSysCode(systemCode);
                 uniAreaService.save(area);
             }
             return area;
@@ -346,7 +350,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
             String subCode = pointExcel.getSubCode();
             String pointCode = pointExcel.getPointCode();
             if (StringUtils.isBlank(pointCode)) {
-                pointExcel.setPointCode(UUID.randomUUID().toString().replaceAll("-", ""));
+                pointExcel.setPointCode(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
                 pointCode = pointExcel.getPointCode();
             }
             UniPoint point = this.getPointByCode(subCode, pointCode);

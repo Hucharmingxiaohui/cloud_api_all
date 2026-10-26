@@ -29,6 +29,10 @@ public class CqDockTaskRecordEntity {
     @TableField("bay_id")
     private String bayId;
 
+    /** 上级点位任务的精确JSON快照；NULL保留历史/平台间隔过滤语义。 */
+    @TableField("point_codes")
+    private String pointCodes;
+
     @TableField("route_id")
     private String routeId;
 

@@ -148,7 +148,7 @@ public class PatrolHostSocketClient implements Runnable {
     public boolean sendCommand(PatrolHostCommand commandData, Class<?> cls) {
         try {
             this.checkCommand(commandData);
-            String xmlData = CenterXmlTool.serialize(commandData, cls);
+            String xmlData = CenterXmlTool.serialize(commandData, cls, centerConfig.getXmlRootName());
             boolean result = sendPacket(xmlData);
             return result;
         } catch (Exception e) {
@@ -297,7 +297,7 @@ public class PatrolHostSocketClient implements Runnable {
     public boolean responseCommand(PatrolHostCommand commandData, Class<?> cls, long serialNumber) {
         try {
             this.checkCommand(commandData);
-            String xmlData = CenterXmlTool.serialize(commandData, cls);
+            String xmlData = CenterXmlTool.serialize(commandData, cls, centerConfig.getXmlRootName());
             boolean result = responsePacket(xmlData, serialNumber);
             return result;
         } catch (Exception e) {

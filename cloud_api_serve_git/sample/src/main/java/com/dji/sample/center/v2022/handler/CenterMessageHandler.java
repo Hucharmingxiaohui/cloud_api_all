@@ -297,6 +297,7 @@ public class CenterMessageHandler extends CenterTcpMessageHandler {
             case "61":
                 switch (command) {
                     case "1":
+                    case "4":
                         log.info("无人机系统收到上级系统【模型同步指令-无人机巡视系统模型】{}", logInfo);
                         break;
                 }

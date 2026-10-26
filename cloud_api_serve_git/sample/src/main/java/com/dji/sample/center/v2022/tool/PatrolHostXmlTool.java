@@ -66,10 +66,7 @@ public class PatrolHostXmlTool {
                 context = JAXBContext.newInstance(new Class[]{EdgeNodeCommand.class, cls});
             }
 
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            EdgeNodeCommand commandData = (EdgeNodeCommand) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, EdgeNodeCommand.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败{}, {}", xmlStr, e);
             return null;
@@ -103,10 +100,7 @@ public class PatrolHostXmlTool {
     public static EdgeNodeCommand deserialize(String xmlStr, Class... cls) {
         try {
             JAXBContext context = JAXBContext.newInstance(cls);
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            EdgeNodeCommand commandData = (EdgeNodeCommand) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, EdgeNodeCommand.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败", e);
             return null;
@@ -117,10 +111,7 @@ public class PatrolHostXmlTool {
     public static EdgeNodeCommandSimple deserialize(String xmlStr) {
         try {
             JAXBContext context = JAXBContext.newInstance(new Class[]{EdgeNodeCommandSimple.class});
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            EdgeNodeCommandSimple commandData = (EdgeNodeCommandSimple) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, EdgeNodeCommandSimple.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败: {} {}", xmlStr, e);
             return null;

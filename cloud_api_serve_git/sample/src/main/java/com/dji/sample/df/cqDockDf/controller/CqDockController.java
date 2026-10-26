@@ -6,6 +6,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqPictureReportTestRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqTaskIdRequest;
 import com.dji.sample.df.cqDockDf.service.CqDockApiService;
 import com.dji.sample.df.cqDockDf.service.CqDockPictureReportService;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskDispatchService;
 import com.dji.sample.df.uavCommonHandleDf.handler.CenterTaskHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
@@ -33,6 +34,9 @@ public class CqDockController {
 
     @Resource
     private CenterTaskHandler centerTaskHandler;
+
+    @Resource
+    private CqDockTaskDispatchService cqDockTaskDispatchService;
 
     /**
      * 机场任务下发
@@ -82,26 +86,34 @@ public class CqDockController {
     }
 
     /**
-     * 本地联调：模拟上级下发间隔任务（真实走 Redis 定时调度 -> CenterTaskHandler 60秒扫描 -> EUA下发）。
-     * 入参：bayId（间隔ID，点位表的bay_id）、taskCode、taskName、delaySeconds（延迟执行秒数，默认5）。
+     * 本地联调：模拟上级点位任务，pointCodes为逗号分隔的point_code，可传subCode限定厂站。
      */
     @PostMapping("/test/schedule-task")
     public CqApiResponse scheduleTask(@RequestBody Map<String, Object> params) {
         log.info("[cq-dock] controller scheduleTask body={}", params);
         CqApiResponse response = new CqApiResponse();
-        String bayId = params.get("bayId") == null ? null : String.valueOf(params.get("bayId"));
+        String pointCodes = params.get("pointCodes") == null ? null : String.valueOf(params.get("pointCodes"));
+        String subCode = params.get("subCode") == null ? null : String.valueOf(params.get("subCode"));
         String taskCode = params.get("taskCode") == null ? null : String.valueOf(params.get("taskCode"));
         String taskName = params.get("taskName") == null ? "本地联调EUA任务" : String.valueOf(params.get("taskName"));
         int delaySeconds = params.get("delaySeconds") == null ? 5 : Integer.parseInt(String.valueOf(params.get("delaySeconds")));
-        if (!StringUtils.hasText(bayId) || !StringUtils.hasText(taskCode)) {
+        if (!StringUtils.hasText(pointCodes) || !StringUtils.hasText(taskCode)) {
             response.setCode(400);
             response.setSuccess(false);
-            response.setMsg("bayId和taskCode不能为空");
+            response.setMsg("pointCodes和taskCode不能为空");
             return response;
         }
         String fixedStartTime = java.time.LocalDateTime.now().plusSeconds(delaySeconds)
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, bayId, taskName);
+        try {
+            pointCodes = cqDockTaskDispatchService.validatePointDispatch(pointCodes, subCode);
+        } catch (IllegalArgumentException e) {
+            response.setCode(400);
+            response.setSuccess(false);
+            response.setMsg(e.getMessage());
+            return response;
+        }
+        centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, pointCodes, taskName, subCode);
         response.setCode(200);
         response.setSuccess(true);
         response.setMsg("定时任务已加入Redis调度，" + fixedStartTime + " 到点后由扫描器执行EUA下发");

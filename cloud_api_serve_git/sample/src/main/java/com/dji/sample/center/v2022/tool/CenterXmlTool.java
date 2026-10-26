@@ -7,17 +7,25 @@ import org.slf4j.LoggerFactory;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
+import javax.xml.bind.JAXBElement;
+import javax.xml.namespace.QName;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 
 public class CenterXmlTool {
     private static final Logger logger = LoggerFactory.getLogger(CenterXmlTool.class);
 
     public static String serialize(PatrolHostCommand commandData, Class<?> cls) {
+        return serialize(commandData, cls, "PatrolHost");
+    }
+
+    public static String serialize(PatrolHostCommand commandData, Class<?> cls, String rootName) {
+        if (!"PatrolHost".equals(rootName) && !"PatrolDevice".equals(rootName)) {
+            throw new IllegalArgumentException("XML root must be exactly PatrolHost or PatrolDevice");
+        }
         try {
             JAXBContext context = null;
 
@@ -37,7 +45,7 @@ public class CenterXmlTool {
             String title = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 
             StringWriter sw = new StringWriter();
-            marshaller.marshal(commandData, sw);
+            marshaller.marshal(new JAXBElement<>(new QName(rootName), PatrolHostCommand.class, commandData), sw);
 
             String msg = title + sw;
             if (msg.indexOf("<Code></Code>") > 0) {
@@ -66,10 +74,7 @@ public class CenterXmlTool {
                 context = JAXBContext.newInstance(new Class[]{PatrolHostCommand.class, cls});
             }
 
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            PatrolHostCommand commandData = (PatrolHostCommand) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, PatrolHostCommand.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败{}, {}", xmlStr, e);
             return null;
@@ -79,10 +84,7 @@ public class CenterXmlTool {
     public static PatrolHostCommand deserialize(String xmlStr, Class... cls) {
         try {
             JAXBContext context = JAXBContext.newInstance(cls);
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            PatrolHostCommand commandData = (PatrolHostCommand) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, PatrolHostCommand.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败", e);
             return null;
@@ -93,10 +95,7 @@ public class CenterXmlTool {
     public static PatrolHostCommandSimple deserialize(String xmlStr) {
         try {
             JAXBContext context = JAXBContext.newInstance(new Class[]{PatrolHostCommandSimple.class});
-            Unmarshaller unmarshaller = context.createUnmarshaller();
-            StringReader sr = new StringReader(xmlStr);
-            PatrolHostCommandSimple commandData = (PatrolHostCommandSimple) unmarshaller.unmarshal(sr);
-            return commandData;
+            return PatrolXmlReader.unmarshal(context, xmlStr, PatrolHostCommandSimple.class);
         } catch (JAXBException e) {
             logger.error("反序列化XML失败: {} {}", xmlStr, e);
             return null;
