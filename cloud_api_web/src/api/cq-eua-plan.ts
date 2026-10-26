@@ -2,17 +2,50 @@ import request, { IWorkspaceResponse } from '/@/api/http/request'
 
 const HTTP_PREFIX = '/api/cqDock/eua/plan'
 
-export const getEuaPlanPage = async function (data: any): Promise<IWorkspaceResponse<any>> {
+export interface EuaPointGroup {
+  subCode: string;
+  routeId: string;
+  routeName: string;
+  points: { id: number; pointCode: string; pointName: string }[];
+}
+
+export interface EuaPlanPayload {
+  id?: number;
+  pointIds: number[];
+  planName: string;
+  remark: string;
+  enabled?: number;
+}
+
+export interface EuaPlanRow {
+  id: number;
+  planName: string;
+  remark: string | null;
+  enabled: number | null;
+  pointCodes: string | null;
+  pointIds: number[];
+  pointCount: number;
+  routeName: string | null;
+  routeId: string | null;
+  subCode: string | null;
+  requiresPointSelection: boolean;
+  lastExecuteStatus?: number;
+  lastTaskName?: string;
+  lastEuaTaskId?: string;
+  lastExecuteTime?: string;
+}
+
+export const getEuaPlanPage = async function (data: any): Promise<IWorkspaceResponse<{ records: EuaPlanRow[]; total: number }>> {
   const result = await request.post(`${HTTP_PREFIX}/page`, data)
   return result.data
 }
 
-export const addEuaPlan = async function (data: any): Promise<IWorkspaceResponse<any>> {
+export const addEuaPlan = async function (data: EuaPlanPayload): Promise<IWorkspaceResponse<any>> {
   const result = await request.post(`${HTTP_PREFIX}/add`, data)
   return result.data
 }
 
-export const updateEuaPlan = async function (data: any): Promise<IWorkspaceResponse<any>> {
+export const updateEuaPlan = async function (data: EuaPlanPayload): Promise<IWorkspaceResponse<any>> {
   const result = await request.post(`${HTTP_PREFIX}/update`, data)
   return result.data
 }
@@ -27,8 +60,8 @@ export const executeEuaPlan = async function (planId: number | string): Promise<
   return result.data
 }
 
-export const getEuaBayOptions = async function (): Promise<IWorkspaceResponse<any>> {
-  const result = await request.get(`${HTTP_PREFIX}/bay-options`)
+export const getEuaPointOptions = async function (): Promise<IWorkspaceResponse<EuaPointGroup[]>> {
+  const result = await request.get(`${HTTP_PREFIX}/point-options`)
   return result.data
 }
 

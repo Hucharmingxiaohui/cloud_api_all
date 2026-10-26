@@ -333,6 +333,10 @@ public class UniPoint {
     @TableField("wayline_id")
     private String waylineId;
 
+    @TableField("eua_route_name")
+    @com.fasterxml.jackson.annotation.JsonProperty("eua_route_name")
+    private String euaRouteName;
+
     @TableField("pic_type")
     private Integer picType;
 

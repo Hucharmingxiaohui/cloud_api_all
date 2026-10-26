@@ -5,6 +5,15 @@
 
 <mapper namespace="com.dji.sample.df.substationDf.dao.UniPointMapper2">
 
+    <!-- Lock the station's existing rows in a fixed order to serialize route-name bindings. -->
+    <select id="selectStationForUpdate" resultType="com.dji.sample.center.entity.UniPoint">
+        SELECT * FROM df_uni_point WHERE sub_code = #{subCode} ORDER BY id FOR UPDATE
+    </select>
+    <update id="updateEuaRouteName">
+        UPDATE df_uni_point SET eua_route_name = #{name} WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
     <select id="selectListByMap" resultType="com.dji.sample.center.entity.UniPoint">
         SELECT * FROM df_uni_point
         <where>

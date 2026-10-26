@@ -65,12 +65,19 @@ public class CqEuaPlanService {
     @Resource
     private CqDockTaskPictureMapper cqDockTaskPictureMapper;
 
+    @Resource
+    private CqEuaRoutePointService cqEuaRoutePointService;
+
+    public List<com.dji.sample.df.cqDockDf.model.dto.CqEuaPointOption> pointOptions() {
+        return cqEuaRoutePointService.pointOptions();
+    }
+
     public IPage<CqEuaPlanEntity> page(CqEuaPlanPageRequest request) {
         int page = request.getPage() == null || request.getPage() <= 0 ? 1 : request.getPage();
         int pageSize = request.getPageSize() == null || request.getPageSize() <= 0 ? 10 : request.getPageSize();
         LambdaQueryWrapper<CqEuaPlanEntity> wrapper = new LambdaQueryWrapper<CqEuaPlanEntity>()
                 .like(StringUtils.hasText(request.getPlanName()), CqEuaPlanEntity::getPlanName, request.getPlanName())
-                .like(StringUtils.hasText(request.getBayName()), CqEuaPlanEntity::getBayName, request.getBayName())
+                .like(StringUtils.hasText(request.getRouteName()), CqEuaPlanEntity::getRouteName, request.getRouteName())
                 .orderByDesc(CqEuaPlanEntity::getCreateTime)
                 .orderByDesc(CqEuaPlanEntity::getId);
         IPage<CqEuaPlanEntity> result = cqEuaPlanMapper.selectPage(new Page<>(page, pageSize), wrapper);
@@ -84,29 +91,27 @@ public class CqEuaPlanService {
                     .forEach(record -> names.putIfAbsent(record.getBusinessId(), record.getTaskName()));
             result.getRecords().forEach(plan -> plan.setLastTaskName(names.get(plan.getLastTaskCode())));
         }
+        result.getRecords().forEach(this::populateSelection);
         return result;
     }
 
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public CqEuaPlanEntity add(CqEuaPlanAddRequest request) {
-        validatePlan(request.getPlanName(), request.getBayId());
-        CqEuaBayOption option = findBayOption(request.getBayId());
-        if (option == null) {
-            throw new IllegalArgumentException("未找到可用间隔或间隔未匹配航线");
-        }
+        validatePlan(request.getPlanName(), request.getEnabled());
+        CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveIds(request.getPointIds());
         Date now = new Date();
         CqEuaPlanEntity entity = new CqEuaPlanEntity();
         entity.setPlanName(request.getPlanName().trim());
-        entity.setBayId(option.getBayId());
-        entity.setBayName(option.getBayName());
-        entity.setRouteId(option.getRouteId());
+        applySelection(entity, selection);
         entity.setRemark(request.getRemark());
-        entity.setEnabled(1);
+        entity.setEnabled(request.getEnabled() == null ? 1 : request.getEnabled());
         entity.setCreateTime(now);
         entity.setUpdateTime(now);
         cqEuaPlanMapper.insert(entity);
         return entity;
     }
 
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public CqEuaPlanEntity update(CqEuaPlanUpdateRequest request) {
         if (request.getId() == null) {
             throw new IllegalArgumentException("计划ID不能为空");
@@ -115,15 +120,10 @@ public class CqEuaPlanService {
         if (entity == null) {
             throw new IllegalArgumentException("计划不存在");
         }
-        validatePlan(request.getPlanName(), request.getBayId());
-        CqEuaBayOption option = findBayOption(request.getBayId());
-        if (option == null) {
-            throw new IllegalArgumentException("未找到可用间隔或间隔未匹配航线");
-        }
+        validatePlan(request.getPlanName(), request.getEnabled());
+        CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveIds(request.getPointIds());
         entity.setPlanName(request.getPlanName().trim());
-        entity.setBayId(option.getBayId());
-        entity.setBayName(option.getBayName());
-        entity.setRouteId(option.getRouteId());
+        applySelection(entity, selection);
         entity.setRemark(request.getRemark());
         if (request.getEnabled() != null) {
             entity.setEnabled(request.getEnabled());
@@ -151,19 +151,33 @@ public class CqEuaPlanService {
         if (plan.getEnabled() != null && plan.getEnabled() == 0) {
             throw new IllegalArgumentException("计划已停用");
         }
+        if (!StringUtils.hasText(plan.getPointCodes())) {
+            throw new IllegalArgumentException("请重新选择点位并保存计划");
+        }
+        CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveSnapshot(
+                plan.getPointCodes(), plan.getSubCode(), plan.getRouteId(), plan.getRouteName());
         long timestamp = System.currentTimeMillis();
         String taskCode = "EUA_PLAN_" + plan.getId() + "_" + timestamp;
         String taskName = plan.getPlanName() + "_" + timestamp;
         String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByBay(plan.getBayId(), taskCode, taskName, fixedStartTime, false);
+        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchPlanPoints(
+                selection.getPointCodes(), plan.getSubCode(), plan.getRouteId(), plan.getRouteName(),
+                taskCode, taskName, fixedStartTime);
         plan.setLastTaskCode(taskCode);
         plan.setLastEuaTaskId(result.getEuaTaskId());
         plan.setLastExecuteTime(new Date());
         plan.setLastExecuteStatus(result.isSuccess() ? 2 : 0);
         plan.setLastExecuteMsg(result.getResponseMsg());
-        plan.setRouteId(result.getRouteId() == null ? plan.getRouteId() : result.getRouteId());
         plan.setUpdateTime(new Date());
-        cqEuaPlanMapper.updateById(plan);
+        // Only write execution metadata: a concurrently edited selection must not be overwritten.
+        cqEuaPlanMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqEuaPlanEntity>()
+                .eq(CqEuaPlanEntity::getId, plan.getId())
+                .set(CqEuaPlanEntity::getLastTaskCode, plan.getLastTaskCode())
+                .set(CqEuaPlanEntity::getLastEuaTaskId, plan.getLastEuaTaskId())
+                .set(CqEuaPlanEntity::getLastExecuteTime, plan.getLastExecuteTime())
+                .set(CqEuaPlanEntity::getLastExecuteStatus, plan.getLastExecuteStatus())
+                .set(CqEuaPlanEntity::getLastExecuteMsg, plan.getLastExecuteMsg())
+                .set(CqEuaPlanEntity::getUpdateTime, plan.getUpdateTime()));
         return result;
     }
 
@@ -271,22 +285,39 @@ public class CqEuaPlanService {
         }
     }
 
-    private CqEuaBayOption findBayOption(String bayId) {
-        if (!StringUtils.hasText(bayId)) {
-            return null;
-        }
-        return bayOptions().stream()
-                .filter(option -> bayId.equals(option.getBayId()))
-                .findFirst()
-                .orElse(null);
+    private void applySelection(CqEuaPlanEntity entity, CqEuaRoutePointService.Selection selection) {
+        entity.setBayId(null);
+        entity.setBayName(null);
+        entity.setSubCode(selection.getSubCode());
+        entity.setRouteId(selection.getRouteId());
+        entity.setRouteName(selection.getRouteName());
+        entity.setPointCodes(selection.getPointCodes());
+        entity.setPointIds(selection.getPointIds());
+        entity.setPointCount(selection.getPointIds().size());
+        entity.setRequiresPointSelection(false);
     }
 
-    private void validatePlan(String planName, String bayId) {
+    private void populateSelection(CqEuaPlanEntity plan) {
+        plan.setPointIds(new ArrayList<>());
+        plan.setPointCount(0);
+        plan.setRequiresPointSelection(true);
+        if (!StringUtils.hasText(plan.getPointCodes())) return;
+        try {
+            plan.setPointCount(cqEuaRoutePointService.parseCodes(plan.getPointCodes()).size());
+            CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveSnapshot(
+                    plan.getPointCodes(), plan.getSubCode(), plan.getRouteId(), plan.getRouteName());
+            plan.setPointIds(selection.getPointIds());
+            plan.setRequiresPointSelection(false);
+        } catch (IllegalArgumentException e) {
+            log.warn("EUA计划需重新选点: planId={}, reason={}", plan.getId(), e.getMessage());
+        }
+    }
+
+    private void validatePlan(String planName, Integer enabled) {
         if (!StringUtils.hasText(planName)) {
             throw new IllegalArgumentException("计划名称不能为空");
         }
-        if (!StringUtils.hasText(bayId)) {
-            throw new IllegalArgumentException("间隔不能为空");
-        }
+        if (planName.trim().length() > 128) throw new IllegalArgumentException("计划名称不能超过128个字符");
+        if (enabled != null && enabled != 0 && enabled != 1) throw new IllegalArgumentException("启用状态无效");
     }
 }

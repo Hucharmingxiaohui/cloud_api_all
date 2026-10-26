@@ -43,6 +43,19 @@ public class ImportPointController {
     @Autowired
     ImportPointService importPointService;
 
+    @Autowired
+    private com.dji.sample.df.cqDockDf.service.CqEuaRoutePointService cqEuaRoutePointService;
+
+    @PostMapping("/bind-eua-route")
+    public Result bindEuaRoute(@RequestBody com.dji.sample.df.substationDf.model.entity.BindEuaRouteRequest request) {
+        try {
+            cqEuaRoutePointService.bind(request.getIds(), request.getEuaRouteName());
+            return Result.success("绑定成功");
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
 
     @PostMapping("/import")
     public ResponseEntity<String> importPoint(@RequestPart("file") MultipartFile file ,

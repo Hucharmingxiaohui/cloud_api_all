@@ -353,6 +353,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 pointExcel.setPointCode(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
                 pointCode = pointExcel.getPointCode();
             }
+            uniPointMapper2.selectStationForUpdate(subCode);
             UniPoint point = this.getPointByCode(subCode, pointCode);
             if (point == null) {
                 point = new UniPoint();
@@ -432,6 +433,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
             } else {
                 point.setPoint_code(pointCode);
             }*/
+            validateEuaRouteChange(point, pointExcel.getWaylineId());
             point.setWaylineId(pointExcel.getWaylineId());
             point.setPicType(Integer.parseInt(pointExcel.getPicType()));
             point.setWaylinePointPos(pointExcel.getWaylinePointPos());
@@ -571,6 +573,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updatePoint(Map<String, Object> params) {
         Object idObj = params.get("id");
         if (idObj == null || StringUtils.isBlank(String.valueOf(idObj))) {
@@ -592,6 +595,12 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
             point.setComponentName(StringUtils.trimToNull((String) params.get("componentName")));
         }
         if (params.containsKey("waylineId")) {
+            UniPoint existing = uniPointMapper2.selectById(point.getId());
+            if (existing == null) throw new FastException("点位不存在");
+            List<UniPoint> locked = uniPointMapper2.selectStationForUpdate(existing.getSubCode());
+            existing = locked.stream().filter(p -> point.getId().equals(p.getId())).findFirst()
+                    .orElseThrow(() -> new FastException("点位不存在"));
+            validateEuaRouteChange(existing, StringUtils.trimToEmpty((String) params.get("waylineId")));
             // 允许传空字符串表示解除航线绑定（空串会更新，null 会被 updateById 跳过）
             point.setWaylineId(StringUtils.trimToEmpty((String) params.get("waylineId")));
         }
@@ -602,5 +611,10 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
             point.setPicType(Integer.valueOf(String.valueOf(params.get("picType"))));
         }
         this.updateById(point);
+    }
+
+    private void validateEuaRouteChange(UniPoint point, String routeId) {
+        if (StringUtils.isNotBlank(point.getEuaRouteName()) && !Objects.equals(point.getWaylineId(), routeId))
+            throw new FastException("点位已绑定EUA航线名称，不能直接修改航线ID；请先核对导入航线与绑定名称");
     }
 }

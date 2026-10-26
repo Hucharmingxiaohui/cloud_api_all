@@ -41,6 +41,7 @@
           >
             删除
           </el-button>
+          <el-button class="new_btn" type="primary" :disabled="pointsLoading || !selectedPointRows.length" @click="showEuaBind(selectedPointRows)">批量绑定航线</el-button>
           <el-upload
             :before-upload="beforeUpload"
             :show-file-list="false"
@@ -100,7 +101,7 @@
       </div>
       <div class="point-main-panel">
       <div class="table-container">
-        <el-table :data="tableData" stripe class="point-table" @selection-change="handleSelectionChange">
+        <el-table ref="pointTableRef" :data="tableData" stripe class="point-table" @selection-change="handleSelectionChange">
           <el-table-column type="selection"  align="center" width="60"></el-table-column>
           <el-table-column
             type="index"
@@ -132,8 +133,10 @@
               {{ scope.row.pic_type === 0? '可见光':'红外' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" width="160">
+          <el-table-column label="绑定EUA航线名称" prop="eua_route_name" align="center" min-width="160" show-overflow-tooltip />
+          <el-table-column label="操作" align="center" width="260">
             <template #default="scope">
+              <el-button link type="primary" :disabled="pointsLoading" @click="showEuaBind([scope.row])">绑定EUA航线</el-button>
               <el-button
                 link
                 type="primary"
@@ -206,6 +209,19 @@
         </div>
       </el-dialog>
 
+      <el-dialog v-model="euaBindVisible" title="绑定EUA航线" width="520px" :close-on-click-modal="false" :close-on-press-escape="!euaBinding" :show-close="!euaBinding" :before-close="closeEuaBind">
+        <el-form label-width="100px" @submit.prevent="saveEuaBind">
+          <el-form-item label="航线名称" required>
+            <el-input v-model="euaRouteName" placeholder="请输入EUA航线名称" maxlength="255" show-word-limit :disabled="euaBinding" />
+          </el-form-item>
+          <div>本次绑定 {{ euaBindIds.length }} 个点位，仅更新名称，不修改已导入的航线ID。</div>
+        </el-form>
+        <template #footer>
+          <el-button :disabled="euaBinding" @click="euaBindVisible = false">取消</el-button>
+          <el-button type="primary" :loading="euaBinding" @click="saveEuaBind">确认</el-button>
+        </template>
+      </el-dialog>
+
       <!-- 点位编辑弹窗 -->
       <el-dialog
         v-model="pointEditVisible"
@@ -272,11 +288,11 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref, computed, onMounted } from 'vue'
+import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { Search, Refresh, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import { downloadFile } from '/@/utils/common'
-import { ElButton, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage, ElRadioGroup, ElRadio } from 'element-plus'
-import { getPointList, getPointTree, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile, updatePointApi } from '/@/api/points'
+import { ElButton, ElCheckbox, ElDialog, ElForm, ElFormItem, ElMessageBox, ElInput, ElSelect, ElOption, ElUpload, ElMessage, ElRadioGroup, ElRadio } from 'element-plus'
+import { bindEuaRoute, getPointList, getPointTree, deletePointListapi, importPointList, exportPointTemplate, exportPointDataFile, updatePointApi } from '/@/api/points'
 import { getWaylineDetail, getWaylineFiles } from '/@/api/wayline'
 import { ELocalStorageKey } from '/@/types'
 import { DEVICE_NAME } from '/@/types/device'
@@ -316,6 +332,57 @@ const fileList = ref<FileItem[]>([])
 const tableData = ref([])
 
 const selectRows = ref([])
+const pointTableRef = ref()
+const selectedPointRows = computed(() => tableData.value.filter(row => selectRows.value.includes(row.id)))
+const euaBindVisible = ref(false)
+const euaBinding = ref(false)
+const euaRouteName = ref('')
+const euaBindIds = ref<number[]>([])
+const pointsLoading = ref(false)
+let pointListRequest = 0
+watch(queryForm, clearPointSelection, { flush: 'sync' })
+
+function clearPointSelection () {
+  selectRows.value = []
+  pointTableRef.value?.clearSelection()
+}
+
+function showEuaBind (rows: any[]) {
+  if (!rows.length || euaBinding.value || pointsLoading.value) return
+  euaBindIds.value = rows.map(row => row.id)
+  const name = rows[0].eua_route_name || ''
+  euaRouteName.value = rows.every(row => (row.eua_route_name || '') === name) ? name : ''
+  euaBindVisible.value = true
+}
+
+function closeEuaBind (done: () => void) {
+  if (!euaBinding.value) done()
+}
+
+async function saveEuaBind () {
+  if (euaBinding.value) return
+  const name = euaRouteName.value.trim()
+  if (!name || name.length > 255) {
+    ElMessage.warning('请输入1到255个字符的EUA航线名称')
+    return
+  }
+  euaBinding.value = true
+  try {
+    const res = await bindEuaRoute({ ids: [...euaBindIds.value], euaRouteName: name })
+    if (res.code !== 0) {
+      ElMessage.error(res.message || '绑定失败')
+      return
+    }
+    ElMessage.success('绑定成功')
+    euaBindVisible.value = false
+    await getPoinntList()
+  } catch {
+    ElMessage.error('绑定失败，请稍后重试')
+  } finally {
+    euaBinding.value = false
+  }
+}
+
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId) || ''
 const waylineDetailVisible = ref(false)
 const waylineDetailLoading = ref('')
@@ -342,17 +409,24 @@ async function getPointTreeData () {
 }
 
 // 获取风机信息查询
-function getPoinntList () {
+async function getPoinntList () {
+  const request = ++pointListRequest
+  pointsLoading.value = true
+  clearPointSelection()
   try {
-    getPointList({ ...paginationProp, ...queryForm }).then(res => {
-      if (res.code !== 0) {
-        return
-      }
-      tableData.value = res.data.list
-      paginationProp.total = res.data.pagination.total
-    })
+    const res = await getPointList({ ...paginationProp, ...queryForm })
+    if (request !== pointListRequest) return
+    if (res.code !== 0) {
+      ElMessage.error(res.message || '点位列表加载失败')
+      return
+    }
+    clearPointSelection()
+    tableData.value = res.data.list
+    paginationProp.total = res.data.pagination.total
   } catch (error) {
-
+    if (request === pointListRequest) ElMessage.error('点位列表加载失败，请稍后重试')
+  } finally {
+    if (request === pointListRequest) pointsLoading.value = false
   }
 }
 
@@ -915,7 +989,7 @@ async function exportPointData () {
     /* 这个会确保 label 在垂直方向居中 */
     background-color: rgba(1, 36, 98, 1);
     border-radius: 4px;
-    height: 60px;
+    min-height: 60px;
     padding-top: 15px;
     padding-left: 10px;
     margin: 31px 12px 0 12px;

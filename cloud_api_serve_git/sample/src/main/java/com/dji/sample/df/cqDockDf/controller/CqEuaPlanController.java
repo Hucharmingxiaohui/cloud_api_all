@@ -120,6 +120,11 @@ public class CqEuaPlanController {
         return Result.success(cqEuaPlanService.bayOptions());
     }
 
+    @GetMapping("/point-options")
+    public Result pointOptions() {
+        return Result.success(cqEuaPlanService.pointOptions());
+    }
+
     @PostMapping("/task-record/page")
     public Result taskRecordPage(@RequestBody CqEuaTaskRecordPageRequest request) {
         return Result.success(cqEuaPlanService.taskRecordPage(request));

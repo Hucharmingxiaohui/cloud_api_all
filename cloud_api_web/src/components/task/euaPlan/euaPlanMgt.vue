@@ -5,8 +5,8 @@
         <el-form-item label="计划名称:">
           <el-input v-model="queryForm.planName" placeholder="请输入计划名称" class="custom-input" />
         </el-form-item>
-        <el-form-item label="间隔名称:">
-          <el-input v-model="queryForm.bayName" placeholder="请输入间隔名称" class="custom-input" />
+        <el-form-item label="EUA航线名称:">
+          <el-input v-model="queryForm.routeName" placeholder="请输入EUA航线名称" class="custom-input" />
         </el-form-item>
         <el-form-item>
           <el-button class="new_btn" type="primary" :icon="Search" @click="getPlan">查询</el-button>
@@ -20,9 +20,14 @@
       <el-table :data="tableData" v-loading="loading" border style="width: 100%">
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="planName" label="计划名称" show-overflow-tooltip />
-        <el-table-column prop="bayName" label="间隔名称" show-overflow-tooltip />
-        <el-table-column prop="bayId" label="间隔ID" show-overflow-tooltip />
+        <el-table-column prop="routeName" label="EUA航线名称" show-overflow-tooltip />
         <el-table-column prop="routeId" label="EUA航线ID" show-overflow-tooltip />
+        <el-table-column prop="pointCount" label="点位数量" width="100" align="center">
+          <template #default="scope">
+            <span v-if="hasPlanPoints(scope.row)">{{ scope.row.pointCount }}</span>
+            <el-tag v-else type="warning">需重新选择点位</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="最近执行状态" width="120" align="center">
           <template #default="scope">
             <el-tag v-if="scope.row.lastExecuteStatus === 2" type="warning">执行中</el-tag>
@@ -36,7 +41,7 @@
         <el-table-column prop="lastExecuteTime" label="最近执行时间" width="180" show-overflow-tooltip />
         <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="scope">
-            <el-button link type="primary" @click="executePlan(scope.row)">立即执行</el-button>
+            <el-button link type="primary" :disabled="!hasPlanPoints(scope.row) || executingIds.includes(scope.row.id)" :loading="executingIds.includes(scope.row.id)" @click="executePlan(scope.row)">立即执行</el-button>
             <el-button link type="primary" @click="editPlan(scope.row)">编辑</el-button>
             <el-button link type="danger" @click="removePlan(scope.row)">删除</el-button>
           </template>
@@ -59,32 +64,72 @@
     <el-dialog
       v-model="planDialogVisible"
       :title="planForm.id ? '编辑EUA飞行计划' : '新建EUA飞行计划'"
-      width="720px"
+      width="820px"
+      top="6vh"
       :close-on-click-modal="false"
+      :close-on-press-escape="!saving"
+      :show-close="!saving"
+      :before-close="closePlanDialog"
       class="eua-plan-dialog"
       append-to-body
     >
-      <el-form ref="planFormRef" :model="planForm" :rules="planRules" label-width="120px" class="plan-form">
+      <el-form ref="planFormRef" :model="planForm" :rules="planRules" label-width="100px" class="plan-form">
         <el-form-item label="计划名称" prop="planName">
           <el-input v-model="planForm.planName" maxlength="50" show-word-limit placeholder="请输入计划名称" />
         </el-form-item>
-        <el-form-item label="间隔" prop="bayId">
-          <el-select v-model="planForm.bayId" filterable placeholder="请选择间隔" :teleported="false" class="select-operation">
-            <el-option
-              v-for="item in bayOptions"
-              :key="item.bayId"
-              :label="formatBayLabel(item)"
-              :value="item.bayId"
-            />
-          </el-select>
+        <el-form-item label="航线与点位" required>
+          <div class="point-picker" v-loading="optionsLoading">
+            <el-alert v-if="selectionWarning" :title="selectionWarning" type="warning" :closable="false" show-icon />
+            <el-button v-if="selectionWarning" :disabled="optionsLoading || !!optionsError || saving" @click="reselectPoints">重新选择全部点位</el-button>
+            <el-alert v-if="optionsError" :title="optionsError" type="error" :closable="false" />
+            <el-button v-if="optionsError" @click="loadPointOptions(editingSnapshot)">重试加载点位</el-button>
+            <div class="point-picker-heading">
+              <div class="point-picker-help">
+                <div>仅支持选择同一场站、同一航线下的点位</div>
+                <div>勾选航线可全选，清空选择后可切换航线</div>
+              </div>
+              <span class="point-selection-count">已选 <strong>{{ planForm.pointIds.length }}</strong> 个点位</span>
+            </div>
+            <el-tree
+              ref="selectionTreeRef"
+              :data="pointTree"
+              node-key="key"
+              show-checkbox
+              default-expand-all
+              :props="{ label: 'label', children: 'children', disabled: 'disabled' }"
+              :check-on-click-node="false"
+              :expand-on-click-node="false"
+              :empty-text="optionsLoading ? '正在加载点位' : '暂无可选点位，请先导入wayline_id，再绑定EUA航线名称'"
+              @check="handlePointCheck"
+            >
+              <template #default="{ data }">
+                <div class="point-tree-node" :class="{ 'is-route': !!data.children, 'is-unavailable': data.disabled }" :title="data.label">
+                  <template v-if="data.children">
+                    <div class="point-tree-title">
+                      <span class="point-tree-name">{{ data.routeName }}</span>
+                      <span class="point-route-count">{{ data.children.length }} 个点位</span>
+                    </div>
+                    <div class="point-tree-meta">场站：{{ data.subCode }} · 航线 ID：{{ data.routeId }}</div>
+                  </template>
+                  <template v-else>
+                    <span class="point-tree-name">{{ data.pointName }}</span>
+                    <span class="point-tree-code">{{ data.pointCode }}</span>
+                  </template>
+                </div>
+              </template>
+            </el-tree>
+          </div>
+        </el-form-item>
+        <el-form-item label="启用状态">
+          <el-switch v-model="planForm.enabled" :active-value="1" :inactive-value="0" :disabled="saving" />
         </el-form-item>
         <el-form-item label="备注">
-          <el-input v-model="planForm.remark" type="textarea" :rows="4" maxlength="200" show-word-limit placeholder="请输入备注" />
+          <el-input v-model="planForm.remark" type="textarea" :rows="3" maxlength="200" show-word-limit placeholder="请输入备注（选填）" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button type="primary" :loading="saving" @click="submitPlan">保存</el-button>
-        <el-button @click="planDialogVisible = false">取消</el-button>
+        <el-button :disabled="saving" @click="planDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" :disabled="optionsLoading || !!optionsError || !!selectionWarning" @click="submitPlan">保存计划</el-button>
       </template>
     </el-dialog>
 
@@ -92,21 +137,29 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { ElAlert, ElButton, ElMessage, ElMessageBox, ElSwitch, ElTree, FormInstance, FormRules } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { addEuaPlan, deleteEuaPlan, executeEuaPlan, getEuaBayOptions, getEuaPlanPage, updateEuaPlan } from '/@/api/cq-eua-plan'
+import { addEuaPlan, deleteEuaPlan, executeEuaPlan, getEuaPointOptions, getEuaPlanPage, updateEuaPlan, EuaPointGroup, EuaPlanPayload, EuaPlanRow } from '/@/api/cq-eua-plan'
+import { buildPointTree, hasPlanPoints, restoreSelection, selectionError } from './pointSelection'
 
 const loading = ref(false)
 const saving = ref(false)
-const tableData = ref<any[]>([])
-const bayOptions = ref<any[]>([])
+const tableData = ref<EuaPlanRow[]>([])
+const pointGroups = ref<EuaPointGroup[]>([])
+const optionsLoading = ref(false)
+const optionsError = ref('')
+const selectionWarning = ref('')
+const selectionTreeRef = ref<InstanceType<typeof ElTree>>()
+const executingIds = ref<number[]>([])
+const editingSnapshot = ref<EuaPlanRow | null>(null)
+let optionsRequest = 0
 const planDialogVisible = ref(false)
 const planFormRef = ref<FormInstance>()
 
 const queryForm = reactive({
   planName: '',
-  bayName: ''
+  routeName: ''
 })
 
 const pagination = reactive({
@@ -115,16 +168,53 @@ const pagination = reactive({
   total: 0
 })
 
-const planForm = reactive<any>({
+const planForm = reactive<EuaPlanPayload>({
   id: undefined,
   planName: '',
-  bayId: '',
-  remark: ''
+  pointIds: [] as number[],
+  remark: '',
+  enabled: 1
 })
 
 const planRules: FormRules = {
-  planName: [{ required: true, message: '请输入计划名称', trigger: 'blur' }],
-  bayId: [{ required: true, message: '请选择间隔', trigger: 'change' }]
+  planName: [{ required: true, whitespace: true, message: '请输入计划名称', trigger: 'blur' }]
+}
+
+const pointTree = computed(() => buildPointTree(pointGroups.value, planForm.pointIds).map((group, groupIndex) => ({
+  ...group,
+  routeName: pointGroups.value[groupIndex].routeName,
+  subCode: pointGroups.value[groupIndex].subCode,
+  routeId: pointGroups.value[groupIndex].routeId,
+  disabled: group.disabled || saving.value || !!selectionWarning.value,
+  children: group.children.map((point, pointIndex) => ({
+    ...point,
+    pointName: pointGroups.value[groupIndex].points[pointIndex].pointName || pointGroups.value[groupIndex].points[pointIndex].pointCode,
+    pointCode: pointGroups.value[groupIndex].points[pointIndex].pointCode,
+    disabled: point.disabled || saving.value || !!selectionWarning.value
+  }))
+})))
+
+function closePlanDialog (done: () => void) {
+  if (!saving.value) done()
+}
+
+async function syncCheckedPoints () {
+  await nextTick()
+  selectionTreeRef.value?.setCheckedKeys(planForm.pointIds.map((id: number) => `point:${id}`))
+}
+
+function handlePointCheck (_node: any, state: { checkedNodes: any[] }) {
+  const ids = state.checkedNodes.filter(node => node.pointId !== undefined).map(node => node.pointId)
+  const error = ids.length ? selectionError(pointGroups.value, ids) : ''
+  if (error) ElMessage.warning(error)
+  else planForm.pointIds = ids
+  syncCheckedPoints()
+}
+
+function reselectPoints () {
+  selectionWarning.value = ''
+  planForm.pointIds = []
+  syncCheckedPoints()
 }
 
 async function getPlan () {
@@ -134,13 +224,16 @@ async function getPlan () {
       page: pagination.current,
       pageSize: pagination.pageSize,
       planName: queryForm.planName,
-      bayName: queryForm.bayName
+      routeName: queryForm.routeName
     })
     if (res.code === 0) {
-      const data = res.data || {}
-      tableData.value = (data.records || []).map(normalizePlanRow)
-      pagination.total = data.total || 0
+      tableData.value = (res.data?.records || []).map(normalizePlanRow)
+      pagination.total = res.data?.total || 0
+    } else {
+      ElMessage.error(res.message || '计划列表加载失败')
     }
+  } catch {
+    ElMessage.error('计划列表加载失败，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -148,7 +241,7 @@ async function getPlan () {
 
 function reset () {
   queryForm.planName = ''
-  queryForm.bayName = ''
+  queryForm.routeName = ''
   pagination.current = 1
   getPlan()
 }
@@ -156,38 +249,53 @@ function reset () {
 function toCreatePlan () {
   resetPlanForm()
   planDialogVisible.value = true
-  loadBayOptions()
+  editingSnapshot.value = null
+  loadPointOptions()
 }
 
 function editPlan (row: any) {
+  resetPlanForm()
   planForm.id = row.id
   planForm.planName = row.planName
-  planForm.bayId = row.bayId
   planForm.remark = row.remark
+  planForm.enabled = row.enabled ?? 1
+  editingSnapshot.value = row
   planDialogVisible.value = true
-  loadBayOptions()
+  loadPointOptions(row)
 }
 
 function resetPlanForm () {
   planForm.id = undefined
   planForm.planName = ''
-  planForm.bayId = ''
+  planForm.pointIds = []
   planForm.remark = ''
+  planForm.enabled = 1
+  selectionWarning.value = ''
   planFormRef.value?.clearValidate()
 }
 
-async function loadBayOptions () {
-  const res = await getEuaBayOptions()
-  if (res.code === 0) {
-    bayOptions.value = (res.data || []).map(normalizeBayOption).filter((item: any) => item.bayId)
+async function loadPointOptions (row: any = null) {
+  const request = ++optionsRequest
+  optionsLoading.value = true
+  optionsError.value = ''
+  pointGroups.value = []
+  planForm.pointIds = []
+  try {
+    const res = await getEuaPointOptions()
+    if (request !== optionsRequest) return
+    if (res.code !== 0) throw new Error(res.message || '点位加载失败')
+    pointGroups.value = res.data || []
+    if (row) {
+      const restored = restoreSelection(pointGroups.value, row)
+      planForm.pointIds = restored.ids
+      selectionWarning.value = restored.warning
+    }
+    await syncCheckedPoints()
+  } catch (error) {
+    if (request === optionsRequest) optionsError.value = error instanceof Error ? error.message : '点位加载失败，请重试'
+  } finally {
+    if (request === optionsRequest) optionsLoading.value = false
   }
-}
-
-function normalizeBayOption (item: any) {
-  const bayId = item.bayId || item.bay_id || item.id || ''
-  const bayName = item.bayName || item.bay_name || item.name || bayId
-  const routeId = item.routeId || item.route_id || item.waylineId || item.wayline_id || ''
-  return { ...item, bayId, bayName, routeId }
 }
 
 function normalizePlanRow (item: any) {
@@ -195,8 +303,6 @@ function normalizePlanRow (item: any) {
     ...item,
     id: item.id,
     planName: item.planName || item.plan_name || item.name || '',
-    bayId: item.bayId || item.bay_id || '',
-    bayName: item.bayName || item.bay_name || '',
     routeId: item.routeId || item.route_id || item.waylineId || item.wayline_id || '',
     lastExecuteStatus: item.lastExecuteStatus ?? item.last_execute_status,
     lastEuaTaskId: item.lastEuaTaskId || item.last_eua_task_id || '',
@@ -205,23 +311,22 @@ function normalizePlanRow (item: any) {
   }
 }
 
-function formatBayLabel (item: any) {
-  const name = item.bayName || item.bayId
-  return item.routeId ? `${name}（${item.routeId}）` : name
-}
-
 async function submitPlan () {
-  await planFormRef.value?.validate()
+  if (saving.value || optionsLoading.value || optionsError.value || selectionWarning.value) return
+  if (!await planFormRef.value?.validate().catch(() => false)) return
+  const error = selectionError(pointGroups.value, planForm.pointIds)
+  if (error) {
+    ElMessage.warning(error)
+    return
+  }
   saving.value = true
   try {
     const payload = {
-      id: planForm.id,
-      planName: planForm.planName,
-      plan_name: planForm.planName,
-      name: planForm.planName,
-      bayId: planForm.bayId,
-      bay_id: planForm.bayId,
-      remark: planForm.remark
+      ...(planForm.id ? { id: planForm.id } : {}),
+      planName: planForm.planName.trim(),
+      pointIds: [...planForm.pointIds],
+      remark: planForm.remark,
+      enabled: planForm.enabled
     }
     const res = planForm.id ? await updateEuaPlan(payload) : await addEuaPlan(payload)
     if (res.code === 0) {
@@ -231,28 +336,48 @@ async function submitPlan () {
     } else {
       ElMessage.error(res.message || '保存失败')
     }
+  } catch {
+    ElMessage.error('保存失败，请稍后重试')
   } finally {
     saving.value = false
   }
 }
 
 async function executePlan (row: any) {
-  await ElMessageBox.confirm(`确定立即执行计划“${row.planName}”吗？`, '提示', { type: 'warning' })
-  const res = await executeEuaPlan(row.id)
-  if (res.code === 0 && res.data?.success) {
-    ElMessage.success('任务已下发EUA平台')
-    getPlan()
-  } else {
-    ElMessage.error(res.data?.responseMsg || res.message || '任务下发失败')
+  if (!hasPlanPoints(row) || executingIds.value.includes(row.id)) return
+  try {
+    await ElMessageBox.confirm(`确定立即执行计划“${row.planName}”吗？`, '提示', { type: 'warning' })
+  } catch { return }
+  executingIds.value.push(row.id)
+  try {
+    const res = await executeEuaPlan(row.id)
+    if (res.code === 0 && res.data?.success) {
+      ElMessage.success('任务已下发EUA平台')
+      getPlan()
+    } else {
+      ElMessage.error(res.data?.responseMsg || res.message || '任务下发失败')
+    }
+  } catch {
+    ElMessage.error('任务下发失败，请稍后重试')
+  } finally {
+    executingIds.value = executingIds.value.filter(id => id !== row.id)
   }
 }
 
 async function removePlan (row: any) {
-  await ElMessageBox.confirm(`确定删除计划“${row.planName}”吗？`, '提示', { type: 'warning' })
-  const res = await deleteEuaPlan(row.id)
-  if (res.code === 0) {
-    ElMessage.success('删除成功')
-    getPlan()
+  try {
+    await ElMessageBox.confirm(`确定删除计划“${row.planName}”吗？`, '提示', { type: 'warning' })
+  } catch { return }
+  try {
+    const res = await deleteEuaPlan(row.id)
+    if (res.code === 0) {
+      ElMessage.success('删除成功')
+      getPlan()
+    } else {
+      ElMessage.error(res.message || '删除失败')
+    }
+  } catch {
+    ElMessage.error('删除失败，请稍后重试')
   }
 }
 
@@ -262,6 +387,62 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.point-picker {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(113, 159, 255, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(3, 17, 42, 0.3);
+  .el-tree {
+    height: clamp(180px, 32vh, 300px);
+    overflow: auto;
+    padding: 10px 12px;
+    background: transparent;
+    color: #e5efff;
+    --el-tree-node-hover-bg-color: rgba(70, 143, 242, 0.14);
+    :deep(.el-tree-node__content) { height: auto; min-height: 36px; padding-right: 8px; }
+    :deep(.el-tree-node__expand-icon) { color: #9dbbe6; }
+    :deep(.el-checkbox) { margin-right: 10px; }
+  }
+}
+.point-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(113, 159, 255, 0.2);
+  background: rgba(69, 133, 233, 0.08);
+}
+.point-picker-help { color: #b8cbea; font-size: 12px; line-height: 22px; }
+.point-selection-count {
+  flex-shrink: 0;
+  padding: 0 10px;
+  border-radius: 4px;
+  background: rgba(64, 158, 255, 0.15);
+  color: #bcdfff;
+  font-size: 12px;
+  line-height: 28px;
+  strong { color: #fff; margin: 0 3px; font-size: 15px; }
+}
+.point-tree-node {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: 22px;
+  &.is-route { display: block; padding: 7px 0; }
+  &.is-unavailable { opacity: 0.45; }
+}
+.point-tree-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.point-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e5efff; }
+.is-route .point-tree-name { font-weight: 600; color: #fff; }
+.point-route-count { flex-shrink: 0; color: #a8cfff; font-size: 12px; }
+.point-tree-meta { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9bb6dc; font-size: 12px; }
+.point-tree-code { margin-left: auto; flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #a8c0e1; font-size: 12px; }
 .container {
   width: 100%;
   min-height: calc(100vh - 105px);
@@ -389,6 +570,8 @@ onMounted(() => {
 }
 
 :global(.eua-plan-dialog) {
+  max-width: calc(100vw - 32px);
+  border-radius: 10px;
   background-color: #0B2757;
   box-shadow: inset 0 0 15px 1px rgba(34, 135, 255, 0.5);
   border: 1px solid rgba(113, 159, 255, 0.45);
@@ -409,13 +592,19 @@ onMounted(() => {
 }
 
 :global(.eua-plan-dialog .el-dialog__body) {
-  padding: 28px 36px 8px 20px;
+  padding: 24px 28px 4px 20px;
+  max-height: 72vh;
+  overflow-y: auto;
 }
 
 :global(.eua-plan-dialog .el-dialog__footer) {
-  padding: 8px 36px 26px;
-  text-align: center;
+  padding: 16px 28px 22px;
+  text-align: right;
+  border-top: 1px solid rgba(113, 159, 255, 0.18);
 }
+
+:global(.eua-plan-dialog .plan-form .el-form-item) { margin-bottom: 22px; }
+:global(.eua-plan-dialog .el-dialog__footer .el-button) { min-width: 88px; }
 
 :global(.eua-plan-dialog .plan-form .el-form-item__label) {
   color: rgba(255, 255, 255, 0.88);

@@ -39,6 +39,19 @@ public class CqDockTaskDispatchService {
     @Resource
     private CqDockTaskStatusHandler cqDockTaskStatusHandler;
 
+    @Resource
+    private CqEuaRoutePointService cqEuaRoutePointService;
+
+    public CqDockTaskDispatchResult dispatchPlanPoints(String snapshot, String subCode, String expectedRouteId,
+                                                       String expectedRouteName, String taskCode,
+                                                       String taskName, String fixedStartTime) {
+        CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveSnapshot(
+                snapshot, subCode, expectedRouteId, expectedRouteName);
+        List<String> codes = cqEuaRoutePointService.parseCodes(selection.getPointCodes());
+        return dispatchByPoints(String.join(",", codes), subCode, taskCode, taskName, fixedStartTime,
+                false, expectedRouteId);
+    }
+
     public CqDockTaskDispatchResult dispatchByBay(String bayId, String taskCode, String taskName,
                                                   String fixedStartTime, boolean reportToPatrol) {
         log.info("开始执行EUA任务: taskCode={}, bayId={}, taskName={}, fixedStartTime={}, reportToPatrol={}",
@@ -110,11 +123,20 @@ public class CqDockTaskDispatchService {
 
     public CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
                                                     String taskName, String fixedStartTime, boolean reportToPatrol) {
+        return dispatchByPoints(pointCodes, subCode, taskCode, taskName, fixedStartTime, reportToPatrol, null);
+    }
+
+    private CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
+                                                    String taskName, String fixedStartTime, boolean reportToPatrol,
+                                                    String expectedRouteId) {
         List<String> codes = normalizePointCodes(pointCodes);
         String snapshot = JSONObject.toJSONString(codes);
         String routeId;
         try {
             routeId = resolvePointRoute(codes, subCode);
+            if (expectedRouteId != null) {
+                if (!expectedRouteId.equals(routeId)) throw new IllegalArgumentException("计划航线ID已变化，请重新选择点位并保存");
+            }
         } catch (IllegalArgumentException e) {
             savePointTaskRecord(taskCode, taskName, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot);
             return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, e.getMessage());
