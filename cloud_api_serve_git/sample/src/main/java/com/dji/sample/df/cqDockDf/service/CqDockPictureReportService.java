@@ -11,7 +11,6 @@ import com.df.server.dto.robotDog.AnalyseParamsRecReq;
 import com.df.server.dto.robotDog.AnalyseParamsReq;
 import com.df.server.dto.robotDog.TaskInfo;
 import com.df.server.service.his.impl.HisExePointAnalyseServiceImpl;
-import com.dji.sample.center.config.CenterNormalConfig;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.center.utils.DateUtils;
 import com.dji.sample.center.utils.ftp.FtpUtils;
@@ -90,8 +89,8 @@ public class CqDockPictureReportService {
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
     @Autowired
     private PatrolHostSocketClient patrolHostSocketClient;
-    @Autowired
-    private CenterNormalConfig centerConfig;
+    @Value("${normalStation.stationCode}")
+    private String normalStationCode;
     @Autowired
     private CqDockProperties cqDockProperties;
     @Autowired
@@ -620,7 +619,7 @@ public class CqDockPictureReportService {
     }
 
     private void sendPatrolResultItems(List<PatrolResultItem> items) {
-        PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", centerConfig.getStationCode());
+        PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
         commandData.addItems(items);
         patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
     }

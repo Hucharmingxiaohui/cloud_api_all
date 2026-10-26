@@ -12,6 +12,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -44,6 +45,8 @@ public class CqDockTaskStatusHandler {
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
+    @Value("${normalStation.stationCode}")
+    private String normalStationCode;
 
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
         startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, true);
@@ -269,6 +272,7 @@ public class CqDockTaskStatusHandler {
         commandData.setSendCode(centerConfig.getStationCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
+        commandData.setCode(normalStationCode);
         boolean sendSuccess = patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
         if (sendSuccess) {
             log.info("上报EUA任务状态成功: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",

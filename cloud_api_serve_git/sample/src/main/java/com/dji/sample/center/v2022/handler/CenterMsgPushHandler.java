@@ -11,6 +11,7 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointCount.PointCount;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -31,6 +32,8 @@ public class CenterMsgPushHandler {
     private CenterNormalConfig centerNormalConfig;
     @Autowired
     private ICenterToUavPlanMapper iCenterToUavPlanMapper;
+    @Value("${normalStation.stationCode}")
+    private String normalStationCode;
 
 
     /**
@@ -100,11 +103,21 @@ public class CenterMsgPushHandler {
      * J.6.10 任务状态数据 - 起始
      */
     public void pushPatrolStatusStart(List<BaseItem> list) {
+        pushPatrolStatusStart(list, false);
+    }
+
+    public void pushPatrolStatusStart(List<BaseItem> list, boolean euaTask) {
         if (!isConnectCenter()) {
             log.info("当前主站连接异常，任务状态上送失败");
             return;
         }
         if (list != null && list.size() > 0) {
+            if (euaTask) {
+                PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("41", "", normalStationCode);
+                commandData.addItems(list);
+                patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
+                return;
+            }
             PatrolHostCommand commandData = new PatrolHostCommand();
             commandData.addItems(list);
             commandData.setSendCode(centerNormalConfig.getServerCode());

@@ -102,7 +102,7 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
             entity.setHistaskInsertTime(DateUtils.getNowDate());
             iUniTaskPlanMapper.updateById(entity);
             this.sendTaskControlResponse(taskPatrolledId, "200");
-            pushTaskStart(entity, taskPatrolledId);
+            pushTaskStart(entity, taskPatrolledId, immediateTask.planType == 5);
         } else {
             this.sendTaskControlResponse("", "500");
         }
@@ -151,7 +151,7 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
 //        iCenterToUavPlanMapper.insert(center);
 //    }
 
-    private void pushTaskStart(UniTaskPlanEntity entity, String taskPatrolledId) {
+    private void pushTaskStart(UniTaskPlanEntity entity, String taskPatrolledId, boolean euaTask) {
         List<BaseItem> items = new ArrayList<>();
         PatrolStatusItem item = new PatrolStatusItem();
         item.setTask_patrolled_id(taskPatrolledId);
@@ -164,7 +164,7 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
         item.setDescription("");
         item.setPlan_start_time(DateUtils.getNowDateTimeStr());
         items.add(item);
-        centerMsgPushHandler.pushPatrolStatusStart(items);
+        centerMsgPushHandler.pushPatrolStatusStart(items, euaTask);
     }
 
     private boolean isCqDockTaskEnabled() {
