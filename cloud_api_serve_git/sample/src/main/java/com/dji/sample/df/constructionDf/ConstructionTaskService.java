@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 /** Local originals and analysis journal belong to the existing job, never a second flight task. */
 @Service
 public class ConstructionTaskService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
     private final IWaylineJobMapper jobs;
     private final PubWaylineJobPlanDfMapper plans;
     private final IFileMapperDf media;
@@ -134,15 +135,18 @@ public class ConstructionTaskService {
         List<MediaFileEntity> entries = media(job);
         Map<String, Object> manifest = read(dir(job).resolve("media.json"));
         List<Map<String, Object>> photos = new ArrayList<>();
+        Map<String,Object> bindingSnapshot=overall==null?Map.of():overall.jobSnapshot(job.getWorkspaceId(),job.getJobId());
         for (MediaFileEntity file : entries) {
             Map<String, Object> photo = new LinkedHashMap<>();
             photo.put("file_id", file.getFileId()); photo.put("name", file.getFileName());
+            photo.putAll(ConstructionOverallService.matchPhoto(bindingSnapshot,file.getFileName()));
             photo.put("archived", manifest.containsKey(file.getFileId()) && Files.isRegularFile(original(job, file.getFileId())));
             photos.add(photo);
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("job_id", job.getJobId()); result.put("name", job.getName());
         result.put("plan_type", ConstructionType.PLAN_TYPE); result.put("photos", photos);
+        result.put("overall_route",bindingSnapshot);
         result.put("expected_count", job.getMediaCount()); result.put("received_count", entries.size());
         result.put("media_complete", complete(job, entries));
         result.put("analysis_configured", gateways.getIfAvailable() != null);

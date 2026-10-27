@@ -2,16 +2,16 @@
   <div class="area-map">
     <div class="dock-toolbar">
       <div><b>机巢位置</b><span>{{ docks?.length ? `${docks.length} 个机巢已有定位` : '等待机巢上报定位' }}</span></div>
-      <div class="dock-actions"><select v-model="selectedDock" aria-label="选择定位机巢" :disabled="!docks?.length"><option value="">全部机巢</option><option v-for="dock in docks" :key="dock.sn" :value="dock.sn">{{ dock.name }}</option></select><button :disabled="!docks?.length || !!mode" @click="locateDocks">定位机巢</button><button :disabled="docksLoading" @click="emit('refresh-docks')">{{ docksLoading ? '加载中' : '刷新' }}</button></div>
+      <div class="dock-actions"><select v-model="selectedDock" aria-label="选择定位机巢" :disabled="!docks?.length || disabled || coverageLocked || !!mode"><option value="">全部机巢</option><option v-for="dock in docks" :key="dock.sn" :value="dock.sn">{{ dock.name }}</option></select><button :disabled="!docks?.length || !!mode" @click="locateDocks">定位机巢</button><button :disabled="docksLoading" @click="emit('refresh-docks')">{{ docksLoading ? '加载中' : '刷新' }}</button></div>
     </div>
     <p v-if="dockError" class="dock-message">{{ dockError }}</p>
     <div v-if="selectedDock" class="coverage-toolbar">
       <b>{{ selectedDockName }}覆盖范围</b>
       <span v-if="coverageLoading">加载中…</span>
       <template v-else>
-        <label>半径 <input v-model.number="radiusDraft" type="number" min="100" max="5000" step="1" aria-label="机巢覆盖半径（米）" :disabled="coverageSaving || disabled || !!mode" @input="previewCoverage" /> 米</label>
-        <button v-for="value in [100, 2000, 5000]" :key="value" :disabled="coverageSaving || disabled || !!mode" @click="radiusDraft = value; previewCoverage()">{{ value === 100 ? value + 'm' : value / 1000 + 'km' }}</button>
-        <button :disabled="coverageSaving || disabled || !!mode || !validRadius" @click="saveCoverage">{{ coverageSaving ? '保存中…' : '保存范围' }}</button>
+        <label>半径 <input v-model.number="radiusDraft" type="number" min="100" max="5000" step="1" aria-label="机巢覆盖半径（米）" :disabled="coverageSaving || disabled || coverageLocked || !!mode" @input="previewCoverage" /> 米</label>
+        <button v-for="value in [100, 2000, 5000]" :key="value" :disabled="coverageSaving || disabled || coverageLocked || !!mode" @click="radiusDraft = value; previewCoverage()">{{ value === 100 ? value + 'm' : value / 1000 + 'km' }}</button>
+        <button :disabled="coverageSaving || disabled || coverageLocked || !!mode || !validRadius" @click="saveCoverage">{{ coverageSaving ? '保存中…' : '保存范围' }}</button>
         <button :disabled="!coverageOverlay || !!mode" @click="fitCoverage">查看全范围</button>
         <span>{{ savedRadius === null ? '尚未配置' : `已保存 ${savedRadius}m` }}{{ coveragePreview ? ' · 预览未保存' : '' }}（最大5km）</span>
       </template>
@@ -60,9 +60,12 @@ const props = defineProps<{
   dockError?: string
   docksLoading?: boolean
   activeDockSn?: string
+  independentCoverage?: boolean
+  coverageLocked?: boolean
+  selectedWaypoints?: number[]
   wayline?: ConstructionWayline | null
 }>()
-const emit = defineEmits(['select', 'update:boundary', 'drawing', 'refresh-docks'])
+const emit = defineEmits(['select', 'update:boundary', 'drawing', 'refresh-docks', 'coverage-change', 'select-waypoint'])
 const selectedDock = ref('')
 const selectedDockName = computed(() => props.docks?.find(d => d.sn === selectedDock.value)?.name || selectedDock.value)
 const coverageLoading = ref(false); const coverageSaving = ref(false); const coverageError = ref('')
@@ -121,6 +124,9 @@ async function saveCoverage () {
   } catch (error) { if (token === coverageEpoch) coverageError.value = error instanceof Error ? error.message : '覆盖范围保存失败' } finally { coverageSaving.value = false }
 }
 watch(selectedDock, loadCoverage)
+watch([selectedDock, savedRadius, coverageLoading, coverageError], () => {
+  emit('coverage-change', { sn: selectedDock.value, radius: savedRadius.value, loading: coverageLoading.value, error: coverageError.value })
+}, { immediate: true })
 
 const containerRef = ref<HTMLDivElement | null>(null)
 const mapError = ref('')
@@ -149,7 +155,7 @@ const dockMarkers = new Map<string, any>()
 let fittedDocks = false
 let resizeObserver: ResizeObserver | null = null
 let routeOverlays: any[] = []
-function renderWayline () {
+function renderWayline (fit = true) {
   if (!map) return
   routeOverlays.forEach(o => map.remove(o)); routeOverlays = []
   const points = props.wayline?.points || []
@@ -158,13 +164,17 @@ function renderWayline () {
   routeOverlays.push(line)
   points.forEach((p, i) => {
     const content = document.createElement('span'); content.className = 'route-point'; content.textContent = String(i + 1)
-    routeOverlays.push(new AMap.Marker({ position: wgs84togcj02(p.lng, p.lat), content, offset: new AMap.Pixel(-12, -12), zIndex: 160, title: `航点 ${i + 1} · ${p.height}m` }))
+    if (props.selectedWaypoints?.includes(i + 1)) { content.style.background = '#ff8759'; content.style.outline = '3px solid white' }
+    const marker = new AMap.Marker({ position: wgs84togcj02(p.lng, p.lat), content, offset: new AMap.Pixel(-12, -12), zIndex: 160, title: `航点 ${i + 1} · ${p.height}m` })
+    marker.on('click', () => { if (!props.disabled) emit('select-waypoint', i + 1) })
+    routeOverlays.push(marker)
   })
   map.add(routeOverlays)
   const activeDock = props.activeDockSn ? dockMarkers.get(props.activeDockSn) : null
-  map.setFitView([...routeOverlays, ...(draftPolygon ? [draftPolygon] : []), ...(activeDock ? [activeDock] : [])], false, [65, 65, 65, 65])
+  if (fit) map.setFitView([...routeOverlays, ...(draftPolygon ? [draftPolygon] : []), ...(activeDock ? [activeDock] : [])], false, [65, 65, 65, 65])
 }
-watch(() => props.wayline, renderWayline, { deep: true })
+watch(() => props.wayline, () => renderWayline(), { deep: true })
+watch(() => props.selectedWaypoints, () => renderWayline(false), { deep: true })
 
 function locateDocks () {
   if (!map || mode.value) return
@@ -183,10 +193,10 @@ function renderDocks () {
     const label = document.createElement('span'); label.className = 'dock-label'; label.textContent = dock.name
     content.append(icon, label)
     const marker = new AMap.Marker({ position: wgs84togcj02(dock.lng, dock.lat), content, offset: new AMap.Pixel(-18, -18), zIndex: 180, title: `${dock.name} · ${dock.sn}` })
-    marker.on('click', () => { if (mode.value || props.disabled) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
+    marker.on('click', () => { if (mode.value || props.disabled || props.coverageLocked) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
     map.add(marker); dockMarkers.set(dock.sn, marker)
   }
-  if (selectedDock.value && !dockMarkers.has(selectedDock.value)) selectedDock.value = ''
+  if (selectedDock.value && !dockMarkers.has(selectedDock.value) && !props.coverageLocked) selectedDock.value = ''
   renderCoverage()
   if (!fittedDocks && dockMarkers.size && !mode.value && !props.editable && !props.areas.length && !boundaryDraft.value.length) {
     locateDocks(); fittedDocks = true
@@ -420,7 +430,7 @@ watch(() => props.editable, value => {
 })
 watch([() => props.areas, () => props.selectedId], renderAreas, { deep: false })
 watch(() => props.docks, renderDocks, { deep: true })
-watch(() => props.activeDockSn, value => { if (value) selectedDock.value = value; renderDocks() })
+watch(() => props.activeDockSn, value => { if (value && !props.independentCoverage) selectedDock.value = value; renderDocks() })
 
 onMounted(() => {
   if (typeof AMap === 'undefined') {

@@ -1,5 +1,14 @@
 import type { ConstructionPoint } from '/@/api/construction'
 
+export function pointsWithinCoverage (center: ConstructionPoint, radius: number, points: ConstructionPoint[]): boolean {
+  if (!Number.isInteger(radius) || radius < 100 || radius > 5000 || !points.length) return false
+  const rad = Math.PI / 180
+  return points.every(p => {
+    const h = Math.sin((p.lat - center.lat) * rad / 2) ** 2 + Math.cos(center.lat * rad) * Math.cos(p.lat * rad) * Math.sin((p.lng - center.lng) * rad / 2) ** 2
+    return Number.isFinite(h) && 2 * 6371008.8 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h)))) <= radius + 0.01
+  })
+}
+
 // Local azimuthal equidistant projection: distances from the dock remain in metres.
 export function areaCoverage (center: ConstructionPoint, radius: number, boundary: ConstructionPoint[]): 'full' | 'partial' | null {
   if (!Number.isFinite(radius) || radius < 100 || radius > 5000 || boundary.length < 3) return null

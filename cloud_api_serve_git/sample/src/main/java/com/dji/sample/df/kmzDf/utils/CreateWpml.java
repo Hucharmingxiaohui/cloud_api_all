@@ -302,7 +302,7 @@ public class CreateWpml {
                                 actionActuatorFuncParamElement.addElement("wpml:orientedFilePath").addText(actionUUID.toString());
                                 actionActuatorFuncParamElement.addElement("wpml:orientedFileMD5");
                                 actionActuatorFuncParamElement.addElement("wpml:orientedFileSize").addText("0");
-                                actionActuatorFuncParamElement.addElement("wpml:fileSuffix").addText(orientedShoot.getOrientedFileSuffix()+i+1);
+                                actionActuatorFuncParamElement.addElement("wpml:fileSuffix").addText(orientedShoot.getOrientedFileSuffix()+(i+1));
                                 actionActuatorFuncParamElement.addElement("wpml:orientedPhotoMode").addText(orientedShoot.getOrientedPhotoMode());
                             }
                             //全景拍照

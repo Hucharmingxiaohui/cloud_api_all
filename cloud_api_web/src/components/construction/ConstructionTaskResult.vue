@@ -7,7 +7,8 @@
       <el-tabs v-model="tab"><el-tab-pane label="本地照片" name="photos" /><el-tab-pane label="分析与结果" name="analysis" /><el-tab-pane label="巡检报告" name="report" /></el-tabs>
       <div v-if="tab === 'photos'" class="panel">
         <div class="table-tools"><span>原图保留在本部署端，分析批次继续关联本条飞行任务。</span><el-button :disabled="busy || !detail.photos.length" @click="archive">保存 / 补齐本地原图</el-button></div>
-        <el-table :data="detail.photos" empty-text="尚未接收到照片"><el-table-column prop="name" label="照片名称" /><el-table-column label="本地状态"><template #default="{ row }">{{ row.archived ? '已归档' : '待归档' }}</template></el-table-column><el-table-column label="操作"><template #default="{ row }"><el-button link :disabled="!row.archived || busy" @click="preview(row)">查看原图</el-button></template></el-table-column></el-table>
+        <div v-if="detail.overall_route?.overall_id" class="table-tools"><span>按本次执行的区域绑定快照归类</span><el-select v-model="photoArea"><el-option value="" :label="'全部照片（' + detail.photos.length + '）'" /><el-option v-for="area in detail.overall_route.bindings" :key="area.area_id" :value="area.area_id" :label="area.area_name + '（' + detail.photos.filter(p => p.area_id === area.area_id).length + '）'" /><el-option value="__unmatched" :label="'未匹配 / 未绑定（' + detail.photos.filter(p => !p.area_id).length + '）'" /></el-select></div>
+        <el-table :data="visiblePhotos" empty-text="当前分类暂无照片"><el-table-column prop="name" label="照片名称" /><el-table-column v-if="detail.overall_route?.overall_id" label="巡检区域 / 航点"><template #default="{ row }">{{ row.area_name || row.association_message || '未匹配' }}{{ row.waypoint_index ? ' · 航点' + row.waypoint_index : '' }}</template></el-table-column><el-table-column label="本地状态"><template #default="{ row }">{{ row.archived ? '已归档' : '待归档' }}</template></el-table-column><el-table-column label="操作"><template #default="{ row }"><el-button link :disabled="!row.archived || busy" @click="preview(row)">查看原图</el-button></template></el-table-column></el-table>
       </div>
       <div v-else-if="tab === 'analysis'" class="panel">
         <h3>回站手动分析</h3><p>回到站内连接网线后，先检查分析主机，再手动提交。连接主机和刷新结果不会启动新的分析。</p>
@@ -38,6 +39,8 @@ import type { ConstructionResult } from '/@/api/construction'
 const props = defineProps<{ jobId: string }>()
 const router = useRouter(); const tab = ref('photos'); const busy = ref(false); const error = ref('')
 const detail = ref<ConstructionResult | null>(null); const connected = ref<boolean | null>(null)
+const photoArea = ref('')
+const visiblePhotos = computed(() => (detail.value?.photos || []).filter(p => !photoArea.value || (photoArea.value === '__unmatched' ? !p.area_id : p.area_id === photoArea.value)))
 const photoUrl = ref(''); const photoName = ref(''); const photoVisible = ref(false)
 let requestId = uuidv4(); let disposed = false
 const labels: Record<string, string> = { SUBMITTING: '提交结果待确认', UNKNOWN: '提交结果待确认', QUEUED: '排队中', RUNNING: '分析中', SUCCEEDED: '分析完成', FAILED: '分析失败' }

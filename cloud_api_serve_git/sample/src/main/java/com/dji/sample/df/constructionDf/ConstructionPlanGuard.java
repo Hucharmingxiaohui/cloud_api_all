@@ -13,6 +13,7 @@ import java.util.*;
 /** Validation shared by the construction endpoint and the legacy dispatch path. */
 @Service
 public class ConstructionPlanGuard {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
     private final ThreadLocal<String> dispatchPlan = new ThreadLocal<>();
     private final JdbcTemplate db;
     private final PubWaylineJobPlanDfMapper plans;
@@ -50,7 +51,13 @@ public class ConstructionPlanGuard {
     public void validate(PubWaylineJobPlanDfEntity p,boolean readFile) {
         Map<String,Object> link=relation(p.getWorkspaceId(),p.getPlanId());
         if(((Number)link.get("archived")).intValue()!=0) throw new RuleException(400,"计划已归档");
-        Map<String,Object> snapshot=route(p.getWorkspaceId(),(String)link.get("area_id"),p.getFileId(),((Number)link.get("area_version")).intValue(),readFile);
+        Map<String,Object> frozen=overall==null?Map.of():overall.decode(link.get("snapshot_json"));
+        Map<String,Object> snapshot;
+        if(frozen.get("overall_route") instanceof Map) {
+            Map<String,Object> r=(Map<String,Object>)frozen.get("overall_route");
+            if(!Objects.equals(p.getFileId(),r.get("wayline_id"))||!Objects.equals(p.getDockSn(),r.get("dock_sn"))) throw new RuleException(409,"总体计划航线或机巢与绑定快照不一致");
+            overall.validate(p.getWorkspaceId(),r,readFile);snapshot=frozen;
+        } else snapshot=route(p.getWorkspaceId(),(String)link.get("area_id"),p.getFileId(),((Number)link.get("area_version")).intValue(),readFile);
         if(!Objects.equals(link.get("file_sign"),snapshot.get("file_sign"))) throw new RuleException(409,"航线文件已变化，请重新创建计划");
         dock(p.getWorkspaceId(),p.getDockSn());
         if(Objects.equals(p.getTaskType(),1)&&(p.getBeginTime()==null||p.getBeginTime()<=System.currentTimeMillis())) throw new RuleException(400,"计划执行时间已过，请重新创建计划");

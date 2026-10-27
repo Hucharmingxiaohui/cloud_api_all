@@ -5,6 +5,9 @@ const exported = {}
 const source = fs.readFileSync('src/components/construction/dockCoverageGeometry.ts', 'utf8')
 require('node:vm').runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { exports: exported })
 const center = { lng: 120, lat: 36 }
+assert.equal(exported.pointsWithinCoverage(center, 2000, [center, { lng: 120.001, lat: 36 }]), true, 'two-point overall route')
+assert.equal(exported.pointsWithinCoverage(center, 100, [center, { lng: 120.01, lat: 36 }]), false, 'outside endpoint')
+assert.equal(exported.pointsWithinCoverage(center, 2000, [{ lng: NaN, lat: 36 }]), false)
 for (const radius of [100, 2000, 5000]) {
   const points = exported.coverageBoundary(center, radius)
   assert.equal(points.length, 96)

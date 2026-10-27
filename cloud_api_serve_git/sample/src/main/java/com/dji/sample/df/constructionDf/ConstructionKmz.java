@@ -14,6 +14,8 @@ public final class ConstructionKmz {
     public static final int LIMIT=20*1024*1024;
     public final List<Point> points=new ArrayList<>();
     public final List<Map<String,Object>> preview=new ArrayList<>();
+    public final Map<Integer,List<String>> photoSuffixes=new LinkedHashMap<>();
+    public boolean pointPhotoOnly=true;
     public String heightMode;
     public int drone,droneSub,payload,payloadSub;
     private static RuleException bad(String text) { return new RuleException(400,text); }
@@ -98,6 +100,17 @@ public final class ConstructionKmz {
                 if(speed<=0||speed>15) throw bad("航点速度应大于0且不超过15m/s");
                 result.points.add(new Point(lng,lat));
                 result.preview.add(Map.of("lng",lng,"lat",lat,"height",height));
+                List<String> suffixes=new ArrayList<>();
+                for(Element group:children(p,"actionGroup")) {
+                    boolean single="reachPoint".equals(text(one(group,"actionTrigger"),"actionTriggerType"))&&Integer.parseInt(text(group,"actionGroupStartIndex"))==i&&Integer.parseInt(text(group,"actionGroupEndIndex"))==i;
+                    for(Element action:children(group,"action")) {
+                        if(!Set.of("takePhoto","orientedShoot").contains(text(action,"actionActuatorFunc"))) continue;
+                        if(!single) {result.pointPhotoOnly=false;continue;}
+                        List<Element> names=children(one(action,"actionActuatorFuncParam"),"fileSuffix");
+                        if(names.size()==1&&!names.get(0).getTextContent().trim().isEmpty()) suffixes.add(names.get(0).getTextContent().trim());
+                    }
+                }
+                result.photoSuffixes.put(i+1,suffixes);
             }
             return result;
         } catch(RuleException e) { throw e; } catch(Exception e) { throw bad("KMZ 结构或参数无效："+e.getClass().getSimpleName()); }

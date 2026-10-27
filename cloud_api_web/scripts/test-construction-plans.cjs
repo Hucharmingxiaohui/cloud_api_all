@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const { parse, compileScript, compileTemplate } = require('@vue/compiler-sfc')
-for (const name of ['ConstructionPlans', 'ConstructionPlanForm', 'ConstructionAreaMap']) {
+for (const name of ['ConstructionPlans', 'ConstructionPlanForm', 'ConstructionAreaMap', 'ConstructionOverallRoutes', 'ConstructionTaskResult']) {
   const filename = `src/components/construction/${name}.vue`
   const { descriptor, errors } = parse(fs.readFileSync(filename, 'utf8'), { filename })
   assert.deepEqual(errors, [])

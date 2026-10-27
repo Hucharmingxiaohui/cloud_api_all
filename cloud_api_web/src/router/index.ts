@@ -283,6 +283,7 @@ const routes: Array<RouteRecordRaw> = [
           // 子菜单 - 普通点位计划
           { path: '/taskManage/construction', redirect: '/taskManage/construction/plans', meta: { showInMenu: false } },
           { path: '/taskManage/construction/areas', redirect: '/variableMgt/constructionAreas', meta: { showInMenu: false } },
+          { path: '/taskManage/construction/overall', name: 'constructionOverallRoutes', component: () => import('/@/components/construction/ConstructionOverallRoutes.vue'), meta: { showInMenu: false, cache: false } },
           { path: '/taskManage/construction/tasks', redirect: to => ({ path: '/task/taskResult', query: { demo_task: typeof to.query.task === 'string' ? to.query.task : 'select' } }), meta: { showInMenu: false } },
           {
             path: '/taskManage/construction/plans',

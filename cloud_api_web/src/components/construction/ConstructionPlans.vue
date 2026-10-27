@@ -1,30 +1,32 @@
 <template>
   <main class="construction-plans">
-    <header><div><h2>工地巡检计划</h2><p>按巡检区域管理计划，查看航线与机巢位置。</p></div><div class="actions"><el-button @click="router.push('/task/TaskPanel')">飞行任务</el-button><el-button :disabled="busy" @click="refresh">刷新</el-button></div></header>
+    <header><div><h2>工地巡检计划</h2><p>选择机巢，仅查看其完全覆盖区域的巡检计划。</p></div><div class="actions"><el-button :disabled="busy" @click="router.push('/taskManage/construction/overall')">总体航线与计划</el-button><el-button @click="router.push('/task/TaskPanel')">飞行任务</el-button><el-button :disabled="busy" @click="refresh">刷新</el-button></div></header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="plans-layout">
       <aside class="region-panel">
         <h3>巡检区域 <small>{{ filteredAreas.length }} 个</small></h3>
         <el-input v-model="areaKeyword" placeholder="搜索巡检区域" clearable />
         <el-checkbox v-model="showArchivedAreas" @change="refresh">显示已归档区域</el-checkbox>
-        <p v-if="loading">加载中…</p><p v-else-if="!filteredAreas.length">暂无匹配区域</p>
+        <p v-if="loading">加载中…</p><p v-else-if="coverageHint">{{ coverageHint }}</p><p v-else-if="!filteredAreas.length">当前机巢没有完全覆盖的匹配区域</p>
+        <small v-if="coverage.sn">当前机巢：{{ deviceName(coverage.sn) }} · 按已保存范围筛选完全覆盖区域</small>
         <div class="region-scroll"><button v-for="area in filteredAreas" :key="area.id" class="plan-area-card" :class="{ selected: selectedId === area.id }" :disabled="busy || formVisible" @click="selectArea(area.id)"><strong>{{ area.name }}</strong><span>{{ area.category }} · v{{ area.version }}</span><span>{{ area.archived ? '已归档' : area.enabled ? '启用' : '暂停' }}</span></button></div>
         <el-button @click="manageArea">施工区域管理</el-button>
       </aside>
       <section class="plans-content">
-        <div class="plan-map"><ConstructionAreaMap :areas="mapAreas" :selected-id="selectedId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="activeDock" :wayline="preview" @select="selectArea" @refresh-docks="refreshDocks" /></div>
+        <div class="plan-map"><ConstructionAreaMap :areas="mapAreas" :selected-id="selectedId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="activeDock" :independent-coverage="true" :wayline="preview" @coverage-change="coverage = $event" @select="selectArea" @refresh-docks="refreshDocks" /></div>
         <section class="plan-list">
           <div class="list-heading"><div><h3>{{ selectedArea ? selectedArea.name + ' · 巡检计划' : '请选择巡检区域' }}</h3><p v-if="activeDock">执行机巢：{{ deviceName(activeDock) }}{{ docks.some(d => d.sn === activeDock) ? '' : '（暂无定位）' }}</p></div><el-button type="primary" :disabled="!canCreate || busy || plansLoading" @click="openCreate">＋ 新建计划</el-button></div>
           <div class="actions plan-filters"><el-input v-model="planKeyword" placeholder="搜索计划名称" clearable @input="page = 1" /><el-checkbox v-model="showArchivedPlans" :disabled="busy" @change="loadPlans">显示已归档计划</el-checkbox><el-button size="small" :disabled="!selectedArea" @click="manageArea">管理区域航线</el-button></div>
           <p v-if="plansError" class="error" role="alert">{{ plansError }}</p>
           <el-table :data="pagedPlans" v-loading="plansLoading" height="100%" highlight-current-row row-key="plan_id" :current-row-key="selectedPlanId" @row-click="selectPlan">
             <el-table-column prop="name" label="计划名称" min-width="155" />
+            <el-table-column label="巡检范围" min-width="125"><template #default="{ row }">{{ row.overall_id ? '总体 · ' + row.bindings.length + '个区域' : '当前区域' }}</template></el-table-column>
             <el-table-column label="巡检航线" min-width="145"><template #default="{ row }">{{ routeName(row.file_id) }}</template></el-table-column>
             <el-table-column label="执行机巢" min-width="130"><template #default="{ row }">{{ deviceName(row.dock_sn) }}</template></el-table-column>
             <el-table-column label="执行方式" min-width="160"><template #default="{ row }">{{ row.task_type === 1 ? '定时 · ' + formatTime(row.begin_time) : '立即任务' }}</template></el-table-column>
             <el-table-column label="状态" min-width="210"><template #default="{ row }"><span :class="{ error: row.status !== 'READY' }">{{ row.message }}</span><small v-if="row.last_dispatch">最近下发：{{ dispatchLabel(row.last_dispatch.status) }}</small></template></el-table-column>
             <el-table-column label="操作" width="210" fixed="right"><template #default="{ row }"><el-button link type="primary" :disabled="busy || row.status !== 'READY'" @click.stop="dispatch(row)">下发任务</el-button><el-button v-if="['SUBMITTING', 'UNKNOWN'].includes(row.last_dispatch?.status)" link :disabled="busy" @click.stop="reconcile(row)">查询下发</el-button><el-button link :disabled="busy || !!row.archived" @click.stop="archive(row)">归档</el-button></template></el-table-column>
-            <template #empty>{{ selectedArea ? '当前区域暂无匹配计划，可点击新建计划' : '请从左侧或地图选择区域' }}</template>
+            <template #empty>{{ coverageHint || (selectedCovered ? '当前区域暂无匹配计划，可点击新建计划' : '请选择当前机巢完全覆盖的巡检区域') }}</template>
           </el-table>
           <el-pagination v-model:current-page="page" :page-size="10" :total="filteredPlans.length" layout="total, prev, pager, next" />
         </section>
@@ -34,12 +36,13 @@
   </main>
 </template>
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConstructionAreaMap from './ConstructionAreaMap.vue'
 import ConstructionPlanForm from './ConstructionPlanForm.vue'
 import { useConstructionDocks } from './useConstructionDocks'
+import { areaCoverage } from './dockCoverageGeometry'
 import { archiveConstructionPlan, dispatchConstructionPlan, getConstructionWayline, listConstructionAreas, listConstructionPlans, listConstructionWaylines, refreshConstructionDispatch } from '/@/api/construction'
 import type { ConstructionAreaRecord, ConstructionPlan, ConstructionWayline } from '/@/api/construction'
 import { uuidv4 } from '/@/utils/uuid'
@@ -52,12 +55,28 @@ const plans = ref<ConstructionPlan[]>([]); const routes = ref<ConstructionWaylin
 let epoch = 0; let areaEpoch = 0; let previewEpoch = 0
 const dispatchRequests = new Map<string, string>()
 const selectedPlanId = ref('')
+const coverage = ref<{ sn: string; radius: number | null; loading: boolean; error: string }>({ sn: '', radius: null, loading: false, error: '' })
+const coverageDock = computed(() => docks.value.find(d => d.sn === coverage.value.sn))
+const coverageHint = computed(() => {
+  if (!coverage.value.sn) return '请在地图上选择机巢，查看其完全覆盖区域的计划'
+  if (coverage.value.loading) return '正在读取机巢覆盖范围…'
+  if (coverage.value.error) return coverage.value.error
+  if (!coverageDock.value) return '当前机巢暂无有效定位'
+  if (coverage.value.radius === null) return '请先为当前机巢配置并保存覆盖范围'
+  return ''
+})
+const coveredAreas = computed(() => coverageHint.value ? [] : areas.value.filter(a => areaCoverage(coverageDock.value!, coverage.value.radius!, a.boundary || []) === 'full'))
 const selectedArea = computed(() => areas.value.find(a => a.id === selectedId.value))
-const filteredAreas = computed(() => areas.value.filter(a => a.name.includes(areaKeyword.value.trim())))
-const mapAreas = computed(() => filteredAreas.value.map(a => ({ ...a, boundary: a.boundary || [] })))
-const canCreate = computed(() => selectedArea.value?.enabled && !selectedArea.value.archived)
-const filteredPlans = computed(() => plans.value.filter(p => p.name.includes(planKeyword.value.trim())))
+const filteredAreas = computed(() => coveredAreas.value.filter(a => a.name.includes(areaKeyword.value.trim())))
+const mapAreas = computed(() => areas.value.map(a => ({ ...a, boundary: a.boundary || [] })))
+const selectedCovered = computed(() => coveredAreas.value.some(a => a.id === selectedId.value))
+const canCreate = computed(() => selectedCovered.value && selectedArea.value?.enabled && !selectedArea.value.archived)
+const filteredPlans = computed(() => selectedCovered.value ? plans.value.filter(p => p.name.includes(planKeyword.value.trim()) && (!p.bindings || p.bindings.every(b => coveredAreas.value.some(a => a.id === b.area_id)))) : [])
 const pagedPlans = computed(() => filteredPlans.value.slice((page.value - 1) * 10, page.value * 10))
+watch([() => filteredAreas.value.map(a => a.id).join(','), busy, formVisible], () => {
+  if (busy.value || formVisible.value) return
+  if (!filteredAreas.value.some(a => a.id === selectedId.value)) selectArea(filteredAreas.value[0]?.id || '')
+})
 function deviceName (sn: string) { const d = devices.value.find(d => d.device_sn === sn); return d?.nickname || d?.device_name || sn }
 function routeName (id: string) { return routes.value.find(r => r.wayline_id === id)?.name || id }
 function formatTime (value: number) { return new Date(value).toLocaleString('zh-CN', { hour12: false }) }
@@ -71,19 +90,20 @@ async function refresh () {
     const data = await listConstructionAreas({ archived: showArchivedAreas.value })
     if (token !== areaEpoch) return
     areas.value = data
-    if (!data.some(a => a.id === selectedId.value)) { selectedPlanId.value = ''; selectedId.value = data[0]?.id || '' }
+    if (!filteredAreas.value.some(a => a.id === selectedId.value)) { selectedPlanId.value = ''; selectedId.value = filteredAreas.value[0]?.id || '' }
     await loadPlans()
   } catch (e) { if (token === areaEpoch) error.value = message(e) } finally { if (token === areaEpoch) loading.value = false }
   refreshDocks()
 }
 async function selectArea (id: string) {
   if (busy.value || formVisible.value || id === selectedId.value) return
+  if (id && !coveredAreas.value.some(a => a.id === id)) { ElMessage.info('该区域未被当前机巢完全覆盖'); return }
   selectedPlanId.value = ''; selectedId.value = id; planKeyword.value = ''; await router.replace({ query: { ...route.query, area: id } }); await loadPlans()
 }
 async function loadPlans () {
   const token = ++epoch; const area = selectedId.value
   plans.value = []; routes.value = []; page.value = 1; clearPreview(); plansError.value = ''
-  if (!area) { plansLoading.value = false; return }
+  if (!area || !selectedCovered.value) { plansLoading.value = false; return }
   plansLoading.value = true
   const results = await Promise.allSettled([listConstructionPlans(area, showArchivedPlans.value), listConstructionWaylines(area)])
   if (token !== epoch) return
@@ -93,21 +113,25 @@ async function loadPlans () {
   else plansError.value += (plansError.value ? '；' : '') + message(results[1].reason)
   plansLoading.value = false
   const selected = plans.value.find(p => p.plan_id === selectedPlanId.value)
-  if (selected) { activeDock.value = selected.dock_sn; await previewRoute(selected.file_id) } else selectedPlanId.value = ''
+  if (selected) { activeDock.value = selected.dock_sn; await previewPlan(selected) } else selectedPlanId.value = ''
 }
 async function previewRoute (id: string) {
   const token = ++previewEpoch; const area = selectedId.value; preview.value = null
   try { const data = await getConstructionWayline(area, id); if (token !== previewEpoch) return; if (data.status !== 'VALID') throw new Error(data.message); preview.value = data } catch (e) { if (token === previewEpoch) ElMessage.warning(message(e)) }
 }
-function selectPlan (plan: ConstructionPlan) { if (busy.value || formVisible.value) return; selectedPlanId.value = plan.plan_id; activeDock.value = plan.dock_sn; previewRoute(plan.file_id) }
+async function previewPlan (plan: ConstructionPlan) {
+  if (plan.overall_route) { previewEpoch++; preview.value = { ...plan.overall_route, status: plan.status === 'READY' ? 'VALID' : 'STALE', source: 'overall', area_version: 0, message: plan.message }; return }
+  await previewRoute(plan.file_id)
+}
+function selectPlan (plan: ConstructionPlan) { if (busy.value || formVisible.value) return; selectedPlanId.value = plan.plan_id; activeDock.value = plan.dock_sn; previewPlan(plan) }
 function manageArea () { router.push({ path: '/variableMgt/constructionAreas', query: selectedId.value ? { area: selectedId.value } : {} }) }
 function openCreate () { if (!routes.value.some(r => r.status === 'VALID')) { ElMessage.warning('本区域没有有效航线，请先管理区域航线'); return } if (!devices.value.length) { ElMessage.warning('尚未加载到可选机巢，请刷新机巢列表'); return } clearPreview(); formVisible.value = true }
 function closeForm () { formVisible.value = false; clearPreview() }
 async function created (plan: ConstructionPlan) { closeForm(); ElMessage.success('计划已保存，可在列表下发'); await loadPlans(); selectPlan(plan) }
 async function dispatch (plan: ConstructionPlan) {
-  if (busy.value) return
+  if (busy.value || !selectedCovered.value) return
   busy.value = true
-  try { await ElMessageBox.confirm(`下发“${plan.name}”？执行机巢：${deviceName(plan.dock_sn)}${plan.task_type === 1 ? '，定时：' + formatTime(plan.begin_time) : '，立即执行'}。`, '下发任务', { confirmButtonText: '确认下发', cancelButtonText: '取消' }) } catch { busy.value = false; return }
+  try { await ElMessageBox.confirm(`下发“${plan.name}”？${plan.overall_id ? '将执行整条总体航线，巡检' + plan.bindings?.length + '个区域。' : ''}执行机巢：${deviceName(plan.dock_sn)}${plan.task_type === 1 ? '，定时：' + formatTime(plan.begin_time) : '，立即执行'}。`, '下发任务', { confirmButtonText: '确认下发', cancelButtonText: '取消' }) } catch { busy.value = false; return }
   if (!dispatchRequests.has(plan.plan_id)) dispatchRequests.set(plan.plan_id, uuidv4())
   try {
     const result = await dispatchConstructionPlan(plan.plan_id, dispatchRequests.get(plan.plan_id)!)

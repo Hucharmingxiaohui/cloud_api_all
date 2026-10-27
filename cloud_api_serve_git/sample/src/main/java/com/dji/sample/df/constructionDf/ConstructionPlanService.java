@@ -18,6 +18,7 @@ import java.util.*;
 
 @Service
 public class ConstructionPlanService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
     private final JdbcTemplate db; private final PubWaylineJobPlanDfMapper plans;
     private final ConstructionAreaService areas; private final ConstructionPlanGuard guard;
     private final PubWaylineJobPlanDfService execution; private final TransactionTemplate tx;
@@ -37,12 +38,27 @@ public class ConstructionPlanService {
     private String request(Map<String,Object> body) { String id=text(body,"request_id",64);if(!id.matches("[a-zA-Z0-9-]{16,64}")) throw new RuleException(400,"请求标识无效");return id; }
     @Transactional(rollbackFor=Exception.class)
     public Map<String,Object> create(CustomClaim user,String area,Map<String,Object> body) {
+        return createInternal(user,area,body,null);
+    }
+    @Transactional(rollbackFor=Exception.class)
+    @SuppressWarnings("unchecked")
+    public Map<String,Object> createOverall(CustomClaim user,String id,Map<String,Object> body) {
+        String w=user.getWorkspaceId();
+        db.queryForList("SELECT id FROM construction_overall_route WHERE workspace_id=? AND id=? FOR UPDATE",w,id);
+        Map<String,Object> route=overall.stored(w,id);
+        if(number(body,"expected_version",1,Integer.MAX_VALUE)!=((Number)route.get("version")).intValue()) throw new RuleException(409,"绑定版本已改变，请刷新");
+        overall.validate(w,route,true);
+        if(!Objects.equals(route.get("wayline_id"),body.get("file_id"))||!Objects.equals(route.get("dock_sn"),body.get("dock_sn"))) throw new RuleException(400,"总体计划必须使用绑定的航线和机巢");
+        return createInternal(user,(String)((List<Map<String,Object>>)route.get("bindings")).get(0).get("area_id"),body,route);
+    }
+    @SuppressWarnings("unchecked")
+    private Map<String,Object> createInternal(CustomClaim user,String area,Map<String,Object> body,Map<String,Object> overallRoute) {
         String w=user.getWorkspaceId();
         if(db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,area).isEmpty()) throw new RuleException(404,"区域不存在");
         String req=request(body);String digest=DigestUtils.md5DigestAsHex(encode(List.of(area,new TreeMap<>(body))).getBytes(StandardCharsets.UTF_8));
         List<Map<String,Object>> previous=db.queryForList("SELECT * FROM construction_plan WHERE workspace_id=? AND request_id=?",w,req);
         if(!previous.isEmpty()) { if(!digest.equals(previous.get(0).get("request_hash"))) throw new RuleException(409,"此请求已用于另一份计划");return detail(w,(String)previous.get(0).get("plan_id")); }
-        int version=number(body,"expected_version",1,Integer.MAX_VALUE);
+        int version=overallRoute==null?number(body,"expected_version",1,Integer.MAX_VALUE):((Number)((List<Map<String,Object>>)overallRoute.get("bindings")).get(0).get("area_version")).intValue();
         String file=text(body,"file_id",64),dock=text(body,"dock_sn",64),name=text(body,"name",50);
         int type=number(body,"task_type",0,1),rth=number(body,"rth_altitude",30,1500),action=number(body,"out_of_control",0,2);
         long begin=System.currentTimeMillis();
@@ -50,7 +66,7 @@ public class ConstructionPlanService {
             Object raw=body.get("begin_time");if(!(raw instanceof Number)) throw new RuleException(400,"请选择定时执行时间");
             begin=((Number)raw).longValue();if(begin<=System.currentTimeMillis()+30000) throw new RuleException(400,"执行时间须至少晚于当前时间30秒");
         }
-        guard.dock(w,dock);Map<String,Object> snapshot=guard.route(w,area,file,version,true);
+        guard.dock(w,dock);Map<String,Object> snapshot=overallRoute==null?guard.route(w,area,file,version,true):Map.of("overall_route",overallRoute,"file_sign",overallRoute.get("file_sign"));
         PubWaylineJobPlanDfEntity p=new PubWaylineJobPlanDfEntity();
         p.setPlanId(UUID.randomUUID().toString());p.setWorkspaceId(w);p.setUsername(user.getUsername());p.setPlanSource("系统创建");
         p.setName(name);p.setFileId(file);p.setDockSn(dock);p.setTaskType(type);p.setWaylineType(0);p.setPlanType(ConstructionType.PLAN_TYPE);
@@ -58,11 +74,17 @@ public class ConstructionPlanService {
         p.setCreateTime(System.currentTimeMillis());p.setUpdateTime(p.getCreateTime());
         if(plans.insert(p)!=1) throw new RuleException(500,"计划保存失败");
         db.update("INSERT INTO construction_plan (plan_id,workspace_id,area_id,area_version,file_sign,snapshot_json,request_id,request_hash) VALUES (?,?,?,?,?,?,?,?)",p.getPlanId(),w,area,version,snapshot.get("file_sign"),encode(snapshot),req,digest);
+        if(overallRoute!=null) for(Map<String,Object> b:(List<Map<String,Object>>)overallRoute.get("bindings")) db.update("INSERT INTO construction_overall_plan_area (workspace_id,plan_id,overall_id,area_id) VALUES (?,?,?,?)",w,p.getPlanId(),overallRoute.get("overall_id"),b.get("area_id"));
         return detail(w,p.getPlanId());
+    }
+    public List<Map<String,Object>> listOverall(String w,String id,boolean archived) {
+        overall.stored(w,id);
+        List<Map<String,Object>> rows=db.queryForList("SELECT p.*,c.area_id,c.area_version,c.archived FROM pub_wayline_job_plan_df p JOIN construction_plan c ON c.plan_id=p.plan_id AND c.workspace_id=p.workspace_id WHERE c.workspace_id=? AND p.plan_type=6 AND (?=1 OR c.archived=0) AND EXISTS (SELECT 1 FROM construction_overall_plan_area a WHERE a.workspace_id=c.workspace_id AND a.plan_id=c.plan_id AND a.overall_id=?) ORDER BY p.id DESC",w,archived?1:0,id);
+        for(Map<String,Object> row:rows) decorate(w,row);return rows;
     }
     public List<Map<String,Object>> list(String w,String area,boolean archived) {
         areas.detail(w,area);
-        List<Map<String,Object>> rows=db.queryForList("SELECT p.*,c.area_id,c.area_version,c.archived FROM pub_wayline_job_plan_df p JOIN construction_plan c ON c.plan_id=p.plan_id AND c.workspace_id=p.workspace_id WHERE c.workspace_id=? AND c.area_id=? AND p.plan_type=6 AND (?=1 OR c.archived=0) ORDER BY p.id DESC",w,area,archived?1:0);
+        List<Map<String,Object>> rows=db.queryForList("SELECT p.*,c.area_id,c.area_version,c.archived FROM pub_wayline_job_plan_df p JOIN construction_plan c ON c.plan_id=p.plan_id AND c.workspace_id=p.workspace_id WHERE c.workspace_id=? AND (c.area_id=? OR EXISTS (SELECT 1 FROM construction_overall_plan_area a WHERE a.workspace_id=c.workspace_id AND a.plan_id=c.plan_id AND a.area_id=?)) AND p.plan_type=6 AND (?=1 OR c.archived=0) ORDER BY p.id DESC",w,area,area,archived?1:0);
         for(Map<String,Object> row:rows) decorate(w,row);return rows;
     }
     public Map<String,Object> detail(String w,String id) {
@@ -72,6 +94,10 @@ public class ConstructionPlanService {
     }
     private void decorate(String w,Map<String,Object> row) {
         String id=(String)row.get("plan_id");row.put("status","READY");row.put("message","可下发");
+        if(overall!=null) {
+            Object snapshot=overall.decode(guard.relation(w,id).get("snapshot_json")).get("overall_route");
+            if(snapshot instanceof Map) {row.put("overall_route",snapshot);row.put("overall_id",((Map<?,?>)snapshot).get("overall_id"));row.put("bindings",((Map<?,?>)snapshot).get("bindings"));}
+        }
         try { guard.validate(guard.require(w,id),false); } catch(RuleException e) { row.put("status","BLOCKED");row.put("message",e.getMessage()); }
         List<Map<String,Object>> last=db.queryForList("SELECT status,job_id,message,created_at FROM construction_plan_dispatch WHERE workspace_id=? AND plan_id=? ORDER BY dispatch_order DESC LIMIT 1",w,id);
         if(!last.isEmpty()) { row.put("last_dispatch",last.get(0));String state=(String)last.get(0).get("status");if(List.of("SUBMITTING","UNKNOWN").contains(state)) {row.put("status","BLOCKED");row.put("message","下发结果待确认，请先在飞行任务列表核查，勿重复下发");} }

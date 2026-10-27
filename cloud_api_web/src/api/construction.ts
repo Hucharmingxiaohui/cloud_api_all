@@ -1,5 +1,13 @@
 import request from './http/request'
 
+export interface ConstructionPoint { lng: number; lat: number }
+export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[] }
+export interface ConstructionOverallRoute {
+  overall_id: string; version: number; wayline_id: string; name: string; dock_sn: string; file_sign: string
+  points: Array<ConstructionPoint & { height: number; index: number; photo_suffixes: string[] }>
+  height_mode: string; bindings: ConstructionOverallBinding[]; status?: string; message?: string
+}
+
 export interface DockCoverage { dock_sn: string; radius_m: number | null }
 export async function getDockCoverage (sn: string) {
   return unwrapArea<DockCoverage>(await request.get(`/api/construction/docks/${encodeURIComponent(sn)}/coverage`), '覆盖范围加载失败')
@@ -23,7 +31,8 @@ export interface ConstructionResult {
   media_complete: boolean
   analysis_configured: boolean
   analysis: ConstructionAnalysis
-  photos: Array<{ file_id: string; name: string; archived: boolean }>
+  overall_route?: Partial<ConstructionOverallRoute>
+  photos: Array<{ file_id: string; name: string; archived: boolean; association?: string; association_message?: string; waypoint_index?: number; area_id?: string; area_name?: string }>
 }
 const base = (jobId: string) => `/api/construction/tasks/${encodeURIComponent(jobId)}`
 function unwrap<T> (response: { data: { code: number; data: T; message?: string } }): T {
@@ -41,7 +50,7 @@ export async function getConstructionPhoto (jobId: string, fileId: string) {
 }
 
 // ---- 施工区域（真实标定） ----
-export interface ConstructionPoint { lng: number; lat: number }
+
 export interface ConstructionAreaRecord {
   id: string
   name: string
@@ -117,6 +126,7 @@ export async function unlinkConstructionWayline (id: string, wayline: string) {
 }
 
 export interface ConstructionPlan {
+  overall_id?: string; overall_route?: ConstructionOverallRoute; bindings?: ConstructionOverallBinding[]
   id: number; plan_id: string; name: string; file_id: string; dock_sn: string
   area_id: string; area_version: number; task_type: number; begin_time: number
   rth_altitude: number; out_of_control: number; archived: number | boolean
@@ -141,4 +151,21 @@ export async function archiveConstructionPlan (id: string) {
 }
 export async function refreshConstructionDispatch (id: string) {
   return unwrapArea<ConstructionPlan>(await request.post(`/api/construction/plans/${encodeURIComponent(id)}/refresh-dispatch`), '下发状态查询失败')
+}
+
+const overallBase = '/api/construction/overall-routes'
+export async function listConstructionOverallRoutes (sn: string) {
+  return unwrapArea<ConstructionOverallRoute[]>(await request.get(overallBase, { params: { dock_sn: sn } }), '总体航线加载失败')
+}
+export async function inspectConstructionOverallRoute (sn: string, id: string) {
+  return unwrapArea<ConstructionOverallRoute>(await request.get(overallBase + '/inspect', { params: { dock_sn: sn, wayline_id: id } }), '总体航线解析失败')
+}
+export async function saveConstructionOverallRoute (body: { dock_sn: string; wayline_id: string; file_sign: string; expected_version: number; bindings: ConstructionOverallBinding[] }) {
+  return unwrapArea<ConstructionOverallRoute>(await request.post(overallBase, body), '总体航线绑定保存失败')
+}
+export async function listConstructionOverallPlans (id: string, archived = false) {
+  return unwrapArea<ConstructionPlan[]>(await request.get(`${overallBase}/${encodeURIComponent(id)}/plans`, { params: { archived } }), '总体计划加载失败')
+}
+export async function createConstructionOverallPlan (id: string, body: ConstructionPlanInput) {
+  return unwrapArea<ConstructionPlan>(await request.post(`${overallBase}/${encodeURIComponent(id)}/plans`, body), '总体计划保存失败')
 }
