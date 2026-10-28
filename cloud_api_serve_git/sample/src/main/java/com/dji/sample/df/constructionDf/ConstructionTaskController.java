@@ -17,6 +17,7 @@ import static com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM;
 @RequestMapping("/api/construction/tasks/{jobId}")
 public class ConstructionTaskController {
     private final ConstructionTaskService service;
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionTransferService transfers;
     public ConstructionTaskController(ConstructionTaskService service) { this.service = service; }
     private WaylineJobEntity job(HttpServletRequest request, String jobId) {
         CustomClaim claim = (CustomClaim) request.getAttribute(TOKEN_CLAIM);
@@ -31,6 +32,18 @@ public class ConstructionTaskController {
     @PostMapping("/archive")
     public HttpResultResponse archive(HttpServletRequest request, @PathVariable String jobId) throws Exception {
         WaylineJobEntity job = job(request, jobId); service.archive(job);
+        return HttpResultResponse.success(service.detail(job));
+    }
+    @PostMapping("/export")
+    public HttpResultResponse export(HttpServletRequest request, @PathVariable String jobId) throws Exception {
+        java.nio.file.Path path=service.exportTransfer(job(request,jobId),transfers);
+        return HttpResultResponse.success(Map.of("path",path.toString(),"name",path.getFileName().toString()));
+    }
+    @PostMapping("/photo-associations")
+    public HttpResultResponse assign(HttpServletRequest request,@PathVariable String jobId,@RequestBody Map<String,Object> body) throws Exception {
+        WaylineJobEntity job=job(request,jobId);CustomClaim claim=(CustomClaim)request.getAttribute(TOKEN_CLAIM);
+        try { service.assignPhotos(job,body,claim.getUsername()); }
+        catch(ConstructionAreaGeometry.RuleException e){ return HttpResultResponse.error(e.getCode(),e.getMessage()); }
         return HttpResultResponse.success(service.detail(job));
     }
     @GetMapping("/media/{fileId}")

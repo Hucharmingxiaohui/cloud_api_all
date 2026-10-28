@@ -15,9 +15,10 @@ import java.io.InputStream;
 import java.net.URLConnection;
 import java.util.regex.Pattern;
 
-/** A shared library route, with versioned point ownership. Never copies a KMZ. */
+/** Shared source or generated execution route, with versioned point ownership. */
 @Service
 public class ConstructionOverallService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionPreparationService preparation;
     private final JdbcTemplate db;
     private final ConstructionAreaService areas;
     private final IWaylineFileService files;
@@ -59,13 +60,14 @@ public class ConstructionOverallService {
         List<Map<String,Object>> polygon=(List<Map<String,Object>>)area.get("boundary");
         if(polygon==null||polygon.size()<3||polygon.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖区域："+area.get("name"));
         binding.put("area_name",area.get("name"));
+        binding.put("boundary",polygon);
     }
     public Map<String,Object> inspect(String w,String sn,String file) {
         var stored=files.getWaylineByWaylineId(w,file).orElseThrow(()->bad("当前工作空间未找到航线"));
-        ConstructionKmz kmz;
+        ConstructionKmz kmz; byte[] raw;
         try {
             URLConnection c=files.getObjectUrl(w,file).openConnection();c.setConnectTimeout(5000);c.setReadTimeout(15000);
-            try(InputStream in=c.getInputStream()){kmz=ConstructionKmz.parse(ConstructionKmz.readBounded(in));}
+            try(InputStream in=c.getInputStream()){raw=ConstructionKmz.readBounded(in);kmz=ConstructionKmz.parse(raw);}
         } catch(RuleException e){throw e;}catch(Exception e){throw bad("航线文件读取失败，请检查本地存储");}
         if(!kmz.pointPhotoOnly) throw bad("总体航点绑定暂不支持等时、等距或跨航点拍照，请改为到点拍照后再关联");
         Map<String,Object> center=coverage(w,sn);
@@ -75,7 +77,19 @@ public class ConstructionOverallService {
             Map<String,Object> p=new LinkedHashMap<>(kmz.preview.get(i));p.put("index",i+1);p.put("photo_suffixes",kmz.photoSuffixes.get(i+1));points.add(p);
         }
         Map<String,Object> result=new LinkedHashMap<>();result.put("wayline_id",file);result.put("name",stored.getName());result.put("file_sign",stored.getSign());
+        if(preparation!=null){
+            if(!Objects.equals(stored.getSign(),org.springframework.util.DigestUtils.md5DigestAsHex(raw))) throw new RuleException(409,"航线文件内容与版本标识不一致");
+            var provenance=preparation.lineage(w,file);
+            if(!provenance.isEmpty()&&!Objects.equals(stored.getSign(),provenance.get("prepared_sign"))) throw new RuleException(409,"生成的执行版被修改，请重新上传源航线并生成执行版");
+            var normalized=ConstructionPhotoNaming.prepare(raw);result.put("needs_preparation",normalized.changed());result.put("preparation_points",normalized.changedPoints());result.putAll(provenance);
+        }
         result.put("points",points);result.put("height_mode",kmz.heightMode);result.put("dock_sn",sn);result.put("coverage",center);return result;
+    }
+    public Map<String,Object> prepare(String w,String sn,String file,String sign,String user) {
+        Map<String,Object> inspected=inspect(w,sn,file);
+        if(!Objects.equals(sign,inspected.get("file_sign"))) throw new RuleException(409,"航线已变化，请重新解析");
+        String id=preparation.prepare(w,file,sign,user);
+        return inspect(w,sn,id);
     }
     @SuppressWarnings("unchecked")
     public static List<Map<String,Object>> bindings(Object raw,List<Map<String,Object>> points) {
@@ -106,6 +120,7 @@ public class ConstructionOverallService {
         int expected=integer(body.get("expected_version"),0,Integer.MAX_VALUE);
         Map<String,Object> snapshot=inspect(w,sn,file);
         if(!Objects.equals(body.get("file_sign"),snapshot.get("file_sign"))) throw new RuleException(409,"航线文件已变化，请重新加载后绑定");
+        if(Boolean.TRUE.equals(snapshot.get("needs_preparation"))) throw new RuleException(409,"请先生成拍照标识执行版后再绑定");
         List<Map<String,Object>> links=bindings(body.get("bindings"),(List<Map<String,Object>>)snapshot.get("points"));
         for(Map<String,Object> b:links) {
             db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,b.get("area_id"));
@@ -136,6 +151,7 @@ public class ConstructionOverallService {
         for(Map<String,Object> p:(List<Map<String,Object>>)snapshot.get("points")) if(!inside(center,p)) throw bad("总体航线超出机巢当前覆盖范围");
         if(readFile) {
             Map<String,Object> actual=inspect(w,sn,file);
+            if(Boolean.TRUE.equals(actual.get("needs_preparation"))) throw new RuleException(409,"航线拍照标识需补齐，请重新解析生成执行版并创建计划");
             if(!json.valueToTree(actual.get("points")).equals(json.valueToTree(snapshot.get("points")))) throw new RuleException(409,"执行航点或拍照后缀已改变，请重新绑定");
         }
     }
@@ -151,11 +167,22 @@ public class ConstructionOverallService {
         List<Map<String,Object>> rows=db.queryForList("SELECT snapshot_json FROM construction_plan_dispatch WHERE workspace_id=? AND job_id=? ORDER BY dispatch_order DESC LIMIT 1",w,job);
         if(rows.isEmpty()) return Map.of();Map<String,Object> dispatch=decode(rows.get(0).get("snapshot_json"));
         Map<String,Object> plan=decode(dispatch.get("snapshot_json"));Object overall=plan.get("overall_route");
-        return overall instanceof Map?(Map<String,Object>)overall:Map.of();
+        if(overall instanceof Map) return (Map<String,Object>)overall;
+        // Single-area tasks also need their execution-time area when transferred offline.
+        if(plan.get("area") instanceof Map) {
+            Map<String,Object> area=(Map<String,Object>)plan.get("area");
+            return Map.of("single_area",true,"area",area,"wayline",plan.getOrDefault("wayline",Map.of()),
+                    "points",List.of(),"bindings",List.of(Map.of("area_id",area.get("id"),"area_name",area.get("name"),"waypoints",List.of())));
+        }
+        return Map.of();
     }
     @SuppressWarnings("unchecked")
     public static Map<String,Object> matchPhoto(Map<String,Object> snapshot,String name) {
         if(snapshot.isEmpty()) return Map.of();
+        if(Boolean.TRUE.equals(snapshot.get("single_area"))) {
+            Map<String,Object> b=((List<Map<String,Object>>)snapshot.get("bindings")).get(0);
+            return Map.of("association","MATCHED","area_id",b.get("area_id"),"area_name",b.get("area_name"));
+        }
         Set<Integer> matches=new HashSet<>();
         for(Map<String,Object> p:(List<Map<String,Object>>)snapshot.get("points")) for(String suffix:(List<String>)p.get("photo_suffixes")) {
             if(name!=null&&Pattern.compile("(?:^|_)"+Pattern.quote(suffix)+"(?=_|\\.|$)").matcher(name).find()) matches.add(((Number)p.get("index")).intValue());

@@ -30,8 +30,8 @@ foreach ($relative in @('wayline/service/IWaylineFileService.java','wayline/serv
 $jarPaths = (Get-ChildItem -LiteralPath $libsRoot -Filter '*.jar' | ForEach-Object FullName) -join ';'
 $lombokJar = Get-ChildItem "$env:USERPROFILE/.m2/repository/org/projectlombok/lombok" -Recurse -Filter '*.jar' | Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
 $jarPaths += ";$lombokJar"
-$classpath = "$classesRoot;$backendRoot/sample/target/classes;$backendRoot/cloud-sdk/target/classes;$jarPaths"
-$arguments = @('-encoding','UTF-8','-cp', ('"' + $classpath.Replace('\','/') + '"'), '-d', ('"' + $classesRoot.Replace('\','/') + '"'))
+$classpath = "$classesRoot;$backendRoot/sample/target/classes;$backendRoot/sample/target/dfe-patrol-uav.jar.original;$backendRoot/cloud-sdk/target/classes;$jarPaths"
+$arguments = @('--release','11','-encoding','UTF-8','-cp', ('"' + $classpath.Replace('\','/') + '"'), '-d', ('"' + $classesRoot.Replace('\','/') + '"'))
 $arguments += $sources | ForEach-Object { '"' + $_.Replace('\','/') + '"' }
 $argFile = Join-Path $checkRoot 'javac.args'
 [IO.File]::WriteAllLines($argFile, $arguments, (New-Object Text.UTF8Encoding($false)))

@@ -106,7 +106,10 @@ public final class ConstructionKmz {
                     for(Element action:children(group,"action")) {
                         if(!Set.of("takePhoto","orientedShoot").contains(text(action,"actionActuatorFunc"))) continue;
                         if(!single) {result.pointPhotoOnly=false;continue;}
-                        List<Element> names=children(one(action,"actionActuatorFuncParam"),"fileSuffix");
+                        Element params=one(action,"actionActuatorFuncParam");
+                        // DJI precise re-shoot uses orientedFileSuffix; older platform-generated files use fileSuffix.
+                        List<Element> names="orientedShoot".equals(text(action,"actionActuatorFunc"))?children(params,"orientedFileSuffix"):List.of();
+                        if(names.isEmpty()) names=children(params,"fileSuffix");
                         if(names.size()==1&&!names.get(0).getTextContent().trim().isEmpty()) suffixes.add(names.get(0).getTextContent().trim());
                     }
                 }

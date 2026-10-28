@@ -10,6 +10,7 @@
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getTaskResultTypeApi } from '/@/api/media'
+import { getConstructionResult } from '/@/api/construction'
 import { ERouterName } from '/@/types'
 import { isConstructionTask } from '../construction/constructionTaskType'
 import ConstructionTaskResult from '../construction/ConstructionTaskResult.vue'
@@ -28,6 +29,11 @@ async function load () {
     const saved = JSON.parse(localStorage.getItem('TaskInfo') || '{}')
     const id = typeof route.query.job_id === 'string' ? route.query.job_id : saved.job_id
     if (!id) throw new Error('缺少任务信息，请从飞行任务列表重新进入')
+    if (id.startsWith('offline-')) {
+      await getConstructionResult(id)
+      if (current !== generation) return
+      construction.value = true; jobId.value = id; return
+    }
     const response = await getTaskResultTypeApi(id)
     if (current !== generation) return
     if (response.code !== 0) throw new Error('无法确认任务类型，请重试')

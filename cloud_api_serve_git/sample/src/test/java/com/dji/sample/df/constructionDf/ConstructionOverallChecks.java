@@ -16,7 +16,7 @@ public class ConstructionOverallChecks {
     static void check(boolean ok,String message){if(!ok)throw new AssertionError(message);}
     static void reject(Runnable call){try{call.run();}catch(RuleException e){return;}throw new AssertionError("Expected rejection");}
     static Map<String,Object> point(int i,String suffix){return new LinkedHashMap<>(Map.of("index",i,"lng",120.0+i*.001,"lat",36.0,"height",90.0,"photo_suffixes",suffix.isEmpty()?List.of():List.of(suffix)));}
-    static Map<String,Object> binding(String id,int... indices){return Map.of("area_id",id,"area_version",1,"waypoints",Arrays.stream(indices).boxed().toList());}
+    static Map<String,Object> binding(String id,int... indices){return Map.of("area_id",id,"area_version",1,"waypoints",Arrays.stream(indices).boxed().collect(java.util.stream.Collectors.toList()));}
     static byte[] fixture(String trigger) throws Exception {
         String mission="<wpml:missionConfig><wpml:droneInfo><wpml:droneEnumValue>77</wpml:droneEnumValue><wpml:droneSubEnumValue>0</wpml:droneSubEnumValue></wpml:droneInfo><wpml:payloadInfo><wpml:payloadEnumValue>66</wpml:payloadEnumValue></wpml:payloadInfo></wpml:missionConfig>";
         String points="";
@@ -47,7 +47,7 @@ public class ConstructionOverallChecks {
                 if(sql.contains("construction_dock_coverage")) return List.of(Map.of("radius_m",2000));
                 if(sql.contains("FROM construction_area ")) return List.of(Map.of("id",a[1]));
                 if(sql.contains("construction_plan_dispatch"))return dispatch.isEmpty()?List.of():List.of(dispatch);
-                if(sql.contains("construction_overall_route"))return stored.values().stream().filter(r->Objects.equals(a[0],r.get("workspace_id"))&&(sql.contains("dock_sn=?")?Objects.equals(a[1],r.get("dock_sn")):Objects.equals(a[1],r.get("id")))).toList();
+                if(sql.contains("construction_overall_route"))return stored.values().stream().filter(r->Objects.equals(a[0],r.get("workspace_id"))&&(sql.contains("dock_sn=?")?Objects.equals(a[1],r.get("dock_sn")):Objects.equals(a[1],r.get("id")))).collect(java.util.stream.Collectors.toList());
                 throw new AssertionError(sql);
             }
             @Override public int update(String sql,Object... a){
@@ -104,7 +104,7 @@ public class ConstructionOverallChecks {
                     check(xml.contains("<wpml:fileSuffix>WP2</wpml:fileSuffix>")&&xml.contains("<wpml:fileSuffix>WP12</wpml:fileSuffix>"),"template and execution naming agree");
                 }
             }
-        } finally {try(var walk=java.nio.file.Files.walk(temp)){for(var p:walk.sorted(Comparator.reverseOrder()).toList())java.nio.file.Files.deleteIfExists(p);}}
+        } finally {try(var walk=java.nio.file.Files.walk(temp)){for(var p:walk.sorted(Comparator.reverseOrder()).collect(java.util.stream.Collectors.toList()))java.nio.file.Files.deleteIfExists(p);}}
         System.out.println("Generated takePhoto/orientedShoot suffixes passed: points 1-12, template and execution agree.");
     }
 }

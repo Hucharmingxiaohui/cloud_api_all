@@ -72,7 +72,7 @@
             class="new_btn"
             type="primary"
             :icon="Search"
-            @click="getPlans"
+            @click="refreshTasks"
             >查询
           </el-button>
           <!-- 重置按钮 -->
@@ -94,6 +94,7 @@
       </el-form>
     </div>
     <div class="content">
+      <ConstructionTransfers ref="transfers" />
       <div class="table-container">
         <el-table
           :data="plansData.data"
@@ -357,11 +358,14 @@ import { commonColor } from '/@/utils/color'
 import { ExclamationCircleOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useRouter } from 'vue-router'
 import { CONSTRUCTION_PLAN_TYPE, isConstructionTask } from '../construction/constructionTaskType'
+import ConstructionTransfers from '../construction/ConstructionTransfers.vue'
 import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 const router = useRouter()
+const transfers = ref<InstanceType<typeof ConstructionTransfers>>()
+function refreshTasks () { getPlans(); transfers.value?.refresh() }
 
 const selectedData = ref([])
 // 存储已处理的任务ID，避免重复分析

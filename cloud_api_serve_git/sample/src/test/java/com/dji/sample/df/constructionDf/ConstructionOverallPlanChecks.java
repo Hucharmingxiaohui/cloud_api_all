@@ -60,7 +60,7 @@ public class ConstructionOverallPlanChecks {
                     if(sql.contains("LIMIT 1")&&!out.isEmpty()) return List.of(out.get(out.size()-1));return out;
                 }
                 if(sql.contains("FROM construction_plan")) {
-                    return links.values().stream().filter(r->Objects.equals(r.get("workspace_id"),a[0])&&Objects.equals(r.get(sql.contains("request_id=?")?"request_id":"plan_id"),a[1])).toList();
+                    return links.values().stream().filter(r->Objects.equals(r.get("workspace_id"),a[0])&&Objects.equals(r.get(sql.contains("request_id=?")?"request_id":"plan_id"),a[1])).collect(java.util.stream.Collectors.toList());
                 }
                 throw new UnsupportedOperationException(sql);
             }

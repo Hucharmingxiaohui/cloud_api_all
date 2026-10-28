@@ -3,6 +3,7 @@ import request from './http/request'
 export interface ConstructionPoint { lng: number; lat: number }
 export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[] }
 export interface ConstructionOverallRoute {
+  needs_preparation?: boolean; preparation_points?: number[]; source_wayline_id?: string; source_sign?: string; prepared_sign?: string
   overall_id: string; version: number; wayline_id: string; name: string; dock_sn: string; file_sign: string
   points: Array<ConstructionPoint & { height: number; index: number; photo_suffixes: string[] }>
   height_mode: string; bindings: ConstructionOverallBinding[]; status?: string; message?: string
@@ -23,6 +24,10 @@ export interface ConstructionAnalysis {
   result?: Record<string, unknown>
 }
 export interface ConstructionResult {
+  transfer_source?: { deployment: string; workspace: string; job_id: string }
+  association_revision?: number
+  unresolved_count?: number
+  analysis_stale?: boolean
   job_id: string
   name: string
   plan_type: number
@@ -32,7 +37,7 @@ export interface ConstructionResult {
   analysis_configured: boolean
   analysis: ConstructionAnalysis
   overall_route?: Partial<ConstructionOverallRoute>
-  photos: Array<{ file_id: string; name: string; archived: boolean; association?: string; association_message?: string; waypoint_index?: number; area_id?: string; area_name?: string }>
+  photos: Array<{ file_id: string; name: string; archived: boolean; association?: string; association_message?: string; waypoint_index?: number; area_id?: string; area_name?: string; excluded?: boolean }>
 }
 const base = (jobId: string) => `/api/construction/tasks/${encodeURIComponent(jobId)}`
 function unwrap<T> (response: { data: { code: number; data: T; message?: string } }): T {
@@ -40,7 +45,21 @@ function unwrap<T> (response: { data: { code: number; data: T; message?: string 
   return response.data.data
 }
 export async function getConstructionResult (jobId: string) { return unwrap<ConstructionResult>(await request.get(base(jobId))) }
+export interface ConstructionTransferTask {
+  job_id: string; name: string; dock_sn?: string; execute_time?: number; end_time?: number; photo_count: number; imported_at: number
+  origin: { deployment: string; workspace: string; job_id: string }
+}
+export interface ConstructionTransfers {
+  deployment: string; inbox: string; exports: string; tasks: ConstructionTransferTask[]
+  receipts?: Array<{ file: string; status: string; message: string; job_id?: string }>
+}
+export async function getConstructionTransfers () { return unwrap<ConstructionTransfers>(await request.get('/api/construction/transfers')) }
+export async function scanConstructionTransfers () { return unwrap<ConstructionTransfers>(await request.post('/api/construction/transfers/scan', null, { timeout: 600000 })) }
+export async function exportConstructionTask (jobId: string) { return unwrap<{ path: string; name: string }>(await request.post(`${base(jobId)}/export`, null, { timeout: 600000 })) }
 export async function archiveConstructionPhotos (jobId: string) { return unwrap<ConstructionResult>(await request.post(`${base(jobId)}/archive`)) }
+export async function assignConstructionPhotos (jobId: string, body: { file_ids: string[]; expected_revision: number; area_id?: string; excluded: boolean; reason?: string }) {
+  return unwrap<ConstructionResult>(await request.post(`${base(jobId)}/photo-associations`, body))
+}
 export async function checkConstructionHost (jobId: string) { return unwrap<{ connected: boolean }>(await request.post(`${base(jobId)}/analysis/check`)) }
 export async function submitConstructionAnalysis (jobId: string, requestId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis`, { request_id: requestId })) }
 export async function refreshConstructionAnalysis (jobId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis/refresh`)) }
@@ -159,6 +178,9 @@ export async function listConstructionOverallRoutes (sn: string) {
 }
 export async function inspectConstructionOverallRoute (sn: string, id: string) {
   return unwrapArea<ConstructionOverallRoute>(await request.get(overallBase + '/inspect', { params: { dock_sn: sn, wayline_id: id } }), '总体航线解析失败')
+}
+export async function prepareConstructionOverallRoute (sn: string, id: string, sign: string) {
+  return unwrapArea<ConstructionOverallRoute>(await request.post(overallBase + '/prepare', { dock_sn: sn, wayline_id: id, file_sign: sign }), '执行版航线生成失败')
 }
 export async function saveConstructionOverallRoute (body: { dock_sn: string; wayline_id: string; file_sign: string; expected_version: number; bindings: ConstructionOverallBinding[] }) {
   return unwrapArea<ConstructionOverallRoute>(await request.post(overallBase, body), '总体航线绑定保存失败')
