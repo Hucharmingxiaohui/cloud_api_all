@@ -111,10 +111,13 @@ public class CqDockTaskStatusHandler {
             return;
         }
         try {
+            redisUtils.expire(MONITOR_HASH + ":" + taskCode, 2 * 60 * 60L);
             log.info("准备查询EUA任务状态: taskCode={}, euaTaskId={}, lastState={}, lastProgress={}",
                     taskCode, euaTaskId, detail.get("lastState"), detail.get("lastProgress"));
             CqApiResponse response = cqDockApiService.taskStatus(euaTaskId);
-            if (response == null || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
+            if (response == null || Boolean.FALSE.equals(response.getSuccess())
+                    || (response.getCode() != null && !Objects.equals(response.getCode(), 200))
+                    || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
                 log.warn("EUA任务状态查询失败: taskCode={}, euaTaskId={}, msg={}", taskCode, euaTaskId, response == null ? null : response.getMsg());
                 return;
             }
@@ -122,6 +125,10 @@ public class CqDockTaskStatusHandler {
             JSONObject data = response.getData();
             String euaStatus = extractStatus(data);
             String mappedState = mapEuaState(euaStatus);
+            if (mappedState == null) {
+                log.warn("未知EUA任务状态，保留监控重试: taskCode={}, status={}", taskCode, euaStatus);
+                return;
+            }
             int progress = extractProgress(data, mappedState);
             boolean reportToPatrol = Boolean.parseBoolean(detail.getOrDefault("reportToPatrol", "true"));
             log.info("EUA任务状态查询结果: taskCode={}, euaTaskId={}, euaStatus={}, mappedState={}, progress={}, reportToPatrol={}, data={}",
@@ -138,22 +145,15 @@ public class CqDockTaskStatusHandler {
             if (isTerminalEuaStatus(euaStatus)) {
                 log.info("EUA任务进入终态处理: taskCode={}, euaTaskId={}, euaStatus={}, reportToPatrol={}",
                         taskCode, euaTaskId, euaStatus, reportToPatrol);
-                if ("7".equals(euaStatus)) {
-                    // EUA约定：7表示任务完成且图片上传完成/总数已齐，此时再执行HTTP查图、落库、本地保存、FTP上传和上级图片上报。
-//                  todo 后续需让EUA平台规定7为图片上传结束标志
-//                  图片上传结束主动调用图片接口进行巡视上报
-                    if (reportToPatrol) {
-                        log.info("EUA任务完成，开始查图并上报巡视: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
-                        cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
-                    } else {
-                        log.info("EUA计划任务完成，开始查图并分析: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
-                        cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
-                    }
-                    if (!reportToPatrol) {
-                        updateEuaPlanExecuteStatus(taskCode, true, "EUA任务完成");
-                    }
-                } else if (!reportToPatrol) {
-                    updateEuaPlanExecuteStatus(taskCode, false, "EUA任务结束，状态=" + euaStatus);
+                boolean processed;
+                if (reportToPatrol) {
+                    processed = cqDockPictureReportService.fetchSaveAndReport(taskCode, detail.get("taskName"), euaTaskId);
+                } else {
+                    processed = cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
+                }
+                if (!processed) return;
+                if (!reportToPatrol) {
+                    updateEuaPlanExecuteStatus(taskCode, "1".equals(euaStatus), "EUA任务结束，状态=" + euaStatus);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);
@@ -196,7 +196,7 @@ public class CqDockTaskStatusHandler {
             return null;
         }
         String status = data.getString("status");
-        return status;
+        return status == null ? null : status.trim();
     }
 
     private int extractProgress(JSONObject data, String mappedState) {
@@ -214,17 +214,14 @@ public class CqDockTaskStatusHandler {
 
     private String mapEuaState(String status) {
         if (!StringUtils.hasText(status)) {
-            return "2";
+            return null;
         }
         String value = status.trim();
         if ("0".equals(value)) {
             return "5";
         }
-        if ("7".equals(value)) {
-            return "1";
-        }
         if ("1".equals(value)) {
-            return "2";
+            return "1";
         }
         if ("2".equals(value)) {
             return "2";
@@ -241,7 +238,7 @@ public class CqDockTaskStatusHandler {
         if ("6".equals(value)) {
             return "4";
         }
-        return "2";
+        return null;
     }
 
     private boolean isTerminalEuaStatus(String status) {
@@ -249,7 +246,7 @@ public class CqDockTaskStatusHandler {
             return false;
         }
         String value = status.trim();
-        return "7".equals(value) || "3".equals(value) || "6".equals(value);
+        return "1".equals(value) || "3".equals(value) || "6".equals(value);
     }
 
     private void sendTaskStatus(String taskCode, String taskName, String euaTaskId, String mappedState,

@@ -78,10 +78,17 @@ public class CqDockController {
             response.setMsg("taskCode和euaTaskId不能为空");
             return response;
         }
-        cqDockPictureReportService.fetchSaveAndReport(request.getTaskCode(), request.getTaskName(), request.getEuaTaskId());
+        boolean processed = cqDockPictureReportService.fetchSaveAndReport(
+                request.getTaskCode(), request.getTaskName(), request.getEuaTaskId());
         response.setCode(200);
         response.setSuccess(true);
-        response.setMsg("EUA图片列表获取、入库、本地保存、分析调度已触发");
+        com.alibaba.fastjson.JSONObject data = new com.alibaba.fastjson.JSONObject();
+        data.put("processed", processed);
+        data.put("pending", !processed);
+        response.setData(data);
+        response.setMsg(processed
+                ? "EUA图片本次处理已触发，不代表异步分析及上报全部完成"
+                : "EUA图片本次未处理完成，请检查传输状态或响应数据后重试");
         return response;
     }
 

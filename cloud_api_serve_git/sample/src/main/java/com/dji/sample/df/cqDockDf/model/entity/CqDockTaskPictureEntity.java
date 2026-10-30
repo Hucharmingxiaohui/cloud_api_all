@@ -49,7 +49,7 @@ public class CqDockTaskPictureEntity {
     private String pointName;
 
     /**
-     * 图片类型 0可见光 1红外（EUA图片列表 pointType）
+     * 图片类型 0可见光 1红外（EUA photoStorage 1/2 映射）
      */
     @TableField("point_type")
     private Integer pointType;

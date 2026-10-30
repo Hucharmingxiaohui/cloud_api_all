@@ -1,6 +1,5 @@
 package com.dji.sample.df.cqDockDf.service;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.dji.sample.df.cqDockDf.config.CqDockProperties;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
@@ -15,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientResponseException;
 
 import javax.annotation.Resource;
 
@@ -36,10 +36,8 @@ public class CqDockApiService {
      * 机场任务下发 POST /machineNest/noauth/third/task/assign_task
      */
     public CqApiResponse assignTask(CqAssignTaskRequest request) {
-        log.info("[cq-dock] assignTask request: {}", JSON.toJSONString(request));
         CqApiResponse response = post(properties.getAssignTaskPath(), request);
-        log.info("[cq-dock] assignTask response: code={}, success={}, msg={}, data={}",
-                response.getCode(), response.getSuccess(), response.getMsg(), response.getData());
+        log.info("[cq-dock] assignTask result: code={}, success={}", response.getCode(), response.getSuccess());
         return response;
     }
 
@@ -51,8 +49,7 @@ public class CqDockApiService {
         request.setTaskId(taskId);
         log.info("[cq-dock] pictureList request: taskId={}", taskId);
         CqApiResponse response = post(properties.getPictureListPath(), request);
-        log.info("[cq-dock] pictureList response: code={}, success={}, msg={}, data={}",
-                response.getCode(), response.getSuccess(), response.getMsg(), response.getData());
+        log.info("[cq-dock] pictureList result: code={}, success={}", response.getCode(), response.getSuccess());
         return response;
     }
 
@@ -64,8 +61,7 @@ public class CqDockApiService {
         request.setTaskId(taskId);
         log.info("[cq-dock] taskStatus request: taskId={}", taskId);
         CqApiResponse response = post(properties.getTaskStatusPath(), request);
-        log.info("[cq-dock] taskStatus response: code={}, success={}, msg={}, data={}",
-                response.getCode(), response.getSuccess(), response.getMsg(), response.getData());
+        log.info("[cq-dock] taskStatus result: code={}, success={}", response.getCode(), response.getSuccess());
         return response;
     }
 
@@ -83,26 +79,34 @@ public class CqDockApiService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("access_key", properties.getAccessKey());
             headers.set("access_secret", properties.getAccessSecret());
-            String json = body == null ? "{}" : JSON.toJSONString(body);
-            log.info("[cq-dock] POST url={}, body={}", url, json);
+            CqDockTransportCodec codec = new CqDockTransportCodec(properties);
+            String json = codec.request(body).toJSONString();
+            log.info("[cq-dock] POST path={}", path);
             HttpEntity<String> entity = new HttpEntity<>(json, headers);
             ResponseEntity<String> responseEntity = httpClientTemplate.postForEntity(url, entity, String.class);
-            String raw = responseEntity.getBody();
-            result.setRawBody(raw);
-            log.info("[cq-dock] POST result url={}, body={}", url, raw);
-            if (StringUtils.isNotBlank(raw)) {
-                JSONObject obj = JSON.parseObject(raw);
-                result.setCode(obj.getInteger("code"));
-                result.setMsg(obj.getString("msg"));
-                result.setSuccess(obj.getBoolean("success"));
-                result.setData(obj.getJSONObject("data"));
-            }
-        } catch (Exception e) {
-            log.error("[cq-dock] POST failed url={}, error={}", url, e.getMessage(), e);
+            populate(result, codec.decodeResponse(responseEntity.getBody()));
+        } catch (RestClientResponseException e) {
+            result.setCode(e.getRawStatusCode());
+            result.setMsg("EUA HTTP request failed");
+            try {
+                JSONObject error = new CqDockTransportCodec(properties).decodeResponse(e.getResponseBodyAsString());
+                if (!Boolean.TRUE.equals(error.get("success"))) populate(result, error);
+            } catch (Exception ignored) { /* An HTTP error body need not be JSON or encrypted. */ }
             result.setSuccess(false);
-            result.setMsg(e.getMessage());
+            log.warn("[cq-dock] POST failed path={}, status={}", path, e.getRawStatusCode());
+        } catch (Exception e) {
+            log.warn("[cq-dock] POST transport failed path={}, type={}", path, e.getClass().getSimpleName());
+            result.setSuccess(false);
+            result.setMsg("EUA加密传输失败");
         }
         return result;
+    }
+
+    private void populate(CqApiResponse result, JSONObject obj) {
+        result.setCode(obj.getInteger("code"));
+        result.setMsg(obj.getString("msg"));
+        result.setSuccess(Integer.valueOf(200).equals(result.getCode()) && Boolean.TRUE.equals(obj.get("success")));
+        result.setData(obj.getJSONObject("data"));
     }
 
     private String trimSlash(String base) {

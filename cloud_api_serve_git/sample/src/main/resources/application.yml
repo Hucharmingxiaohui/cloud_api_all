@@ -102,7 +102,7 @@ mqtt:
     username: df1560
     password: dfe2k_1500
   CUSTOM:
-    enabled: true
+    enabled: false
     protocol: MQTT
     # 重庆电力下级无人机平台 EMQX
     host: 172.20.63.105
@@ -329,6 +329,8 @@ normalStation:
 
 # 重庆电力下级无人机平台（机场对接 HTTP）
 cq-dock:
+  sm4-key: "${CQ_DOCK_SM4_KEY:6a362336ae4c36fk}"
+  mock-enabled: true
   # TODO 填写下级平台 HTTP 根地址，例如 http://ip:port
   base-url: "http://127.0.0.1:6789"
   access-key: ""

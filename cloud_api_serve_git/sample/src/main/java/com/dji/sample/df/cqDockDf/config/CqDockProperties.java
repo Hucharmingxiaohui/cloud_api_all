@@ -14,9 +14,14 @@ public class CqDockProperties {
      */
     private String baseUrl = "";
 
+    @lombok.ToString.Exclude
     private String accessKey = "";
 
+    @lombok.ToString.Exclude
     private String accessSecret = "";
+
+    @lombok.ToString.Exclude
+    private String sm4Key;
 
     private String assignTaskPath = "/machineNest/noauth/third/task/assign_task";
 

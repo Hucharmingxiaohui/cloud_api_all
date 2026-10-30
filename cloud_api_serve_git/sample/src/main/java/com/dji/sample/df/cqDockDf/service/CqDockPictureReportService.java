@@ -111,23 +111,25 @@ public class CqDockPictureReportService {
     private String serverPort;
 
     /**
-     * EUA任务完成（状态7）后的入口：HTTP查图 -> 落库+本地保存 -> 原图先统一上报 -> 分析结果后续按张增量上报。
+     * 终态任务轮询图片；传输完成后才落库、下载、分析和上报。
      */
-    public void fetchSaveAndReport(String taskCode, String taskName, String euaTaskId) {
+    public boolean fetchSaveAndReport(String taskCode, String taskName, String euaTaskId) {
 //      获取并本地保存图片
-        fetchAndSavePictures(taskCode, taskName, euaTaskId);
+        if (fetchAndSavePictures(taskCode, taskName, euaTaskId) < 0) return false;
 //      原图先统一上报，避免分析服务异常导致上级完全收不到图片
         reportOriginalPictures(taskCode, taskName, euaTaskId);
 //      后续分析结果按张增量上报
         startAnalysisAndReport(taskCode, taskName, euaTaskId);
+        return true;
     }
 
     /**
      * 平台内EUA计划入口：HTTP查图 -> 落库+本地保存 -> 可见光分析/红外测温，不向上级巡视系统上报Type=61。
      */
-    public void fetchSaveAndAnalyseOnly(String taskCode, String taskName, String euaTaskId) {
-        fetchAndSavePictures(taskCode, taskName, euaTaskId);
+    public boolean fetchSaveAndAnalyseOnly(String taskCode, String taskName, String euaTaskId) {
+        if (fetchAndSavePictures(taskCode, taskName, euaTaskId) < 0) return false;
         startAnalysisOnly(taskCode, euaTaskId);
+        return true;
     }
 
     /**
@@ -255,9 +257,21 @@ public class CqDockPictureReportService {
 
     private int fetchAndSavePictures(String taskCode, String taskName, String euaTaskId) {
         CqApiResponse response = cqDockApiService.pictureList(euaTaskId);
-        if (response == null || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
+        if (response == null || Boolean.FALSE.equals(response.getSuccess())
+                || (response.getCode() != null && !Objects.equals(response.getCode(), 200))
+                || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
             log.warn("EUA图片列表获取失败: taskCode={}, euaTaskId={}, msg={}", taskCode, euaTaskId, response == null ? null : response.getMsg());
-            return 0;
+            return -1;
+        }
+        JSONObject data = response.getData();
+        if (data == null || !euaTaskId.equals(data.getString("taskId"))) {
+            log.warn("EUA图片列表taskId缺失或不匹配: expected={}, actual={}",
+                    euaTaskId, data == null ? null : data.getString("taskId"));
+            return -1;
+        }
+        if (!"2".equals(data.getString("status"))) return -1;
+        if (!(data.get("pictureList") instanceof JSONArray)) {
+            throw new IllegalArgumentException("EUA pictureList必须是数组");
         }
         List<JSONObject> pictures = extractPictures(response.getData());
         if (pictures.isEmpty()) {
@@ -274,13 +288,13 @@ public class CqDockPictureReportService {
             String bayId = record == null ? null : record.getBayId();
             log.warn("EUA图片间隔过滤失败，忽略本次列表: taskCode={}, euaTaskId={}, bayId={}, reason={}, kept=0, ignored={}",
                     taskCode, euaTaskId, bayId, record == null ? "任务记录不存在" : "任务间隔为空", pictures.size());
-            return 0;
+            return -1;
         }
         if (allowedPointCodes.isEmpty()) {
             String bayId = record.getBayId();
             log.warn("EUA图片间隔无有效点位，忽略本次列表: taskCode={}, euaTaskId={}, bayId={}, kept=0, ignored={}",
                     taskCode, euaTaskId, bayId, pictures.size());
-            return 0;
+            return -1;
         }
         int count = 0;
         int kept = 0;
@@ -290,9 +304,12 @@ public class CqDockPictureReportService {
                 continue;
             }
             kept++;
+            parsePointType(picture);
 //          保存图片
             if (savePicture(taskCode, taskName, euaTaskId, picture, "http") != null) {
                 count++;
+            } else {
+                return -1;
             }
         }
         log.info("EUA图片间隔过滤完成: taskCode={}, euaTaskId={}, bayId={}, kept={}, ignored={}",
@@ -362,14 +379,14 @@ public class CqDockPictureReportService {
             // 已有终态的行（重复触发/断点续跑）跳过
             if (Objects.equals(row.getAnalysisStatus(), ANALYSIS_DONE)
                     || Objects.equals(row.getAnalysisStatus(), ANALYSIS_INFRARED_DONE)
-                    || Objects.equals(row.getAnalysisStatus(), ANALYSIS_FAILED)) {
+                    || (Objects.equals(row.getAnalysisStatus(), ANALYSIS_PENDING) && StringUtils.hasText(row.getRequestId()))) {
                 continue;
             }
             try {
                 UniPoint uniPoint = resolveUniPoint(row);
                 if (uniPoint == null) {
                     markAnalysisFailed(row, "未在点位表中匹配到点位(point_code=" + row.getPointId() + ")");
-                    continue;
+                    throw new IllegalStateException("未匹配到EUA点位");
                 }
                 if (row.getPointType() != null && row.getPointType() == POINT_TYPE_INFRARED) {
 //                  红外图片测温
@@ -383,6 +400,7 @@ public class CqDockPictureReportService {
             } catch (Exception e) {
                 markAnalysisFailed(row, e.getMessage());
                 log.error("CQ图片分析调度失败: taskCode={}, pictureName={}", taskCode, row.getPictureName(), e);
+                throw new IllegalStateException("EUA图片分析调度失败", e);
             }
         }
         if (pendingCallback == 0) {
@@ -416,15 +434,15 @@ public class CqDockPictureReportService {
         TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
         if (temParamEntity == null) {
             markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
-            return;
+            throw new IllegalStateException("红外图片坐标无效");
         }
         TemResultEntity temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
         if (temResult.getError() != null) {
             markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
-            return;
+            throw new IllegalStateException("红外测温失败");
         }
         row.setPointVal("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
-        row.setPointValUnit("正常");
+        row.setPointValUnit("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
         row.setAnalysisStatus(ANALYSIS_INFRARED_DONE);
         row.setUpdateTime(new Date());
         cqDockTaskPictureMapper.updateById(row);
@@ -471,7 +489,7 @@ public class CqDockPictureReportService {
     private boolean submitVisibleAnalysis(CqDockTaskPictureEntity row, UniPoint uniPoint, String taskName, String euaTaskId) {
         if (!StringUtils.hasText(row.getLocalPath()) || !new File(row.getLocalPath()).exists()) {
             markAnalysisFailed(row, "本地图片不存在，无法送分析: " + row.getLocalPath());
-            return false;
+            throw new IllegalStateException("本地图片不存在");
         }
         String requestId = UUID.randomUUID().toString();
         // 与 handleUavResult 一致：唯一编码=点位编码+图片类型，objectId 后缀 _2 表示无人机
@@ -514,6 +532,7 @@ public class CqDockPictureReportService {
             httpUtils.sendPostJson(analyseUrl, JSONObject.toJSONString(params));
         } catch (Exception e) {
             log.error("【CQ_发送智能分析请求】异常！ {}", e.getMessage());
+            throw new IllegalStateException("发送智能分析失败", e);
         }
     }
 
@@ -569,6 +588,7 @@ public class CqDockPictureReportService {
                 row.setUpdateTime(new Date());
                 cqDockTaskPictureMapper.updateById(row);
                 log.error("CQ原图上报失败: taskCode={}, pictureName={}", taskCode, row.getPictureName(), e);
+                throw new IllegalStateException("EUA原图上报失败", e);
             }
         }
 
@@ -604,7 +624,8 @@ public class CqDockPictureReportService {
             }
             PatrolResultItem item = buildResultItem(row.getBusinessId(), row.getTaskName(), row.getEuaTaskId(), row, fileType, filePath);
             item.setValue(defaultText(row.getPointVal()));
-            item.setValue_unit(defaultText(row.getPointValUnit()));
+            item.setValue_unit(defaultText(Objects.equals(row.getPointType(), POINT_TYPE_INFRARED)
+                    ? row.getPointVal() : row.getPointValUnit()));
             sendPatrolResultItems(Lists.newArrayList(item));
             log.info("CQ分析结果增量上报完成: taskCode={}, euaTaskId={}, pictureName={}, filePath={}",
                     row.getBusinessId(), row.getEuaTaskId(), row.getPictureName(), filePath);
@@ -615,13 +636,16 @@ public class CqDockPictureReportService {
             row.setUpdateTime(new Date());
             cqDockTaskPictureMapper.updateById(row);
             log.error("CQ分析结果增量上报失败: taskCode={}, pictureName={}", row.getBusinessId(), row.getPictureName(), e);
+            throw new IllegalStateException("EUA分析结果上报失败", e);
         }
     }
 
     private void sendPatrolResultItems(List<PatrolResultItem> items) {
         PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
         commandData.addItems(items);
-        patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class);
+        if (!patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class)) {
+            throw new IllegalStateException("EUA巡视结果发送失败");
+        }
     }
 
     /**
@@ -695,7 +719,8 @@ public class CqDockPictureReportService {
         item.setDevice_name(defaultText(entity.getPointName()));
         item.setDevice_id(defaultText(entity.getPointId()));
         item.setValue(defaultText(entity.getPointVal()));
-        item.setValue_unit(defaultText(entity.getPointValUnit()));
+        item.setValue_unit(defaultText(Objects.equals(entity.getPointType(), POINT_TYPE_INFRARED)
+                ? entity.getPointVal() : entity.getPointValUnit()));
         item.setUnit("");
         item.setTime(DateUtils.getNowDateTimeStr());
         item.setRecognition_type("");
@@ -724,10 +749,8 @@ public class CqDockPictureReportService {
         }
         List<JSONObject> result = new ArrayList<>();
         for (int i = 0; i < array.size(); i++) {
-            JSONObject item = array.getJSONObject(i);
-            if (item != null) {
-                result.add(item);
-            }
+            if (!(array.get(i) instanceof JSONObject)) throw new IllegalArgumentException("EUA图片项必须是对象");
+            result.add(array.getJSONObject(i));
         }
         return result;
     }
@@ -737,6 +760,7 @@ public class CqDockPictureReportService {
      */
     private CqDockTaskPictureEntity savePicture(String taskCode, String taskName, String euaTaskId,
                                                 JSONObject picture, String source) {
+        Integer pointType = parsePointType(picture);
 //      todo ，mqtt主动上报链路上来的，pictureId取的是整个上报json的主键id
         String pictureId = firstText(picture, "pictureId", "photoId", "id");
         String pictureUrl = firstText(picture, "pictureUrl", "url", "fileUrl", "path");
@@ -777,8 +801,8 @@ public class CqDockPictureReportService {
         if (StringUtils.hasText(pointName)) {
             entity.setPointName(pointName);
         }
-        // EUA图片列表新增 pointType：0可见光 1红外，缺省按可见光处理
-        entity.setPointType(parsePointType(picture));
+        // EUA photoStorage：1可见光、2红外；内部仍使用0/1。
+        entity.setPointType(pointType);
         entity.setRawData(picture.toJSONString());
         entity.setUpdateTime(now);
 
@@ -801,6 +825,8 @@ public class CqDockPictureReportService {
             entity.setReportMsg(e.getMessage());
             log.error("EUA图片处理失败: source={}, taskCode={}, euaTaskId={}, pictureName={}, pictureUrl={}",
                     source, taskCode, euaTaskId, pictureName, pictureUrl, e);
+            cqDockTaskPictureMapper.updateById(entity);
+            throw new IllegalStateException("EUA图片保存失败", e);
         }
         entity.setUpdateTime(new Date());
         cqDockTaskPictureMapper.updateById(entity);
@@ -808,16 +834,10 @@ public class CqDockPictureReportService {
     }
 
     private Integer parsePointType(JSONObject picture) {
-        String value = firstText(picture, "pointType", "picType", "pictureType");
-        if (!StringUtils.hasText(value)) {
-            return POINT_TYPE_VISIBLE;
-        }
-        try {
-            return Integer.valueOf(value.trim());
-        } catch (NumberFormatException e) {
-            log.warn("EUA图片pointType无法解析，按可见光处理: {}", value);
-            return POINT_TYPE_VISIBLE;
-        }
+        String value = picture.getString("photoStorage");
+        if ("1".equals(value)) return POINT_TYPE_VISIBLE;
+        if ("2".equals(value)) return POINT_TYPE_INFRARED;
+        throw new IllegalArgumentException("未知EUA photoStorage: " + value);
     }
 
     private CqDockTaskPictureEntity findPicture(String taskCode, String euaTaskId, String pictureName, String pictureId, String pictureUrl) {
