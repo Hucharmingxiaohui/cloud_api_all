@@ -388,3 +388,23 @@ modelSync:
   stationPoints: false
   solarPoints: true
 
+construction-analysis:
+  # 原图根目录：下面再放“任务ID”文件夹
+  input-root: E:/construction-test/input
+
+  # 分析结果、标注图及报告保存目录，与原图目录分开
+  result-root: E:/construction-test/output
+
+  # 本机Python算法Mock
+  algorithm-url: http://127.0.0.1:9000
+  algorithm-token: ""
+
+  connect-timeout-ms: 5000
+  read-timeout-ms: 30000
+
+  # 单任务最多100张，单图20MB，总原图100MB
+  max-photos: 100
+  max-file-bytes: 20971520
+  max-total-bytes: 104857600
+
+

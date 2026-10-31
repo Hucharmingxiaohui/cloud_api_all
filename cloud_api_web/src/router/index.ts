@@ -284,6 +284,7 @@ const routes: Array<RouteRecordRaw> = [
           { path: '/taskManage/construction', redirect: '/taskManage/construction/plans', meta: { showInMenu: false } },
           { path: '/taskManage/construction/areas', redirect: '/variableMgt/constructionAreas', meta: { showInMenu: false } },
           { path: '/taskManage/construction/overall', name: 'constructionOverallRoutes', component: () => import('/@/components/construction/ConstructionOverallRoutes.vue'), meta: { showInMenu: false, cache: false } },
+          { path: '/taskManage/construction/analysis', name: 'constructionAnalysis', component: () => import('/@/components/constructionAnalysis/ConstructionAnalysis.vue'), meta: { showInMenu: true, label: '工地照片分析', cache: false } },
           { path: '/taskManage/construction/tasks', redirect: to => ({ path: '/task/taskResult', query: { demo_task: typeof to.query.task === 'string' ? to.query.task : 'select' } }), meta: { showInMenu: false } },
           {
             path: '/taskManage/construction/plans',
