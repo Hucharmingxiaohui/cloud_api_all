@@ -24,6 +24,10 @@
             <div class="tools"><el-select v-model="areaId" placeholder="选择完全覆盖的区域"><el-option v-for="area in coveredAreas" :key="area.id" :value="area.id" :label="area.name" /></el-select><el-button :disabled="!areaId || !checked.length || busy" @click="assign">绑定选中航点</el-button><el-button :disabled="!checked.length || busy" @click="unassign">取消选中航点绑定</el-button><el-button :disabled="busy" @click="suggest">按位置预选当前区域航点</el-button></div>
           </template>
           <p v-if="!editing">{{ draft.bindings.map(b => `${b.area_name || areaName(b.area_id)}：航点${b.waypoints.join('、')}`).join('；') }}</p>
+          <div v-if="selected && !editing" class="overall-detection-entry">
+            <div><h3>航点检测规则</h3><p>按工作面查看航点，分别配置可见光检测项目和红外温度检测。</p></div>
+            <el-button type="primary" :disabled="busy || formVisible" @click="analysisVisible = true">航点检测配置</el-button>
+          </div>
           <el-table v-if="editing" :data="draft.points" max-height="260" row-key="index">
             <el-table-column v-if="editing" width="65"><template #default="{ row }"><el-tooltip :content="busy ? '正在处理，请稍候' : bindingIssue(row.index) || '勾选此航点，然后点击绑定选中航点'" placement="right"><span><el-checkbox :model-value="checked.includes(row.index)" :aria-label="'选择航点 ' + row.index" :disabled="busy || !eligible(row.index)" @change="togglePoint(row.index)" /></span></el-tooltip></template></el-table-column>
             <el-table-column prop="index" label="航点" width="75" />
@@ -55,12 +59,14 @@
     </el-dialog>
     <ConstructionPlanForm v-if="formVisible && selected && preview" :area="formContext" :routes="[preview]" :devices="[{ device_sn: sn, nickname: docks.find(d => d.sn === sn)?.name || sn }]" :overall-id="selected.overall_id" @close="formVisible = false" @busy="busy = $event" @saved="created" />
   </main>
+  <ConstructionAnalysisConfig v-if="analysisVisible && selected" :context="{ overall_id: selected.overall_id }" @close="analysisVisible = false" />
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConstructionAreaMap from './ConstructionAreaMap.vue'
+import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
 import ConstructionPlanForm from './ConstructionPlanForm.vue'
 import { useConstructionDocks } from './useConstructionDocks'
 import { areaCoverage, pointsWithinCoverage } from './dockCoverageGeometry'
@@ -70,6 +76,7 @@ import { listConstructionAreas, listConstructionOverallRoutes, inspectConstructi
 import type { ConstructionAreaRecord, ConstructionOverallRoute, ConstructionPlan, ConstructionWayline } from '/@/api/construction'
 import { uuidv4 } from '/@/utils/uuid'
 const router = useRouter()
+const analysisVisible = ref(false)
 const { docks, error: dockError, loading: docksLoading, refresh: refreshDocks } = useConstructionDocks()
 const sn = ref(''); const radius = ref<number | null>(null); const busy = ref(false); const error = ref('')
 const areas = ref<ConstructionAreaRecord[]>([]); const areaId = ref(''); const rows = ref<ConstructionOverallRoute[]>([])
@@ -211,6 +218,10 @@ onBeforeUnmount(() => { epoch++; plansEpoch++ })
 refresh()
 </script>
 <style scoped>
+.overall-detection-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin: 16px 0 8px; padding: 16px 18px; background: #14385b; border: 1px solid #429bdc; border-left: 4px solid #53cfff; border-radius: 8px; }
+.overall-detection-entry h3 { margin: 0 0 6px; color: #f3f9ff; font-size: 16px; }
+.overall-detection-entry p { margin: 0; color: #c9def4; line-height: 1.6; font-size: 13px; }
+.overall-detection-entry :deep(.el-button) { min-height: 42px; padding: 0 24px; font-weight: 600; }
 .overall-page { height: 100%; overflow: auto; padding: 16px; box-sizing: border-box; background: #061c3e; color: #dce9fb; --el-text-color-primary: #e7f0ff; --el-text-color-regular: #c2d4ed; --el-fill-color-blank: #102b50; --el-bg-color: #102b50; --el-border-color: #294d79; --el-fill-color-light: #17365c; }
 header,.tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; } h2,h3 { margin: 0; color: #e7f0ff; } p { font-size: 13px; color: #a8bdd8; line-height: 1.7; } .error { color: #ffad8e; }
 .overall-layout { display: grid; grid-template-columns: 240px minmax(0,1fr); gap: 12px; margin-top: 12px; } aside,.bindings-panel,.plans-panel { background: #0d294f; padding: 14px; border: 1px solid #29476d; border-radius: 5px; } aside { display: flex; flex-direction: column; gap: 12px; }

@@ -9,6 +9,24 @@ export interface ConstructionOverallRoute {
   height_mode: string; bindings: ConstructionOverallBinding[]; status?: string; message?: string
 }
 
+export interface ConstructionDetectionPolicy {
+  visible_checks: string[]
+  infrared: { enabled: boolean; max_temperature_c: number | null; min_hotspot_pixels: number }
+}
+export interface ConstructionConfigContext { area_id?: string; wayline_id?: string; overall_id?: string }
+export interface ConstructionAnalysisConfiguration {
+  revision: number; catalog: Array<{ code: string; name: string }>; default_policy: ConstructionDetectionPolicy
+  area_id?: string; area_name?: string; file_sign?: string; route_version?: number; name?: string
+  area?: { override: ConstructionDetectionPolicy | null; effective: ConstructionDetectionPolicy; inherited: ConstructionDetectionPolicy; inherited_source: string; source: string }
+  points?: Array<{ index: number; area_id?: string; area_name?: string; photo_suffixes: string[]; override: ConstructionDetectionPolicy | null; effective: ConstructionDetectionPolicy; inherited: ConstructionDetectionPolicy; inherited_source: string; source: string }>
+}
+export async function getConstructionAnalysisConfig (params: ConstructionConfigContext) {
+  return unwrapArea<ConstructionAnalysisConfiguration>(await request.get('/api/construction/analysis-config', { params }), '检测配置加载失败')
+}
+export async function saveConstructionAnalysisConfig (params: ConstructionConfigContext, body: { target: string; expected_revision: number; policy: ConstructionDetectionPolicy | null; waypoint_index?: number; file_sign?: string; route_version?: number }) {
+  return unwrapArea<ConstructionAnalysisConfiguration>(await request.put('/api/construction/analysis-config', body, { params }), '检测配置保存失败')
+}
+
 export interface DockCoverage { dock_sn: string; radius_m: number | null }
 export async function getDockCoverage (sn: string) {
   return unwrapArea<DockCoverage>(await request.get(`/api/construction/docks/${encodeURIComponent(sn)}/coverage`), '覆盖范围加载失败')
@@ -91,6 +109,12 @@ export interface ConstructionAreaVersionRecord {
 }
 export class ConstructionAreaConflictError extends Error {}
 const areasBase = '/api/construction/areas'
+export interface ConstructionParkingPoint { id: string; name: string; lng: number; lat: number; radius_m: number; version: number }
+const parkingBase = '/api/construction/parking-points'
+export async function listParkingPoints () { return unwrapArea<ConstructionParkingPoint[]>(await request.get(parkingBase), '驻车点加载失败') }
+export async function createParkingPoint (body: { name: string; lng: number; lat: number; radius_m: number }) { return unwrapArea<ConstructionParkingPoint>(await request.post(parkingBase, body), '驻车点保存失败') }
+export async function updateParkingPoint (id: string, body: { name: string; lng: number; lat: number; radius_m: number; version?: number }) { return unwrapArea<ConstructionParkingPoint>(await request.put(`${parkingBase}/${encodeURIComponent(id)}`, body), '驻车点更新失败') }
+export async function deleteParkingPoint (id: string, version: number) { return unwrapArea<null>(await request.delete(`${parkingBase}/${encodeURIComponent(id)}`, { params: { version } }), '驻车点删除失败') }
 function unwrapArea<T> (response: { data: { code: number; data: T; message?: string } }, fallback: string): T {
   if (response.data.code === 409) throw new ConstructionAreaConflictError(response.data.message || fallback)
   if (response.data.code !== 0) throw new Error(response.data.message || fallback)

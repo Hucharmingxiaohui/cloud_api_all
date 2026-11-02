@@ -1,10 +1,19 @@
 <template>
-  <div class="area-map">
+  <div class="area-map" :class="{ 'floating-tools': floatingTools }">
     <div class="dock-toolbar">
       <div><b>机巢位置</b><span>{{ docks?.length ? `${docks.length} 个机巢已有定位` : '等待机巢上报定位' }}</span></div>
       <div class="dock-actions"><select v-model="selectedDock" aria-label="选择定位机巢" :disabled="!docks?.length || disabled || coverageLocked || !!mode"><option value="">全部机巢</option><option v-for="dock in docks" :key="dock.sn" :value="dock.sn">{{ dock.name }}</option></select><button :disabled="!docks?.length || !!mode" @click="locateDocks">定位机巢</button><button :disabled="docksLoading" @click="emit('refresh-docks')">{{ docksLoading ? '加载中' : '刷新' }}</button></div>
     </div>
+    <div v-if="floatingTools" class="parameter-switches">
+      <button :aria-expanded="toolPanel === 'coverage'" @click="toggleTool('coverage')">机巢覆盖{{ toolPanel === 'coverage' ? ' · 收起' : '' }}</button>
+      <button v-if="parkingEnabled" :aria-expanded="toolPanel === 'parking'" @click="toggleTool('parking')">车载驻车点{{ parkingEditing ? ' · 编辑中' : '' }}{{ toolPanel === 'parking' ? ' · 收起' : '' }}</button>
+    </div>
     <p v-if="dockError" class="dock-message">{{ dockError }}</p>
+    <div class="map-viewport">
+    <div class="parameter-panels" :class="{ 'is-open': !!toolPanel }" @click.stop @dblclick.stop @pointerdown.stop @wheel.stop>
+    <header v-if="floatingTools && toolPanel" class="parameter-heading"><b>{{ toolPanel === 'coverage' ? '机巢覆盖设置' : '车载驻车点' }}</b><button aria-label="收起参数面板" @click="toolPanel = ''">收起</button></header>
+    <div v-show="!floatingTools || toolPanel === 'coverage'" class="coverage-panel">
+    <p v-if="floatingTools && !selectedDock" class="dock-message">请先在上方选择机巢。</p>
     <div v-if="selectedDock" class="coverage-toolbar">
       <b>{{ selectedDockName }}覆盖范围</b>
       <span v-if="coverageLoading">加载中…</span>
@@ -22,6 +31,13 @@
       <span v-if="!coveredAreas.length">暂无相交巡检区域</span>
       <button v-for="item in coveredAreas" :key="item.area.id" :class="['coverage-area', item.coverage, { selected: item.area.id === selectedId }]" :disabled="disabled || !!mode || editable" @click="selectCoveredArea(item.area.id)">{{ item.area.name }} · {{ item.coverage === 'full' ? '完全覆盖' : '部分覆盖' }}{{ item.area.enabled ? '' : ' · 暂停' }}</button>
     </div>
+    </div>
+    <div v-show="!floatingTools || toolPanel === 'parking'">
+    <div v-if="floatingTools && parkingPicking" class="picking-notice">请在地图空白处单击选点。<button @click="toolPanel = ''">收起以便选点</button><button @click="parkingRef?.cancelPicking()">取消选点</button></div>
+    <ConstructionParkingPoints v-if="parkingEnabled && mapReady" ref="parkingRef" :map="map" :areas="areas" :docks="docks || []" :dock-sn="selectedDock" :locked="!!disabled || editable || !!mode" @select-area="selectCoveredArea" @picking="onParkingPicking" @editing="parkingEditing = $event" @selected="toolPanel = 'parking'" />
+    </div>
+    </div>
+    <div v-if="floatingTools && parkingPicking && !toolPanel" class="picking-status" @click.stop>请单击地图标定驻车点<button @click="toolPanel = 'parking'">返回参数</button><button @click="parkingRef?.cancelPicking()">取消选点</button></div>
     <div v-if="editable" class="map-toolbar">
       <button type="button" :class="{ active: mode === 'rect' }" :disabled="disabled || !!mode" @click="begin('rect')">▭ 矩形框选</button>
       <button type="button" :class="{ active: mode === 'poly' }" :disabled="disabled || !!mode" @click="begin('poly')">⬡ 多边形</button>
@@ -32,12 +48,17 @@
       <span class="map-hint">{{ hint }}</span>
     </div>
     <div v-if="mapError" class="map-error" role="alert">地图加载失败：{{ mapError }}</div>
+    <div v-if="wayline?.status === 'VALID' && wayline.points?.length" class="wayline-preview-bar">
+      <span><b>{{ wayline.name }}</b> · {{ wayline.points.length }} 个航点 · 黄色线为当前航线</span>
+      <button @click="renderWayline()">定位航线</button>
+    </div>
     <div ref="containerRef" class="map-container" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CURRENT_CONFIG } from '/@/api/http/config'
 import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
@@ -46,6 +67,7 @@ import type { ConstructionDockMarker } from './useConstructionDocks'
 import { getDockCoverage, saveDockCoverage } from '/@/api/construction'
 import { areaCoverage, coverageBoundary } from './dockCoverageGeometry'
 import { areaLabelPosition } from './constructionWaylineGeometry'
+import ConstructionParkingPoints from './ConstructionParkingPoints.vue'
 // AMap is loaded globally by index.html (/amap/AMap3.js), same as use-g-map.ts.
 declare const AMap: any
 /* global defineEmits, defineProps */
@@ -64,9 +86,20 @@ const props = defineProps<{
   coverageLocked?: boolean
   selectedWaypoints?: number[]
   wayline?: ConstructionWayline | null
+  parkingEnabled?: boolean
+  floatingTools?: boolean
 }>()
 const emit = defineEmits(['select', 'update:boundary', 'drawing', 'refresh-docks', 'coverage-change', 'select-waypoint'])
 const selectedDock = ref('')
+const mapReady = ref(false); const parkingPicking = ref(false)
+const toolPanel = ref<'' | 'coverage' | 'parking'>('')
+const parkingEditing = ref(false)
+const parkingRef = ref<{ cancelPicking(): void } | null>(null)
+function toggleTool (panel: 'coverage' | 'parking') { toolPanel.value = toolPanel.value === panel ? '' : panel }
+function onParkingPicking (value: boolean) {
+  parkingPicking.value = value
+  if (props.floatingTools) toolPanel.value = value ? '' : 'parking'
+}
 const selectedDockName = computed(() => props.docks?.find(d => d.sn === selectedDock.value)?.name || selectedDock.value)
 const coverageLoading = ref(false); const coverageSaving = ref(false); const coverageError = ref('')
 const radiusDraft = ref(100); const savedRadius = ref<number | null>(null); const coveragePreview = ref(false)
@@ -193,7 +226,7 @@ function renderDocks () {
     const label = document.createElement('span'); label.className = 'dock-label'; label.textContent = dock.name
     content.append(icon, label)
     const marker = new AMap.Marker({ position: wgs84togcj02(dock.lng, dock.lat), content, offset: new AMap.Pixel(-18, -18), zIndex: 180, title: `${dock.name} · ${dock.sn}` })
-    marker.on('click', () => { if (mode.value || props.disabled || props.coverageLocked) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
+    marker.on('click', () => { if (mode.value || parkingPicking.value || props.disabled || props.coverageLocked) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
     map.add(marker); dockMarkers.set(dock.sn, marker)
   }
   if (selectedDock.value && !dockMarkers.has(selectedDock.value) && !props.coverageLocked) selectedDock.value = ''
@@ -233,7 +266,8 @@ function renderDraft () {
     strokeWeight: 2,
     fillColor: '#39d9ff',
     fillOpacity: 0.18,
-    zIndex: 60
+    zIndex: 60,
+    bubble: true
   })
   map.add(draftPolygon)
   if (props.editable) openEditor()
@@ -271,9 +305,10 @@ function renderAreas () {
       fillColor: area.id === props.selectedId ? '#2f7bd9' : '#274f86',
       fillOpacity: area.id === props.selectedId ? 0.22 : 0.1,
       zIndex: 40,
+      bubble: true,
       extData: { id: area.id }
     })
-    overlay.on('click', () => { if (!mode.value) emit('select', area.id) })
+    overlay.on('click', () => { if (!mode.value && !parkingPicking.value) emit('select', area.id) })
     areaOverlays.set(area.id, overlay)
     map.add(overlay)
     const position = areaLabelPosition(area.boundary)
@@ -281,7 +316,7 @@ function renderAreas () {
     content.className = 'construction-area-label' + (area.id === props.selectedId ? ' selected' : '')
     content.textContent = area.name; content.title = area.name
     const label = new AMap.Marker({ position: wgs84togcj02(position.lng, position.lat), content, offset: new AMap.Pixel(0, 0), anchor: 'top-left', zIndex: 140, title: area.name })
-    label.on('click', () => { if (!mode.value && !props.disabled && !props.editable) emit('select', area.id) })
+    label.on('click', () => { if (!mode.value && !parkingPicking.value && !props.disabled && !props.editable) emit('select', area.id) })
     areaLabels.push(label); map.add(label)
   }
   if (!mode.value && !boundaryDraft.value.length && areaOverlays.size) {
@@ -459,6 +494,7 @@ onMounted(() => {
     renderDraft()
     renderDocks()
     renderWayline()
+    mapReady.value = true
     resizeObserver = new ResizeObserver(() => { if (map && typeof map.resize === 'function') map.resize() })
     if (containerRef.value) resizeObserver.observe(containerRef.value)
   } catch (error) {
@@ -477,13 +513,46 @@ onBeforeUnmount(() => {
   for (const overlay of areaOverlays.values()) map?.remove(overlay)
   areaOverlays.clear()
   areaLabels.forEach(label => map?.remove(label)); areaLabels.length = 0
-  map?.destroy()
-  map = null
   mouseTool = null
 })
+onUnmounted(() => { map?.destroy(); map = null })
 </script>
 
 <style scoped>
+.parameter-panels { display: contents; }
+.map-viewport { display: contents; }
+.floating-tools .map-viewport { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.floating-tools { position: relative; }
+.parameter-switches { display: flex; gap: 8px; padding: 6px 12px; flex-shrink: 0; background: #0b2548; border-bottom: 1px solid #23436e; }
+.parameter-switches button, .parameter-heading button, .picking-notice button, .picking-status button { padding: 5px 9px; color: #dcecff; background: #16385d; border: 1px solid #436b96; border-radius: 4px; cursor: pointer; }
+.parameter-switches button[aria-expanded=true] { border-color: #59cfff; color: #a4ecff; background: #13496a; }
+.floating-tools .parameter-panels { position: absolute; z-index: 250; top: 12px; left: 12px; width: min(370px, calc(100% - 24px)); max-height: calc(100% - 24px); display: none; overflow: auto; overscroll-behavior: contain; box-sizing: border-box; background: #102846f5; border: 1px solid #456b95; border-radius: 7px; box-shadow: 0 8px 24px #00132670; }
+.floating-tools .parameter-panels.is-open { display: block; }
+.parameter-heading { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; background: #14365a; color: #e5f4ff; border-bottom: 1px solid #456b95; font-size: 13px; }
+.floating-tools .coverage-toolbar { align-items: flex-start; }
+.floating-tools .coverage-toolbar > b { width: 100%; overflow-wrap: anywhere; }
+.floating-tools .coverage-areas { max-height: none; }
+.floating-tools .coverage-area { text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+.floating-tools :deep(.parking-panel) { max-height: none; overflow: visible; border-top: 0; }
+.floating-tools :deep(.parking-heading), .floating-tools :deep(.parking-form), .floating-tools :deep(.parking-details) { min-width: 0; }
+.floating-tools :deep(.parking-form label), .floating-tools :deep(.parking-form span), .floating-tools :deep(.parking-distance) { max-width: 100%; overflow-wrap: anywhere; }
+.floating-tools :deep(.parking-form input) { max-width: 100%; box-sizing: border-box; }
+.floating-tools :deep(.parking-areas button) { max-width: 100%; text-align: left; overflow-wrap: anywhere; }
+.picking-notice, .picking-status { padding: 10px 12px; color: #ffe3a8; background: #173657; font-size: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.picking-status { position: absolute; left: 12px; top: 12px; z-index: 251; max-width: calc(100% - 24px); box-sizing: border-box; border: 1px solid #c79c57; border-radius: 5px; }
+.floating-tools .map-container { min-height: 0; }
+.floating-tools .dock-message { flex-shrink: 0; }
+.area-map :deep(.parking-marker) { display:flex; align-items:center; gap:8px; width:max-content; cursor:pointer; }
+.area-map :deep(.parking-pin) { position:relative; display:flex; align-items:center; justify-content:center; width:32px; height:32px; border:2px solid #f0e5ff; border-radius:50%; color:white; background:#7552b8; font-weight:bold; font-size:17px; }
+.area-map :deep(.parking-marker.selected .parking-pin) { background:#9d65ed; box-shadow:0 0 14px #bca1ff; }
+.area-map :deep(.parking-marker.selected .parking-pin::after) { content:''; position:absolute; inset:-5px; border:2px solid #cbb2ff; border-radius:50%; animation:parking-pulse 1.7s ease-out infinite; pointer-events:none; }
+.area-map :deep(.parking-label),.area-map :deep(.parking-distance-label) { padding:5px 8px; background:#192c4f; border:1px solid #a58bda; border-radius:4px; color:#eee2ff; white-space:nowrap; font-size:12px; }
+.area-map :deep(.parking-distance-label) { color:#ffe0a8; border-color:#c99a55; }
+@keyframes parking-pulse { from { transform:scale(.8); opacity:1; } to { transform:scale(1.9); opacity:0; } }
+@media(prefers-reduced-motion:reduce) { .area-map :deep(.parking-marker.selected .parking-pin::after) { animation:none; } }
+.wayline-preview-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 9px 12px; background: #163552; border-bottom: 1px solid #456071; color: #ffe392; font-size: 12px; flex-shrink: 0; }
+.wayline-preview-bar span { overflow-wrap: anywhere; }
+.wayline-preview-bar button { padding: 5px 12px; border: 1px solid #d9b852; border-radius: 4px; background: #38402d; color: #ffe392; cursor: pointer; }
 .area-map :deep(.construction-area-label) { display: block; width: max-content; max-width: 220px; transform: translate(-50%, -50%); padding: 5px 9px; border: 1px solid #689bd0; border-radius: 4px; background: #082646e8; color: #e7f3ff; font-size: 13px; line-height: 1.5; font-weight: 600; white-space: normal; overflow-wrap: anywhere; text-align: center; cursor: pointer; box-shadow: 0 2px 6px #00152b80; }
 .area-map :deep(.construction-area-label.selected) { border-color: #75e6ff; background: #145480ee; color: #fff; }
 .coverage-areas { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 8px 12px; max-height: 110px; overflow: auto; background: #0c2344; color: #a8bdd8; font-size: 12px; }

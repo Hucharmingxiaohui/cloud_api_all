@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "前端：启动开发服务",
+      "type": "shell",
+      "command": "npm.cmd run serve",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "前端：生产构建",
+      "type": "shell",
+      "command": "npm.cmd run build",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "后端：Maven 打包",
+      "type": "shell",
+      "command": "mvn.cmd -B -ntp package",
+      "options": { "cwd": "${workspaceFolder}/../cloud_api_serve_git" },
+      "problemMatcher": []
+    }
+  ]
+}

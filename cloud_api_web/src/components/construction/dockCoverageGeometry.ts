@@ -1,5 +1,11 @@
 import type { ConstructionPoint } from '/@/api/construction'
 
+export function groundDistance (a: ConstructionPoint, b: ConstructionPoint): number {
+  const rad = Math.PI / 180
+  const h = Math.sin((b.lat - a.lat) * rad / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lng - a.lng) * rad / 2) ** 2
+  return 2 * 6371008.8 * Math.asin(Math.sqrt(Math.min(1, Math.max(0, h))))
+}
+
 export function pointsWithinCoverage (center: ConstructionPoint, radius: number, points: ConstructionPoint[]): boolean {
   if (!Number.isInteger(radius) || radius < 100 || radius > 5000 || !points.length) return false
   const rad = Math.PI / 180

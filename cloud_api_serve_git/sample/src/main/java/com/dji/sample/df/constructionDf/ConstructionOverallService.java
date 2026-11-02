@@ -167,12 +167,12 @@ public class ConstructionOverallService {
         List<Map<String,Object>> rows=db.queryForList("SELECT snapshot_json FROM construction_plan_dispatch WHERE workspace_id=? AND job_id=? ORDER BY dispatch_order DESC LIMIT 1",w,job);
         if(rows.isEmpty()) return Map.of();Map<String,Object> dispatch=decode(rows.get(0).get("snapshot_json"));
         Map<String,Object> plan=decode(dispatch.get("snapshot_json"));Object overall=plan.get("overall_route");
-        if(overall instanceof Map) return (Map<String,Object>)overall;
+        if(overall instanceof Map) {Map<String,Object> result=new LinkedHashMap<>((Map<String,Object>)overall);if(plan.containsKey("analysis_config"))result.put("analysis_config",plan.get("analysis_config"));return result;}
         // Single-area tasks also need their execution-time area when transferred offline.
         if(plan.get("area") instanceof Map) {
             Map<String,Object> area=(Map<String,Object>)plan.get("area");
             return Map.of("single_area",true,"area",area,"wayline",plan.getOrDefault("wayline",Map.of()),
-                    "points",List.of(),"bindings",List.of(Map.of("area_id",area.get("id"),"area_name",area.get("name"),"waypoints",List.of())));
+                    "points",List.of(),"bindings",List.of(Map.of("area_id",area.get("id"),"area_name",area.get("name"),"waypoints",List.of())),"analysis_config",plan.getOrDefault("analysis_config",Map.of()));
         }
         return Map.of();
     }

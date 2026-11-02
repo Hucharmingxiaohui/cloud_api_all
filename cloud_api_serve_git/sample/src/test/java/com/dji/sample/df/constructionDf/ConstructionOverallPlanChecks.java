@@ -106,6 +106,11 @@ public class ConstructionOverallPlanChecks {
             protected void doRollback(DefaultTransactionStatus s) {}
         };
         ConstructionPlanService service=new ConstructionPlanService(db,mapper,areas,guard,executor,manager);
+        AtomicInteger configRevision=new AtomicInteger(1);
+        ConstructionAnalysisConfigService configs=new ConstructionAnalysisConfigService(null,null,null,null,null) {
+            @Override public Map<String,Object> freeze(String w,String a,String f,Map<String,Object> r) {return new LinkedHashMap<>(Map.of("file_sign","signature","revision",configRevision.get(),"default_policy",ConstructionAnalysisPolicy.defaults()));}
+        };
+        java.lang.reflect.Field configField=ConstructionPlanService.class.getDeclaredField("analysisConfig");configField.setAccessible(true);configField.set(service,configs);
         CustomClaim user=new CustomClaim();user.setWorkspaceId("w");user.setUsername("pilot");
         Map<String,Object> body=new LinkedHashMap<>(Map.of("name","Plan","file_id","route","dock_sn","dock","task_type",0,"rth_altitude",100,"out_of_control",0,"expected_version",1,"request_id","create-request-00001"));
         Map<String,Object> result=service.create(user,"area",body);String id=(String)result.get("plan_id");
@@ -121,9 +126,11 @@ public class ConstructionOverallPlanChecks {
         rejects(()->guard.resolve("w",spoof),400);
         check(guard.dispatch(id,()->guard.resolve("w",spoof)).getFileId().equals("route"));
         PubWaylineJobPlanDfEntity ordinary=new PubWaylineJobPlanDfEntity();ordinary.setPlanType(3);check(guard.resolve("w",ordinary)==ordinary);
+        configRevision.set(2);
         Map<String,Object> req=Map.of("request_id","dispatch-request-001");
         check(service.dispatch(user,id,req).get("status").equals("SUCCEEDED"));
         check(service.dispatch(user,id,req).get("job_id").equals("job-1")&&calls.get()==1);
+        check(((Map<?,?>)new com.fasterxml.jackson.databind.ObjectMapper().readValue(String.valueOf(links.get(id).get("snapshot_json")),Map.class).get("analysis_config")).get("revision").equals(1));
         area.put("version",2);rejects(()->service.dispatch(user,id,Map.of("request_id","dispatch-request-002")),409);check(calls.get()==1);area.put("version",1);
         area.put("enabled",false);rejects(()->service.dispatch(user,id,Map.of("request_id","dispatch-request-002")),400);area.put("enabled",true);
         links.get(id).put("file_sign","changed");rejects(()->guard.validate(catalog.get(id),true),409);links.get(id).put("file_sign","signature");
@@ -136,6 +143,7 @@ public class ConstructionOverallPlanChecks {
         failure.set(0);service.dispatch(user,timed,Map.of("request_id","dispatch-request-005"));rejects(()->service.dispatch(user,timed,Map.of("request_id","dispatch-request-006")),409);
         Map<String,Object> job=new HashMap<>(Map.of("plan_id",timed,"file_id","route","dock_sn","dock"));executionJobs.add(job);
         catalog.get(timed).setBeginTime(1L);guard.beforeExecute("w","job-timed");
+        check(((Map<?,?>)new com.fasterxml.jackson.databind.ObjectMapper().readValue(String.valueOf(links.get(id).get("snapshot_json")),Map.class).get("analysis_config")).get("revision").equals(1));
         area.put("version",2);rejects(()->guard.beforeExecute("w","job-timed"),409);area.put("version",1);
         job.put("file_id","tampered");rejects(()->guard.beforeExecute("w","job-timed"),409);
         com.dji.sample.df.electricInspectionDf.service.impl.PubWaylineJobPlanDfServiceImpl legacy=new com.dji.sample.df.electricInspectionDf.service.impl.PubWaylineJobPlanDfServiceImpl();
@@ -160,11 +168,14 @@ public class ConstructionOverallPlanChecks {
         overallBody.put("file_id","different");rejects(()->service.createOverall(user,"overall",overallBody),400);overallBody.put("file_id","route");
         CustomClaim foreign=new CustomClaim();foreign.setWorkspaceId("foreign");rejects(()->service.createOverall(foreign,"overall",overallBody),404);
         check(catalog.size()==plansBefore+1);
+        configRevision.set(3);
         Map<String,Object> overallDispatch=service.dispatch(user,overallId,Map.of("request_id","overall-dispatch-00001"));
         check("SUCCEEDED".equals(overallDispatch.get("status"))&&calls.get()==flightsBefore+1);
         check(service.dispatch(user,overallId,Map.of("request_id","overall-dispatch-00001")).get("job_id").equals(overallDispatch.get("job_id"))&&calls.get()==flightsBefore+1);
         Map<String,Object> frozenDispatch=overall.decode(overall.decode(overallDispatch.get("snapshot_json")).get("snapshot_json"));
         check(((Map<?,?>)frozenDispatch.get("overall_route")).get("version").equals(1));
+        check(((Map<?,?>)frozenDispatch.get("analysis_config")).get("revision").equals(2));
+        check(((Map<?,?>)overall.jobSnapshot("w",(String)overallDispatch.get("job_id")).get("analysis_config")).get("revision").equals(2));
         executionJobs.clear();executionJobs.add(Map.of("plan_id",overallId,"file_id","route","dock_sn","dock"));guard.beforeExecute("w","overall-job");
         overallRoute.put("version",2);
         rejects(()->guard.beforeExecute("w","overall-job"),409);

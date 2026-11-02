@@ -19,6 +19,7 @@ import java.util.*;
 @Service
 public class ConstructionPlanService {
     @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionAnalysisConfigService analysisConfig;
     private final JdbcTemplate db; private final PubWaylineJobPlanDfMapper plans;
     private final ConstructionAreaService areas; private final ConstructionPlanGuard guard;
     private final PubWaylineJobPlanDfService execution; private final TransactionTemplate tx;
@@ -67,6 +68,7 @@ public class ConstructionPlanService {
             begin=((Number)raw).longValue();if(begin<=System.currentTimeMillis()+30000) throw new RuleException(400,"执行时间须至少晚于当前时间30秒");
         }
         guard.dock(w,dock);Map<String,Object> snapshot=overallRoute==null?guard.route(w,area,file,version,true):Map.of("overall_route",overallRoute,"file_sign",overallRoute.get("file_sign"));
+        if(analysisConfig!=null){snapshot=new LinkedHashMap<>(snapshot);Map<String,Object> config=analysisConfig.freeze(w,area,file,overallRoute);if(!Objects.equals(snapshot.get("file_sign"),config.get("file_sign")))throw new RuleException(409,"航线文件已变化，请重新创建计划");snapshot.put("analysis_config",config);}
         PubWaylineJobPlanDfEntity p=new PubWaylineJobPlanDfEntity();
         p.setPlanId(UUID.randomUUID().toString());p.setWorkspaceId(w);p.setUsername(user.getUsername());p.setPlanSource("系统创建");
         p.setName(name);p.setFileId(file);p.setDockSn(dock);p.setTaskType(type);p.setWaylineType(0);p.setPlanType(ConstructionType.PLAN_TYPE);

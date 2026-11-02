@@ -35,10 +35,10 @@ $arguments = @('--release','11','-encoding','UTF-8','-cp', ('"' + $classpath.Rep
 $arguments += $sources | ForEach-Object { '"' + $_.Replace('\','/') + '"' }
 $argFile = Join-Path $checkRoot 'javac.args'
 [IO.File]::WriteAllLines($argFile, $arguments, (New-Object Text.UTF8Encoding($false)))
-& 'D:/JDK-17/bin/javac.exe' "@$argFile"
+& (Join-Path $env:JAVA_HOME 'bin/javac.exe') "@$argFile"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionWaylineChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionWaylineChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionWaylineChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 Write-Output 'Construction wayline backend compilation passed.'

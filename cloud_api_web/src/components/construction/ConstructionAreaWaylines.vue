@@ -11,12 +11,17 @@
     <p v-if="error" class="route-error" role="alert">{{ error }}</p>
     <el-button v-if="error" size="small" @click="load">刷新列表</el-button>
     <p v-if="!busy && !error && !rows.length">该区域暂无航线，可新建或上传。</p>
-    <article v-for="row in rows" :key="row.wayline_id" :class="['route-card', { selected: selected === row.wayline_id }]">
-      <button class="route-select" :disabled="busy" @click="select(row)"><strong>{{ row.name }}</strong><span>{{ row.source === 'manual' ? '二维创建' : row.source === 'existing' ? '航线库关联' : 'KMZ 导入' }} · 区域 v{{ row.area_version }}</span></button>
+    <article v-for="row in rows" :key="row.wayline_id" :class="['route-card', { selected: selected === row.wayline_id }]" @click="!busy && select(row)">
+      <button class="route-select" :disabled="busy" :aria-pressed="selected === row.wayline_id" @click.stop="select(row)"><strong>{{ row.name }}</strong><span>{{ row.source === 'manual' ? '二维创建' : row.source === 'existing' ? '航线库关联' : 'KMZ 导入' }} · 区域 v{{ row.area_version }}</span><span class="preview-label">{{ selected === row.wayline_id && selectedHeight ? '正在地图上显示 · 点击重新定位' : '点击查看地图航线' }}</span></button>
       <p :class="{ 'route-error': row.status !== 'VALID' }">{{ row.message }}</p>
-      <div class="route-actions"><el-button v-if="row.status === 'STALE'" size="small" :disabled="busy || !enabled" @click="revalidate(row)">重新校验</el-button><el-button size="small" :disabled="busy" @click="unlink(row)">解除关联</el-button></div>
+      <div class="waypoint-detection-entry">
+        <el-button type="primary" plain :disabled="busy || row.status !== 'VALID'" @click.stop="openAnalysis(row)">航点检测配置</el-button>
+        <span>{{ row.status === 'VALID' ? '逐点选择检测项目 · 可见光 / 红外' : '航线校验通过后可配置检测项目' }}</span>
+      </div>
+      <div class="route-actions" @click.stop><el-button v-if="row.status === 'STALE'" size="small" :disabled="busy || !enabled" @click="revalidate(row)">重新校验</el-button><el-button size="small" :disabled="busy" @click="unlink(row)">解除关联</el-button></div>
     </article>
     <p v-if="selectedHeight" class="route-hint">预览高度：{{ selectedHeight === 'WGS84' ? 'WGS84 椭球高' : '相对起飞点高度' }}。进场、返航路径不包含在区域边界校验中。</p>
+    <ConstructionAnalysisConfig v-if="analysisFile" :context="{ area_id: areaId, wayline_id: analysisFile }" @close="analysisFile = ''" />
     <el-dialog v-model="libraryVisible" title="关联航线管理中的已有航线" width="680px" append-to-body :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy">
       <p>选择已有航线，区域校验通过后建立关联，原航线文件保持不变。</p>
       <el-input v-model="libraryKeyword" placeholder="按航线名称搜索，回车查询" clearable @keyup.enter="searchLibrary" />
@@ -34,6 +39,7 @@
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
 import { bindConstructionWayline, getConstructionWayline, listConstructionWaylines, unlinkConstructionWayline, uploadConstructionWayline, validateConstructionWayline } from '/@/api/construction'
 import { getWaylineFiles } from '/@/api/wayline'
 import type { ConstructionWayline } from '/@/api/construction'
@@ -42,6 +48,7 @@ import { uuidv4 } from '/@/utils/uuid'
 const props = defineProps<{ areaId: string; version: number; enabled: boolean; initialWayline?: string }>()
 const emit = defineEmits(['preview', 'busy'])
 const router = useRouter()
+const analysisFile = ref('')
 const rows = ref<ConstructionWayline[]>([])
 const busy = ref(false); const error = ref(''); const selected = ref(''); const selectedHeight = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -101,7 +108,11 @@ async function select (row: ConstructionWayline) {
     Object.assign(row, result)
     if (result.status !== 'VALID') { error.value = result.message; return }
     selectedHeight.value = result.height_mode || ''; emit('preview', result)
+    return true
   } catch (e) { if (token === epoch) error.value = message(e) } finally { if (token === epoch) setBusy(false) }
+}
+async function openAnalysis (row: ConstructionWayline) {
+  if (await select(row)) analysisFile.value = row.wayline_id
 }
 function create () {
   localStorage.removeItem(`construction_wayline_draft_${props.areaId}`)
@@ -148,6 +159,11 @@ onBeforeUnmount(() => { epoch++; libraryEpoch++; emit('busy', false) })
 .route-error { color: #ffad8e !important; }
 .route-card { border: 1px solid #294d79; border-radius: 5px; padding: 10px; margin-top: 12px; }
 .route-card.selected { border-color: #39d9ff; background: #14345c; }
+.route-card { cursor: pointer; }
+.route-select .preview-label { color: #8fe3ff; font-size: 12px; }
+.waypoint-detection-entry { margin: 12px 0; padding: 12px 0; border-top: 1px solid #31567f; border-bottom: 1px solid #31567f; }
+.waypoint-detection-entry :deep(.el-button) { width: 100%; min-height: 40px; font-size: 14px; font-weight: 600; --el-button-bg-color: #163e66; --el-button-text-color: #9ee8ff; --el-button-border-color: #489ccb; }
+.waypoint-detection-entry span { display: block; margin-top: 8px; color: #b7d3ed; font-size: 12px; line-height: 1.6; }
 .route-select { width: 100%; border: 0; padding: 0; background: transparent; color: #e8f4ff; text-align: left; cursor: pointer; }
 .route-select strong { display: block; overflow-wrap: anywhere; }
 .route-select span { display: block; margin-top: 7px; color: #a8bdd8; font-size: 12px; }

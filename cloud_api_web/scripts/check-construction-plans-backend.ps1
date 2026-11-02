@@ -16,12 +16,12 @@ if (!(Test-Path (Join-Path $SourceRoot 'ConstructionPlanChecks.java'))) {
   $sources += "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf/ConstructionPlanChecks.java"
 }
 $sources += "$javaRoot/df/constructionDf/ConstructionType.java"
-foreach ($name in @('ConstructionOverallService.java','ConstructionOverallController.java','ConstructionTaskService.java','ConstructionTaskController.java','ConstructionKmz.java','ConstructionPhotoNaming.java','ConstructionPreparationService.java','ConstructionPhotoAssociation.java','ConstructionTransferService.java','ConstructionTransferController.java')) {
+foreach ($name in @('ConstructionOverallService.java','ConstructionOverallController.java','ConstructionTaskService.java','ConstructionTaskController.java','ConstructionKmz.java','ConstructionPhotoNaming.java','ConstructionPreparationService.java','ConstructionPhotoAssociation.java','ConstructionTransferService.java','ConstructionTransferController.java','ConstructionAnalysisPolicy.java','ConstructionAnalysisConfigService.java','ConstructionAnalysisConfigController.java','ConstructionParkingController.java')) {
   $staged = Join-Path $SourceRoot $name
   $installed = "$javaRoot/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
 }
-foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java')) {
+foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java','ConstructionAnalysisConfigChecks.java','ConstructionParkingChecks.java')) {
   $staged = Join-Path $SourceRoot $name
   $installed = "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
@@ -43,35 +43,41 @@ $arguments = @('--release','11','-encoding','UTF-8','-cp', ('"' + $classpath.Rep
 $arguments += $sources | ForEach-Object { '"' + $_.Replace('\','/') + '"' }
 $argFile = Join-Path $checkRoot 'plans-javac.args'
 [IO.File]::WriteAllLines($argFile,$arguments,(New-Object Text.UTF8Encoding($false)))
-& 'D:/JDK-17/bin/javac.exe' "@$argFile"
+& (Join-Path $env:JAVA_HOME 'bin/javac.exe') "@$argFile"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionPlanChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionPlanChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionPlanChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 Write-Output 'Construction plans backend compilation passed.'
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionOverallChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOverallChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOverallChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionOverallPlanChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOverallPlanChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOverallPlanChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionDockCoverageChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionDockCoverageChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionDockCoverageChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionOrientedSuffixChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOrientedSuffixChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionOrientedSuffixChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionFallbackChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionFallbackChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionFallbackChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionTransferChecks.class") {
-  & 'D:/JDK-17/bin/java.exe' '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionTransferChecks'
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionTransferChecks'
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
+if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionAnalysisConfigChecks.class") {
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionAnalysisConfigChecks'
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+& (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionParkingChecks'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

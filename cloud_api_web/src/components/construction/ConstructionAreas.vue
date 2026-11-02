@@ -6,6 +6,7 @@
         <p>围绕机巢划定施工区域，管理巡检边界与历史版本。</p>
       </div>
       <div class="heading-actions">
+        <el-button :disabled="editing || saving" @click="analysisContext = {}">默认检测配置</el-button>
         <el-checkbox v-model="showArchived" size="small" @change="load">显示已归档</el-checkbox>
         <el-button type="primary" @click="newArea">＋ 新建区域</el-button>
       </div>
@@ -45,12 +46,21 @@
           :dock-error="dockError"
           :docks-loading="docksLoading"
           :wayline="routePreview"
+          parking-enabled
+          floating-tools
           @refresh-docks="refreshDocks"
           @drawing="drawing = $event"
           @select="onMapSelect"
           @update:boundary="value => { if (draft) draft.boundary = value }"
         />
         <div class="property-panel">
+          <section v-if="draft?.id && !editing" class="area-detection-entry">
+            <span class="detection-level">工作面统一规则</span>
+            <h3>{{ draft.name }}</h3>
+            <p>统一设置本工作面的可见光检测项目和红外温度检测。</p>
+            <el-button type="primary" :disabled="saving || routeBusy" @click="analysisContext = { area_id: draft.id }">工作面检测配置</el-button>
+            <small>单个航点需调整？在下方航线卡片中设置。</small>
+          </section>
           <el-radio-group v-if="draft?.id && !editing" v-model="detailTab" size="small" class="detail-tabs"><el-radio-button label="routes">区域航线</el-radio-button><el-radio-button label="detail">区域详情</el-radio-button></el-radio-group>
           <ConstructionAreaWaylines v-if="draft?.id && !editing && detailTab === 'routes'" :key="draft.id" :area-id="draft.id" :version="draft.version" :enabled="draft.enabled && !areas.find(a => a.id === draft?.id)?.archived" :initial-wayline="String(route.query.wayline || '')" @preview="routePreview = $event" @busy="routeBusy = $event" />
           <template v-else>
@@ -80,6 +90,7 @@
       </section>
     </div>
 
+    <ConstructionAnalysisConfig v-if="analysisContext" :context="analysisContext" @close="analysisContext = null" />
     <el-drawer v-model="historyVisible" title="版本历史" size="420px">
       <div v-if="historyLoading" class="list-status">加载中…</div>
       <el-table v-else :data="historyRows" size="small">
@@ -96,6 +107,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import ConstructionAreaWaylines from './ConstructionAreaWaylines.vue'
+import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
+import type { ConstructionConfigContext, ConstructionAreaRecord, ConstructionAreaVersionRecord, ConstructionPoint, ConstructionWayline } from '/@/api/construction'
 import ConstructionAreaMap from './ConstructionAreaMap.vue'
 import { useConstructionDocks } from './useConstructionDocks'
 import { areaSquareMeters, validateBoundary } from './constructionModel'
@@ -103,7 +116,6 @@ import {
   archiveConstructionArea, constructionAreaHistory, createConstructionArea, getConstructionArea,
   listConstructionAreas, updateConstructionArea, ConstructionAreaConflictError
 } from '/@/api/construction'
-import type { ConstructionAreaRecord, ConstructionAreaVersionRecord, ConstructionPoint, ConstructionWayline } from '/@/api/construction'
 
 const route = useRoute()
 const detailTab = ref('routes')
@@ -121,6 +133,7 @@ const showArchived = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const editingMode = ref(false)
+const analysisContext = ref<ConstructionConfigContext | null>(null)
 const draft = ref<{ id: string | null; name: string; category: string; enabled: boolean; notes: string; version: number; boundary: ConstructionPoint[] } | null>(null)
 let baseline = ''
 let selectionSequence = 0
@@ -307,6 +320,12 @@ refreshDocks()
 .area-editor { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 0; min-height: 0; padding: 0; overflow: hidden; }
 .property-panel { border-left: 1px solid #23436e; padding: 18px 16px; min-height: 0; overflow: auto; }
 .detail-tabs { margin-bottom: 18px; }
+.area-detection-entry { margin-bottom: 20px; padding: 14px; border: 1px solid #429bdc; border-top: 3px solid #53cfff; border-radius: 8px; background: linear-gradient(135deg, #173e68, #102c50); }
+.detection-level { color: #8fe3ff; font-size: 12px; font-weight: 600; }
+.area-detection-entry h3 { margin: 8px 0; color: #f3f9ff; font-size: 16px; overflow-wrap: anywhere; }
+.area-detection-entry p { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: #c9def4; }
+.area-detection-entry :deep(.el-button) { width: 100%; min-height: 40px; font-size: 14px; font-weight: 600; }
+.area-detection-entry small { display: block; margin-top: 10px; color: #acc8e6; font-size: 12px; line-height: 1.6; }
 .property-empty { padding: 50px 6px 10px; text-align: center; color: #9bb2d0; line-height: 1.8; }
 .property-empty > span { display: block; font-size: 44px; color: #5b9fd9; }
 .property-empty h4 { color: #deebff; font-size: 14px; }
