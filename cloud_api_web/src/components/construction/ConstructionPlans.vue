@@ -13,7 +13,7 @@
         <el-button @click="manageArea">施工区域管理</el-button>
       </aside>
       <section class="plans-content">
-        <div class="plan-map"><ConstructionAreaMap :areas="mapAreas" :selected-id="selectedId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="activeDock" :independent-coverage="true" :wayline="preview" @coverage-change="coverage = $event" @select="selectArea" @refresh-docks="refreshDocks" /></div>
+        <div class="plan-map"><ConstructionAreaMap parking-enabled floating-tools :areas="mapAreas" :selected-id="selectedId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="activeDock" :independent-coverage="true" :wayline="preview" @coverage-change="coverage = $event" @select="selectArea" @refresh-docks="refreshDocks" /></div>
         <section class="plan-list">
           <div class="list-heading"><div><h3>{{ selectedArea ? selectedArea.name + ' · 巡检计划' : '请选择巡检区域' }}</h3><p v-if="activeDock">执行机巢：{{ deviceName(activeDock) }}{{ docks.some(d => d.sn === activeDock) ? '' : '（暂无定位）' }}</p></div><el-button type="primary" :disabled="!canCreate || busy || plansLoading" @click="openCreate">＋ 新建计划</el-button></div>
           <div class="actions plan-filters"><el-input v-model="planKeyword" placeholder="搜索计划名称" clearable @input="page = 1" /><el-checkbox v-model="showArchivedPlans" :disabled="busy" @change="loadPlans">显示已归档计划</el-checkbox><el-button size="small" :disabled="!selectedArea" @click="manageArea">管理区域航线</el-button></div>
@@ -164,10 +164,11 @@ h2,h3,p { margin: 0; } h2 { font-size: 20px; color: #e7f0ff; } h3 { font-size: 1
 .region-scroll { flex: 1; overflow: auto; } small { display: block; color: #91aac8; font-size: 12px; margin-top: 5px; }
 .plan-area-card { width: 100%; padding: 13px; margin-bottom: 9px; text-align: left; background: #102f55; color: #dce9fb; border: 1px solid #294d79; border-radius: 5px; cursor: pointer; }
 .plan-area-card span { display: block; margin-top: 8px; font-size: 12px; color: #9eb6d6; }.plan-area-card.selected { border-color: #39d9ff; background: #17406a; }
-.plans-content { display: grid; grid-template-rows: minmax(300px, 1.2fr) minmax(300px, 1fr); gap: 12px; min-width: 0; min-height: 0; }
+.plans-content { display: grid; grid-template-rows: minmax(520px, 1.6fr) minmax(300px, 1fr); gap: 12px; min-width: 0; min-height: 832px; }
+.plan-map { min-width: 0; min-height: 0; }
 .plan-list { display: flex; flex-direction: column; padding: 14px; gap: 12px; min-height: 0; }.plan-list :deep(.el-table) { flex: 1; min-height: 100px; }
 .plan-list :deep(.el-table) { --el-table-current-row-bg-color: #17406a; --el-table-row-hover-bg-color: #17365c; }
 .plan-filters { justify-content: flex-start; }.plan-filters .el-input { max-width: 240px; }.error { color: #ffad8e; }.actions { flex-wrap: wrap; }
 @media(max-width: 1050px) { .plans-layout { grid-template-columns: 200px minmax(0,1fr); } }
-@media(max-width: 680px) { .plans-layout { display: flex; flex-direction: column; }.region-panel { max-height: 240px; flex: none; }.plans-content { min-height: 720px; } header { align-items: flex-start; } }
+@media(max-width: 680px) { .plans-layout { display: flex; flex-direction: column; }.region-panel { max-height: 240px; flex: none; }.plans-content { grid-template-rows: minmax(460px, 1.4fr) minmax(300px, 1fr); min-height: 772px; } header { align-items: flex-start; } }
 </style>

@@ -94,7 +94,10 @@
       </el-form>
     </div>
     <div class="content">
-      <ConstructionTransfers ref="transfers" />
+      <el-button :aria-expanded="showTransfers" aria-controls="construction-transfers" @click="showTransfers = !showTransfers">{{ showTransfers ? '收起离线接收' : '离线接收工地巡检结果' }}</el-button>
+      <div v-show="showTransfers" id="construction-transfers">
+        <ConstructionTransfers ref="transfers" />
+      </div>
       <div class="table-container">
         <el-table
           :data="plansData.data"
@@ -365,6 +368,7 @@ import { getRoot } from '/@/root'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 const router = useRouter()
 const transfers = ref<InstanceType<typeof ConstructionTransfers>>()
+const showTransfers = ref(false)
 function refreshTasks () { getPlans(); transfers.value?.refresh() }
 
 const selectedData = ref([])
