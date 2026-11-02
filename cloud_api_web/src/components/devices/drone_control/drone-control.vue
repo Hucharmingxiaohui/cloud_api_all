@@ -415,9 +415,10 @@
       <div class="form-content">
         <div><span class="form-label">起飞纬度:</span><a-input-number v-model:value="missionParams.lat" /></div>
         <div><span class="form-label">起飞经度:</span><a-input-number v-model:value="missionParams.lng" /></div>
-        <div><span class="form-label">机巢悬停高度:</span><a-input-number v-model:value="missionParams.homeHoverAlt" /></div>
-        <div><span class="form-label">安全起飞高度:</span><a-input-number v-model:value="missionParams.securityTakeoffAlt" /></div>
-        <div><span class="form-label">指导飞行高度:</span><a-input-number v-model:value="missionParams.flightAlt" /></div>
+        <div><span class="form-label">相对机巢悬停高度(m):</span><a-input-number v-model:value="missionParams.homeHoverAlt" disabled /></div>
+        <div><span class="form-label">返航参考高度(m):</span><a-input-number v-model:value="missionParams.securityTakeoffAlt" /></div>
+        <div><span class="form-label">指点飞行高度(m):</span><a-input-number v-model:value="missionParams.flightAlt" disabled /></div>
+        <div>一键起飞：安全起飞/指点飞行高度固定25米；目标椭球高=当前机巢椭球高+20米，非离地高度。</div>
         <div><span class="form-label">作业高度(m):</span><a-input-number v-model:value="missionParams.alt" :min="10" /></div>
         <div><span class="form-label">抵近速度(m/s):</span><a-input-number v-model:value="missionParams.approachSpeed" :min="1" :max="MAX_SPEED" /></div>
         <div><span class="form-label">盘旋半径(m):</span><a-input-number v-model:value="missionParams.orbitRadius" :min="20" /></div>
@@ -465,7 +466,7 @@
 <script setup lang="ts">
 import { defineProps, reactive, ref, watch, computed, onMounted, watchEffect } from 'vue'
 import { Select, message, Button } from 'ant-design-vue'
-import { PayloadInfo, DeviceInfoType, ControlSource, DeviceOsdCamera, DrcStateEnum } from '/@/types/device'
+import { PayloadInfo, DeviceInfoType, DockBasicOsd, ControlSource, DeviceOsdCamera, DrcStateEnum } from '/@/types/device'
 import { useMyStore } from '/@/store'
 import { postDrcEnter, postDrcEnterOnly, postDrcExit, postSpeakerDrcEnter, postSpeakerDrcExit } from '/@/api/drc'
 import { useMqtt, DeviceTopicInfo } from '/@/components/g-map/use-mqtt'
@@ -1222,9 +1223,9 @@ const missionParams = reactive({
   visible: false,
   lat: null as null | number,
   lng: null as null | number,
-  homeHoverAlt: 115 as null | number,
-  securityTakeoffAlt: 20 as null | number,
-  flightAlt: 20 as null | number,
+  homeHoverAlt: 20 as null | number,
+  securityTakeoffAlt: 25 as null | number,
+  flightAlt: 25 as null | number,
   alt: 80 as number, // 作业高度（可改）
   approachSpeed: 8 as number, // 抵近速度
   orbitRadius: 60 as number, // 盘旋半径
@@ -1262,23 +1263,16 @@ function onMissionParamConfirm (confirm: boolean) {
 }
 
 // 1)取机巢坐标的小工具：优先OSD，其次任务参数兜底
-function getHomeFromDevice (): { lat: number; lng: number } | null {
-  // 尝试从设备信息拿机巢经纬度（按你给的结构推断，可按实际字段名改）
-  const lat = (props.deviceInfo as any)?.dock?.basic_osd?.latitude
-  const lng = (props.deviceInfo as any)?.dock?.basic_osd?.longitude
-  console.log('lat:' + lat)
-  console.log('lng:' + lng)
-  if (typeof lat === 'number' && typeof lng === 'number') return { lat, lng }
+function getHomeFromDevice (osd?: DockBasicOsd): { lat: number; lng: number } | null {
+  const lat = osd?.latitude
+  const lng = osd?.longitude
+  if (typeof lat === 'number' && Number.isFinite(lat) && Math.abs(lat) <= 90 &&
+      typeof lng === 'number' && Number.isFinite(lng) && Math.abs(lng) <= 180) return { lat, lng }
 
-  // 兜底：在「参数设置」里也让用户填过 homeLat/homeLng，则可用：
-  if (missionParams?.lat != null && missionParams?.lng != null) {
+  if (typeof missionParams.lat === 'number' && Number.isFinite(missionParams.lat) && Math.abs(missionParams.lat) <= 90 &&
+      typeof missionParams.lng === 'number' && Number.isFinite(missionParams.lng) && Math.abs(missionParams.lng) <= 180) {
     return { lat: missionParams.lat, lng: missionParams.lng }
   }
-
-  // 再兜底：如果你有后端接口能取home（例如 /api/device/{sn}/home），可以在这里同步取一次
-  // const { data } = await axios.get(`/api/device/${props.sn}/home`);
-  // return data ? { lat: data.lat, lng: data.lng } : null;
-
   return null
 }
 
@@ -1287,32 +1281,37 @@ function getHomeFromDevice (): { lat: number; lng: number } | null {
 async function onOneKeyTakeoff () {
   if (missionBusy.value) return
 
-  const home = getHomeFromDevice()
+  // 按当前机场SN读取同一份OSD快照，避免切换机场后沿用面板的旧遥测。
+  const osd = store.state.deviceState.dockInfo[props.sn]?.basic_osd
+  const dockHeight = osd?.height
+  if (typeof dockHeight !== 'number' || !Number.isFinite(dockHeight)) {
+    message.error('当前机巢OSD缺少有效WGS84椭球高，无法计算起飞目标高度，请等待该机场遥测更新')
+    return
+  }
+  const home = getHomeFromDevice(osd)
   if (!home) {
     message.error('找不到机巢坐标：请确认设备OSD或在参数里填写 homeLat/homeLng')
     return
   }
-  if (missionParams.homeHoverAlt == null) {
-    message.error('请设置机巢悬停高度（homeHoverAlt）')
+  const targetHeight = dockHeight + 20
+  if (!Number.isFinite(targetHeight) || targetHeight < 2 || targetHeight > 1500) {
+    message.error('机巢椭球高+20米超出目标高度允许范围（2～1500米），已阻止起飞')
     return
   }
-  if (missionParams.securityTakeoffAlt == null) {
-    message.error('请设置安全起飞高度（securityTakeoffAlt）')
-    return
-  }
-  if (missionParams.flightAlt == null) {
-    message.error('请设置指挥飞行高度高度（flightAlt）')
+  if (typeof missionParams.securityTakeoffAlt !== 'number' || !Number.isFinite(missionParams.securityTakeoffAlt)) {
+    message.error('请设置有效的返航参考高度（securityTakeoffAlt）')
     return
   }
 
   missionBusy.value = true
   missionState.value = 'takingOff'
   try {
+    console.info(`[一键起飞] 机巢=${props.sn}，目标悬停椭球高=${dockHeight}+20=${targetHeight}米（WGS84，相对机巢20米，非离地高度），安全起飞高度=25米，指点飞行高度=25米（均相对机场起飞点）`)
     await takeoffToPoint(props.sn, {
       target_latitude: home.lat,
       target_longitude: home.lng,
-      target_height: missionParams.homeHoverAlt, // 悬停高度
-      security_takeoff_height: missionParams.securityTakeoffAlt, // Math.max(20, Math.min(50, missionParams.homeHoverAlt - 10)),
+      target_height: targetHeight,
+      security_takeoff_height: 25,
       rth_altitude: Math.max(30, missionParams.securityTakeoffAlt),
       max_speed: Math.min(MAX_SPEED, 8), // 统一用下划线；速度取保守值
       rc_lost_action: LostControlActionInCommandFLight.RETURN_HOME,
@@ -1320,7 +1319,7 @@ async function onOneKeyTakeoff () {
       rth_mode: ERthMode.SETTING,
       commander_mode_lost_action: ECommanderModeLostAction.CONTINUE,
       commander_flight_mode: ECommanderFlightMode.SETTING,
-      commander_flight_height: missionParams.flightAlt,
+      commander_flight_height: 25,
     })
     message.success('已起飞并前往机巢上空悬停')
     missionState.value = 'hovering'

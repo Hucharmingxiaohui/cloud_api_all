@@ -44,6 +44,9 @@ import java.util.UUID;
 public class ControlServiceImpl implements IControlService {
 
     @Autowired
+    private com.dji.sample.control.diagnostics.FlightDiagnostics flightDiagnostics;
+
+    @Autowired
     private IWebSocketMessageService webSocketMessageService;
 
     @Autowired
@@ -81,6 +84,15 @@ public class ControlServiceImpl implements IControlService {
 
     @Override
     public HttpResultResponse controlDockDebug(String sn, RemoteDebugMethodEnum controlMethodEnum, RemoteDebugParam param) {
+        if (controlMethodEnum == RemoteDebugMethodEnum.RETURN_HOME) {
+            return flightDiagnostics.command("return_home", sn,
+                    session -> controlDockDebugDiagnostic(sn, controlMethodEnum, param, session));
+        }
+        return controlDockDebugDiagnostic(sn, controlMethodEnum, param, null);
+    }
+
+    private HttpResultResponse controlDockDebugDiagnostic(String sn, RemoteDebugMethodEnum controlMethodEnum,
+            RemoteDebugParam param, com.dji.sample.control.diagnostics.FlightDiagnostics.Session session) {
         DebugMethodEnum methodEnum = controlMethodEnum.getDebugMethodEnum();
         RemoteDebugHandler data = checkDebugCondition(sn, param, controlMethodEnum);
 
@@ -90,9 +102,13 @@ public class ControlServiceImpl implements IControlService {
         }
         TopicServicesResponse response;
         switch (controlMethodEnum) {
-            case RETURN_HOME:
-                response = abstractWaylineService.returnHome(SDKManager.getDeviceSDK(sn));
+            case RETURN_HOME: {
+                var sdk = SDKManager.getDeviceSDK(sn);
+                flightDiagnostics.outbound(session, null);
+                response = abstractWaylineService.returnHome(sdk);
+                flightDiagnostics.reply(session, response);
                 break;
+            }
             case RETURN_HOME_CANCEL:
                 response = abstractWaylineService.returnHomeCancel(SDKManager.getDeviceSDK(sn));
                 break;
@@ -163,11 +179,21 @@ public class ControlServiceImpl implements IControlService {
 
     @Override
     public HttpResultResponse takeoffToPoint(String sn, TakeoffToPointParam param) {
+        return flightDiagnostics.command("takeoff_to_point", sn,
+                session -> takeoffToPointDiagnostic(sn, param, session));
+    }
+
+    private HttpResultResponse takeoffToPointDiagnostic(String sn, TakeoffToPointParam param,
+            com.dji.sample.control.diagnostics.FlightDiagnostics.Session session) {
         checkTakeoffCondition(sn);
 
         param.setFlightId(UUID.randomUUID().toString());
+        var sdk = SDKManager.getDeviceSDK(sn);
+        TakeoffToPointRequest request = mapper.convertValue(param, TakeoffToPointRequest.class);
+        flightDiagnostics.outbound(session, param);
         TopicServicesResponse<ServicesReplyData> response = abstractControlService.takeoffToPoint(
-                SDKManager.getDeviceSDK(sn), mapper.convertValue(param, TakeoffToPointRequest.class));
+                sdk, request);
+        flightDiagnostics.reply(session, response);
         ServicesReplyData reply = response.getData();
         return reply.getResult().isSuccess() ?
                 HttpResultResponse.success()
