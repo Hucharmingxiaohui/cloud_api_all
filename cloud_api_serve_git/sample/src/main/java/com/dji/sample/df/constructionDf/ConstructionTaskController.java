@@ -64,4 +64,32 @@ public class ConstructionTaskController {
     public HttpResultResponse refresh(HttpServletRequest request, @PathVariable String jobId) throws Exception {
         return HttpResultResponse.success(service.refresh(job(request, jobId)));
     }
+    @GetMapping("/analysis")
+    public HttpResultResponse analysis(HttpServletRequest request,@PathVariable String jobId)throws Exception {
+        return HttpResultResponse.success(service.refresh(job(request,jobId)));
+    }
+    @GetMapping("/analysis/batches")
+    public HttpResultResponse batches(HttpServletRequest request,@PathVariable String jobId)throws Exception {
+        return HttpResultResponse.success(service.batches(job(request,jobId)));
+    }
+    @GetMapping("/analysis/batches/{batchId}")
+    public HttpResultResponse batch(HttpServletRequest request,@PathVariable String jobId,@PathVariable String batchId)throws Exception {
+        return HttpResultResponse.success(service.batch(job(request,jobId),batchId));
+    }
+    @GetMapping("/analysis/batches/{batchId}/photos/{fileId}/result")
+    public ResponseEntity<FileSystemResource> result(HttpServletRequest request,@PathVariable String jobId,@PathVariable String batchId,@PathVariable String fileId)throws Exception {
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(new FileSystemResource(service.resultPhoto(job(request,jobId),batchId,fileId)));
+    }
+    @PostMapping({"/analysis/batches/{batchId}/report","/report"})
+    public HttpResultResponse generateReport(HttpServletRequest request,@PathVariable String jobId,@PathVariable(required=false) String batchId)throws Exception {
+        WaylineJobEntity task=job(request,jobId);
+        return HttpResultResponse.success(service.generateReport(task,batchId==null?service.currentBatch(task):batchId));
+    }
+    @GetMapping({"/analysis/batches/{batchId}/report","/report"})
+    public ResponseEntity<FileSystemResource> report(HttpServletRequest request,@PathVariable String jobId,@PathVariable(required=false) String batchId)throws Exception {
+        WaylineJobEntity task=job(request,jobId);
+        return ResponseEntity.ok().header("Content-Disposition","attachment; filename=construction-report.docx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(new FileSystemResource(service.report(task,batchId==null?service.currentBatch(task):batchId)));
+    }
 }

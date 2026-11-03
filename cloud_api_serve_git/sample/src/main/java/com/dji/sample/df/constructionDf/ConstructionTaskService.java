@@ -202,7 +202,8 @@ public class ConstructionTaskService {
         result.put("overall_route",bindingSnapshot);
         result.put("expected_count", job.getMediaCount()); result.put("received_count", entries.size());
         result.put("media_complete", complete(job, entries));
-        result.put("analysis_configured", gateways.getIfAvailable() != null);
+        ConstructionAnalysisGateway configured=gateways.getIfAvailable();
+        result.put("analysis_configured", configured instanceof ConstructionNativeAnalysisGateway?((ConstructionNativeAnalysisGateway)configured).configured():configured!=null);
         Map<String,Object> analysis=read(dir(job).resolve("analysis.json"));
         result.put("analysis",analysis);
         if (job.getJobId().startsWith("offline-")) result.put("transfer_source", imported(job.getWorkspaceId(),job.getJobId()).get("origin"));
@@ -216,6 +217,10 @@ public class ConstructionTaskService {
     private int revision(Map<String,Object> journal) { return ((Number)journal.getOrDefault("revision",0)).intValue(); }
     public void assignPhotos(WaylineJobEntity job,Map<String,Object> body,String user) throws Exception {
         locked(job,()->{
+            if(gateways.getIfAvailable() instanceof ConstructionNativeAnalysisGateway)
+                for(Map<String,Object> active:nativeGateway().batches(job))
+                    if(!List.of("SUCCEEDED","FAILED").contains(String.valueOf(active.get("status"))))
+                        throw error(HttpStatus.CONFLICT,"分析批次尚未结束或提交结果待确认，暂不能修改照片归属");
             Map<String,Object> batch=read(dir(job).resolve("analysis.json"));
             if(!batch.isEmpty()&&!List.of("SUCCEEDED","FAILED").contains(String.valueOf(batch.get("status"))))throw error(HttpStatus.CONFLICT,"分析批次尚未结束，暂不能修改照片归属");
             Map<String,Object> journal=read(dir(job).resolve("associations.json"));
@@ -255,6 +260,15 @@ public class ConstructionTaskService {
     public Map<String, Object> submit(WaylineJobEntity job, String requestId) throws Exception {
         if (requestId == null || !requestId.matches("[a-zA-Z0-9_-]{8,100}"))
             throw error(HttpStatus.BAD_REQUEST, "请提供有效的幂等请求标识");
+        if(gateway() instanceof ConstructionNativeAnalysisGateway) return locked(job,()->{
+            for(Map<String,Object> old:batches(job))if(requestId.equals(old.get("request_id")))return old;
+            Map<String,Object> legacy=read(dir(job).resolve("analysis.json"));
+            if(!legacy.isEmpty()&&!Boolean.TRUE.equals(legacy.get("native_adapter"))&&!List.of("SUCCEEDED","FAILED").contains(legacy.get("status")))
+                throw error(HttpStatus.CONFLICT,"旧分析批次结果待确认，请先人工核对，不会自动重新提交");
+            List<MediaFileEntity> entries=media(job);
+            if(!complete(job,entries))throw error(HttpStatus.CONFLICT,"飞行未完成或媒体未收齐，不能提交分析");
+            return remember(job,((ConstructionNativeAnalysisGateway)gateway()).submit(job,requestId));
+        });
         return locked(job, () -> {
             Path history = dir(job).resolve("batch-" + key(requestId) + ".json");
             if (Files.exists(history)) return read(history);
@@ -299,6 +313,11 @@ public class ConstructionTaskService {
     }
 
     public Map<String, Object> refresh(WaylineJobEntity job) throws Exception {
+        if(gateway() instanceof ConstructionNativeAnalysisGateway){
+            List<Map<String,Object>> all=batches(job);
+            if(all.isEmpty())return read(dir(job).resolve("analysis.json"));
+            return batch(job,(String)all.get(0).get("batch_id"));
+        }
         return locked(job, () -> {
             Path current = dir(job).resolve("analysis.json");
             Map<String, Object> batch = read(current);
@@ -316,6 +335,94 @@ public class ConstructionTaskService {
         });
     }
     private static ResponseStatusException error(HttpStatus status, String message) { return new ResponseStatusException(status, message); }
+
+    private ConstructionNativeAnalysisGateway nativeGateway(){
+        if(!(gateway() instanceof ConstructionNativeAnalysisGateway))throw error(HttpStatus.SERVICE_UNAVAILABLE,"原生分析适配器未配置");
+        return (ConstructionNativeAnalysisGateway)gateway();
+    }
+    private Map<String,Object> remember(WaylineJobEntity job,Map<String,Object> batch)throws Exception {
+        batch.put("native_adapter",true);
+        write(dir(job).resolve("analysis.json"),batch);return batch;
+    }
+    public List<Map<String,Object>> batches(WaylineJobEntity job)throws Exception{
+        List<Map<String,Object>> result=new ArrayList<>(nativeGateway().batches(job));
+        Set<Object> ids=result.stream().map(b->b.get("batch_id")).collect(Collectors.toSet());
+        if(Files.isDirectory(dir(job)))try(DirectoryStream<Path> stream=Files.newDirectoryStream(dir(job),"batch-*.json")){
+            for(Path p:stream){Map<String,Object> b=read(p);if(!b.isEmpty()&&ids.add(b.get("batch_id")))result.add(b);}
+        }
+        result.sort(Comparator.comparingLong((Map<String,Object> b)->b.get("created_at") instanceof Number?((Number)b.get("created_at")).longValue():0).reversed());return result;
+    }
+    public Map<String,Object> batch(WaylineJobEntity job,String id)throws Exception {
+        for(Map<String,Object> b:batches(job))if(id.equals(b.get("batch_id"))&&!b.containsKey("report_ready"))return b;
+        Map<String,Object> value=nativeGateway().batch(job,id);
+        Map<String,Object> current=read(dir(job).resolve("analysis.json"));
+        if(Objects.equals(current.get("batch_id"),id))remember(job,value);
+        return value;
+    }
+    public String currentBatch(WaylineJobEntity job)throws Exception {
+        Map<String,Object> b=read(dir(job).resolve("analysis.json"));
+        if(!(b.get("batch_id") instanceof String))throw error(HttpStatus.NOT_FOUND,"暂无分析批次");return (String)b.get("batch_id");
+    }
+    public Map<String,Object> generateReport(WaylineJobEntity job,String id)throws Exception {
+        Map<String,Object> b=nativeGateway().generate(job,id);
+        return locked(job,()->{
+            Map<String,Object> current=read(dir(job).resolve("analysis.json"));
+            if(id.equals(current.get("batch_id")))remember(job,b);return b;
+        });
+    }
+    public Path report(WaylineJobEntity job,String id)throws Exception{return nativeGateway().report(job,id);}
+    public Path resultPhoto(WaylineJobEntity job,String id,String file)throws Exception{return nativeGateway().evidence(job,id,file);}
+
+    Map<String,Object> analysisSnapshot(WaylineJobEntity job)throws Exception {
+        Map<String,Object> frozen=new LinkedHashMap<>();
+        frozen.put("overall_route",snapshot(job));frozen.put("media_manifest",read(dir(job).resolve("media.json")));
+        Map<String,Object> journal=read(dir(job).resolve("associations.json"));
+        frozen.put("association_revision",revision(journal));frozen.put("association_decisions",decisions(journal));
+        return frozen;
+    }
+    Path analysisOriginal(WaylineJobEntity job,String fileId)throws Exception {
+        Path path=photo(job,fileId);
+        if(!Objects.equals(read(dir(job).resolve("media.json")).get(fileId),checksum(path)))
+            throw error(HttpStatus.CONFLICT,"原图已改变或损坏，请核对归档，不能使用旧元数据提交");
+        return path;
+    }
+    Map<String,Path> analysisOriginals(WaylineJobEntity job)throws Exception {
+        Map<String,Object> manifest=read(dir(job).resolve("media.json"));Map<String,Path> out=new LinkedHashMap<>();
+        for(MediaFileEntity file:media(job)){
+            Path path=photo(job,file.getFileId());
+            if(!Objects.equals(manifest.get(file.getFileId()),checksum(path)))throw error(HttpStatus.CONFLICT,"原图已改变或损坏，请核对归档，不能使用旧元数据提交");
+            out.put(file.getFileId(),path);
+        }return out;
+    }
+    @SuppressWarnings("unchecked")
+    Map<String,Map<String,Object>> analysisMetadata(WaylineJobEntity job)throws Exception {
+        Map<String,Object> snap=snapshot(job), config=(Map<String,Object>)snap.getOrDefault("analysis_config",Map.of());
+        if(!(config.get("schema_version") instanceof Number)||((Number)config.get("schema_version")).doubleValue()!=1)
+            throw error(HttpStatus.CONFLICT,"任务缺少受支持的冻结检测配置版本，不能读取当前规则代替历史快照");
+        List<Map<String,Object>> points=(List<Map<String,Object>>)config.getOrDefault("points",List.of());
+        Map<String,Object> journal=read(dir(job).resolve("associations.json"));Map<String,Map<String,Object>> out=new LinkedHashMap<>();
+        for(MediaFileEntity file:media(job)){
+            Map<String,Object> association=ConstructionPhotoAssociation.resolve(snap,file.getFileId(),file.getFileName(),decisions(journal));
+            Map<String,Object> p=new LinkedHashMap<>();p.put("id",file.getFileId());p.put("fileName",file.getFileName());p.put("areaId",association.get("area_id"));p.put("excluded",Boolean.TRUE.equals(association.get("excluded")));
+            p.put("ready",false);p.put("checks",List.of());p.put("type","unknown");p.put("metadataSource","frozen-task-snapshot");
+            if(Boolean.TRUE.equals(p.get("excluded"))){out.put(file.getFileId(),p);continue;}
+            List<Map<String,Object>> matches=new ArrayList<>();
+            for(Map<String,Object> point:points)for(String suffix:(List<String>)point.getOrDefault("photo_suffixes",List.of()))
+                if(file.getFileName()!=null&&java.util.regex.Pattern.compile("(?:^|_)"+java.util.regex.Pattern.quote(suffix)+"(?=_|\\.|$)").matcher(file.getFileName()).find()){matches.add(point);break;}
+            if(matches.size()==1&&Objects.equals(matches.get(0).get("area_id"),association.get("area_id"))){
+                Map<String,Object> point=matches.get(0);Map<String,Object> policy=ConstructionAnalysisPolicy.validate(point.get("effective"));
+                String name=file.getFileName();boolean thermal=java.util.regex.Pattern.compile("(?i)(?:^|_)T(?=_|\\.|$)").matcher(name).find(),visible=java.util.regex.Pattern.compile("(?i)(?:^|_)V(?=_|\\.|$)").matcher(name).find();
+                if(thermal!=visible){
+                    Map<String,Object> ir=(Map<String,Object>)policy.get("infrared");p.put("type",thermal?"infrared":"visible");p.put("checks",thermal?List.of():policy.get("visible_checks"));p.put("ready",true);
+                    p.put("waypoint_index",point.get("index"));p.put("policy_source",point.get("source"));p.put("infrared_temperature_enabled",thermal&&Boolean.TRUE.equals(ir.get("enabled")));
+                    if(thermal&&Boolean.TRUE.equals(ir.get("enabled")))throw error(HttpStatus.CONFLICT,"V1.0算法协议尚未提供红外测温能力；冻结的温度异常检测不能执行，不会改用火灾烟雾检测");
+                    p.put("infrared_temperature",Map.of("status","not_requested","message","本照片未请求红外测温"));
+                }
+            }
+            if(!Boolean.TRUE.equals(p.get("excluded"))&&!Boolean.TRUE.equals(p.get("ready")))throw error(HttpStatus.CONFLICT,"任务缺少有效冻结检测配置、唯一拍摄航点或明确_T/_V镜头标记："+file.getFileName());
+            p.put("originalUrl","/api/construction/tasks/"+job.getJobId()+"/media/"+file.getFileId());out.put(file.getFileId(),p);
+        }return out;
+    }
 
     /** Export under the same lock as archive/analysis so ownership cannot change mid-package. */
     public Path exportTransfer(WaylineJobEntity job, ConstructionTransferService transfer) throws Exception {

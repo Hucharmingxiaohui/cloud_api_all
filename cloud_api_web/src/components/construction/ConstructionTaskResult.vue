@@ -60,8 +60,11 @@
                   <el-alert v-if="!detail.analysis_configured" title="分析服务尚未配置，当前可查看及归档本地照片。" type="info" :closable="false" show-icon />
                   <p v-if="detail.analysis.message" class="inline-notice">{{ detail.analysis.message }}</p>
                   <div class="analysis-rows"><div><span>分析主机</span><b>{{ connected === null ? '未检查' : connected ? '可连接' : '不可连接' }}</b></div><div><span>当前批次</span><b>{{ detail.analysis.batch_id || '尚未提交' }}</b></div></div>
-                  <div class="analysis-actions"><el-button :disabled="busy || !detail.analysis_configured" @click="check">检查分析主机</el-button><el-button type="primary" :disabled="!canSubmit" @click="submit">{{ detail.analysis.batch_id ? '重新分析' : '提交分析' }}</el-button><el-button :disabled="busy || !detail.analysis.batch_id || !detail.analysis_configured" @click="refresh">查询进度 / 取回结果</el-button></div>
+                  <div class="analysis-actions"><el-button :disabled="busy || !detail.analysis_configured" @click="check">检查分析主机</el-button><el-button type="primary" :disabled="!canSubmit" @click="submit">{{ detail.analysis.batch_id ? '重新分析' : '开始分析' }}</el-button><el-button :disabled="busy || !detail.analysis_configured" @click="refresh">刷新批次 / 查询进度</el-button></div>
                   <p class="helper">{{ submitHint }}。提交覆盖本次任务全部待分析照片，不受左侧区域筛选影响。</p>
+                  <el-alert v-if="pendingSubmit" title="上次提交响应未确认，已保留原请求标识。请刷新批次核对；不会自动创建新分析任务。" type="warning" :closable="false" />
+                  <el-button v-if="pendingSubmit" :disabled="busy" @click="sendAnalysis">使用原请求标识确认提交</el-button>
+                  <p class="helper">检测项自动读取执行时冻结快照，不读取当前配置、不逐图编辑。红外测温不等于火灾烟雾检测；当前 V1.0 不支持测温时会由服务端明确阻断，不能视为正常。</p>
                 </section>
                 <section class="analysis-results"><div class="section-title"><h3>{{ activeAreaName }} · 人数统计</h3><span>同一工作面跨角度去重</span></div>
                   <div v-if="areaCounts.length" class="people-grid"><article v-for="item in areaCounts" :key="item.area_id"><span>{{ areaName(item.area_id) }}</span><strong>{{ item.status === 'success' && Number.isInteger(item.count) && item.count >= 0 ? item.count : '—' }}<small>人</small></strong><p>{{ countStatus(item.status) }}</p><small v-if="item.message">{{ item.message }}</small></article></div>
@@ -70,10 +73,26 @@
                   <details v-if="detail.analysis.result" class="raw-result"><summary>查看服务返回的原始结果</summary><pre>{{ JSON.stringify(detail.analysis.result, null, 2) }}</pre></details>
                 </section>
               </div>
+              <section class="analysis-console">
+                <h3>历史批次与逐图结果</h3>
+                <el-select :model-value="selectedBatchId" placeholder="选择分析批次" :disabled="busy" style="width:100%" @change="selectBatch"><el-option v-for="batch in batches" :key="batch.batch_id" :value="batch.batch_id" :label="batchLabel(batch)" /></el-select>
+                <el-alert v-if="pollError" :title="pollError" type="warning" :closable="false" show-icon />
+                <p v-if="selectedBatch">{{ statusText(selectedBatch.status || '') }} · 已处理 {{ selectedBatch.finished ?? '—' }} / {{ selectedBatch.total ?? '—' }} 张（非成功数） · 请求标识 {{ selectedBatch.request_id || '历史记录未提供' }}</p>
+                <p v-if="selectedBatch?.message" class="inline-notice">{{ selectedBatch.message }}</p>
+                <p class="helper">批次完成仅表示结果已取回，不代表所有检测成功或现场无隐患。未勾选检测项、已排除照片不会参与检测；原图仍保留。不将单图或各区域人数相加作为全工地去重总数。</p>
+                <details v-if="selectedBatch"><summary>本批次冻结的排除记录与检测策略（只读）</summary><p v-for="(decision, id) in selectedBatch.association_decisions || {}" :key="id">{{ id }}：{{ decision.excluded ? '已排除 · ' + decision.reason : '确认区域 · ' + decision.area_id }}</p><p class="helper">检测列表仅包含本批次实际提交的照片。下方为执行时策略快照，可核对未勾选项及红外关闭策略；缺失的历史快照不使用当前配置补齐。</p><pre style="white-space:pre-wrap">{{ selectedBatch.overall_route?.analysis_config ? JSON.stringify(selectedBatch.overall_route.analysis_config, null, 2) : '该历史批次未提供冻结检测策略' }}</pre></details>
+                <el-table :data="analysisPhotos" row-key="file_id" max-height="620" style="width:100%">
+                  <el-table-column label="照片 / 冻结配置" min-width="250"><template #default="{ row }"><b>{{ row.name }}</b><p>{{ areaName(row.area_id) }} · {{ typeText(row.type) }} · 航点 {{ row.waypoint_index ?? '未匹配' }}</p><small>检测项：{{ row.checks.map(checkText).join('、') || '未勾选可见光检测项' }}</small><p>配置来源：{{ sourceText(row.policy_source) }} · {{ row.metadataSource || '执行时冻结快照' }}</p><small v-if="row.excluded">已排除：{{ row.message || '详见照片归属记录' }}</small><small v-if="row.infrared_temperature_enabled"> · 请求红外测温（V1.0 暂不支持）</small></template></el-table-column>
+                  <el-table-column label="逐图状态" min-width="150"><template #default="{ row }">{{ row.excluded ? '已排除' : statusText(row.status || '') }}<p>{{ row.message }}</p><p v-if="row.infrared_temperature">红外：{{ statusText(row.infrared_temperature.status) }} {{ row.infrared_temperature.message }}</p></template></el-table-column>
+                  <el-table-column label="检测结果" min-width="320"><template #default="{ row }"><div v-for="(item, index) in row.result?.checks || []" :key="item.code + index"><b>{{ checkText(item.code) }}</b> · {{ statusText(item.status) }}<span v-if="item.code === 'person_count'"> · 单图人数 {{ countText({ status: item.status, count: item.count ?? null }) }}</span><span v-if="item.boxes"> · {{ item.boxes.length }} 个框</span><span v-if="item.label"> · {{ item.label }}（{{ item.score ?? '未返回置信度' }}）</span><p>{{ item.message }}</p></div><span v-if="!row.result">尚无检测结果，不能判断无隐患</span><p v-if="row.result?.image_error">标注图缺失：{{ row.result.image_error }}</p><details v-if="row.result"><summary>完整结果 / 坐标与置信度</summary><pre style="white-space:pre-wrap">{{ JSON.stringify(row.result, null, 2) }}</pre></details></template></el-table-column>
+                  <el-table-column label="证据" width="115"><template #default="{ row }"><el-button link @click="previewEvidence(row)">原图 / 标注图</el-button></template></el-table-column>
+                </el-table>
+                <el-empty v-if="!analysisPhotos.length" description="暂无逐图结果；旧批次缺少冻结元数据时仅保留原记录，不补用当前配置。" />
+              </section>
             </el-tab-pane>
 
             <el-tab-pane label="巡检报告" name="report">
-              <section class="report-panel"><div class="section-title"><div><span class="eyebrow">一次任务 · 一份报告</span><h3>工地巡检报告</h3></div><span class="badge warning">正式报告待接入</span></div><div class="report-sheet"><div class="report-cover"><span>施工现场巡检</span><h2>{{ detail.name }}</h2><p>任务编号 {{ detail.job_id }}</p><div class="report-stamp">资料概览</div></div><div class="report-body"><h3>巡检资料汇总</h3><div class="report-summary"><span>接收照片 <b>{{ detail.received_count }} 张</b></span><span>本地归档 <b>{{ archivedCount }} 张</b></span><span>分析状态 <b>{{ statusLabel }}</b></span></div><h3>区域章节</h3><div v-for="(group, index) in areaGroups" :key="group.key" class="report-chapter"><span>{{ String(index + 1).padStart(2, '0') }}</span><b>{{ group.name }}</b><small>{{ group.photos.length }} 张照片</small><el-button link type="primary" @click="selectedArea = group.key; tab = 'photos'">查看资料 →</el-button></div><div class="report-notice">当前展示已采集资料，不构成最终巡检结论。正式报告将按区域汇总检测结果、去重人数与异常证据图；待分析服务及报告接口接入后开放生成与下载。</div></div></div></section>
+              <section class="report-panel"><div class="section-title"><div><span class="eyebrow">按分析批次留存</span><h3>工地巡检报告</h3></div><el-button :disabled="busy" @click="refresh">刷新报告列表</el-button></div><p class="helper">仅结果取回完成的批次可生成 Word 报告；部分检测不可用、失败和缺失证据会如实保留，不转换成“全部正常”。生成与下载是两个独立操作，历史报告不会被重新分析覆盖。</p><el-table :data="batches" row-key="batch_id"><el-table-column label="分析批次" min-width="260"><template #default="{ row }">{{ batchLabel(row) }}<p>{{ row.message }}</p></template></el-table-column><el-table-column label="报告状态" width="150"><template #default="{ row }">{{ row.report_ready ? '已生成' : '尚未生成' }}</template></el-table-column><el-table-column label="操作" min-width="240"><template #default="{ row }"><el-button :disabled="busy || !reportAllowed(row)" @click="generateReport(row)">{{ row.report_ready ? '重新生成' : '生成 Word 报告' }}</el-button><el-button type="primary" :disabled="busy || !reportAllowed(row) || !row.report_ready" @click="downloadReport(row)">下载</el-button></template></el-table-column></el-table><el-empty v-if="!batches.length" description="暂无分析批次，请先在“分析与结果”中开始分析。" /></section>
             </el-tab-pane>
           </el-tabs>
         </section>
@@ -97,6 +116,7 @@
     <el-dialog v-model="photoVisible" title="巡检照片" width="min(1240px, 94vw)" top="5vh" class="construction-photo-dialog" append-to-body @closed="zoom = 1">
       <div v-if="selectedPhoto" class="viewer-layout"><div class="viewer-stage" v-loading="previewBusy"><div class="viewer-canvas"><img v-if="photoUrl" :src="photoUrl" :alt="selectedPhoto.name" :style="{ width: (zoom * 100) + '%', maxHeight: zoom === 1 ? '58vh' : 'none' }" @error="previewError = '图片无法解码，可下载原图使用专用软件查看'"><p v-if="previewError" class="viewer-error">{{ previewError }} <el-button @click="preview(selectedPhoto)">重试</el-button></p></div><div class="viewer-controls"><el-button :disabled="previewIndex <= 0 || previewBusy" @click="movePreview(-1)">← 上一张</el-button><span>{{ previewIndex + 1 }} / {{ previewPhotos.length }}</span><el-button :disabled="previewIndex >= previewPhotos.length - 1 || previewBusy" @click="movePreview(1)">下一张 →</el-button><el-button @click="zoom = zoom === 1 ? 2 : 1">{{ zoom === 1 ? '放大 2×' : '适应窗口' }}</el-button></div></div><aside class="viewer-info"><span>原始采集照片</span><h3>{{ selectedPhoto.name }}</h3><dl><dt>巡检区域</dt><dd>{{ selectedPhoto.area_name || areaName(selectedPhoto.area_id) }}</dd><dt>拍摄航点</dt><dd>{{ selectedPhoto.waypoint_index ? '航点 ' + selectedPhoto.waypoint_index : '未关联' }}</dd><dt>保存状态</dt><dd>已归档至本部署端</dd></dl><p v-if="selectedPhoto.association_message">{{ selectedPhoto.association_message }}</p><el-button type="primary" :disabled="!photoUrl || previewBusy" @click="downloadPhoto">下载原图</el-button><small>当前为采集原图，非算法标注结果图。</small></aside></div>
     </el-dialog>
+    <el-dialog v-model="evidenceVisible" title="本批次照片证据" width="min(1240px, 94vw)" append-to-body @closed="releaseEvidence"><div v-loading="evidenceBusy" style="display:flex;gap:20px;flex-wrap:wrap"><section style="flex:1;min-width:260px"><h3>原始采集照片</h3><img v-if="evidenceOriginal" :src="evidenceOriginal" alt="原始采集照片" style="max-width:100%" /><p v-else>{{ evidenceOriginalError || '正在读取原图' }}</p></section><section style="flex:1;min-width:260px"><h3>本批次算法标注图</h3><img v-if="evidenceResult" :src="evidenceResult" alt="本批次算法标注图" style="max-width:100%" /><p v-else>{{ evidenceResultError || '本照片尚无标注图，不能据此判断正常' }}</p></section></div></el-dialog>
   </main>
 </template>
 
@@ -106,8 +126,10 @@ import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { ERouterName } from '/@/types'
 import { uuidv4 } from '/@/utils/uuid'
-import { getConstructionResult, archiveConstructionPhotos, checkConstructionHost, submitConstructionAnalysis, refreshConstructionAnalysis, getConstructionPhoto, assignConstructionPhotos, exportConstructionTask } from '/@/api/construction'
-import type { ConstructionResult } from '/@/api/construction'
+import { getConstructionResult, archiveConstructionPhotos, checkConstructionHost, submitConstructionAnalysis, getConstructionPhoto, assignConstructionPhotos, exportConstructionTask, listConstructionBatches, getConstructionBatch, getConstructionResultPhoto, generateConstructionReport, downloadConstructionReport } from '/@/api/construction'
+import type { ConstructionResult, ConstructionAnalysis, ConstructionAnalysisPhoto } from '/@/api/construction'
+import { checkText, typeText, statusText, countText, errorText } from '../constructionAnalysis/model'
+import { createBatchPoller, reportAllowed, reportFileName, photoLens } from './task-analysis'
 
 type Photo = ConstructionResult['photos'][number]
 interface PhotoGroup { key: string; name: string; waypoints: number[]; photos: Photo[]; warn?: boolean }
@@ -115,6 +137,22 @@ const props = defineProps<{ jobId: string }>()
 const router = useRouter(); const tab = ref('photos'); const busy = ref(false); const error = ref('')
 const detail = ref<ConstructionResult | null>(null); const connected = ref<boolean | null>(null)
 const exportPath = ref('')
+const batches = ref<ConstructionAnalysis[]>([]); const selectedBatchId = ref(''); const pollError = ref(''); const pendingSubmit = ref(false)
+const selectedBatch = computed(() => batches.value.find(b => b.batch_id === selectedBatchId.value) || null)
+function batchLabel (batch: ConstructionAnalysis) { return `${batch.created_at ? new Date(batch.created_at).toLocaleString() : '历史批次'} · ${batch.batch_id} · ${statusText(batch.status || '')}` }
+function sourceText (source?: string) { return ({ default: '平台默认（执行时）', area: '区域覆盖（执行时）', waypoint: '航点覆盖（执行时）', point: '航点覆盖（执行时）' } as Record<string, string>)[source || ''] || source || '冻结来源缺失，不补用当前配置' }
+const analysisPhotos = computed<ConstructionAnalysisPhoto[]>(() => {
+  const frozen = selectedBatch.value?.photos
+  if (frozen) return frozen.filter(p => !selectedArea.value || selectedArea.value === 'all' || p.area_id === selectedArea.value || (selectedArea.value === '__excluded' && p.excluded))
+  if (selectedBatch.value) return []
+  const points = detail.value?.overall_route?.analysis_config?.points || []
+  return (detail.value?.photos || []).filter(p => !selectedArea.value || selectedArea.value === 'all' || p.area_id === selectedArea.value || (selectedArea.value === '__excluded' && p.excluded)).map(photo => {
+    const matches = points.filter(point => point.photo_suffixes.some(suffix => new RegExp('(?:^|_)' + suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=_|\\.|$)').test(photo.name)))
+    const point = matches.length === 1 && matches[0].area_id === photo.area_id ? matches[0] : undefined
+    const type = photoLens(photo.name)
+    return { file_id: photo.file_id, name: photo.name, area_id: photo.area_id, type, excluded: photo.excluded, waypoint_index: point?.index, checks: point && type === 'visible' ? point.effective.visible_checks : [], policy_source: point?.source, metadataSource: '执行时冻结快照（提交前只读参考，服务端校验为准）', status: photo.excluded ? 'not_requested' : '待分析', message: photo.excluded ? photo.association_message : !point || type === 'unknown' ? '冻结检测配置、唯一拍摄航点或镜头元数据缺失；服务端将阻断分析，不使用当前配置补齐' : undefined, infrared_temperature_enabled: type === 'infrared' && point?.effective.infrared.enabled }
+  })
+})
 const selectedArea = ref(''); const keyword = ref(''); const archiveFilter = ref('all'); const page = ref(1)
 const overall = computed(() => detail.value?.overall_route?.overall_id ? detail.value.overall_route : null)
 const areaGroups = computed<PhotoGroup[]>(() => {
@@ -146,13 +184,13 @@ const labels: Record<string, string> = { SUBMITTING: '提交结果待确认', UN
 const statusLabel = computed(() => detail.value?.analysis_stale ? '归属变更待重分析' : labels[detail.value?.analysis.status || ''] || '待手动分析')
 const analysisComplete = computed(() => !detail.value?.analysis_stale && detail.value?.analysis.status === 'SUCCEEDED')
 const unresolvedCount = computed(() => detail.value?.unresolved_count ?? (overall.value ? detail.value?.photos.filter(p => !p.area_id && !p.excluded).length || 0 : 0))
-const associationLocked = computed(() => !!detail.value?.analysis.batch_id && !['SUCCEEDED', 'FAILED'].includes(detail.value.analysis.status || ''))
+const associationLocked = computed(() => pendingSubmit.value || (!!detail.value?.analysis.batch_id && !['SUCCEEDED', 'FAILED'].includes(detail.value.analysis.status || '')) || batches.value.some(b => !!b.batch_id && !['SUCCEEDED', 'FAILED'].includes(b.status || '')))
 const canSubmit = computed(() => !busy.value && unresolvedCount.value === 0 && detail.value?.photos.some(p => !p.excluded) && connected.value === true && detail.value?.analysis_configured && detail.value?.media_complete && !associationLocked.value)
 const submitHint = computed(() => unresolvedCount.value ? '请先在本地照片页确认所有待定照片归属，或填写排除原因' : !detail.value?.analysis_configured ? '请先配置站内分析服务' : !detail.value.media_complete ? '等待本次飞行完成并收齐照片' : associationLocked.value ? '请查询已有批次，避免重复下发' : !detail.value.photos.some(p => !p.excluded) ? '所有照片均已排除，暂无可分析照片' : connected.value !== true ? '接入站内网络后，请先检查主机连接' : '已具备提交条件，重新分析将保留原批次记录')
 interface AreaCount { area_id: string; status: string; count: number | null; message?: string }
 const areaCounts = computed<AreaCount[]>(() => {
-  const values = detail.value?.analysis.result?.areas
-  if (detail.value?.analysis_stale) return []
+  const values = selectedBatch.value ? selectedBatch.value.areas || selectedBatch.value.result?.areas : detail.value?.analysis.result?.areas
+  if (detail.value?.analysis_stale && selectedBatch.value?.batch_id === detail.value.analysis.batch_id) return []
   if (!Array.isArray(values)) return []
   return values.filter((v): v is AreaCount => !!v && typeof v.area_id === 'string' && typeof v.status === 'string').filter(v => !selectedArea.value || selectedArea.value === 'all' || v.area_id === selectedArea.value)
 })
@@ -160,6 +198,35 @@ function areaName (id?: string) { return areaGroups.value.find(g => g.key === id
 function countStatus (status: string) { return ({ success: '区域去重人数', unavailable: '模型不可用', not_applicable: '不适用', unassessable: '无法判断', failed: '统计失败', not_requested: '未要求统计' } as Record<string, string>)[status] || '统计待确认' }
 
 const thumbs = ref<Record<string, string>>({}); let disposed = false; let epoch = 0; let thumbEpoch = 0; let requestId = uuidv4()
+const pendingRequests = new Map<string, string>()
+const poller = createBatchPoller({ fetch: getConstructionBatch, receive: batch => { pollError.value = ''; rememberBatch(batch) }, error: cause => { pollError.value = '进度暂未取回，将继续查询原批次：' + errorText(cause) }, schedule: fn => setTimeout(fn, 4000), cancel: timer => clearTimeout(timer) })
+function rememberBatch (batch: ConstructionAnalysis) {
+  if (!batch.batch_id) return
+  const index = batches.value.findIndex(b => b.batch_id === batch.batch_id)
+  if (index < 0) batches.value.unshift(batch); else batches.value[index] = batch
+  if (detail.value?.analysis.batch_id === batch.batch_id) detail.value.analysis = batch
+  if (batch.request_id === pendingRequests.get(props.jobId)) { pendingRequests.delete(props.jobId); pendingSubmit.value = false; requestId = uuidv4() }
+}
+async function history (token: number, job: string) {
+  const values = await listConstructionBatches(job)
+  if (!current(token)) return
+  batches.value = values
+  const matched = values.find(b => b.request_id === pendingRequests.get(job))
+  if (matched) { pendingRequests.delete(job); pendingSubmit.value = false; requestId = uuidv4() }
+  const batch = matched || values.find(b => b.batch_id === selectedBatchId.value) || values[0]
+  selectedBatchId.value = batch?.batch_id || ''
+  if (batch) {
+    if (detail.value && values[0]?.batch_id === batch.batch_id) detail.value.analysis = batch
+    poller.watch(job, batch)
+  } else poller.reset()
+}
+async function selectBatch (id: string) {
+  if (busy.value) return
+  poller.reset(); selectedBatchId.value = id; pollError.value = ''; releaseEvidence(); evidenceVisible.value = false
+  await run(async (token, job) => {
+    try { const batch = await getConstructionBatch(job, id); if (current(token)) { rememberBatch(batch); poller.watch(job, batch) } } catch (cause) { if (current(token)) { const batch = selectedBatch.value; if (batch) poller.watch(job, batch) } throw cause }
+  })
+}
 const photoVisible = ref(false); const selectedPhoto = ref<Photo | null>(null); const photoUrl = ref(''); const previewBusy = ref(false); const previewError = ref(''); const zoom = ref(1); let previewEpoch = 0
 const previewPhotos = computed(() => filteredPhotos.value.filter(p => p.archived))
 const previewIndex = computed(() => previewPhotos.value.findIndex(p => p.file_id === selectedPhoto.value?.file_id))
@@ -180,7 +247,7 @@ async function saveAssociations () {
   const body = { file_ids: [...associationSelection.value], expected_revision: detail.value.association_revision || 0, area_id: associationMode.value === 'area' ? associationArea.value : undefined, excluded: associationMode.value === 'exclude', reason: exclusionReason.value.trim() }
   await run(async (token, job) => { const data = await assignConstructionPhotos(job, body); if (current(token)) { detail.value = data; associationVisible.value = false; associationSelection.value = [] } })
 }
-async function load () { await run(async (token, job) => { const data = await getConstructionResult(job); if (current(token)) detail.value = data }) }
+async function load () { await run(async (token, job) => { const data = await getConstructionResult(job); if (current(token)) { detail.value = data; await history(token, job) } }) }
 async function exportTask () { await run(async (token, job) => { const data = await exportConstructionTask(job); if (current(token)) exportPath.value = data.path }) }
 async function archive () { await run(async (token, job) => { const data = await archiveConstructionPhotos(job); if (current(token)) detail.value = data }) }
 async function loadThumbs () {
@@ -205,9 +272,48 @@ async function submit () {
   const job = props.jobId
   try { await ElMessageBox.confirm('将提交本次飞行任务的照片进行分析，包含全部巡检区域。是否继续？', '手动提交分析', { confirmButtonText: '提交分析', cancelButtonText: '取消' }) } catch { return }
   if (job !== props.jobId || !canSubmit.value) return
-  await run(async (token, id) => { const batch = await submitConstructionAnalysis(id, requestId); if (current(token) && detail.value) { detail.value.analysis = batch; requestId = uuidv4() } })
+  await sendAnalysis()
 }
-async function refresh () { await run(async (token, job) => { const batch = await refreshConstructionAnalysis(job); if (current(token) && detail.value) detail.value.analysis = batch }) }
+async function sendAnalysis () {
+  await run(async (token, id) => {
+    const submittedId = requestId; pendingRequests.set(id, submittedId); pendingSubmit.value = true
+    try {
+      const batch = await submitConstructionAnalysis(id, submittedId)
+      if (current(token) && detail.value) { detail.value.analysis = batch; detail.value.analysis_stale = false; rememberBatch(batch); selectedBatchId.value = batch.batch_id || ''; poller.watch(id, batch) }
+    } catch (cause: any) {
+      if (current(token) && (cause?.businessCode || (cause?.response?.status >= 400 && cause?.response?.status < 500))) { pendingRequests.delete(id); pendingSubmit.value = false }
+      throw cause
+    }
+  })
+}
+async function refresh () { await run(async (token, job) => { await history(token, job); if (!current(token)) return; const id = selectedBatchId.value; if (id) { const batch = await getConstructionBatch(job, id); if (current(token)) { rememberBatch(batch); pollError.value = ''; poller.watch(job, batch) } } }) }
+async function generateReport (batch: ConstructionAnalysis) {
+  if (!batch.batch_id || !reportAllowed(batch)) return
+  const id = batch.batch_id
+  await run(async (token, job) => { const value = await generateConstructionReport(job, id); if (current(token)) rememberBatch(value) })
+}
+const downloadUrls = new Set<string>()
+async function downloadReport (batch: ConstructionAnalysis) {
+  if (!batch.batch_id || !batch.report_ready || !reportAllowed(batch)) return
+  const id = batch.batch_id
+  await run(async (token, job) => {
+    const blob = await downloadConstructionReport(job, id); if (!current(token)) return
+    const url = URL.createObjectURL(blob); downloadUrls.add(url)
+    const link = document.createElement('a'); link.href = url; link.download = reportFileName(job, id); document.body.appendChild(link); link.click(); link.remove()
+    setTimeout(() => { if (downloadUrls.delete(url)) URL.revokeObjectURL(url) }, 1000)
+  })
+}
+const evidenceVisible = ref(false); const evidenceBusy = ref(false); const evidenceOriginal = ref(''); const evidenceResult = ref(''); const evidenceOriginalError = ref(''); const evidenceResultError = ref(''); let evidenceEpoch = 0
+function releaseEvidence () { ++evidenceEpoch; for (const url of [evidenceOriginal.value, evidenceResult.value]) if (url) URL.revokeObjectURL(url); evidenceOriginal.value = ''; evidenceResult.value = ''; evidenceBusy.value = false }
+async function previewEvidence (photo: ConstructionAnalysisPhoto) {
+  releaseEvidence(); const token = evidenceEpoch; const job = props.jobId; const batchId = selectedBatchId.value
+  evidenceVisible.value = true; evidenceBusy.value = true; evidenceOriginalError.value = ''; evidenceResultError.value = photo.result?.image_error || ''
+  await Promise.all([
+    (async () => { try { const blob = await getConstructionPhoto(job, photo.file_id); if (!disposed && token === evidenceEpoch) evidenceOriginal.value = URL.createObjectURL(blob) } catch { if (!disposed && token === evidenceEpoch) evidenceOriginalError.value = '原图读取失败，请确认已归档后重试' } })(),
+    (async () => { if (!batchId || !photo.image_url) return; try { const blob = await getConstructionResultPhoto(job, batchId, photo.file_id); if (!disposed && token === evidenceEpoch) evidenceResult.value = URL.createObjectURL(blob) } catch { if (!disposed && token === evidenceEpoch) evidenceResultError.value = '标注图暂不可用，结构化检测结果仍可查看' } })()
+  ])
+  if (!disposed && token === evidenceEpoch) evidenceBusy.value = false
+}
 async function preview (photo: Photo) {
   if (!photo.archived) return
   const token = ++previewEpoch
@@ -222,8 +328,8 @@ function release () { ++thumbEpoch; ++previewEpoch; for (const url of Object.val
 watch([selectedArea, keyword, archiveFilter], () => { page.value = 1 })
 watch(pagePhotos, () => { loadThumbs() })
 watch(filteredPhotos, photos => { page.value = Math.min(page.value, Math.max(1, Math.ceil(photos.length / 24))) })
-watch(() => props.jobId, () => { ++epoch; release(); detail.value = null; connected.value = null; busy.value = false; photoVisible.value = false; selectedArea.value = ''; keyword.value = ''; archiveFilter.value = 'all'; page.value = 1; tab.value = 'photos'; requestId = uuidv4(); load() }, { immediate: true })
-onBeforeUnmount(() => { disposed = true; ++epoch; release() })
+watch(() => props.jobId, () => { ++epoch; poller.reset(); release(); releaseEvidence(); evidenceVisible.value = false; batches.value = []; selectedBatchId.value = ''; pollError.value = ''; detail.value = null; exportPath.value = ''; error.value = ''; connected.value = null; busy.value = false; photoVisible.value = false; associationVisible.value = false; selectedArea.value = ''; keyword.value = ''; archiveFilter.value = 'all'; page.value = 1; tab.value = 'photos'; requestId = pendingRequests.get(props.jobId) || uuidv4(); pendingSubmit.value = pendingRequests.has(props.jobId); load() }, { immediate: true })
+onBeforeUnmount(() => { disposed = true; ++epoch; poller.dispose(); release(); releaseEvidence(); downloadUrls.forEach(url => URL.revokeObjectURL(url)); downloadUrls.clear() })
 </script>
 
 <style scoped src="./construction.css"></style>

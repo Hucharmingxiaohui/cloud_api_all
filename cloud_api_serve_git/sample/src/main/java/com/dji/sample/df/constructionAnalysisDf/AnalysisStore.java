@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /** All access is confined to configured roots; symlinks are deliberately unsupported. */
-public final class AnalysisStore {
+public class AnalysisStore {
     private final Path input, output;
     final ObjectMapper json = new ObjectMapper();
     public AnalysisStore(Path input, Path output) {
@@ -50,6 +50,14 @@ public final class AnalysisStore {
         }
         return files;
     }
+    public Map<String,Path> scan(String workspace,String task)throws IOException{return scan(task);}
+    public Path original(String workspace,String task,String image)throws IOException{return scan(workspace,task).get(id(image));}
+    public String base(String task){return "/api/construction-analysis/tasks/"+task;}
+    public String originalName(String workspace,String task,String image,Path path){return path.getFileName().toString();}
+    public void authorizeMetadata(AnalysisMetadata metadata,String workspace,String task){metadata.resolve(workspace,task);}
+    public void authorizeInputs(String workspace,String task)throws IOException{scan(workspace,task);}
+    public Map<String,Object> manualMetadata(Path journal)throws IOException{return read(journal);}
+    public Map<String,Object> frozenBatchMetadata(String workspace,String task)throws IOException{return Map.of();}
     public Path task(String workspace,String task) throws IOException {return safe(output.resolve(id(workspace)).resolve(id(task)));}
     public void claim(String workspace,String task) throws IOException {
         id(workspace);id(task);Path owners=safe(output.resolve(".owners"));Files.createDirectories(owners);

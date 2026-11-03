@@ -32,7 +32,7 @@ public class AnalysisService implements AutoCloseable {
         if(maxPhotos<1||maxFile<1||maxTotal<maxFile||maxTotal>256L*1024*1024)throw new IllegalArgumentException("Invalid analysis limits");
         this.store=store;this.metadata=metadata;this.client=client;this.maxPhotos=maxPhotos;this.maxFile=maxFile;this.maxTotal=maxTotal;
     }
-    private void authorize(String w,String t)throws IOException {AnalysisStore.id(w);AnalysisStore.id(t);metadata.resolve(w,t);store.scan(t);store.claim(w,t);}
+    private void authorize(String w,String t)throws IOException {AnalysisStore.id(w);AnalysisStore.id(t);store.authorizeMetadata(metadata,w,t);store.authorizeInputs(w,t);store.claim(w,t);}
     private ReentrantLock taskLock(String w,String t){return taskLocks.computeIfAbsent(AnalysisStore.id(w)+":"+AnalysisStore.id(t),k->new ReentrantLock());}
     @FunctionalInterface private interface IoOperation<T>{T run()throws IOException;}
     private <T>T guarded(String w,String t,IoOperation<T> operation)throws IOException {
@@ -57,7 +57,7 @@ public class AnalysisService implements AutoCloseable {
     @SuppressWarnings("unchecked") static List<Map<String,Object>> photos(Map<String,Object> b){return (List<Map<String,Object>>)b.getOrDefault("photos",List.of());}
     private Map<String,Object> taskLocked(String w,String t)throws IOException {
         AnalysisStore.id(w);Map<String,Map<String,Object>> nativePhotos=metadata.resolve(w,AnalysisStore.id(t));
-        Map<String,Path> scanned=store.scan(t);store.claim(w,t);Map<String,Object> saved=store.read(journal(w,t));
+        Map<String,Path> scanned=store.scan(w,t);store.claim(w,t);Map<String,Object> saved=store.manualMetadata(journal(w,t));
         Map<String,Map<String,Object>> manual=new HashMap<>();for(Map<String,Object> p:photos(saved))manual.put((String)p.get("id"),p);
         List<Map<String,Object>> out=new ArrayList<>();
         for(Map.Entry<String,Path> e:scanned.entrySet()) {
@@ -66,7 +66,7 @@ public class AnalysisService implements AutoCloseable {
             if(nativePhotos.containsKey(e.getKey()))p.putAll(nativePhotos.get(e.getKey()));
             Map<String,Object> m=manual.get(e.getKey());
             if(m!=null&&Objects.equals(m.get("fileName"),p.get("fileName")))p.putAll(m);
-            p.put("originalUrl",base(t)+"/photos/"+e.getKey()+"/original");out.add(p);
+            p.putIfAbsent("originalUrl",base(t)+"/photos/"+e.getKey()+"/original");out.add(p);
         }
         Map<String,Object> result=new LinkedHashMap<>();result.put("taskId",t);result.put("photos",out);result.put("batches",batchesInternal(w,t));return result;
     }
@@ -106,7 +106,7 @@ public class AnalysisService implements AutoCloseable {
         for(Map<String,Object> b:batchesInternal(w,t))if(!TERMINAL.contains(b.get("status")))throw error(HttpStatus.CONFLICT,"An active or uncertain batch already exists");
         if(!client.configured())throw error(HttpStatus.SERVICE_UNAVAILABLE,"Algorithm service is not configured");
         Map<String,Object> task=task(w,t);List<Map<String,Object>> selected=new ArrayList<>();long total=0;
-        Map<String,Path> files=store.scan(t);
+        Map<String,Path> files=store.scan(w,t);
         for(Map<String,Object> p:photos(task)) {
             if(Boolean.TRUE.equals(p.get("excluded")))continue;
             if(!Boolean.TRUE.equals(p.get("ready")))throw error(HttpStatus.CONFLICT,"Confirm metadata for every included photo");
@@ -119,6 +119,7 @@ public class AnalysisService implements AutoCloseable {
         if(executor.getQueue().remainingCapacity()==0)throw error(HttpStatus.SERVICE_UNAVAILABLE,"Analysis submission queue is full");
         Map<String,Object> b=new LinkedHashMap<>();String batch=UUID.randomUUID().toString();
         b.put("batchId",batch);b.put("requestId",requestId);b.put("taskId",t);b.put("remoteId",null);b.put("status","SUBMITTING");b.put("finished",0);b.put("total",selected.size());b.put("message",null);b.put("createdAt",Instant.now().toString());b.put("areas",List.of());b.put("photos",selected);b.put("reportReady",false);
+        b.putAll(store.frozenBatchMetadata(w,t));
         persist(w,t,b);String key=key(w,t,batch);pending.add(key);
         try{executor.execute(()->send(w,t,batch));}catch(RejectedExecutionException e){pending.remove(key);b.put("status","FAILED");b.put("message","Submission queue unavailable; no request sent");persist(w,t,b);}
         return b;
@@ -130,9 +131,9 @@ public class AnalysisService implements AutoCloseable {
     private void sendLocked(String w,String t,String batch) {
         Map<String,Object> b=null;boolean sending=false;
         try {
-            b=load(w,t,batch);List<Map<String,Object>> images=new ArrayList<>();Map<String,Path> files=store.scan(t);long total=0;
+            b=load(w,t,batch);List<Map<String,Object>> images=new ArrayList<>();Map<String,Path> files=store.scan(w,t);long total=0;
             for(Map<String,Object> p:photos(b)) {
-                Path file=files.get(p.get("id"));if(file==null||!file.getFileName().toString().equals(p.get("fileName")))throw error(HttpStatus.CONFLICT,"Original file changed after batch freeze");
+                Path file=files.get(p.get("id"));if(file==null||!store.originalName(w,t,(String)p.get("id"),file).equals(p.get("fileName")))throw error(HttpStatus.CONFLICT,"Original file changed after batch freeze");
                 byte[] bytes=store.bytes(file,maxFile);total+=bytes.length;if(total>maxTotal)throw error(HttpStatus.PAYLOAD_TOO_LARGE,"Task exceeds configured total limit");
                 if(!digest(bytes).equals(p.get("sha256")))throw error(HttpStatus.CONFLICT,"Original bytes changed after batch freeze");
                 Map<String,Object> image=new LinkedHashMap<>();image.put("id",p.get("id"));image.put("area_id",p.get("areaId"));image.put("type",p.get("type"));image.put("checks",p.get("checks"));image.put("data",Base64.getEncoder().encodeToString(bytes));images.add(image);
@@ -250,7 +251,7 @@ public class AnalysisService implements AutoCloseable {
         }
     }
     private Path originalLocked(String w,String t,String image)throws IOException {
-        authorize(w,t);Path p=store.scan(t).get(AnalysisStore.id(image));if(p==null)throw error(HttpStatus.NOT_FOUND,"Photo not found");return p;
+        authorize(w,t);Path p=store.original(w,t,AnalysisStore.id(image));if(p==null)throw error(HttpStatus.NOT_FOUND,"Photo not found");return p;
     }
     private Path resultLocked(String w,String t,String batch,String image)throws IOException {
         authorize(w,t);AnalysisStore.id(image);Map<String,Object> b=load(w,t,batch);
@@ -266,7 +267,7 @@ public class AnalysisService implements AutoCloseable {
         authorize(w,t);Map<String,Object> b=load(w,t,batch);Path p=store.file(store.batch(w,t,batch),"report.docx");
         if(!Boolean.TRUE.equals(b.get("reportReady")))throw error(HttpStatus.NOT_FOUND,"Generate report first");store.bytes(p,maxTotal+16L*1024*1024);return p;
     }
-    static String base(String t){return "/api/construction-analysis/tasks/"+t;}
+    String base(String t){return store.base(t);}
     static String digest(byte[] bytes) {try{return Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception e){throw new IllegalStateException(e);}}
     @PreDestroy public void close(){executor.shutdown();try{if(!executor.awaitTermination(5,TimeUnit.SECONDS))executor.shutdownNow();}catch(InterruptedException e){executor.shutdownNow();Thread.currentThread().interrupt();}}
 }

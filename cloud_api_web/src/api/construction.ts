@@ -2,17 +2,18 @@ import request from './http/request'
 
 export interface ConstructionPoint { lng: number; lat: number }
 export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[] }
+export interface ConstructionDetectionPolicy {
+  visible_checks: string[]
+  infrared: { enabled: boolean; max_temperature_c: number | null; min_hotspot_pixels: number }
+}
 export interface ConstructionOverallRoute {
+  analysis_config?: { schema_version?: number; points: Array<{ index: number; area_id?: string; photo_suffixes: string[]; effective: ConstructionDetectionPolicy; source?: string }> }
   needs_preparation?: boolean; preparation_points?: number[]; source_wayline_id?: string; source_sign?: string; prepared_sign?: string
   overall_id: string; version: number; wayline_id: string; name: string; dock_sn: string; file_sign: string
   points: Array<ConstructionPoint & { height: number; index: number; photo_suffixes: string[] }>
   height_mode: string; bindings: ConstructionOverallBinding[]; status?: string; message?: string
 }
 
-export interface ConstructionDetectionPolicy {
-  visible_checks: string[]
-  infrared: { enabled: boolean; max_temperature_c: number | null; min_hotspot_pixels: number }
-}
 export interface ConstructionConfigContext { area_id?: string; wayline_id?: string; overall_id?: string }
 export interface ConstructionAnalysisConfiguration {
   revision: number; catalog: Array<{ code: string; name: string }>; default_policy: ConstructionDetectionPolicy
@@ -35,8 +36,27 @@ export async function saveDockCoverage (sn: string, radius: number) {
   return unwrapArea<DockCoverage>(await request.put(`/api/construction/docks/${encodeURIComponent(sn)}/coverage`, { radius_m: radius }), '覆盖范围保存失败')
 }
 
+export interface ConstructionAreaCount { area_id: string; status: string; count: number | null; message?: string }
+export interface ConstructionCheckResult { code: string; status: string; count?: number | null; message?: string; boxes?: unknown[]; label?: string; score?: number }
+export interface ConstructionAnalysisPhoto {
+  file_id: string; name: string; area_id?: string; type: string; checks: string[]; excluded?: boolean
+  waypoint_index?: number; policy_source?: string; metadataSource?: string; status?: string; message?: string; image_url?: string
+  infrared_temperature_enabled?: boolean; infrared_temperature?: { status: string; message?: string }
+  result?: { checks?: ConstructionCheckResult[]; image_error?: string; [key: string]: unknown }
+}
 export interface ConstructionAnalysis {
   batch_id?: string
+  request_id?: string
+  job_id?: string
+  remote_id?: string
+  created_at?: number
+  finished?: number
+  total?: number
+  report_ready?: boolean
+  areas?: ConstructionAreaCount[]
+  photos?: ConstructionAnalysisPhoto[]
+  overall_route?: Partial<ConstructionOverallRoute>
+  association_decisions?: Record<string, { excluded?: boolean; reason?: string; area_id?: string }>
   status?: string
   message?: string
   result?: Record<string, unknown>
@@ -59,7 +79,7 @@ export interface ConstructionResult {
 }
 const base = (jobId: string) => `/api/construction/tasks/${encodeURIComponent(jobId)}`
 function unwrap<T> (response: { data: { code: number; data: T; message?: string } }): T {
-  if (response.data.code !== 0) throw new Error(response.data.message || '工地任务请求失败')
+  if (response.data.code !== 0) throw Object.assign(new Error(response.data.message || '工地任务请求失败'), { businessCode: response.data.code })
   return response.data.data
 }
 export async function getConstructionResult (jobId: string) { return unwrap<ConstructionResult>(await request.get(base(jobId))) }
@@ -81,6 +101,16 @@ export async function assignConstructionPhotos (jobId: string, body: { file_ids:
 export async function checkConstructionHost (jobId: string) { return unwrap<{ connected: boolean }>(await request.post(`${base(jobId)}/analysis/check`)) }
 export async function submitConstructionAnalysis (jobId: string, requestId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis`, { request_id: requestId })) }
 export async function refreshConstructionAnalysis (jobId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis/refresh`)) }
+const batchBase = (jobId: string, batchId: string) => `${base(jobId)}/analysis/batches/${encodeURIComponent(batchId)}`
+export async function listConstructionBatches (jobId: string) { return unwrap<ConstructionAnalysis[]>(await request.get(`${base(jobId)}/analysis/batches`)) }
+export async function getConstructionBatch (jobId: string, batchId: string) { return unwrap<ConstructionAnalysis>(await request.get(batchBase(jobId, batchId))) }
+export async function getConstructionResultPhoto (jobId: string, batchId: string, fileId: string) {
+  return (await request.get(`${batchBase(jobId, batchId)}/photos/${encodeURIComponent(fileId)}/result`, { responseType: 'blob' })).data as Blob
+}
+export async function generateConstructionReport (jobId: string, batchId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${batchBase(jobId, batchId)}/report`)) }
+export async function downloadConstructionReport (jobId: string, batchId: string) {
+  return (await request.get(`${batchBase(jobId, batchId)}/report`, { responseType: 'blob' })).data as Blob
+}
 export async function getConstructionPhoto (jobId: string, fileId: string) {
   const response = await request.get(`${base(jobId)}/media/${encodeURIComponent(fileId)}`, { responseType: 'blob' })
   return response.data as Blob

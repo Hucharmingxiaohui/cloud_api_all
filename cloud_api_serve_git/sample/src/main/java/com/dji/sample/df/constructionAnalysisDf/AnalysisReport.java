@@ -37,7 +37,7 @@ final class AnalysisReport {
                     row(checks,checkName(code),status(check.get("status")),count,details(check));
                 }
                 if(photo.get("checks") instanceof List)for(Object code:(List<?>)photo.get("checks"))if(!received.contains(code))row(checks,checkName(code),"结果未取回","—","缺少该项目结果，不能据此认定无隐患");
-                line(doc,"原图证据："+AnalysisService.base(task)+"/photos/"+photo.get("id")+"/original");
+                line(doc,"原图证据："+photo.get("originalUrl"));
                 Path original=service.original(workspace,task,(String)photo.get("id"));
                 byte[] bytes=service.store.bytes(original,service.maxFile);
                 if(!AnalysisService.digest(bytes).equals(photo.get("sha256")))line(doc,"警告：原图已在提交后发生变化，未嵌入，不能作为本批次原始证据。");
