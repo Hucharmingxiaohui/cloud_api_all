@@ -435,7 +435,7 @@ public class CreateWpml {
 
                             }
                             //判断是否为第一个航点
-                            if(i==0){//如果是就添加如下动作
+                            if(i==0 && actionList.stream().noneMatch(a -> "gimbalRotate".equals(a.getActionActuatorFunc()))){// Keep explicit pitch actions; do not reset an automatically planned camera to zero.
                                 Element actionElement =actionGroupElement.addElement("wpml:action");
                                 actionElement.addElement("wpml:actionId").addText(Integer.toString(actionGlobalIndex++));
                                 actionElement.addElement("wpml:actionActuatorFunc").addText("gimbalRotate");

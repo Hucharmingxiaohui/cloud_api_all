@@ -10,6 +10,7 @@
                 </a-row>
             </div>
             <div class="scrollbar" :style="{ height: scorllHeight + 'px'}">
+                    <div v-if="constructionAreaId" class="sweep-entry"><el-select v-model="constructionDockSn" placeholder="请选择参考机巢" :disabled="constructionSaving" filterable><el-option v-for="dock in constructionDocks" :key="dock.sn" :label="`${dock.name}${dock.height == null ? '（等待椭球高）' : ''}`" :value="dock.sn" :disabled="dock.height == null" /></el-select><el-button type="primary" :disabled="!constructionArea || constructionSaving || !constructionDock" @click="sweepVisible = true">自动生成 S 型航线</el-button><small>参考机巢用于计算 WGS84 航高；航线保存后高度固定</small></div>
                 <LayersTree
                 :layer-data="mapLayers"
                 class="project-layer-content"
@@ -63,27 +64,28 @@
                             />
                         </el-select> -->
                     </div>
-                    <el-divider class="divider-color" v-if="layerState.currentType === ''"></el-divider>
-                    <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
+                    <section v-if="layerState.currentType === ''" class="operation-card operation-card--height">
+                    <div class="operation-card__title">执行高度</div>
+                    <div class="latitude element-item" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">全局航点高度 (相对起飞点, m):</span>
+                          <span class="title">{{ constructionAbsoluteHeight ? '全局航点高度 (WGS84 椭球高, m):' : '全局航点高度 (相对起飞点, m):' }}</span>
                         </div>
-                        <el-slider v-model="lineState.globalHeight" show-input   :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
+                        <el-slider v-model="lineState.globalHeight" show-input :min="2" :max="1500" :disabled="constructionAbsoluteHeight" @change="updateLine" class="custom-el-slider"/>
                     </div>
-                    <el-divider class="divider-color"  v-if="layerState.currentType === ''"></el-divider>
-                    <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
+                    <div class="latitude element-item" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
                           <span class="title">速度(m/s):</span>
                         </div>
                         <el-slider v-model="lineState.autoFlightSpeed"  :min="1" :max="15" @change="updateLine" class="custom-el-slider"/>
                     </div>
-                    <el-divider class="divider-color"  v-if="layerState.currentType === ''"></el-divider>
-                    <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
+                    <div class="latitude element-item safety-height-control" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">安全起飞高度 (m):</span>
+                          <span class="title">安全起飞高度（相对起飞点，m）:</span>
                         </div>
-                        <el-slider v-model="lineState.takeOffSecurityHeight" show-input   :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
+                        <el-input-number v-model="lineState.takeOffSecurityHeight" :min="2" :max="1500" :step="1" controls-position="right" @change="updateLine" class="safety-height-input"/>
+                        <small>起飞至首航点前的最小安全爬升高度；独立于 WGS84 航点绝对高度。</small>
                     </div>
+                    </section>
                     <el-divider class="divider-color" v-if="layerState.currentType === ''" ></el-divider>
                     <div v-if="layerState.currentType === ''" style="margin-top: 10px">
                       <div style="display: flex; justify-content: space-between;color: aliceblue;">
@@ -352,6 +354,7 @@
             <showMap ref="myMap" :construction-mode="!!constructionAreaId" :construction-boundary="constructionArea?.boundary || []" :draft-storage-key="draftStorageKey" />
         </div>
     </div>
+    <ConstructionSweepDialog v-if="sweepVisible && constructionArea" :boundary="constructionArea.boundary" @close="sweepVisible = false" @apply="applySweep" />
 </template>
 <script setup>
 import { watch, ref, onMounted, nextTick, reactive, computed, onBeforeUnmount } from 'vue'
@@ -365,6 +368,9 @@ import { useGMapCover } from '/@/hooks/use-g-map-cover'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConstructionArea, createConstructionWayline } from '/@/api/construction'
 import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
+import ConstructionSweepDialog from '/@/components/construction/ConstructionSweepDialog.vue'
+import { useConstructionDocks } from '/@/components/construction/useConstructionDocks'
+import { resolveSweepAbsoluteHeight } from '/@/components/construction/constructionSweep'
 import { uuidv4 } from '/@/utils/uuid'
 import { commitWaylineFile, commitWaylineFile1, deleteWaylineFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName, ELiveStatusValue, EStatusValue } from '/@/types'
@@ -381,10 +387,57 @@ const draftStorageKey = constructionAreaId ? `construction_wayline_draft_${const
 const constructionArea = ref(null)
 const constructionError = ref('')
 const constructionSaving = ref(false)
+const sweepVisible = ref(false)
+const constructionDockSn = ref('')
+const { docks: constructionDocks, refresh: refreshConstructionDocks } = useConstructionDocks()
+const constructionDock = computed(() => constructionDocks.value.find(dock => dock.sn === constructionDockSn.value) || null)
+const constructionAbsoluteHeight = computed(() => constructionAreaId && store.state.Points[0]?.folder?.executeHeightMode === 'WGS84')
+async function applySweep ({ result, settings }) {
+  if (constructionSaving.value || !constructionArea.value) return
+  if (!constructionDock.value) { ElMessage.error('请选择具有有效 WGS84 椭球高遥测的执行机巢'); return }
+  let absoluteHeight
+  try { absoluteHeight = resolveSweepAbsoluteHeight(constructionDock.value.height, settings.height) } catch (error) { ElMessage.error(error instanceof Error ? error.message : '无法计算 WGS84 航高'); return }
+  if (store.state.Points[0]?.elements?.length) {
+    try { await ElMessageBox.confirm('生成结果将替换当前编辑器内的航点和动作，是否继续？已保存的航线不受影响。', '替换当前草稿') } catch { return }
+  }
+  const issue = routeBoundaryError(result.points, constructionArea.value.boundary)
+  if (issue) { ElMessage.error(issue); return }
+  const layers = JSON.parse(JSON.stringify(store.state.Points)); const route = layers[0]
+  route.elements.forEach(p => { if (store.state.coverMap[p.id]?.length) useGMapCoverHook.removeCoverFromMap(p.id) })
+  route.elements = result.points.map((p, i) => ({
+    id: uuidv4(),
+    name: `航点${i + 1}${p.capture ? '' : '（转场）'}`,
+    resource: { type: MapElementEnum.PIN, content: generatePoint({ longitude: p.lng, latitude: p.lat }, { color: '#19be6b' }) },
+    Placemark: {
+      useGlobalHeight: 1,
+      useGlobalHeadingParam: 1,
+      useGlobalSpeed: 1,
+      useGlobalTurnParam: 1,
+      gimbalPitchAngle: settings.pitch,
+      actionGroup: {
+        actionGroupMode: 'sequence',
+        actionList: [
+          { actionActuatorFunc: 'gimbalRotate', actionActuatorFuncParam: { gimbalRotate: { gimbalPitchRotateEnable: 1, gimbalPitchRotateAngle: settings.pitch, payloadPositionIndex: 0 } } },
+          ...(p.capture ? [{ actionActuatorFunc: 'takePhoto', actionActuatorFuncParam: { takePhoto: { fileSuffix: '航点', payloadPositionIndex: 0, useGlobalPayloadLensIndex: 0, payloadLensIndex: settings.lens } } }] : [])
+        ]
+      }
+    }
+  }))
+  route.folder.executeHeightMode = 'WGS84'; route.folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }; route.folder.globalHeight = absoluteHeight; route.folder.autoFlightSpeed = settings.speed
+  route.folder.globalWaypointHeadingParam = { waypointHeadingMode: 'followWayline' }
+  route.folder.gimbalPitchMode = 'usePointSetting'; route.folder.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
+  lineState.globalHeight = absoluteHeight; lineState.autoFlightSpeed = settings.speed; lineState.globalWaypointHeadingMode = 'followWayline'
+  lineState.gimbalPitchMode = 'usePointSetting'; lineState.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
+  selectedKeys.value = []; checkedKeys.value = []; closeDrawer()
+  store.commit('SET_POINTS', layers); mapLayers.value = layers; localStorage.setItem(draftStorageKey, JSON.stringify(route))
+  await nextTick(); myMap.value?.drawWayline(); sweepVisible.value = false
+  ElMessage.success(`已生成 ${result.points.length} 个航点，WGS84 航高 ${absoluteHeight.toFixed(1)} 米，请检查地图后提交保存`)
+}
 let constructionSaved = false
 let constructionRequest = ''
 let constructionPayload = ''
 if (constructionAreaId) {
+  refreshConstructionDocks()
   getConstructionArea(constructionAreaId).then(area => {
     if (area.archived || !area.enabled) throw new Error('区域已归档或暂停')
     if (String(area.version) !== String(editorRoute.query.area_version)) throw new Error('区域已更新，请返回区域页面刷新后创建')
@@ -722,7 +775,8 @@ async function commitWayline () {
     missionConfig.payloadInfo.payloadEnumValue = payloadMap[droneEnumValue][droneSubEnumValue]
   }
   folder.placeMarks = myPlacemark
-  folder.waylineCoordinateSysParam = {}
+  if (constructionAreaId) folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }
+  else folder.waylineCoordinateSysParam = {}
   folder.payloadParam = {
     payloadPositionIndex: 0,
     imageFormat: missionConfig.droneInfo.droneEnumValue === 77 ? 'wide,zoom' : 'wide,ir,zoom' // 只考虑两种机型，需要扩展
@@ -740,6 +794,7 @@ async function commitWayline () {
     if (payload !== constructionPayload) { constructionPayload = payload; constructionRequest = uuidv4() }
     constructionSaving.value = true
     try {
+      if (data.folder.executeHeightMode !== 'WGS84') throw new Error('请先选择参考机巢并生成 S 型航线')
       const saved = await createConstructionWayline(constructionAreaId, constructionArea.value.version, data, constructionRequest)
       constructionSaved = true
       ElMessage.success('航线已保存并关联当前区域')
@@ -924,11 +979,12 @@ function updateLine () {
   Layers[0].missionConfig.takeOffSecurityHeight = lineState.takeOffSecurityHeight
   Layers[0].missionConfig.globalTransitionalSpeed = lineState.globalTransitionalSpeed
   Layers[0].folder.autoFlightSpeed = lineState.autoFlightSpeed
-  Layers[0].folder.globalHeight = lineState.globalHeight
+  if (!constructionAbsoluteHeight.value) Layers[0].folder.globalHeight = lineState.globalHeight
   Layers[0].folder.globalWaypointHeadingParam.waypointHeadingMode = lineState.globalWaypointHeadingMode
   Layers[0].folder.globalWaypointTurnMode = lineState.globalWaypointTurnMode
   Layers[0].folder.gimbalPitchMode = lineState.gimbalPitchMode
   store.commit('SET_POINTS', Layers)
+  if (constructionAreaId) myMap.value?.drawWayline()
 }
 // 选中航线/航点,显示信息
 function checkLayer (keys) {
@@ -1175,6 +1231,7 @@ function updateLayer (id) {
           // 动作序列
           if (actions.value.length > 0) { // 添加无人机动作
             const localActionGroup = []
+            const existingActions = item.Placemark.actionGroup?.actionList || []
             actions.value.forEach(item => {
               if (item.value === 'orientedShoot') { // 定向拍照
                 const node = {
@@ -1214,13 +1271,15 @@ function updateLayer (id) {
                 const node = {
                   actionActuatorFunc: item.value,
                   actionActuatorFuncParam: {
-                    [item.value]: {}
+                    [item.value]: constructionAreaId ? JSON.parse(JSON.stringify(existingActions.find(a => a.actionActuatorFunc === item.value)?.actionActuatorFuncParam?.[item.value] || {})) : {}
                   }
                 }
                 localActionGroup.push(node)
               }
             })
-            item.Placemark.actionGroup.actionList = localActionGroup
+            item.Placemark.actionGroup = { ...(item.Placemark.actionGroup || {}), actionList: localActionGroup }
+          } else if (constructionAreaId) {
+            delete item.Placemark.actionGroup
           }
         }
         if (item.elements) {
@@ -1231,7 +1290,7 @@ function updateLayer (id) {
     findCan(Layers)
   }
   store.commit('SET_POINTS', Layers)
-  // 此处应些更新地图标记
+  if (constructionAreaId) myMap.value?.drawWayline()
 }
 // 删除航点
 function deleteLayer (event) {
@@ -1278,6 +1337,11 @@ function closeDrawer () {
 
 <style lang="scss" >
 .container.construction-editor { position: relative; height: 100%; min-height: 0; }
+.sweep-entry { padding: 12px; border-bottom: 1px solid #365574; }.sweep-entry :deep(.el-button){width:100%}.sweep-entry small{display:block;margin-top:8px;color:#aac8e5;line-height:1.6}
+.operation-card { margin: 12px 0; padding: 12px; border: 1px solid rgba(91, 194, 255, .25); border-radius: 8px; background: linear-gradient(135deg, rgba(20, 79, 126, .38), rgba(6, 31, 75, .7)); }
+.operation-card__title { margin-bottom: 8px; color: #72d8ff; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.safety-height-control small { display: block; margin-top: 8px; color: #a7c5dc; font-size: 12px; line-height: 1.5; }
+.safety-height-input { width: 100%; margin-top: 8px; }
 .construction-editor-banner { position: absolute; z-index: 220; top: 12px; left: 315px; right: 20px; padding: 10px 14px; color: #d9f4ff; background: #0b284a; border: 1px solid #3989b7; font-size: 13px; }
 .construction-editor-banner button { float: right; color: #8cdbff; background: transparent; border: 0; cursor: pointer; }
 .container {

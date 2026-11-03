@@ -46,6 +46,7 @@ public class ConstructionPlanGuard {
         if(readFile) try { routes.validate(workspace,area,file); } catch(IOException e) { throw new RuleException(400,"无法读取航线文件，请检查本地存储"); }
         List<Map<String,Object>> links=db.queryForList("SELECT file_sign FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND wayline_id=?",workspace,area,file);
         if(links.isEmpty()) throw new RuleException(409,"航线已解除区域关联");
+        if(!"WGS84".equals(r.get("height_mode"))) throw new RuleException(409,"航线不是 WGS84 绝对航高，请重新生成 S 型航线后创建计划");
         Map<String,Object> result=new LinkedHashMap<>();result.put("area",a);result.put("wayline",r);result.put("file_sign",links.get(0).get("file_sign"));return result;
     }
     public void validate(PubWaylineJobPlanDfEntity p,boolean readFile) {

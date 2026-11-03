@@ -37,7 +37,7 @@ public class ConstructionPlanChecks {
         JdbcTemplate db=new JdbcTemplate() {
             @Override public List<Map<String,Object>> queryForList(String sql,Object... a) {
                 if(sql.contains("FROM construction_area WHERE")) return "w".equals(a[0])&&"area".equals(a[1])?List.of(area):List.of();
-                if(sql.contains("FROM construction_area_wayline")) return List.of(Map.of("file_sign","signature"));
+                if(sql.contains("FROM construction_area_wayline")) return List.of(Map.of("file_sign","signature","dock_sn","dock"));
                 if(sql.contains("FROM wayline_job j JOIN")) return executionJobs;
                 if(sql.contains("FROM wayline_job")) return List.of();
                 if(sql.contains("FROM pub_wayline_job_plan_df p JOIN construction_plan")) {
@@ -81,11 +81,11 @@ public class ConstructionPlanChecks {
             @Override public Map<String,Object> detail(String w,String id) {if(!w.equals("w")||!id.equals("area")) throw new RuleException(404,"missing");return area;}
         };
         ConstructionWaylineService routes=new ConstructionWaylineService(null,null,null,null,null) {
-            @Override public Map<String,Object> detail(String w,String a,String id) {if(!id.equals("route")) throw new RuleException(404,"unbound");return Map.of("status","VALID","message","valid");}
+            @Override public Map<String,Object> detail(String w,String a,String id) {if(!id.equals("route")) throw new RuleException(404,"unbound");return Map.of("status","VALID","message","valid","height_mode","WGS84");}
             @Override public Map<String,Object> validate(String w,String a,String id) {return detail(w,a,id);}
         };
         FrogJumpLandingRecommendationService docks=new FrogJumpLandingRecommendationService(null,null,null) {
-            @Override public boolean isWorkspaceDock(String w,String sn) {return w.equals("w")&&sn.equals("dock");}
+            @Override public boolean isWorkspaceDock(String w,String sn) {return w.equals("w")&&(sn.equals("dock")||sn.equals("dock-2"));}
         };
         ConstructionPlanGuard guard=new ConstructionPlanGuard(db,mapper,areas,routes,docks);
         PubWaylineJobPlanDfService executor=(PubWaylineJobPlanDfService)Proxy.newProxyInstance(ConstructionPlanChecks.class.getClassLoader(),new Class[]{PubWaylineJobPlanDfService.class},(p,m,a)->{
@@ -111,8 +111,9 @@ public class ConstructionPlanChecks {
         body.put("name","Different");rejects(()->service.create(user,"area",body),409);body.put("name","Plan");
         body.put("request_id","create-request-00002");body.put("file_id","unbound");rejects(()->service.create(user,"area",body),404);body.put("file_id","route");
         body.put("dock_sn","foreign");rejects(()->service.create(user,"area",body),400);body.put("dock_sn","dock");
+        body.put("request_id","create-request-00003");body.put("dock_sn","dock-2");check(!service.create(user,"area",body).get("plan_id").equals(id));body.put("dock_sn","dock");body.put("request_id","create-request-00002");
         body.put("rth_altitude",20);rejects(()->service.create(user,"area",body),400);body.put("rth_altitude",100);
-        check(catalog.size()==1);
+        check(catalog.size()==2);
         rejects(()->guard.require("foreign",id),404);
         PubWaylineJobPlanDfEntity spoof=new PubWaylineJobPlanDfEntity();spoof.setId(catalog.get(id).getId());spoof.setPlanType(3);spoof.setFileId("foreign");spoof.setDockSn("foreign");
         rejects(()->guard.resolve("w",spoof),400);

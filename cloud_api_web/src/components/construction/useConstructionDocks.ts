@@ -3,7 +3,7 @@ import { useMyStore } from '/@/store'
 import { getBindingDevices } from '/@/api/manage'
 import { EDeviceTypeName } from '/@/types'
 
-export interface ConstructionDockMarker { sn: string; name: string; lng: number; lat: number }
+export interface ConstructionDockMarker { sn: string; name: string; lng: number; lat: number; height: number | null }
 
 export function useConstructionDocks () {
   const store = useMyStore()
@@ -20,7 +20,8 @@ export function useConstructionDocks () {
       if (osd?.longitude == null || osd?.latitude == null) return
       const lng = Number(osd.longitude); const lat = Number(osd.latitude)
       if (!Number.isFinite(lng) || !Number.isFinite(lat) || Math.abs(lng) > 180 || Math.abs(lat) > 90 || (lng === 0 && lat === 0)) return
-      result.push({ sn, name, lng, lat })
+      const rawHeight = osd.height == null || osd.height === '' ? NaN : Number(osd.height)
+      result.push({ sn, name, lng, lat, height: Number.isFinite(rawHeight) ? rawHeight : null })
     })
     return result
   })

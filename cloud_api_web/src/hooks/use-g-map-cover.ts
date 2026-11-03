@@ -49,13 +49,14 @@ export function useGMapCover () {
     })
   }
 
-  function init2DPin (name: string, coordinates:GeojsonCoordinate, color?:string, data?:{}) {
+  function init2DPin (name: string, coordinates:GeojsonCoordinate, color?:string, data?:Record<string, any>) {
     const iconOffset = { x: -10, y: -10 }
     const pin = new AMap.Marker({
       position: new AMap.LngLat(coordinates[0], coordinates[1]),
       title: name,
-      icon: getPinIcon(color),
-      offset: iconOffset,
+      ...(data?.constructionWaypoint
+        ? { content: `<span class="construction-waypoint" style="--heading:${data.heading || 0}deg"><b>${data.waypointIndex}</b><i>▲</i></span>`, offset: new AMap.Pixel(-15, -15) }
+        : { icon: getPinIcon(color), offset: iconOffset }),
       // strokeColor: color || normalColor,
       // fillColor: color || normalColor,
       extData: data

@@ -22,6 +22,7 @@ import { computed, defineComponent, onMounted, onBeforeUnmount, reactive, ref, w
 import { ElMessage } from 'element-plus'
 import type { ConstructionPoint } from '/@/api/construction'
 import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
+import { resolveWaypointHeadings } from '/@/components/construction/constructionHeading'
 import {
   generateLineContent,
   generatePointContent,
@@ -292,18 +293,29 @@ export default defineComponent({
     // ----------------------------------------------------------------------------------绘制 删除航线-------------------------------------------------------------------------------
     const markers = [] // 用于存储所有标注的引用
     let polylines = [] // 用于存储折线的引用
+    let segmentMarkers: any[] = []
     let points = [] // 存放所有的航点
     const draggableConstructionMarkers = new WeakSet<object>()
     function drawConstructionLine () {
       if (!root.$map || !root.$aMap) return
       useGMapCoverHook = useGMapCover()
       polylines.forEach(line => root.$map.remove(line)); polylines = []
+      segmentMarkers.forEach(marker => root.$map.remove(marker)); segmentMarkers = []
       const elements = store.state.Points[0].elements
+      const globalHeading = store.state.Points[0]?.folder?.globalWaypointHeadingParam || {}
+      const headings = resolveWaypointHeadings(elements.map(element => ({
+        lng: Number(element.resource.content.geometry.coordinates[0]),
+        lat: Number(element.resource.content.geometry.coordinates[1]),
+        placemark: { waypointHeadingParam: element.Placemark?.waypointHeadingParam || globalHeading }
+      })))
       elements.forEach(ele => {
         const coords = ele.resource.content.geometry.coordinates
         const gcj = wgs84togcj02(coords[0], coords[1])
-        if (!store.state.coverMap[ele.id]) useGMapCoverHook.init2DPin(ele.name, gcj, ele.resource.content.properties.color, { id: ele.id, name: ele.name })
+        const index = elements.indexOf(ele)
+        if (!store.state.coverMap[ele.id]) useGMapCoverHook.init2DPin(`航点${index + 1}`, gcj, ele.resource.content.properties.color, { id: ele.id, name: ele.name, constructionWaypoint: true, waypointIndex: index + 1, heading: headings[index] })
         const marker = store.state.coverMap[ele.id]?.[0]
+        marker?.setContent?.(`<span class="construction-waypoint" style="--heading:${headings[index]}deg"><b>${index + 1}</b><i>▲</i></span>`)
+        marker?.setTitle?.(`航点${index + 1}`)
         if (!marker || draggableConstructionMarkers.has(marker)) return
         draggableConstructionMarkers.add(marker); marker.setDraggable(true)
         marker.on('dragend', () => {
@@ -318,7 +330,30 @@ export default defineComponent({
           drawConstructionLine()
         })
       })
+      renderConstructionDirections(elements)
       showWayline(elements.map(ele => wgs84togcj02(ele.resource.content.geometry.coordinates[0], ele.resource.content.geometry.coordinates[1])))
+    }
+    function renderConstructionDirections (elements) {
+      if (!root.$map || !root.$aMap || elements.length < 1) return
+      const AMap = root.$aMap
+      const globalHeading = store.state.Points[0]?.folder?.globalWaypointHeadingParam || {}
+      const points = elements.map(element => ({
+        lng: Number(element.resource.content.geometry.coordinates[0]),
+        lat: Number(element.resource.content.geometry.coordinates[1]),
+        placemark: { waypointHeadingParam: element.Placemark?.waypointHeadingParam || globalHeading }
+      }))
+      const headings = resolveWaypointHeadings(points)
+      points.slice(0, -1).forEach((point, index) => {
+        if (index % 3 !== 1 && index !== points.length - 2) return
+        const next = points[index + 1]
+        const marker = new AMap.Marker({
+          position: wgs84togcj02((point.lng + next.lng) / 2, (point.lat + next.lat) / 2),
+          offset: new AMap.Pixel(-8, -8),
+          content: `<span class="construction-segment-arrow" style="transform:rotate(${headings[index]}deg)">➤</span>`,
+          zIndex: 170
+        })
+        root.$map.add(marker); segmentMarkers.push(marker)
+      })
     }
     function showWayline (lineArr: string[]) {
       if (props.constructionMode && lineArr.length < 2) return
@@ -768,6 +803,10 @@ export default defineComponent({
 </script>
 
   <style lang="scss" scoped>
+
+  :deep(.construction-segment-arrow) { display: block; padding: 2px; color: #ffde6b; font-size: 14px; line-height: 14px; transform-origin: 50% 50%; text-shadow: 0 1px 3px #2d2200; opacity: .9; }
+  :deep(.construction-waypoint) { position: relative; display: grid; width: 30px; height: 30px; place-items: center; border: 2px solid #eafcff; border-radius: 50%; box-sizing: border-box; color: #062843; background: #20c8df; box-shadow: 0 2px 8px rgba(0, 32, 56, .55); font: 700 13px/1 Arial, sans-serif; }
+  :deep(.construction-waypoint i) { position: absolute; top: -14px; left: 7px; color: #ffdb63; font-size: 16px; font-style: normal; line-height: 16px; transform: rotate(var(--heading)); transform-origin: 50% 19px; text-shadow: 0 1px 3px #15232a; }
 
   .g-map-wrapper {
     height: 100%;

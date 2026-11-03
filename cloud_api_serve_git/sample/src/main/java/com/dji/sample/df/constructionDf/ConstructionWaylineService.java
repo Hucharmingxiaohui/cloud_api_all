@@ -48,6 +48,7 @@ public class ConstructionWaylineService {
     private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw bad("航线数据序列化失败"); } }
     private String hash(byte[] bytes) { return DigestUtils.md5DigestAsHex(bytes); }
     private String requestHash(Object value) { return hash(encode(value).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
+    private double number(Object value,String name,double min,double max) { if(!(value instanceof Number)||!Double.isFinite(((Number)value).doubleValue())) throw bad(name+" 无效"); double result=((Number)value).doubleValue();if(result<min||result>max) throw bad(name+" 超出允许范围");return result; }
     private Map<String,Object> retry(String w,String a,String request,String digest) {
         if(request==null||!request.matches("[a-zA-Z0-9-]{16,64}")) throw bad("提交标识无效");
         List<Map<String,Object>> rows=db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND request_id=?",w,a,request);
@@ -74,6 +75,10 @@ public class ConstructionWaylineService {
         Wayline wayline;
         try { wayline=json.convertValue(body.get("wayline"),Wayline.class); } catch(Exception e) { throw bad("航线参数无效"); }
         if(wayline==null||wayline.getMissionConfig()==null||wayline.getFolder()==null||wayline.getFolder().getPlaceMarks()==null) throw bad("航线参数不完整");
+        if(!"WGS84".equals(wayline.getFolder().getExecuteHeightMode())) throw bad("S 型航线必须使用 WGS84 椭球高模式");
+        if(wayline.getFolder().getWaylineCoordinateSysParam()==null||!"WGS84".equals(wayline.getFolder().getWaylineCoordinateSysParam().getHeightMode())) throw bad("S 型航线模板必须使用 WGS84 椭球高模式");
+        if(!Float.isFinite(wayline.getFolder().getGlobalHeight())||wayline.getFolder().getGlobalHeight()<2||wayline.getFolder().getGlobalHeight()>1500) throw bad("WGS84 航高须为 2–1500 米");
+        if(wayline.getFolder().getPlaceMarks().stream().anyMatch(point->point.getUseGlobalHeight()!=1)) throw bad("S 型航线所有航点必须使用全局 WGS84 航高");
         if(wayline.getFolder().getPlaceMarks().size()<2||wayline.getFolder().getPlaceMarks().size()>2000) throw bad("航线需包含 2–2000 个航点");
         String name=wayline.getMissionConfig().getFileName();
         wayline.getMissionConfig().setFileName("route");

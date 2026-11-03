@@ -21,7 +21,7 @@ foreach ($name in @('ConstructionOverallService.java','ConstructionOverallContro
   $installed = "$javaRoot/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
 }
-foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java','ConstructionAnalysisConfigChecks.java','ConstructionParkingChecks.java')) {
+foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java','ConstructionAnalysisConfigChecks.java','ConstructionParkingChecks.java','ConstructionSweepChecks.java')) {
   $staged = Join-Path $SourceRoot $name
   $installed = "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
@@ -39,6 +39,8 @@ foreach ($name in @('CreateKml.java','CreateWpml.java')) {
   $staged = Join-Path $SourceRoot $name
   if (Test-Path $staged) { $sources += $staged } else { $sources += "$javaRoot/df/kmzDf/utils/$name" }
 }
+$sources += "$javaRoot/df/constructionDf/ConstructionNativeAnalysisGateway.java"
+$sources += Get-ChildItem "$javaRoot/df/constructionAnalysisDf" -Filter '*.java' | ForEach-Object FullName
 $arguments = @('--release','11','-encoding','UTF-8','-cp', ('"' + $classpath.Replace('\','/') + '"'), '-d', ('"' + $classesRoot.Replace('\','/') + '"'))
 $arguments += $sources | ForEach-Object { '"' + $_.Replace('\','/') + '"' }
 $argFile = Join-Path $checkRoot 'plans-javac.args'
@@ -80,4 +82,7 @@ if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionAnalysi
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionParkingChecks'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionSweepChecks'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
