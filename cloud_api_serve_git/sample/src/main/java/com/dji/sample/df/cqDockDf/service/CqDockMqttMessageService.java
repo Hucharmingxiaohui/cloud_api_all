@@ -105,15 +105,13 @@ public class CqDockMqttMessageService {
     public void handlePicture(String topic, String payload) {
         JSONObject json = parse(payload);
         String code = pathSegment(topic, 1);
-        log.info("[cq-dock][push/picture] topic={}, code={}, id={}, messageId={}, taskId={}, pictureName={}, pictureUrl={}, totalNum={}",
+        log.info("[cq-dock][push/picture] topic={}, code={}, id={}, messageId={}, taskId={}, pictureName={}, totalNum={}",
                 topic, code,
                 json.getString("id"),
                 json.getString("messageId"),
                 json.getString("taskId"),
                 json.getString("pictureName"),
-                json.getString("pictureUrl"),
                 json.getString("totalNum"));
-        log.info("[cq-dock][push/picture] full payload={}", payload);
         cqDockPictureReportService.saveMqttPicture(topic, json);
     }
 
@@ -129,18 +127,9 @@ public class CqDockMqttMessageService {
         }
     }
 
-    /**
-     * topic 以 / 开头时 index 从 1 起： /{code}/{sn}/...
-     */
     private String pathSegment(String topic, int index) {
-        if (topic == null || topic.isEmpty()) {
-            return null;
-        }
-        String[] parts = topic.split("/");
-        if (index >= 0 && index < parts.length) {
-            return parts[index];
-        }
-        return null;
+        CqDockMqttTopic parsed = CqDockMqttTopic.parse(topic);
+        return parsed == null ? null : index == 1 ? parsed.getUnitCode() : index == 2 ? parsed.getDockSn() : null;
     }
 
 }

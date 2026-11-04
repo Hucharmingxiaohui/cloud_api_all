@@ -9,6 +9,7 @@ import com.dji.sample.df.uavCommonHandleDf.model.entity.AnalysisResponse;
 import java.util.List;
 
 public interface uavReportService {
+    java.nio.file.Path genCollectionTaskWord(com.dji.sample.wayline.model.entity.WaylineJobEntity job);
 //  生成光伏报告
     void genGfPatrolTaskWordNew(String reportId, String jobId);
 //  生成风机报告

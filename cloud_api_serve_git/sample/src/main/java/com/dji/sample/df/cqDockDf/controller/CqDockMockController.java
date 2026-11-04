@@ -148,6 +148,23 @@ public class CqDockMockController {
         return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(Files.readAllBytes(file));
     }
 
+    @GetMapping("/file/download")
+    public ResponseEntity<byte[]> download(@RequestParam String fileId,
+            @RequestHeader("access_key") String accessKey,
+            @RequestHeader("access_secret") String accessSecret) throws IOException {
+        if (!Objects.equals(properties.getAccessKey(), accessKey) || !Objects.equals(properties.getAccessSecret(), accessSecret))
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        String[] names = {"visible1.jpg", "visible2.jpg", "ir1.jpg", "ir2.jpg"};
+        for (int i = 0; i < names.length; i++) {
+            if (("mock-pic-" + (i + 1)).equals(fileId)) {
+                ResponseEntity<byte[]> image = mockPicture(names[i]);
+                return ResponseEntity.status(image.getStatusCode()).headers(image.getHeaders())
+                        .header("Content-Disposition", "attachment; filename=\"" + names[i] + "\"").body(image.getBody());
+            }
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @Scheduled(fixedDelay = 1000)
     public void advanceSimulation() {
         for (Scenario scenario : scenarios.values()) {

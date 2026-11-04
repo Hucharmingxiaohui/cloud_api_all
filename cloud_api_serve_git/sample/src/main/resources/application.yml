@@ -111,7 +111,7 @@ mqtt:
     username: df1560
     password: dfe2k_1500
     # 订阅主题，多个用逗号分隔
-    inbound-topic: "/+/+/drone/osd,/+/+/dock/osd,/+/+/push/hms,/+/push/picture"
+    inbound-topic: "third/+/+/drone/osd,third/+/+/dock/osd,third/+/+/push/hms,third/+/push/picture"
 
 cloud-sdk:
   mqtt:

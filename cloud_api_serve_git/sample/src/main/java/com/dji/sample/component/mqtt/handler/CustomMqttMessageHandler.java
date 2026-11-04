@@ -1,6 +1,7 @@
 package com.dji.sample.component.mqtt.handler;
 
 import com.dji.sdk.mqtt.ChannelName;
+import com.dji.sample.df.cqDockDf.service.CqDockMqttTopic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -16,10 +17,6 @@ public class CustomMqttMessageHandler {
 
     private static final Logger log = LoggerFactory.getLogger(CustomMqttMessageHandler.class);
 
-    private static final String DRONE_OSD = "/[^/]+/[^/]+/drone/osd";
-    private static final String DOCK_OSD = "/[^/]+/[^/]+/dock/osd";
-    private static final String PUSH_HMS = "/[^/]+/[^/]+/push/hms";
-    private static final String PUSH_PICTURE = "/[^/]+/push/picture";
 
     @Resource(name = ChannelName.INBOUND_CUSTOM_DRONE_OSD)
     private MessageChannel customDroneOsdChannel;
@@ -46,19 +43,21 @@ public class CustomMqttMessageHandler {
         }
 
         try {
-            if (topic.matches(DRONE_OSD)) {
+            CqDockMqttTopic parsed = CqDockMqttTopic.parse(topic);
+            if (parsed == null) return;
+            if ("drone/osd".equals(parsed.getKind())) {
                 customDroneOsdChannel.send(message);
                 return;
             }
-            if (topic.matches(DOCK_OSD)) {
+            if ("dock/osd".equals(parsed.getKind())) {
                 customDockOsdChannel.send(message);
                 return;
             }
-            if (topic.matches(PUSH_HMS)) {
+            if ("push/hms".equals(parsed.getKind())) {
                 customHmsChannel.send(message);
                 return;
             }
-            if (topic.matches(PUSH_PICTURE)) {
+            if ("push/picture".equals(parsed.getKind())) {
                 customPictureChannel.send(message);
                 return;
             }

@@ -84,20 +84,15 @@ public class CqDockUavMonitoringService {
             entity.setTopicDockSn(topicDockSn);
         }
         if (!StringUtils.hasText(entity.getUnitCode()) && StringUtils.hasText(topic)) {
-            String[] parts = topic.split("/");
-            if (parts.length > 1) {
-                entity.setUnitCode(parts[1]);
-            }
+            CqDockMqttTopic parsed = CqDockMqttTopic.parse(topic);
+            if (parsed != null) entity.setUnitCode(parsed.getUnitCode());
         }
         return entity;
     }
 
     private String topicDockSn(String topic) {
-        if (!StringUtils.hasText(topic)) {
-            return null;
-        }
-        String[] parts = topic.split("/");
-        return parts.length > 2 ? parts[2] : null;
+        CqDockMqttTopic parsed = CqDockMqttTopic.parse(topic);
+        return parsed == null ? null : parsed.getDockSn();
     }
 
     private void persist(CqDockUavMonitoringEntity entity) {

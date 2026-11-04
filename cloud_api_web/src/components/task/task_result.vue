@@ -27,6 +27,8 @@
             type="primary"
             :icon="Download"
             @click="createReport()"
+            :disabled="reportBusy"
+            :loading="reportBusy && resultType === 3"
           >
             下载报告
           </el-button>
@@ -35,6 +37,7 @@
             type="primary"
             :icon="Document"
             @click="viewReport()"
+            :disabled="reportBusy"
           >
             查看报告
           </el-button>
@@ -43,6 +46,7 @@
             type="primary"
             :icon="Refresh"
             @click="resetReport()"
+            :disabled="reportBusy"
           >
             重置报告
           </el-button>
@@ -79,6 +83,7 @@
       </el-button> -->
     </div>
     <div class="content" v-loading="loading">
+      <p v-if="resultType === 3">未接入分析，仅展示采集图片；报告包含当前任务全部图片，不受列表分页和名称筛选影响。</p>
       <div class="table-container">
         <el-table :data="mediaData.data" stripe>
           <!-- 多选框 -->
@@ -164,7 +169,7 @@
               <div>{{ scope.row.defect_description  }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="100px" align="center">
+          <el-table-column v-if="resultType !== 3" label="操作" min-width="100px" align="center">
             <template #default="scope">
               <el-button
                 size="small"
@@ -231,6 +236,7 @@
       v-model="viewReportVisible"
       width="880px"
       class="view"
+      @closed="clearOrdinaryReportPreview"
     >
       <div v-loading="viewloading" class="doc-preview-container">
         <div id="docContainer" class="docx-container"></div>
@@ -547,7 +553,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed, onMounted, inject } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { downloadFile } from '/@/utils/common'
@@ -559,7 +565,56 @@ import TempDet from '/@/components/task/tempDet.vue'
 import TempCalibration from '/@/components/task/tempCalibration.vue'
 import { getImageUrl } from '/@/common/url'
 import { renderAsync } from 'docx-preview'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+const reportBusy = ref(false)
+let reportMounted = true
+function clearOrdinaryReportPreview () {
+  if (resultType.value === 3) document.getElementById('docContainer')?.replaceChildren()
+}
+onBeforeUnmount(() => {
+  reportMounted = false
+  clearOrdinaryReportPreview()
+})
+
+async function ordinaryReportAction (action: 'download' | 'view' | 'reset') {
+  if (reportBusy.value) return
+  reportBusy.value = true
+  try {
+    if (action === 'reset') {
+      try {
+        await ElMessageBox.confirm('仅清除当前任务生成的报告，不删除采集图片。确定重置报告？', '重置报告', { confirmButtonText: '确定重置', cancelButtonText: '取消', type: 'warning' })
+      } catch { return }
+      const response = await deleteFlyTaskReportApi(jobInfo.job_id)
+      if (response.code !== 0) throw new Error((response as any).msg || response.message || '重置报告失败')
+      viewReportVisible.value = false
+      clearOrdinaryReportPreview()
+      ElMessage.success('报告已重置，下次查看或下载将按当前图片重新生成')
+      return
+    }
+    const response = await createFlyTaskReportApi({ jobId: jobInfo.job_id })
+    if (response.code !== 0) throw new Error((response as any).msg || response.message || '采集报告生成失败')
+    const blob = await downloadFlyTaskReportApi(jobInfo.job_id)
+    if (!blob || !blob.size) throw new Error('报告内容为空或下载失败')
+    if (!reportMounted) return
+    if (action === 'download') {
+      downloadFile(blob, `${jobInfo.job_name.replace(/[\\/:*?"<>|\r\n]/g, '_')}_${jobInfo.job_id}.docx`)
+      return
+    }
+    viewReportVisible.value = true
+    viewloading.value = true
+    await nextTick()
+    const container = document.getElementById('docContainer')
+    if (!container || !reportMounted) return
+    container.replaceChildren()
+    await renderAsync(blob, container, null, { useBase64URL: true })
+    if (!reportMounted || !viewReportVisible.value) container.replaceChildren()
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '采集报告操作失败，请稍后重试')
+  } finally {
+    reportBusy.value = false
+    viewloading.value = false
+  }
+}
 const viewReportVisible = ref(false)
 const editDefectVisible = ref(false)
 const loading = ref(false) // 全局下载loading
@@ -685,6 +740,7 @@ async function getDefectTypeMap () {
  * 生成任务结果报告
  */
 async function createReport () {
+  if (resultType.value === 3) return ordinaryReportAction('download')
   try {
     loading.value = true
     const response = await createFlyTaskReportApi({
@@ -713,6 +769,7 @@ async function createReport () {
  * 重置任务报告
  */
 async function resetReport () {
+  if (resultType.value === 3) return ordinaryReportAction('reset')
   try {
     loading.value = true
     const response = await deleteFlyTaskReportApi(jobInfo.job_id)
@@ -780,6 +837,7 @@ async function exportOriginImage () {
  * 查看报告
  */
 async function viewReport () {
+  if (resultType.value === 3) return ordinaryReportAction('view')
   try {
     viewReportVisible.value = true
     viewloading.value = true

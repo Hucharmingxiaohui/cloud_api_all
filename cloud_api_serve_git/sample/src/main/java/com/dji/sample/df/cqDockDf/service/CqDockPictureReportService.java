@@ -138,7 +138,7 @@ public class CqDockPictureReportService {
     public void saveMqttPicture(String topic, JSONObject picture) {
         String euaTaskId = firstText(picture, "taskId", "euaTaskId", "eua_task_id");
         if (!StringUtils.hasText(euaTaskId)) {
-            log.warn("EUA MQTT图片推送缺少taskId，忽略: topic={}, payload={}", topic, picture.toJSONString());
+            log.warn("EUA MQTT图片推送缺少taskId，忽略: topic={}", topic);
             return;
         }
 
@@ -761,13 +761,11 @@ public class CqDockPictureReportService {
     private CqDockTaskPictureEntity savePicture(String taskCode, String taskName, String euaTaskId,
                                                 JSONObject picture, String source) {
         Integer pointType = parsePointType(picture);
-//      todo ，mqtt主动上报链路上来的，pictureId取的是整个上报json的主键id
-        String pictureId = firstText(picture, "pictureId", "photoId", "id");
+        String pictureId = firstText(picture, "id", "pictureId", "photoId");
         String pictureUrl = firstText(picture, "pictureUrl", "url", "fileUrl", "path");
         String pictureName = firstText(picture, "pictureName", "fileName", "name");
-        if (!StringUtils.hasText(pictureName)) {
-            pictureName = buildPictureName(pictureUrl, pictureId);
-        }
+        String providedName = pictureName;
+        if (StringUtils.hasText(pictureName)) pictureName = safePictureName(pictureName);
 
         CqDockTaskPictureEntity entity = findPicture(taskCode, euaTaskId, pictureName, pictureId, pictureUrl);
         Date now = new Date();
@@ -813,8 +811,10 @@ public class CqDockPictureReportService {
         }
 //      存数据库及保存本地
         try {
-            if (!StringUtils.hasText(entity.getLocalPath()) || !new File(entity.getLocalPath()).exists()) {
-                entity.setLocalPath(downloadPicture(pictureUrl, taskCode, pictureName));
+            if (!StringUtils.hasText(entity.getLocalPath()) || !Files.isRegularFile(Paths.get(entity.getLocalPath()))
+                    || Files.size(Paths.get(entity.getLocalPath())) == 0) {
+                entity.setLocalPath(downloadPicture(pictureId, pictureUrl, taskCode, providedName));
+                entity.setPictureName(Paths.get(entity.getLocalPath()).getFileName().toString());
             }
             if (!Objects.equals(entity.getReportStatus(), 1)) {
                 entity.setReportStatus(0);
@@ -822,11 +822,11 @@ public class CqDockPictureReportService {
             }
         } catch (Exception e) {
             entity.setReportStatus(2);
-            entity.setReportMsg(e.getMessage());
-            log.error("EUA图片处理失败: source={}, taskCode={}, euaTaskId={}, pictureName={}, pictureUrl={}",
-                    source, taskCode, euaTaskId, pictureName, pictureUrl, e);
+            entity.setReportMsg("EUA图片下载或校验失败");
+            log.warn("EUA图片处理失败: source={}, taskCode={}, euaTaskId={}, type={}",
+                    source, taskCode, euaTaskId, e.getClass().getSimpleName());
             cqDockTaskPictureMapper.updateById(entity);
-            throw new IllegalStateException("EUA图片保存失败", e);
+            throw new IllegalStateException("EUA图片保存失败");
         }
         entity.setUpdateTime(new Date());
         cqDockTaskPictureMapper.updateById(entity);
@@ -844,10 +844,10 @@ public class CqDockPictureReportService {
         LambdaQueryWrapper<CqDockTaskPictureEntity> wrapper = new LambdaQueryWrapper<CqDockTaskPictureEntity>()
                 .eq(CqDockTaskPictureEntity::getBusinessId, taskCode)
                 .eq(CqDockTaskPictureEntity::getEuaTaskId, euaTaskId);
-        if (StringUtils.hasText(pictureName)) {
-            wrapper.eq(CqDockTaskPictureEntity::getPictureName, pictureName);
-        } else if (StringUtils.hasText(pictureId)) {
+        if (StringUtils.hasText(pictureId)) {
             wrapper.eq(CqDockTaskPictureEntity::getPictureId, pictureId);
+        } else if (StringUtils.hasText(pictureName)) {
+            wrapper.eq(CqDockTaskPictureEntity::getPictureName, pictureName);
         } else {
             wrapper.eq(CqDockTaskPictureEntity::getPictureUrl, pictureUrl);
         }
@@ -863,25 +863,70 @@ public class CqDockPictureReportService {
                 .last("LIMIT 1"));
     }
 
-    private String downloadPicture(String pictureUrl, String taskCode, String pictureName) throws Exception {
-        if (!StringUtils.hasText(pictureUrl)) {
-            throw new IllegalArgumentException("EUA图片地址为空");
-        }
-//      设置本地存储路径
-        Path dir = Paths.get(cqDockProperties.getPictureLocalPath(), taskCode);
+    private String downloadPicture(String pictureId, String pictureUrl, String taskCode, String pictureName) throws Exception {
+        Path root = Paths.get(cqDockProperties.getPictureLocalPath()).toAbsolutePath().normalize();
+        if (!StringUtils.hasText(taskCode) || taskCode.contains("/") || taskCode.contains("\\")
+                || taskCode.contains(":") || taskCode.equals(".") || taskCode.equals(".."))
+            throw new IllegalArgumentException("EUA任务路径无效");
+        Path dir = root.resolve(taskCode).normalize();
         Files.createDirectories(dir);
-        String safeName = FileNameUtils.convertChineseToPinyinInitials(pictureName);
-        Path target = dir.resolve(safeName);
-        try (InputStream inputStream = new URL(pictureUrl).openStream();
-             java.io.FileOutputStream outputStream = new FileOutputStream(target.toFile())) {
-            byte[] buffer = new byte[8192];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, len);
+        if (!dir.toRealPath().startsWith(root.toRealPath())) throw new IllegalArgumentException("EUA任务路径无效");
+        Path part = Files.createTempFile(dir, ".eua-", ".part");
+        try {
+            String headerName;
+            try (java.io.OutputStream output = Files.newOutputStream(part)) {
+                if (StringUtils.hasText(pictureId)) {
+                    headerName = cqDockApiService.downloadFile(pictureId, output);
+                } else {
+                    if (!StringUtils.hasText(pictureUrl)) throw new IllegalArgumentException("EUA图片标识为空");
+                    headerName = cqDockApiService.downloadLegacyPicture(pictureUrl, output);
+                }
             }
+            validateImage(part);
+            String name = StringUtils.hasText(pictureName) ? pictureName : headerName;
+            if (!StringUtils.hasText(name)) name = UUID.randomUUID() + ".jpg";
+            Path target = dir.resolve(safePictureName(name));
+            Files.move(part, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return target.toAbsolutePath().toString();
+        } finally { Files.deleteIfExists(part); }
+    }
+
+    private String safePictureName(String name) {
+        String value = name.replace('\\', '/');
+        value = value.substring(value.lastIndexOf('/') + 1).replaceAll("[\\p{Cntrl}<>:\"|?*]", "_")
+                .replaceAll("[. ]+$", "");
+        if (!StringUtils.hasText(value) || value.equals(".") || value.equals("..")) value = "picture.jpg";
+        if (value.matches("(?i)^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\\..*)?$")) value = "_" + value;
+        if (value.length() > 180) value = value.substring(value.length() - 180);
+        return value;
+    }
+
+    private void validateImage(Path file) throws java.io.IOException {
+        if (Files.size(file) == 0 || Files.size(file) > CqDockApiService.MAX_DOWNLOAD_BYTES)
+            throw new java.io.IOException("EUA图片大小无效");
+        try (javax.imageio.stream.ImageInputStream input = javax.imageio.ImageIO.createImageInputStream(file.toFile())) {
+            java.util.Iterator<javax.imageio.ImageReader> readers = javax.imageio.ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) throw new java.io.IOException("EUA图片格式无效");
+            javax.imageio.ImageReader reader = readers.next();
+            try {
+                String format = reader.getFormatName();
+                if (!"JPEG".equalsIgnoreCase(format) && !"PNG".equalsIgnoreCase(format))
+                    throw new java.io.IOException("EUA仅支持JPEG/PNG图片");
+                reader.setInput(input, true, true);
+                int width = reader.getWidth(0), height = reader.getHeight(0);
+                if (width <= 0 || height <= 0 || (long) width * height > 200_000_000L)
+                    throw new java.io.IOException("EUA图片尺寸无效");
+                javax.imageio.ImageReadParam param = reader.getDefaultReadParam();
+                int sample = Math.max(1, (int) Math.ceil(Math.max(width, height) / 1024.0));
+                param.setSourceSubsampling(sample, sample, 0, 0);
+                final boolean[] warning = {false};
+                reader.addIIOReadWarningListener((source, message) -> warning[0] = true);
+                java.awt.image.BufferedImage image = reader.read(0, param);
+                if (image == null || warning[0]) throw new java.io.IOException("EUA图片数据不完整");
+                image.flush();
+            } finally { reader.dispose(); }
         }
-        log.info("EUA图片下载完成: url={}, localPath={}, size={}", pictureUrl, target.toAbsolutePath(), Files.size(target));
-        return target.toAbsolutePath().toString();
     }
 
     private String uploadPicture(String taskCode, String localPath) {

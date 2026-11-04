@@ -10,9 +10,7 @@ public final class CqDockMonitoringPayloadConverter {
     }
 
     public static void applyDroneOsd(CqDockUavMonitoringEntity entity, String topic, JSONObject payload, String rawData) {
-        String[] parts = splitTopic(topic);
-        entity.setUnitCode(firstText(part(parts, 1), entity.getUnitCode()));
-        entity.setTopicDockSn(firstText(part(parts, 2), entity.getTopicDockSn()));
+        applyTopic(entity, topic);
         entity.setTaskId(firstText(payload.getString("taskId"), entity.getTaskId()));
         entity.setDockSn(firstText(payload.getString("dockId"), entity.getDockSn(), entity.getTopicDockSn()));
         entity.setDroneSn(firstText(payload.getString("droneId"), entity.getDroneSn()));
@@ -35,9 +33,7 @@ public final class CqDockMonitoringPayloadConverter {
     }
 
     public static void applyDockOsd(CqDockUavMonitoringEntity entity, String topic, JSONObject payload, String rawData) {
-        String[] parts = splitTopic(topic);
-        entity.setUnitCode(firstText(part(parts, 1), entity.getUnitCode()));
-        entity.setTopicDockSn(firstText(part(parts, 2), entity.getTopicDockSn()));
+        applyTopic(entity, topic);
         entity.setTaskId(firstText(payload.getString("taskId"), entity.getTaskId()));
         entity.setDockSn(firstText(payload.getString("dockId"), entity.getDockSn(), entity.getTopicDockSn()));
         entity.setDockMessageId(payload.getString("messageId"));
@@ -66,12 +62,12 @@ public final class CqDockMonitoringPayloadConverter {
         return null;
     }
 
-    private static String[] splitTopic(String topic) {
-        return topic == null ? new String[0] : topic.split("/");
-    }
-
-    private static String part(String[] parts, int index) {
-        return index >= 0 && index < parts.length ? parts[index] : null;
+    private static void applyTopic(CqDockUavMonitoringEntity entity, String topic) {
+        CqDockMqttTopic parsed = CqDockMqttTopic.parse(topic);
+        if (parsed != null) {
+            entity.setUnitCode(parsed.getUnitCode());
+            entity.setTopicDockSn(parsed.getDockSn());
+        }
     }
 
     private static String nestedString(JSONObject root, String... path) {

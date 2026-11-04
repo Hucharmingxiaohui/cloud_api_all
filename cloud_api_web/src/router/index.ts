@@ -225,6 +225,17 @@ const routes: Array<RouteRecordRaw> = [
         }
       },
       {
+        path: '/euaMonitoring',
+        name: 'euaMonitoring',
+        component: () => import('/@/components/devices/eua-monitoring.vue'),
+        meta: {
+          showInMenu: true,
+          label: 'EUA设备监控',
+          position: 'left',
+          cache: false
+        }
+      },
+      {
         path: '/remoteDebug',
         name: 'remoteDebug',
         component: () => import(/* webpackPrefetch: true */ '/@/components/task/waylineVideo.vue'),

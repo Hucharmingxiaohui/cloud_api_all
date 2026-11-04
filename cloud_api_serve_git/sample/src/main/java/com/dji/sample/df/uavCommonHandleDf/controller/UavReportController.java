@@ -339,10 +339,46 @@ public class UavReportController {
      * 巡视报告界面接口-巡视报告生成
      */
     @PostMapping("/createTaskReport")
-    public Result createHisTaskReport(@RequestBody JSONObject jsonObject) {
+    public Result createHisTaskReport(@RequestBody JSONObject jsonObject, HttpServletRequest request) {
+        WaylineJobEntity job = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jsonObject.getString("jobId")));
+        if (isOrdinary(job)) requireOrdinaryWorkspace(job, request);
+        return createHisTaskReport(jsonObject);
+    }
+
+    private boolean isOrdinary(WaylineJobEntity job) {
+        if (job == null || job.getPlanId() == null) return false;
+        PubWaylineJobPlanDfEntity plan = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
+                .eq(PubWaylineJobPlanDfEntity::getPlanId, job.getPlanId()));
+        return plan != null && Integer.valueOf(3).equals(plan.getPlanType());
+    }
+
+    private void requireOrdinaryWorkspace(WaylineJobEntity job, HttpServletRequest request) {
+        com.dji.sample.common.model.CustomClaim claim = request == null ? null :
+                (com.dji.sample.common.model.CustomClaim) request.getAttribute(com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM);
+        if (claim == null || claim.getWorkspaceId() == null || claim.getWorkspaceId().isBlank())
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "请先登录工作空间");
+        if (!claim.getWorkspaceId().equals(job.getWorkspaceId()))
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
+    }
+
+    private Path collectionReportPath(String jobId) {
+        if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("任务标识无效");
+        return Paths.get(fileConfig.getFileReportPath()).resolve("collection_" + jobId + ".docx");
+    }
+
+    public Result createHisTaskReport(JSONObject jsonObject) {
         WaylineJobEntity candidate = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, jsonObject.getString("jobId")));
         if (isConstruction(candidate)) return Result.warn("工地报告服务尚未接入，请在工地任务结果中查看分析状态");
+        if (isOrdinary(candidate)) {
+            try {
+                uavReportService.genCollectionTaskWord(candidate);
+                return Result.success("采集报告已生成");
+            } catch (IllegalArgumentException e) {
+                return Result.warn(e.getMessage());
+            }
+        }
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         Integer isAnalyzed = waylineJobEntity.getIsAnalyzed();
@@ -388,11 +424,22 @@ public class UavReportController {
 
 //  删除报告，重新生成报告用，之前调用
     @GetMapping("deleteReport")
-    public Result deleteReport(@RequestParam String jobId) {
+    public Result deleteReport(@RequestParam String jobId, HttpServletRequest request) {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(
                 new LambdaQueryWrapper<WaylineJobEntity>()
                         .eq(WaylineJobEntity::getJobId, jobId)
         );
+        if (isOrdinary(waylineJobEntity)) {
+            requireOrdinaryWorkspace(waylineJobEntity, request);
+            synchronized (uavReportService) {
+                try {
+                    Files.deleteIfExists(collectionReportPath(jobId));
+                    return Result.success("采集报告已重置，原图不受影响");
+                } catch (IOException e) {
+                    return Result.error("报告重置失败，请稍后重试");
+                }
+            }
+        }
         String taskName = waylineJobEntity.getName();
         boolean isFileDeleted = deleteReportFile(new File(fileConfig.getFileReportPath() + "/" + buildReportFileName(taskName, jobId)), taskName)
                 | deleteReportFile(new File(fileConfig.getFileReportPath() + "/" + taskName + ".docx"), taskName);
@@ -531,14 +578,18 @@ public class UavReportController {
     }
 
     @GetMapping("/download")
-    public ResponseEntity<Resource> downloadFile(@RequestParam String jobId) {
+    public ResponseEntity<Resource> downloadFile(@RequestParam String jobId, HttpServletRequest request) {
+        WaylineJobEntity candidate = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId));
+        boolean ordinary = isOrdinary(candidate);
+        if (ordinary) requireOrdinaryWorkspace(candidate, request);
         try {
             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(
                     new LambdaQueryWrapper<WaylineJobEntity>()
                             .eq(WaylineJobEntity::getJobId, jobId)
             );
             String name = waylineJobEntity.getName();
-            String filePath = resolveReportFilePath(name, jobId);
+            String filePath = ordinary ? collectionReportPath(jobId).toString() : resolveReportFilePath(name, jobId);
             Path path = Paths.get(filePath).normalize();
             File file = path.toFile();
 
@@ -560,7 +611,8 @@ public class UavReportController {
 
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION,
-                    "attachment; filename=\"" + encodedFileName + "\"");
+                    ordinary ? org.springframework.http.ContentDisposition.attachment().filename("采集报告_" + jobId + ".docx", java.nio.charset.StandardCharsets.UTF_8).build().toString()
+                            : "attachment; filename=\"" + encodedFileName + "\"");
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
             headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(file.length()));
             headers.add("Cache-Control", "no-cache, no-store, must-revalidate");

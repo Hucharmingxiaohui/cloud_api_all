@@ -100,6 +100,72 @@ public class uavReportServiceImpl implements uavReportService {
     private static final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
+    public synchronized java.nio.file.Path genCollectionTaskWord(WaylineJobEntity job) {
+        String jobId = job.getJobId();
+        if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("任务标识无效");
+        List<MediaFileEntity> photos = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+                .eq(MediaFileEntity::getJobId, jobId).eq(MediaFileEntity::getWorkspaceId, job.getWorkspaceId())
+                .orderByAsc(MediaFileEntity::getId));
+        if (photos.isEmpty()) throw new IllegalArgumentException("当前任务暂无采集图片");
+        java.nio.file.Path output = java.nio.file.Paths.get(fileConfig.getFileReportPath()).resolve("collection_" + jobId + ".docx");
+        java.nio.file.Path temp = null;
+        try (XWPFDocument document = new XWPFDocument()) {
+            XWPFParagraph title = document.createParagraph();
+            title.setAlignment(ParagraphAlignment.CENTER);
+            XWPFRun heading = title.createRun();
+            heading.setText("普通航线采集图片报告");
+            heading.setBold(true);
+            heading.setFontFamily("宋体");
+            heading.setFontSize(18);
+            document.createParagraph().createRun().setText("任务名称：" + job.getName());
+            document.createParagraph().createRun().setText("任务编号：" + jobId);
+            document.createParagraph().createRun().setText("未接入分析，仅展示采集图片");
+            document.createParagraph().createRun().setText("采集图片数量：" + photos.size());
+            java.nio.file.Path base = java.nio.file.Paths.get(fileConfig.getRecfilePath() + fileConfig.getRecfileNativePath()).toRealPath();
+            java.nio.file.Path directory = base.resolve(jobId).toRealPath();
+            if (!directory.startsWith(base)) throw new IllegalArgumentException("原图目录无效");
+            for (MediaFileEntity photo : photos) {
+                String name = photo.getFileName();
+                if (name == null || name.contains("/") || name.contains("\\") || name.lastIndexOf('.') <= 0)
+                    throw new IllegalArgumentException("图片名称无效");
+                String stem = name.substring(0, name.lastIndexOf('.'));
+                java.nio.file.Path imagePath = directory.resolve("1_" + stem + ".jpg").toRealPath();
+                if (!imagePath.startsWith(directory)) throw new IllegalArgumentException("原图路径无效");
+                BufferedImage image = ImageIO.read(imagePath.toFile());
+                if (image == null) throw new IllegalArgumentException("原图无法读取：" + name);
+                XWPFTable table = document.createTable(4, 2);
+                table.setWidth("100%");
+                setTableBorders(table);
+                String[][] rows = {{"图片名称", name}, {"采集时间", photo.getCreateTime() == null ? "未记录" : new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(photo.getCreateTime()))},
+                        {"镜头来源", photo.getPayload() == null ? "未记录" : photo.getPayload()}, {"图片类型（按文件名）", name.contains("_T") ? "红外图片" : "可见光图片"}};
+                for (int i = 0; i < rows.length; i++) {
+                    for (int j = 0; j < 2; j++) {
+                        table.getRow(i).getCell(j).setText(rows[i][j]);
+                        setCellFont(table.getRow(i).getCell(j), "宋体", 11, j == 0);
+                    }
+                }
+                double scale = Math.min(14.0 * 360000 / image.getWidth(), 10.0 * 360000 / image.getHeight());
+                XWPFParagraph picture = document.createParagraph();
+                picture.setAlignment(ParagraphAlignment.CENTER);
+                try (InputStream input = java.nio.file.Files.newInputStream(imagePath)) {
+                    picture.createRun().addPicture(input, XWPFDocument.PICTURE_TYPE_JPEG, name,
+                            (int) (image.getWidth() * scale), (int) (image.getHeight() * scale));
+                }
+                document.createParagraph();
+            }
+            java.nio.file.Files.createDirectories(output.getParent());
+            temp = java.nio.file.Files.createTempFile(output.getParent(), "collection-", ".tmp");
+            try (OutputStream stream = java.nio.file.Files.newOutputStream(temp)) { document.write(stream); }
+            java.nio.file.Files.move(temp, output, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return output;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("采集报告生成失败，请确认原图已保存：" + e.getMessage(), e);
+        } finally {
+            if (temp != null) try { java.nio.file.Files.deleteIfExists(temp); } catch (IOException e) { log.warn("临时报告清理失败", e); }
+        }
+    }
+
+    @Override
     public String createNewReport(String jobId) {
         uavReportEntity reportEntity = new uavReportEntity();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().
