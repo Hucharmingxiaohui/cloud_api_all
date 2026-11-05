@@ -105,6 +105,12 @@ export const downloadFlyTaskReportApi = async function (jobId: string): Promise<
 }
 
 // 删除报告
+export async function previewCollectionReportApi (jobId: string): Promise<string> {
+  const result = await request.get(`${HTTP_PREFIX_TWO}/collectionReportPreview?jobId=${encodeURIComponent(jobId)}`, { responseType: 'text' })
+  if (typeof result.data !== 'string' || !result.data.startsWith('<!doctype html>')) throw new Error('报告预览失败，请重新生成')
+  return result.data
+}
+
 export async function deleteFlyTaskReportApi (job_id: string): Promise<IWorkspaceResponse<{}>> {
   const url = `${HTTP_PREFIX_TWO}/deleteReport?jobId=${job_id}`
   const result = await request.get(url)

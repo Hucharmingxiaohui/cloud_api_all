@@ -75,7 +75,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
     public void taskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
        log.info("开始处理下发任务");
 //      需要区分不同任务类型：风机任务、航点航线任务、光伏任务、EUA任务
-//      风机按设备、原生航线/光伏按间隔、EUA按点位下发。
+//      风机按设备、航点航线/光伏按间隔、EUA按点位下发。
         String taskCode = taskCommandItem.getTask_code();
         String taskName = taskCommandItem.getTask_name();
         int deviceLevel = taskCommandItem.getDevice_level();

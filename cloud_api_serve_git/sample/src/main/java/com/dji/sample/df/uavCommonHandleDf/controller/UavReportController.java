@@ -342,7 +342,11 @@ public class UavReportController {
     public Result createHisTaskReport(@RequestBody JSONObject jsonObject, HttpServletRequest request) {
         WaylineJobEntity job = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                 .eq(WaylineJobEntity::getJobId, jsonObject.getString("jobId")));
-        if (isOrdinary(job)) requireOrdinaryWorkspace(job, request);
+        if (isOrdinary(job)) {
+            requireOrdinaryWorkspace(job, request);
+            com.dji.sample.common.model.CustomClaim claim = (com.dji.sample.common.model.CustomClaim) request.getAttribute(com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM);
+            return generateCollectionReport(job, claim.getUsername());
+        }
         return createHisTaskReport(jsonObject);
     }
 
@@ -364,7 +368,32 @@ public class UavReportController {
 
     private Path collectionReportPath(String jobId) {
         if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("任务标识无效");
-        return Paths.get(fileConfig.getFileReportPath()).resolve("collection_" + jobId + ".docx");
+        return Paths.get(fileConfig.getFileReportPath()).resolve("collection_" + jobId + ".xls");
+    }
+
+    @Autowired
+    private com.dji.sample.df.uavCommonHandleDf.service.impl.CollectionXlsReportService collectionXlsReportService;
+
+    private Result generateCollectionReport(WaylineJobEntity job, String operator) {
+        try {
+            Path path = collectionXlsReportService.generate(job, operator);
+            java.util.Map<String, String> metadata = new java.util.HashMap<>();
+            metadata.put("filename", path.getFileName().toString());
+            metadata.put("contentType", "application/vnd.ms-excel");
+            return Result.success(metadata);
+        } catch (IllegalArgumentException e) { return Result.warn(e.getMessage()); }
+    }
+
+    @GetMapping(value = "/collectionReportPreview", produces = "text/html;charset=UTF-8")
+    public ResponseEntity<String> collectionReportPreview(@RequestParam String jobId, HttpServletRequest request) {
+        WaylineJobEntity job = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
+        if (!isOrdinary(job)) return ResponseEntity.notFound().build();
+        requireOrdinaryWorkspace(job, request);
+        try {
+            return ResponseEntity.ok().header("Cache-Control", "no-store")
+                    .header("Content-Security-Policy", "default-src 'none'; img-src data:; style-src 'unsafe-inline'")
+                    .body(collectionXlsReportService.preview(jobId));
+        } catch (IllegalArgumentException e) { return ResponseEntity.notFound().build(); }
     }
 
     public Result createHisTaskReport(JSONObject jsonObject) {
@@ -372,12 +401,7 @@ public class UavReportController {
                 .eq(WaylineJobEntity::getJobId, jsonObject.getString("jobId")));
         if (isConstruction(candidate)) return Result.warn("工地报告服务尚未接入，请在工地任务结果中查看分析状态");
         if (isOrdinary(candidate)) {
-            try {
-                uavReportService.genCollectionTaskWord(candidate);
-                return Result.success("采集报告已生成");
-            } catch (IllegalArgumentException e) {
-                return Result.warn(e.getMessage());
-            }
+            return generateCollectionReport(candidate, "未提供");
         }
         String jobId = jsonObject.get("jobId").toString();
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
@@ -431,7 +455,7 @@ public class UavReportController {
         );
         if (isOrdinary(waylineJobEntity)) {
             requireOrdinaryWorkspace(waylineJobEntity, request);
-            synchronized (uavReportService) {
+            synchronized (collectionXlsReportService) {
                 try {
                     Files.deleteIfExists(collectionReportPath(jobId));
                     return Result.success("采集报告已重置，原图不受影响");
@@ -602,7 +626,7 @@ public class UavReportController {
             }
 
             Resource resource = new UrlResource(file.toURI());
-            String contentType = Files.probeContentType(path);
+            String contentType = ordinary ? "application/vnd.ms-excel" : Files.probeContentType(path);
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
@@ -611,7 +635,7 @@ public class UavReportController {
 
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION,
-                    ordinary ? org.springframework.http.ContentDisposition.attachment().filename("采集报告_" + jobId + ".docx", java.nio.charset.StandardCharsets.UTF_8).build().toString()
+                    ordinary ? org.springframework.http.ContentDisposition.attachment().filename("采集报告_" + jobId + ".xls", java.nio.charset.StandardCharsets.UTF_8).build().toString()
                             : "attachment; filename=\"" + encodedFileName + "\"");
             headers.add(HttpHeaders.CONTENT_TYPE, contentType);
             headers.add(HttpHeaders.CONTENT_LENGTH, String.valueOf(file.length()));

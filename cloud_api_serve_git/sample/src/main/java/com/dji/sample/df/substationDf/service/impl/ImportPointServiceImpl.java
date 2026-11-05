@@ -26,9 +26,6 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
     @Autowired
     UniPointMapper2 uniPointMapper2;
 
-    @Value("${normalStation.stationName}")
-    String subName;
-
     @Value("${centernormal.stationCode}")
     String systemCode;
 
@@ -189,6 +186,12 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
         if ("2".equals(operate)) {
             this.lambdaUpdate().eq(UniPoint::getSubCode, subCode).eq(UniPoint::getPointCode, pointCode).remove();
             return;
+        }
+        if (StringUtils.isBlank(subCode)) {
+            throw new FastException("变电站编码不能为空");
+        }
+        if (StringUtils.isBlank(pointExcel.getSubName())) {
+            throw new FastException("变电站名称不能为空");
         }
 
         //--------------------1.df_uni_area表新增或更新记录--------------------
@@ -359,7 +362,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 point = new UniPoint();
                 point.setPointCode(pointCode);
             }
-            point.setSubName(subName); // 需要从其他表查询
+            point.setSubName(pointExcel.getSubName());
             point.setSysCode(systemCode);
             point.setSubCode(subCode);
             point.setAreaId(area.getAreaId());

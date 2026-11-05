@@ -7,7 +7,6 @@ import com.dji.sample.df.substationDf.service.ImportPointService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -17,11 +16,13 @@ import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -94,6 +95,7 @@ public class ImportPointController {
             // 5. 处理导入数据
             int successCount = 0;
             int failCount = 0;
+            StringBuilder failures = new StringBuilder();
             UniPointImportExcel2 point = new  UniPointImportExcel2();
             for (int i=0;i<points.size();i++) {
                 try {
@@ -104,6 +106,7 @@ public class ImportPointController {
                     successCount++;
                 } catch (Exception e) {
                     failCount++;
+                    failures.append("；第").append(i + 2).append("行: ").append(e.getMessage());
                     log.error("[配置管理-点位标准库-导入点位文件]同步过程中，出现异常，填写的数据:{}，异常:{}",
                             point, e.getMessage());
                 }
@@ -111,6 +114,7 @@ public class ImportPointController {
 
             // 6. 返回导入结果
             String result = String.format("导入完成！成功: %d 条，失败: %d 条", successCount, failCount);
+            result += failures;
             log.info("点位数据导入完成: {}", result);
 
             return ResponseEntity.ok(result);
@@ -136,7 +140,15 @@ public class ImportPointController {
             throw new RuntimeException("Excel文件不存在: " + modelfilePath);
         }
 
-        Resource resource = new FileSystemResource(file);
+        byte[] content;
+        try (InputStream input = new FileInputStream(file);
+             Workbook workbook = WorkbookFactory.create(input);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            ensureStationNameColumn(workbook.getSheetAt(0));
+            workbook.write(output);
+            content = output.toByteArray();
+        }
+        Resource resource = new org.springframework.core.io.ByteArrayResource(content);
         String fileName = file.getName();
 
         // 编码文件名
@@ -151,7 +163,7 @@ public class ImportPointController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(getContentType(fileName)))
                 .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
-                .contentLength(file.length())
+                .contentLength(content.length)
                 .body(resource);
     }
 
@@ -173,9 +185,11 @@ public class ImportPointController {
         List<com.dji.sample.center.entity.UniPoint> points =
                 (List<com.dji.sample.center.entity.UniPoint>) result.get("list");
 
-        try (Workbook workbook = new XSSFWorkbook(file);
+        try (InputStream input = new FileInputStream(file);
+             Workbook workbook = new XSSFWorkbook(input);
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.getSheetAt(0);
+            ensureStationNameColumn(sheet);
             Row templateRow = sheet.getLastRowNum() >= 1 ? sheet.getRow(1) : null;
             CellStyle[] styles = new CellStyle[sheet.getRow(0).getLastCellNum()];
             for (int i = 0; i < styles.length; i++) {
@@ -207,7 +221,7 @@ public class ImportPointController {
 
     private void writePointRow(Row row, com.dji.sample.center.entity.UniPoint point, CellStyle[] styles) {
         Object[] values = {
-                "", point.getSubCode(), point.getAreaName(), point.getBayName(), point.getDeviceName(), point.getDeviceType(),
+                "", point.getSubCode(), point.getSubName(), point.getAreaName(), point.getBayName(), point.getDeviceName(), point.getDeviceType(),
                 point.getComponentName(), point.getPointCode(), point.getPointName(), "uav",
                 point.getMeterType(), point.getAppearanceType(), point.getSaveTypeList(), point.getRecognitionTypeList(),
                 point.getPhase(), point.getLevel(), point.getPointDes(), point.getMapPos(), point.getUpperValue(), point.getLowerValue(),
@@ -220,6 +234,24 @@ public class ImportPointController {
             Object value = values[i];
             if (value instanceof Number) cell.setCellValue(((Number) value).doubleValue());
             else cell.setCellValue(value == null ? "" : String.valueOf(value));
+        }
+    }
+
+    private void ensureStationNameColumn(Sheet sheet) {
+        Row header = sheet.getRow(0);
+        for (Cell cell : header) {
+            if ("变电站名称".equals(cell.getStringCellValue())) return;
+        }
+        for (Cell cell : header) {
+            if ("变电站编码".equals(cell.getStringCellValue())) {
+                int column = cell.getColumnIndex() + 1;
+                sheet.shiftColumns(column, header.getLastCellNum() - 1, 1);
+                Cell nameHeader = header.createCell(column);
+                nameHeader.setCellStyle(cell.getCellStyle());
+                nameHeader.setCellValue("变电站名称");
+                sheet.setColumnWidth(column, sheet.getColumnWidth(column - 1));
+                return;
+            }
         }
     }
 

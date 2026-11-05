@@ -16,6 +16,9 @@ public class UniPointImportExcel2 {
     @Excel(name = "变电站编码")
     private String subCode;
 
+    @Excel(name = "变电站名称")
+    private String subName;
+
     @Excel(name = "区域名称")
     private String areaName;
     @Excel(name = "间隔名称")

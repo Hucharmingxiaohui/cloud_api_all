@@ -407,4 +407,7 @@ construction-analysis:
   max-file-bytes: 20971520
   max-total-bytes: 104857600
 
+ordinary-report:
+  template-path: /dji/java/templates/report-excel-templates.xls
+
 

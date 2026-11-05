@@ -558,7 +558,7 @@ import { useRouter } from 'vue-router'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi } from '/@/api/media'
+import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi, previewCollectionReportApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import TempDet from '/@/components/task/tempDet.vue'
@@ -593,20 +593,28 @@ async function ordinaryReportAction (action: 'download' | 'view' | 'reset') {
     }
     const response = await createFlyTaskReportApi({ jobId: jobInfo.job_id })
     if (response.code !== 0) throw new Error((response as any).msg || response.message || '采集报告生成失败')
-    const blob = await downloadFlyTaskReportApi(jobInfo.job_id)
-    if (!blob || !blob.size) throw new Error('报告内容为空或下载失败')
     if (!reportMounted) return
     if (action === 'download') {
-      downloadFile(blob, `${jobInfo.job_name.replace(/[\\/:*?"<>|\r\n]/g, '_')}_${jobInfo.job_id}.docx`)
+      const blob = await downloadFlyTaskReportApi(jobInfo.job_id)
+      if (!blob || !blob.size || blob.type !== 'application/vnd.ms-excel') throw new Error('XLS 报告内容为空或下载失败')
+      if (!reportMounted) return
+      downloadFile(blob, `${jobInfo.job_name.replace(/[\\/:*?"<>|\r\n]/g, '_')}_${jobInfo.job_id}.xls`)
       return
     }
+    const html = await previewCollectionReportApi(jobInfo.job_id)
+    if (!reportMounted) return
     viewReportVisible.value = true
     viewloading.value = true
     await nextTick()
     const container = document.getElementById('docContainer')
     if (!container || !reportMounted) return
     container.replaceChildren()
-    await renderAsync(blob, container, null, { useBase64URL: true })
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('sandbox', '')
+    iframe.title = '普通巡检 XLS 报告预览'
+    iframe.style.cssText = 'width:100%;height:65vh;border:0;background:white'
+    iframe.srcdoc = html
+    container.appendChild(iframe)
     if (!reportMounted || !viewReportVisible.value) container.replaceChildren()
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '采集报告操作失败，请稍后重试')
