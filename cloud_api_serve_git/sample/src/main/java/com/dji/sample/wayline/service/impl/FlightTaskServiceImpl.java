@@ -72,6 +72,8 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class FlightTaskServiceImpl extends AbstractWaylineService implements IFlightTaskService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.dji.sample.df.centerOrdinary.dao.CenterOrdinaryTaskMapper centerOrdinaryTasks;
     @Autowired
     private com.dji.sample.df.constructionDf.ConstructionPlanGuard constructionPlanGuard;
 
@@ -272,6 +274,10 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 if(TaskTypeEnum.TIMED == param.getTaskType()){
                     beginTime = param.getBeginTime();
                 }
+                if (pubWaylineJobPlanDfEntity != null && pubWaylineJobPlanDfEntity.getCenterOrdinaryTaskId() != null) {
+                    if (param.getBeginTime() == null) throw new SQLException("上级普通任务缺少固定执行时间");
+                    beginTime = param.getBeginTime();
+                }
                 long endTime = taskPeriod.size() > 1 ?
                         LocalDateTime.of(date, LocalTime.ofInstant(Instant.ofEpochSecond(taskPeriod.get(1)), ZoneId.systemDefault()))
                                 .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : beginTime;
@@ -286,6 +292,10 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
                 WaylineJobDTO waylineJob = waylineJobOpt.get();
                 //20241204修改返回job_id
                 job_id=waylineJob.getJobId();
+                if (pubWaylineJobPlanDfEntity != null && pubWaylineJobPlanDfEntity.getCenterOrdinaryTaskId() != null
+                        && centerOrdinaryTasks.bindJob(pubWaylineJobPlanDfEntity.getCenterOrdinaryTaskId(), job_id) != 1) {
+                    throw new SQLException("上级普通任务新jobId持久化失败，尚未发布至设备");
+                }
                 constructionPlanGuard.attachJob(customClaim.getWorkspaceId(), job_id);
 //              三维需要，跟三维发任务开始状态
                 if ("true".equals(ueSwitch)){

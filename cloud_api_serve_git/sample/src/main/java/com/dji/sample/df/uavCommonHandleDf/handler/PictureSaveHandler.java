@@ -39,6 +39,8 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class PictureSaveHandler {
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Resource
     IFileMapperDf iFileMapperDf;
     @Resource
@@ -57,6 +59,9 @@ public class PictureSaveHandler {
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
 
     public Result<Map> pictureSave(String jobId) throws IOException {
+        if (centerOrdinaryTasks.findJob(jobId) != null) {
+            throw new IllegalStateException("上级普通航线选中点位媒体仅由稳定完成链路处理，禁止全航线保存");
+        }
         List<MediaFileEntity> mediaFileEntities = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>().eq(MediaFileEntity::getJobId, jobId));
         // 分离DJI文件和非DJI文件（应该都是DJI文件）
         List<MediaFileEntity> djiFiles = new ArrayList<>();

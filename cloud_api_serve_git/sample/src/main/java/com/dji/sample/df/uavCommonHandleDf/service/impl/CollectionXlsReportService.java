@@ -2,6 +2,7 @@ package com.dji.sample.df.uavCommonHandleDf.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.entity.UniPoint;
+import com.dji.sample.df.mediaDf.OrdinaryPhotoMatcher;
 import com.dji.sample.df.mediaDf.dao.IFileMapperDf;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.substationDf.dao.UniPointMapper2;
@@ -20,7 +21,6 @@ import java.io.*;
 import java.nio.file.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.regex.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,9 +28,9 @@ public class CollectionXlsReportService {
     @Autowired private IFileMapperDf mediaMapper;
     @Autowired private UniPointMapper2 pointMapper;
     @Autowired private FjFileConfig fileConfig;
+    @Autowired private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Value("${ordinary-report.template-path:./templates/report-excel-templates.xls}")
     private String templatePath;
-    private static final Pattern PHOTO = Pattern.compile("^DJI_\\d{14}_\\d+_([TV])_+(.+)\\.[^.]+$");
 
     public Path reportPath(String jobId) {
         if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("任务标识无效");
@@ -38,18 +38,11 @@ public class CollectionXlsReportService {
     }
 
     public static String pointLabel(String name) {
-        if (name == null) return "";
-        name = name.trim();
-        while (name.endsWith("-")) name = name.substring(0, name.length() - 1).trim();
-        return name.substring(name.lastIndexOf('-') + 1).trim();
+        return OrdinaryPhotoMatcher.pointName(name);
     }
 
     public static String photoKey(String name) {
-        if (name == null || name.contains("/") || name.contains("\\")) throw new IllegalArgumentException("图片名称无效：" + name);
-        Matcher matcher = PHOTO.matcher(name);
-        if (!matcher.matches() || matcher.group(2).trim().isEmpty())
-            throw new IllegalArgumentException("图片文件名不符合 DJI_14位时间_序号_T/V_点位标签.扩展名：" + name);
-        return ("V".equals(matcher.group(1)) ? "0:" : "1:") + matcher.group(2).trim();
+        return OrdinaryPhotoMatcher.photoKey(name);
     }
 
     public synchronized Path generate(WaylineJobEntity job, String operator) {
@@ -59,32 +52,36 @@ public class CollectionXlsReportService {
         Path template = Paths.get(templatePath);
         if (!Files.isRegularFile(template) || !Files.isReadable(template))
             throw new IllegalArgumentException("普通报告 XLS 模板不存在或不可读，请放置模板并配置 ordinary-report.template-path：" + template);
-        List<MediaFileEntity> photos = mediaMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+        com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity managed = centerOrdinaryTasks==null ? null : centerOrdinaryTasks.findJob(job.getJobId());
+        Map<MediaFileEntity,UniPoint> frozenMapping=new LinkedHashMap<>();
+        Map<MediaFileEntity,String> storedPaths=new HashMap<>();
+        if (managed!=null) {
+            com.dji.sample.df.centerOrdinary.CenterOrdinarySelection.routePoints(managed.getPointSnapshot(),managed.getSubCode(),managed.getRouteId());
+            if (!"COMPLETED".equals(managed.getStatus())) throw new IllegalArgumentException("选中点位采集尚未完整完成，不能生成报告");
+            List<String> codes=com.alibaba.fastjson.JSON.parseArray(managed.getPointCodes(),String.class);
+            if (managed.getResultSnapshot()!=null) for (com.alibaba.fastjson.JSONObject row:com.alibaba.fastjson.JSON.parseArray(managed.getResultSnapshot(),com.alibaba.fastjson.JSONObject.class)) {
+                UniPoint point=row.getObject("point",UniPoint.class); MediaFileEntity file=row.getObject("media",MediaFileEntity.class);
+                String path=row.getString("localPath");
+                if (point!=null && file!=null && codes.contains(point.getPointCode()) && job.getJobId().equals(file.getJobId())
+                        && job.getWorkspaceId().equals(file.getWorkspaceId()) && path!=null && !path.isBlank()) {
+                    frozenMapping.put(file,point); storedPaths.put(file,path);
+                }
+            }
+        }
+        List<MediaFileEntity> photos = managed!=null ? new ArrayList<>(frozenMapping.keySet()) : mediaMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
                 .eq(MediaFileEntity::getJobId, job.getJobId()).eq(MediaFileEntity::getWorkspaceId, job.getWorkspaceId())
                 .orderByAsc(MediaFileEntity::getId));
         if (photos.isEmpty()) throw new IllegalArgumentException("当前任务暂无采集图片");
         if (photos.size() > 65529) throw new IllegalArgumentException("图片数量超出 XLS 行数上限");
-        List<UniPoint> points = pointMapper.selectList(new LambdaQueryWrapper<UniPoint>().eq(UniPoint::getWaylineId, job.getFileId()));
-        Map<String, List<UniPoint>> index = new LinkedHashMap<>();
-        for (UniPoint point : points) {
-            if (!job.getFileId().equals(point.getWaylineId()) || pointLabel(point.getPointName()).isEmpty()) continue;
-            if (!Integer.valueOf(0).equals(point.getPicType()) && !Integer.valueOf(1).equals(point.getPicType())) continue;
-            index.computeIfAbsent(point.getPicType() + ":" + pointLabel(point.getPointName()), k -> new ArrayList<>()).add(point);
+        List<UniPoint> points = managed!=null ? new ArrayList<>(frozenMapping.values()) : pointMapper.selectList(new LambdaQueryWrapper<UniPoint>().eq(UniPoint::getWaylineId, job.getFileId()));
+        Map<MediaFileEntity,UniPoint> mapping = managed!=null ? frozenMapping : OrdinaryPhotoMatcher.match(job.getFileId(), points, photos);
+        for (MediaFileEntity photo : photos) if (!mapping.containsKey(photo)) {
+            boolean duplicate = photo.getFileId()!=null && mapping.keySet().stream().anyMatch(p -> photo.getFileId().equals(p.getFileId()));
+            if (!duplicate) throw new IllegalArgumentException("未匹配完整点位名称："+photo.getFileName()+"，航线="+job.getFileId());
         }
-        Set<String> conflicts = new LinkedHashSet<>();
+        photos = photos.stream().filter(mapping::containsKey).distinct().collect(Collectors.toList());
         List<UniPoint> matched = new ArrayList<>();
-        List<String> unmatched = new ArrayList<>();
-        for (MediaFileEntity photo : photos) {
-            String key = photoKey(photo.getFileName());
-            List<UniPoint> candidates = index.get(key);
-            if (candidates == null) unmatched.add(photo.getFileName() + "（航线=" + job.getFileId() + "，类型/标签=" + key + "，未匹配点位名称去除末尾 '-' 后的最后非空标签）");
-            else if (candidates.size() > 1) conflicts.add("航线=" + job.getFileId() + " 类型/标签=" + key
-                    + " 类型=" + (key.startsWith("0:") ? "可见光(V，picType=0)" : "红外(T，picType=1)") + " 点位="
-                    + candidates.stream().map(p -> p.getId() + "(" + p.getPointName() + ")").collect(Collectors.joining(",")));
-            else matched.add(candidates.get(0));
-        }
-        if (!conflicts.isEmpty()) throw new IllegalArgumentException("点位匹配冲突：" + String.join("；", conflicts));
-        if (!unmatched.isEmpty()) throw new IllegalArgumentException(String.join("；", unmatched));
+        for (MediaFileEntity photo : photos) matched.add(mapping.get(photo));
         Set<String> stations = matched.stream().map(p -> text(p.getSubName())).collect(Collectors.toCollection(LinkedHashSet::new));
         if (stations.contains("未提供")) throw new IllegalArgumentException("匹配点位未提供厂站名称，无法填写巡检单位");
         Path temp = null;
@@ -114,7 +111,7 @@ public class CollectionXlsReportService {
                 byte[] bytes;
                 BufferedImage image;
                 try {
-                    imagePath = directory.resolve("1_" + name.substring(0, name.lastIndexOf('.')) + ".jpg").toRealPath();
+                    imagePath = managed!=null ? Paths.get(storedPaths.get(photo)).toRealPath() : directory.resolve("1_" + name.substring(0, name.lastIndexOf('.')) + ".jpg").toRealPath();
                     if (!imagePath.startsWith(directory) || !Files.isRegularFile(imagePath)) throw new IOException("原图路径无效");
                     bytes = Files.readAllBytes(imagePath);
                     image = ImageIO.read(new ByteArrayInputStream(bytes));

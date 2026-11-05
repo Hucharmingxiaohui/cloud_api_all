@@ -18,6 +18,9 @@ import java.util.List;
 @Data
 @TableName("pub_wayline_job_plan_df")
 public class PubWaylineJobPlanDfEntity  implements Serializable {
+    @TableField(exist = false)
+    @JsonIgnore
+    private Long centerOrdinaryTaskId;
     @TableId(type = IdType.AUTO) // MyBatis-Plus注解，指定主键字段及其生成策略
     private Integer id; // 主键id
 

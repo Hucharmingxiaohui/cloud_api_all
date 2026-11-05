@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 @Component
 @ConfigurationProperties(prefix = "switch")
 public class SwitchConfig {
+    /** 上级区域普通航线按选中点位执行，与EUA开关独立。 */
+    private String centerOrdinaryTaskEnable = "false";
 
     /**
      * 是否开启与中心端通讯 - 国网规范

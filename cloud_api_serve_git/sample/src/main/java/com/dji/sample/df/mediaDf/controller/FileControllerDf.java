@@ -43,6 +43,8 @@ public class FileControllerDf {
 
     @Autowired
     private IFileServiceDf fileService;
+    @Autowired private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
+    @Autowired private javax.servlet.http.HttpServletRequest request;
 
     @Autowired
     DefectEntityMapper defectEntityMapper;
@@ -139,6 +141,33 @@ public class FileControllerDf {
     @GetMapping("/getMediaFileByJobId")
     public HttpResultResponse getMediaFileByJobId(String job_id,String workspace_id,@RequestParam(defaultValue = "1") Long page,
                                                   @RequestParam(defaultValue = "10") Long pageSize,@RequestParam Map map) throws Exception {
+        com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity managed = centerOrdinaryTasks.findJob(job_id);
+        if (managed != null) {
+            WaylineJobEntity job=waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId,job_id));
+            com.dji.sample.common.model.CustomClaim claim=request==null ? null :
+                    (com.dji.sample.common.model.CustomClaim)request.getAttribute(com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM);
+            if (claim==null || claim.getWorkspaceId()==null || claim.getWorkspaceId().isBlank())
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED,"请先登录工作空间");
+            if (job==null || !claim.getWorkspaceId().equals(job.getWorkspaceId()) || !claim.getWorkspaceId().equals(workspace_id))
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"任务不存在");
+            List<MediaFileDTO> selected=new ArrayList<>();
+            if (managed.getResultSnapshot()!=null) for (com.alibaba.fastjson.JSONObject row : com.alibaba.fastjson.JSON.parseArray(managed.getResultSnapshot(),com.alibaba.fastjson.JSONObject.class)) {
+                com.dji.sample.center.entity.UniPoint point=row.getObject("point",UniPoint.class);
+                MediaFileDTO dto=row.getObject("media",MediaFileDTO.class);
+                String path=row.getString("localPath");
+                List<String> codes=com.alibaba.fastjson.JSON.parseArray(managed.getPointCodes(),String.class);
+                if (point==null || dto==null || codes==null || !codes.contains(point.getPointCode()) || path==null || path.isBlank()
+                        || !job_id.equals(dto.getJobId())) continue;
+                if (map.get("fileName")!=null && (dto.getFileName()==null || !dto.getFileName().contains(map.get("fileName").toString()))) continue;
+                dto.setOriginalImageUrl("/api/file/defect?path="+URLEncoder.encode(path,"UTF-8"));
+                selected.add(dto);
+            }
+            if (page<1 || pageSize<1) throw new IllegalArgumentException("分页参数必须大于零");
+            int from=(int)Math.min((page-1)*pageSize,selected.size());
+            int to=(int)Math.min((long)from+pageSize,selected.size());
+            return HttpResultResponse.success(new PaginationData<>(selected.subList(from,to),new Pagination(page,pageSize,selected.size())))
+                    .setMessage("查询任务结果成功");
+        }
         List<MediaFileDTO> allFiles = fileService.getMediaDileByJobId3(job_id, workspace_id);
 
         List<DefectEntity> defectList = defectEntityMapper.selectList(new LambdaQueryWrapper<DefectEntity>()

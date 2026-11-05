@@ -203,6 +203,8 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级巡视对接开关
 switch:
+  # 启用前必须部署sql/upgrade_20261105_center_ordinary_task.sql
+  centerOrdinaryTaskEnable: false
 #  centerNormalTcpEnable: true
 #  centerOtherTcpEnable: true
 #  centerNormalTcpMsgEnable: true
