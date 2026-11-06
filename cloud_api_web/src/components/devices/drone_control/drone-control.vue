@@ -418,7 +418,7 @@
         <div><span class="form-label">相对机巢悬停高度(m):</span><a-input-number v-model:value="missionParams.homeHoverAlt" disabled /></div>
         <div><span class="form-label">返航参考高度(m):</span><a-input-number v-model:value="missionParams.securityTakeoffAlt" /></div>
         <div><span class="form-label">指点飞行高度(m):</span><a-input-number v-model:value="missionParams.flightAlt" disabled /></div>
-        <div>一键起飞：安全起飞/指点飞行高度固定25米；目标椭球高=当前机巢椭球高+20米，非离地高度。</div>
+        <div>一键起飞：安全起飞/指点飞行高度固定25米；目标椭球高=当前机巢椭球高+10米，非离地高度。</div>
         <div><span class="form-label">作业高度(m):</span><a-input-number v-model:value="missionParams.alt" :min="10" /></div>
         <div><span class="form-label">抵近速度(m/s):</span><a-input-number v-model:value="missionParams.approachSpeed" :min="1" :max="MAX_SPEED" /></div>
         <div><span class="form-label">盘旋半径(m):</span><a-input-number v-model:value="missionParams.orbitRadius" :min="20" /></div>
@@ -1223,7 +1223,7 @@ const missionParams = reactive({
   visible: false,
   lat: null as null | number,
   lng: null as null | number,
-  homeHoverAlt: 20 as null | number,
+  homeHoverAlt: 10 as null | number,
   securityTakeoffAlt: 25 as null | number,
   flightAlt: 25 as null | number,
   alt: 80 as number, // 作业高度（可改）
@@ -1293,9 +1293,9 @@ async function onOneKeyTakeoff () {
     message.error('找不到机巢坐标：请确认设备OSD或在参数里填写 homeLat/homeLng')
     return
   }
-  const targetHeight = dockHeight + 20
+  const targetHeight = dockHeight + 10
   if (!Number.isFinite(targetHeight) || targetHeight < 2 || targetHeight > 1500) {
-    message.error('机巢椭球高+20米超出目标高度允许范围（2～1500米），已阻止起飞')
+    message.error('机巢椭球高+10米超出目标高度允许范围（2～1500米），已阻止起飞')
     return
   }
   if (typeof missionParams.securityTakeoffAlt !== 'number' || !Number.isFinite(missionParams.securityTakeoffAlt)) {
@@ -1306,7 +1306,7 @@ async function onOneKeyTakeoff () {
   missionBusy.value = true
   missionState.value = 'takingOff'
   try {
-    console.info(`[一键起飞] 机巢=${props.sn}，目标悬停椭球高=${dockHeight}+20=${targetHeight}米（WGS84，相对机巢20米，非离地高度），安全起飞高度=25米，指点飞行高度=25米（均相对机场起飞点）`)
+    console.info(`[一键起飞] 机巢=${props.sn}，目标悬停椭球高=${dockHeight}+10=${targetHeight}米（WGS84，相对机巢10米，非离地高度），安全起飞高度=25米，指点飞行高度=25米（均相对机场起飞点）`)
     await takeoffToPoint(props.sn, {
       target_latitude: home.lat,
       target_longitude: home.lng,
