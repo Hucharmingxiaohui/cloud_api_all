@@ -23,4 +23,6 @@ public class CenterOrdinaryTaskEntity {
     private String resultSnapshot;
     private String message;
     private Long claimedTime;
+    private String statusReportKey;
+    private Long statusReportTime;
 }

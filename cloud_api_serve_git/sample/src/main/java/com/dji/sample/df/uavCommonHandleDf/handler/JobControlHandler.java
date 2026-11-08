@@ -65,6 +65,8 @@ import java.util.regex.Pattern;
 @Component
 public class JobControlHandler {
     @Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryStatusSender centerOrdinaryStatus;
+    @Autowired
     private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Autowired
     private com.dji.sample.df.centerOrdinary.CenterOrdinaryMediaService centerOrdinaryMedia;
@@ -303,6 +305,7 @@ public class JobControlHandler {
             return;
         }
         Integer status = dto.getStatus();
+        centerOrdinaryStatus.observed(task, job, dto);
         if (Integer.valueOf(3).equals(status)) {
             int uploaded = normalizeUploadCount(dto.getUploadedCount());
             int total = normalizeUploadCount(dto.getMediaCount());
@@ -313,7 +316,8 @@ public class JobControlHandler {
             clearMonitoringState(monitoringKey);
         } else if (Integer.valueOf(-1).equals(status) || Integer.valueOf(4).equals(status)
                 || Integer.valueOf(5).equals(status) || Integer.valueOf(7).equals(status)) {
-            centerOrdinaryTaskMapper.finish(task.getId(), "DISPATCHED", "FAILED", "飞行取消、失败或中断，禁止自动重飞");
+            centerOrdinaryTaskMapper.finish(task.getId(), "DISPATCHED", Integer.valueOf(4).equals(status) ? "CANCELLED" : "FAILED",
+                    "飞行取消、失败或中断，status=" + status + "，error_code=" + job.getErrorCode() + "，禁止自动重飞");
             clearMonitoringState(monitoringKey);
         }
     }

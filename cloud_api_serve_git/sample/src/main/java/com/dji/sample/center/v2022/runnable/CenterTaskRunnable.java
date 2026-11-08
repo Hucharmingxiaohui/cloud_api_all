@@ -81,7 +81,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
         int deviceLevel = taskCommandItem.getDevice_level();
         String deviceList = taskCommandItem.getDevice_list();
         String fixedStartTime = taskCommandItem.getFixed_start_time();
-        if (deviceLevel == 1 && ("true".equalsIgnoreCase(switchConfig.getCenterOrdinaryTaskEnable())
+        if (deviceLevel == 3 && ("true".equalsIgnoreCase(switchConfig.getCenterOrdinaryTaskEnable())
                 || "1".equals(switchConfig.getCenterOrdinaryTaskEnable()))
                 && (deviceList == null || deviceList.contains(",") || !deviceList.trim().endsWith("-bay"))) {
             AppContext.getBean(com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService.class).accept(taskCommandItem, sub_code);

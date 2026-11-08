@@ -32,6 +32,8 @@ public class CenterOrdinaryTaskService {
     private final PubWaylineJobPlanDfService execution;
     private final SwitchConfig config;
     private final Clock clock;
+    @Autowired
+    private CenterOrdinaryStatusSender statusSender;
 
     @Autowired
     public CenterOrdinaryTaskService(CenterOrdinaryTaskMapper tasks, UniPointMapper2 points,
@@ -52,14 +54,12 @@ public class CenterOrdinaryTaskService {
         if (!enabled()) throw new IllegalStateException("上级普通航线点位任务开关未开启");
         if (!StringUtils.hasText(subCode) || !StringUtils.hasText(command.getTask_code()) || !StringUtils.hasText(command.getTask_name()))
             throw new IllegalArgumentException("厂站、上级任务编码及名称不能为空");
-        if (command.getDevice_level()!=1) throw new IllegalArgumentException("仅支持区域普通航线点位任务");
         List<String> codes = CenterOrdinarySelection.codes(command.getDevice_list());
         long time = parseTime(command.getFixed_start_time());
         String codesJson = JSON.toJSONString(codes);
         CenterOrdinaryTaskEntity old = tasks.findIdentity(subCode, command.getTask_code(), time);
         if (old != null) return same(old, command, codesJson);
         if (time <= clock.millis()) throw new IllegalArgumentException("定时时间已过期，拒绝立即起飞");
-        if (!"1".equals(command.getIsenable())) throw new IllegalArgumentException("仅接受已启用的固定时间任务");
         List<UniPoint> selected = points.selectList(new QueryWrapper<UniPoint>().eq("sub_code", subCode).in("point_code", codes).orderByAsc("point_code"));
         CenterOrdinarySelection.freeze(command.getDevice_list(), subCode, selected);
         String route = selected.get(0).getWaylineId();
@@ -113,6 +113,7 @@ public class CenterOrdinaryTaskService {
             tasks.quarantineReports(clock.millis()-24*60*60_000L);
             for (CenterOrdinaryTaskEntity task : tasks.due(clock.millis())) dispatch(task);
             for (CenterOrdinaryTaskEntity task : tasks.monitoring()) JobControlHandler.ensureCenterOrdinaryMonitoring(task.getJobId(), task.getTaskName());
+            for (CenterOrdinaryTaskEntity task : tasks.pendingStatusReports()) statusSender.terminal(task);
         } catch (Exception e) {
             log.error("上级普通任务扫描失败（请确认已部署独立任务表）", e);
         }

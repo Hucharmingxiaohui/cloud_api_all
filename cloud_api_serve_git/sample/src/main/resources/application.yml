@@ -412,4 +412,25 @@ construction-analysis:
 ordinary-report:
   template-path: /dji/java/templates/report-excel-templates.xls
 
+thermal:
+  #cli为测温工具 sdk为大疆测温sdk
+  provider: cli
+  cli:
+    executable: /opt/python3.12.6/python-headless-3.12.6-linux-aarch64/bin/dji-thermal-cli
+    arguments:
+      - process
+      - --input-dir
+      - "{inputDir}"
+      - --output-dir
+      - "{outputDir}"
+      - -o
+      - "temp_c:tiff"
+      - --distance
+      - embedded
+      - --jobs
+      - "1"
+    timeout-seconds: 60
+    max-file-bytes: 67108864
+    max-pixels: 4194304
+
 

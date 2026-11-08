@@ -8,6 +8,15 @@ import java.util.List;
 
 @Mapper
 public interface CenterOrdinaryTaskMapper extends BaseMapper<CenterOrdinaryTaskEntity> {
+    @Select("SELECT * FROM df_center_ordinary_task WHERE status IN ('COMPLETED','FAILED','CANCELLED','EXPIRED','UNKNOWN','INCOMPLETE','REPORT_UNKNOWN') AND (status_report_key IS NULL OR status_report_key<>status) ORDER BY COALESCE(status_report_time,0),id LIMIT 100")
+    List<CenterOrdinaryTaskEntity> pendingStatusReports();
+
+    @Update("UPDATE df_center_ordinary_task SET status_report_time=#{now} WHERE id=#{id} AND (status_report_key IS NULL OR status_report_key<>#{key}) AND (status_report_time IS NULL OR status_report_time<=#{before})")
+    int reserveStatusReport(@Param("id") long id, @Param("key") String key, @Param("now") long now, @Param("before") long before);
+
+    @Update("UPDATE df_center_ordinary_task SET status_report_key=#{key} WHERE id=#{id} AND status_report_time=#{now}")
+    int statusReported(@Param("id") long id, @Param("key") String key, @Param("now") long now);
+
     @Select("SELECT * FROM df_center_ordinary_task WHERE sub_code=#{sub} AND task_code=#{task} AND scheduled_time=#{time}")
     CenterOrdinaryTaskEntity findIdentity(@Param("sub") String sub, @Param("task") String task, @Param("time") long time);
 
