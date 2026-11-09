@@ -57,6 +57,13 @@ final class TemperatureMatrix {
         }
     }
 
+    TemResultEntity measureWholeImage() {
+        TemParamEntity region = new TemParamEntity();
+        region.setLeft_top_x(0); region.setLeft_top_y(0);
+        region.setRight_bottom_x(width - 1); region.setRight_bottom_y(height - 1);
+        return measure(region);
+    }
+
     TemResultEntity measure(TemParamEntity p) {
         if (p == null) throw new IllegalArgumentException("测温参数不能为空");
         TemResultEntity result = new TemResultEntity();

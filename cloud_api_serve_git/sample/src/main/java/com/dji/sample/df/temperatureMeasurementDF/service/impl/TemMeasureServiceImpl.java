@@ -352,6 +352,18 @@ public class TemMeasureServiceImpl implements TemMeasureService {
      */
     @Override
     public TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity) {
+        return getTemByLocalImagePath(imagePath, temParamEntity, false);
+    }
+
+    @Override
+    public TemResultEntity measureWholeImage(String imagePath) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return thermalCli.measureWholeImage(Path.of(imagePath));
+        }
+        return getTemByLocalImagePath(imagePath, new TemParamEntity(), true);
+    }
+
+    private TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity, boolean wholeImage) {
         if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
             return thermalCli.measure(Path.of(imagePath), temParamEntity);
         }
@@ -435,6 +447,11 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             return temResultEntity;
         }
         //4点测温 / 区域测温（保留EUA本地原图，只清理measure.raw）
+        if (wholeImage) {
+            temParamEntity.setLeft_top_x(0); temParamEntity.setLeft_top_y(0);
+            temParamEntity.setRight_bottom_x(temperatureMatrix[0].length - 1);
+            temParamEntity.setRight_bottom_y(temperatureMatrix.length - 1);
+        }
         if (temParamEntity.getPoint_x() != null && temParamEntity.getPoint_y() != null) {
             double roundedNum = Math.round(temperatureMatrix[temParamEntity.getPoint_y()][temParamEntity.getPoint_x()] * 10) / 10.0;
             temResultEntity.setPoint_tem(roundedNum);

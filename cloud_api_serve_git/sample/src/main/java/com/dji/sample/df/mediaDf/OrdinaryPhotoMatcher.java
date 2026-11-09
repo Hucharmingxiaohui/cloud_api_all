@@ -71,4 +71,57 @@ public final class OrdinaryPhotoMatcher {
         }
         return Collections.unmodifiableMap(result);
     }
+    public static ReportMatchResult matchForReport(String route, List<UniPoint> points, List<MediaFileEntity> photos) {
+        Map<String,List<UniPoint>> candidates=groups(route,points);
+        Map<String,List<MediaFileEntity>> photoGroups=new LinkedHashMap<>();
+        Map<MediaFileEntity,UniPoint> matched=new LinkedHashMap<>();
+        List<String> issues=new ArrayList<>();
+        Map<String,MediaFileEntity> ids=new HashMap<>();
+        Set<String> conflicts=new HashSet<>();
+        for (MediaFileEntity photo:photos) {
+            String key;
+            try { key=photoKey(photo.getFileName()); }
+            catch (IllegalArgumentException e) {
+                issues.add("航线="+route+"；完整名称/point_code/picType=无法解析；预期=无法确定；实际=1；文件名="+photo.getFileName()+"；原因="+e.getMessage());
+                continue;
+            }
+            if (photo.getFileId()!=null && !photo.getFileId().isBlank()) {
+                MediaFileEntity previous=ids.putIfAbsent(photo.getFileId(),photo);
+                if (previous!=null) {
+                    if (Objects.equals(previous.getFileName(),photo.getFileName()) && Objects.equals(previous.getJobId(),photo.getJobId())
+                            && Objects.equals(previous.getWorkspaceId(),photo.getWorkspaceId())) continue;
+                    conflicts.add(key); conflicts.add(photoKey(previous.getFileName()));
+                }
+            }
+            photoGroups.computeIfAbsent(key,k->new ArrayList<>()).add(photo);
+        }
+        for (Map.Entry<String,List<MediaFileEntity>> entry:photoGroups.entrySet()) {
+            String key=entry.getKey(); List<MediaFileEntity> images=entry.getValue();
+            List<UniPoint> group=candidates.getOrDefault(key,Collections.emptyList());
+            String reason;
+            try {
+                if (group.isEmpty()) throw new IllegalArgumentException("未匹配完整点位名称和照片类型");
+                if (conflicts.contains(key)) throw new IllegalArgumentException("同一文件ID对应不同媒体");
+                // Reuse the strict group algorithm; a failed group never contributes partial rows.
+                matched.putAll(match(route,group,images));
+                continue;
+            } catch (IllegalArgumentException e) { reason=e.getMessage(); }
+            String codes=group.stream().map(p->String.valueOf(p.getPointCode())).collect(java.util.stream.Collectors.joining("、"));
+            for (MediaFileEntity image:images) issues.add("航线="+route+"；完整名称="+key.substring(2)+"；picType="+key.charAt(0)
+                    +"；point_code="+(codes.isEmpty()?"无匹配点位":codes)+"；预期="+group.size()+"；实际="+images.size()
+                    +"；文件名="+image.getFileName()+"；原因="+reason+"；已跳过整组");
+        }
+        return new ReportMatchResult(matched,issues);
+    }
+
+    public static final class ReportMatchResult {
+        private final Map<MediaFileEntity,UniPoint> matchedMap;
+        private final List<String> issues;
+        private ReportMatchResult(Map<MediaFileEntity,UniPoint> matchedMap,List<String> issues) {
+            this.matchedMap=Collections.unmodifiableMap(new LinkedHashMap<>(matchedMap));
+            this.issues=Collections.unmodifiableList(new ArrayList<>(issues));
+        }
+        public Map<MediaFileEntity,UniPoint> getMatchedMap() { return matchedMap; }
+        public List<String> getIssues() { return issues; }
+    }
 }

@@ -26,6 +26,15 @@ public class ThermalCli {
     }
 
     public TemResultEntity measure(InputStream source, TemParamEntity parameters) {
+        return measure(source, parameters, false);
+    }
+
+    public TemResultEntity measureWholeImage(Path original) {
+        try (InputStream input = Files.newInputStream(original)) { return measure(input, null, true); }
+        catch (IOException e) { return failure("无法读取本地红外图片"); }
+    }
+
+    private TemResultEntity measure(InputStream source, TemParamEntity parameters, boolean wholeImage) {
         Path work = null;
         try {
             properties.validate();
@@ -52,7 +61,8 @@ public class ThermalCli {
                         || !Files.isRegularFile(tiff, LinkOption.NOFOLLOW_LINKS) || Files.isSymbolicLink(output))
                     throw new IOException("CLI 未输出唯一 source_temp_c.tiff；请核对 process --help 和工具版本");
             }
-            return TemperatureMatrix.read(tiff, config.getMaxFileBytes(), config.getMaxPixels()).measure(parameters);
+            TemperatureMatrix matrix = TemperatureMatrix.read(tiff, config.getMaxFileBytes(), config.getMaxPixels());
+            return wholeImage ? matrix.measureWholeImage() : matrix.measure(parameters);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt(); return failure("CLI 测温被中断");
         } catch (IOException | IllegalArgumentException e) {
