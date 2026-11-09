@@ -36,6 +36,8 @@ public class CollectionXlsReportService {
     @Autowired private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Value("${ordinary-report.template-path:./templates/report-excel-templates.xls}")
     private String templatePath;
+    @Value("${ordinary-report.sequence-matching-enabled:false}")
+    private boolean sequenceMatchingEnabled;
 
     public Path reportPath(String jobId) {
         if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("任务标识无效");
@@ -60,10 +62,15 @@ public class CollectionXlsReportService {
         com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity managed = centerOrdinaryTasks==null ? null : centerOrdinaryTasks.findJob(job.getJobId());
         Map<MediaFileEntity,UniPoint> frozenMapping=new LinkedHashMap<>();
         Map<MediaFileEntity,String> storedPaths=new HashMap<>();
+        List<UniPoint> frozenRoute=Collections.emptyList();
+        List<String> selectedCodes=Collections.emptyList();
         if (managed!=null) {
-            com.dji.sample.df.centerOrdinary.CenterOrdinarySelection.routePoints(managed.getPointSnapshot(),managed.getSubCode(),managed.getRouteId());
+            frozenRoute=com.dji.sample.df.centerOrdinary.CenterOrdinarySelection.routePoints(managed.getPointSnapshot(),managed.getSubCode(),managed.getRouteId());
+            if (sequenceMatchingEnabled && !Objects.equals(job.getFileId(),managed.getRouteId()))
+                throw new IllegalArgumentException("任务航线与全航线冻结快照不一致");
             if (!"COMPLETED".equals(managed.getStatus())) throw new IllegalArgumentException("选中点位采集尚未完整完成，不能生成报告");
             List<String> codes=com.alibaba.fastjson.JSON.parseArray(managed.getPointCodes(),String.class);
+            selectedCodes=codes;
             if (managed.getResultSnapshot()!=null) for (com.alibaba.fastjson.JSONObject row:com.alibaba.fastjson.JSON.parseArray(managed.getResultSnapshot(),com.alibaba.fastjson.JSONObject.class)) {
                 UniPoint point=row.getObject("point",UniPoint.class); MediaFileEntity file=row.getObject("media",MediaFileEntity.class);
                 String path=row.getString("localPath");
@@ -73,16 +80,41 @@ public class CollectionXlsReportService {
                 }
             }
         }
-        List<MediaFileEntity> photos = managed!=null ? new ArrayList<>(frozenMapping.keySet()) : mediaMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+        List<MediaFileEntity> photos = managed!=null && !sequenceMatchingEnabled ? new ArrayList<>(frozenMapping.keySet()) : mediaMapper.selectList(new LambdaQueryWrapper<MediaFileEntity>()
                 .eq(MediaFileEntity::getJobId, job.getJobId()).eq(MediaFileEntity::getWorkspaceId, job.getWorkspaceId())
                 .orderByAsc(MediaFileEntity::getId));
+        if (sequenceMatchingEnabled) photos=photos.stream()
+                .filter(f -> Objects.equals(job.getJobId(),f.getJobId()) && Objects.equals(job.getWorkspaceId(),f.getWorkspaceId()))
+                .collect(Collectors.toList());
         if (photos.isEmpty()) throw new IllegalArgumentException("当前任务暂无采集图片");
         if (photos.size() > 65529) throw new IllegalArgumentException("图片数量超出 XLS 行数上限");
-        List<UniPoint> points = managed!=null ? new ArrayList<>(frozenMapping.values()) : pointMapper.selectList(new LambdaQueryWrapper<UniPoint>().eq(UniPoint::getWaylineId, job.getFileId()));
+        List<UniPoint> points = managed!=null ? (sequenceMatchingEnabled ? frozenRoute : new ArrayList<>(frozenMapping.values())) : pointMapper.selectList(new LambdaQueryWrapper<UniPoint>().eq(UniPoint::getWaylineId, job.getFileId()));
         int totalPhotos = photos.size();
-        OrdinaryPhotoMatcher.ReportMatchResult reportMatch = managed!=null ? null : OrdinaryPhotoMatcher.matchForReport(job.getFileId(), points, photos);
-        Map<MediaFileEntity,UniPoint> mapping = managed!=null ? frozenMapping : reportMatch.getMatchedMap();
-        List<String> issues = reportMatch==null ? Collections.emptyList() : reportMatch.getIssues();
+        OrdinaryPhotoMatcher.ReportMatchResult reportMatch = sequenceMatchingEnabled
+                ? OrdinaryPhotoMatcher.matchForReportBySequence(job.getFileId(), points, photos)
+                : managed!=null ? null : OrdinaryPhotoMatcher.matchForReport(job.getFileId(), points, photos);
+        Map<MediaFileEntity,UniPoint> mapping = new LinkedHashMap<>(reportMatch==null ? frozenMapping : reportMatch.getMatchedMap());
+        List<String> issues = reportMatch==null ? new ArrayList<>() : new ArrayList<>(reportMatch.getIssues());
+        if (managed!=null && sequenceMatchingEnabled) {
+            Map<MediaFileEntity,String> selectedPaths=new HashMap<>();
+            Iterator<Map.Entry<MediaFileEntity,UniPoint>> entries=mapping.entrySet().iterator();
+            while (entries.hasNext()) {
+                Map.Entry<MediaFileEntity,UniPoint> entry=entries.next();
+                if (!selectedCodes.contains(entry.getValue().getPointCode())) { entries.remove(); continue; }
+                MediaFileEntity photo=entry.getKey();
+                List<String> paths=storedPaths.entrySet().stream().filter(stored -> {
+                    MediaFileEntity file=stored.getKey();
+                    return photo.getFileId()!=null && !photo.getFileId().isBlank() && Objects.equals(photo.getFileId(),file.getFileId())
+                            && Objects.equals(photo.getFileName(),file.getFileName()) && Objects.equals(photo.getJobId(),file.getJobId())
+                            && Objects.equals(photo.getWorkspaceId(),file.getWorkspaceId());
+                }).map(Map.Entry::getValue).distinct().collect(Collectors.toList());
+                if (paths.size()!=1) {
+                    issues.add("航线="+job.getFileId()+"；point_code="+entry.getValue().getPointCode()+"；文件名="+photo.getFileName()+"；原因=选中点位序位匹配原图未存储或存储路径不唯一，已跳过");
+                    entries.remove();
+                } else selectedPaths.put(photo,paths.get(0));
+            }
+            storedPaths=selectedPaths;
+        }
         List<String> thermalIssues = new ArrayList<>();
         int thermalMeasured = 0;
         photos = photos.stream().filter(mapping::containsKey).distinct().collect(Collectors.toList());
@@ -167,7 +199,7 @@ public class CollectionXlsReportService {
                 drawing.createPicture(anchor, book.addPicture(bytes, Workbook.PICTURE_TYPE_JPEG));
             }
             int thermalCount = thermalMeasured + thermalIssues.size();
-            String summary = "总照片" + totalPhotos + "张，匹配" + photos.size() + "张，跳过" + issues.size() + "张，匹配点位" + unique + "个。";
+            String summary = "总照片" + totalPhotos + "张，匹配" + photos.size() + "张，跳过" + (sequenceMatchingEnabled ? totalPhotos-photos.size() : issues.size()) + "张，匹配点位" + unique + "个。";
             if (thermalCount > 0) {
                 summary += "可见光正常" + (photos.size() - thermalCount) + "条，红外测温成功" + thermalMeasured + "条，红外测温失败" + thermalIssues.size() + "条。";
             } else if (issues.isEmpty()) {

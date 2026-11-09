@@ -114,6 +114,84 @@ public final class OrdinaryPhotoMatcher {
         return new ReportMatchResult(matched,issues);
     }
 
+    public static ReportMatchResult matchForReportBySequence(String route, List<UniPoint> points, List<MediaFileEntity> photos) {
+        Map<Integer,List<UniPoint>> candidates=new LinkedHashMap<>();
+        Map<Integer,List<MediaFileEntity>> photoGroups=new LinkedHashMap<>();
+        Map<Integer,String> invalidTypes=new HashMap<>();
+        Map<MediaFileEntity,BigInteger> sequences=new HashMap<>();
+        Map<String,MediaFileEntity> ids=new HashMap<>();
+        Map<MediaFileEntity,UniPoint> matched=new LinkedHashMap<>();
+        List<String> issues=new ArrayList<>();
+        for (UniPoint point:points) if (Objects.equals(route,point.getWaylineId())
+                && (Integer.valueOf(0).equals(point.getPicType()) || Integer.valueOf(1).equals(point.getPicType())))
+            candidates.computeIfAbsent(point.getPicType(),k->new ArrayList<>()).add(point);
+        for (MediaFileEntity photo:photos) {
+            Integer type;
+            BigInteger sequence=null;
+            String invalid=null;
+            try {
+                Matcher parsed=parse(photo.getFileName());
+                type="V".equals(parsed.group(2)) ? 0 : 1;
+                sequence=new BigInteger(parsed.group(1));
+            } catch (IllegalArgumentException e) {
+                String name=photo.getFileName();
+                // A recognizable type must fail closed, otherwise a bad sequence could shift every ordinal.
+                boolean visible=name!=null && name.contains("_V_");
+                boolean thermal=name!=null && name.contains("_T_");
+                if (visible==thermal) {
+                    issues.add("航线="+route+"；picType=无法解析；预期=无法确定；实际=1；文件名="+name+"；原因="+e.getMessage());
+                    continue;
+                }
+                type=visible ? 0 : 1;
+                invalid="图片文件名或序号无法解析";
+            }
+            if (photo.getFileId()!=null && !photo.getFileId().isBlank()) {
+                MediaFileEntity previous=ids.putIfAbsent(photo.getFileId(),photo);
+                if (previous!=null) {
+                    if (Objects.equals(previous.getFileName(),photo.getFileName()) && Objects.equals(previous.getJobId(),photo.getJobId())
+                            && Objects.equals(previous.getWorkspaceId(),photo.getWorkspaceId())) continue;
+                    invalidTypes.put(type,"同一文件ID对应不同媒体");
+                    for (Map.Entry<Integer,List<MediaFileEntity>> entry:photoGroups.entrySet())
+                        if (entry.getValue().contains(previous)) invalidTypes.put(entry.getKey(),"同一文件ID对应不同媒体");
+                }
+            }
+            photoGroups.computeIfAbsent(type,k->new ArrayList<>()).add(photo);
+            if (invalid!=null) invalidTypes.putIfAbsent(type,invalid);
+            else sequences.put(photo,sequence);
+        }
+        for (int type=0;type<=1;type++) {
+            List<UniPoint> group=candidates.getOrDefault(type,Collections.emptyList());
+            List<MediaFileEntity> images=photoGroups.getOrDefault(type,Collections.emptyList());
+            if (group.isEmpty() && images.isEmpty()) continue;
+            String reason;
+            try {
+                if (invalidTypes.containsKey(type)) throw new IllegalArgumentException(invalidTypes.get(type));
+                Set<BigInteger> uniqueSequences=new HashSet<>();
+                for (MediaFileEntity image:images) if (!uniqueSequences.add(sequences.get(image)))
+                    throw new IllegalArgumentException("同类型照片数值序号重复，无法确定序位");
+                Set<BigDecimal> positions=new TreeSet<>();
+                for (UniPoint point:group) {
+                    String value=point.getWaylinePointPos();
+                    if (value==null || !value.matches("[+-]?\\d+(?:\\.\\d+)?"))
+                        throw new IllegalArgumentException("航点预置位为空或非数值，点位="+point.getPointCode());
+                    if (!positions.add(new BigDecimal(value)))
+                        throw new IllegalArgumentException("同类型航点预置位数值重复，无法确定序位");
+                }
+                if (group.size()!=images.size()) throw new IllegalArgumentException("点位匹配数量不一致，拒绝按部分照片顺移分配");
+                group.sort(Comparator.comparing(OrdinaryPhotoMatcher::preset).reversed());
+                images.sort(Comparator.comparing((MediaFileEntity image)->sequences.get(image)).reversed());
+                for (int i=0;i<images.size();i++) matched.put(images.get(i),group.get(i));
+                continue;
+            } catch (IllegalArgumentException e) { reason=e.getMessage(); }
+            String codes=group.stream().map(p->String.valueOf(p.getPointCode())).collect(java.util.stream.Collectors.joining("、"));
+            String detail="航线="+route+"；picType="+type+"；point_code="+(codes.isEmpty()?"无匹配点位":codes)
+                    +"；预期="+group.size()+"；实际="+images.size();
+            if (images.isEmpty()) issues.add(detail+"；文件名=无；原因="+reason+"；已跳过整组");
+            else for (MediaFileEntity image:images) issues.add(detail+"；文件名="+image.getFileName()+"；原因="+reason+"；已跳过整组");
+        }
+        return new ReportMatchResult(matched,issues);
+    }
+
     public static final class ReportMatchResult {
         private final Map<MediaFileEntity,UniPoint> matchedMap;
         private final List<String> issues;

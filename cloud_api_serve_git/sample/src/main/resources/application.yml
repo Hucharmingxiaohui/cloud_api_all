@@ -411,6 +411,8 @@ construction-analysis:
 
 ordinary-report:
   template-path: /dji/java/templates/report-excel-templates.xls
+  # 仅报告按同类型照片序号与航点预置位数值降序逐位匹配，关闭时保留完整名称匹配
+  sequence-matching-enabled: false
 
 thermal:
   #cli为测温工具 sdk为大疆测温sdk
