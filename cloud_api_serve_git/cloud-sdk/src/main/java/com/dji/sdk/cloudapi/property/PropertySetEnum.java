@@ -30,7 +30,7 @@ public enum PropertySetEnum {
 
     EXIT_WAYLINE_WHEN_RC_LOST("exit_wayline_when_rc_lost", ExitWaylineWhenRcLostSet.class, CloudSDKVersionEnum.V0_0_1, Set.of(GatewayTypeEnum.DOCK, GatewayTypeEnum.DOCK2), true),
 
-    THERMAL_CURRENT_PALETTE_STYLE("thermal_current_palette_style", ThermalCurrentPaletteStyleSet.class, CloudSDKVersionEnum.V0_0_1, Set.of(GatewayTypeEnum.DOCK, GatewayTypeEnum.DOCK2)),
+    THERMAL_CURRENT_PALETTE_STYLE("thermal_current_palette_style", ThermalCurrentPaletteStyleSet.class, CloudSDKVersionEnum.V0_0_1, Set.of(GatewayTypeEnum.DOCK, GatewayTypeEnum.DOCK2, GatewayTypeEnum.DOCK3)),
 
     THERMAL_GAIN_MODE("thermal_gain_mode", ThermalGainModeSet.class, CloudSDKVersionEnum.V0_0_1, Set.of(GatewayTypeEnum.DOCK, GatewayTypeEnum.DOCK2)),
 

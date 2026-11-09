@@ -90,6 +90,9 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
     private IDeviceRedisService deviceRedisService;
 
     @Autowired
+    private MissionThermalPaletteService missionThermalPaletteService;
+
+    @Autowired
     private IWaylineRedisService waylineRedisService;
 
     @Autowired
@@ -491,6 +494,17 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
         }
 
         WaylineJobDTO job = waylineJob.get();
+
+        try {
+            missionThermalPaletteService.beforeExecute(job.getDockSn());
+        } catch (RuntimeException ex) {
+            waylineJobService.updateJob(WaylineJobDTO.builder()
+                    .workspaceId(workspaceId).jobId(jobId)
+                    .executeTime(LocalDateTime.now()).completedTime(LocalDateTime.now())
+                    .status(WaylineJobStatusEnum.FAILED.getVal()).build());
+            log.error("Thermal palette preflight failed; job={}, dock={}: {}", jobId, job.getDockSn(), ex.getMessage());
+            throw new IllegalStateException("Thermal palette preflight failed; flight was not executed: " + ex.getMessage(), ex);
+        }
 
         TopicServicesResponse<ServicesReplyData> serviceReply = abstractWaylineService.flighttaskExecute(
                 SDKManager.getDeviceSDK(job.getDockSn()), new FlighttaskExecuteRequest().setFlightId(jobId));

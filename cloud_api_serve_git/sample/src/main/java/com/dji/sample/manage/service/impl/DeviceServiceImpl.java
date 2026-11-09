@@ -17,10 +17,12 @@ import com.dji.sample.manage.model.enums.UserTypeEnum;
 import com.dji.sample.manage.model.param.DeviceQueryParam;
 import com.dji.sample.manage.model.receiver.BasicDeviceProperty;
 import com.dji.sample.manage.service.*;
+import com.dji.sample.wayline.service.impl.MissionThermalPaletteService;
 import com.dji.sdk.cloudapi.device.*;
 import com.dji.sdk.cloudapi.firmware.*;
 import com.dji.sdk.cloudapi.firmware.api.AbstractFirmwareService;
 import com.dji.sdk.cloudapi.property.api.AbstractPropertyService;
+import com.dji.sdk.cloudapi.property.ThermalCurrentPaletteStyleSet;
 import com.dji.sdk.cloudapi.tsa.DeviceIconUrl;
 import com.dji.sdk.cloudapi.tsa.TopologyDeviceModel;
 import com.dji.sdk.common.*;
@@ -587,8 +589,29 @@ public class DeviceServiceImpl implements IDeviceService {
             throw new RuntimeException("Device is offline.");
         }
 
+        if (propertyEnum == PropertySetFieldEnum.THERMAL_CURRENT_PALETTE_STYLE) {
+            JsonNode value = param.get(property);
+            if (!value.isObject() || value.size() != 2 || !value.path("payload_index").isTextual()
+                    || !value.path("thermal_current_palette_style").isIntegralNumber()
+                    || !value.path("thermal_current_palette_style").canConvertToInt()) {
+                throw new IllegalArgumentException("Expected payload_index and integer thermal_current_palette_style.");
+            }
+            PayloadIndex index = MissionThermalPaletteService.thermalPayload(osdOpt.get());
+            if (!index.toString().equals(value.path("payload_index").asText())) {
+                throw new IllegalArgumentException("Payload does not match the online infrared camera.");
+            }
+            ThermalCurrentPaletteStyleSet request =
+                    new ThermalCurrentPaletteStyleSet().setPayloadIndex(index)
+                            .setThermalCurrentPaletteStyle(ThermalPaletteStyleEnum.find(
+                                    value.path("thermal_current_palette_style").intValue()));
+            PropertySetReplyResultEnum ack = abstractPropertyService.propertySet(
+                    SDKManager.getDeviceSDK(dockSn), propertyEnum.getProperty(), request);
+            if (ack == null) throw new IllegalStateException("Thermal palette: missing property ACK.");
+            return ack.getResult();
+        }
+
         // Make sure the data is valid.
-        BasicDeviceProperty basicDeviceProperty = objectMapper.convertValue(param.get(property), propertyEnum.getClazz());
+        BasicDeviceProperty basicDeviceProperty = objectMapper.convertValue(param.get(property), propertyEnum.getClazz().asSubclass(BasicDeviceProperty.class));
         boolean valid = basicDeviceProperty.valid();
         if (!valid) {
             throw new IllegalArgumentException(CommonErrorEnum.ILLEGAL_ARGUMENT.getMessage());
