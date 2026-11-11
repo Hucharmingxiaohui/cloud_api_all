@@ -93,7 +93,7 @@ public class CqDockController {
     }
 
     /**
-     * 本地联调：模拟上级点位任务，pointCodes为逗号分隔的point_code，可传subCode限定厂站。
+     * 本地联调：模拟上级点位任务，pointCodes为逗号分隔的point_code，subCode为必填上级站点Code。
      */
     @PostMapping("/test/schedule-task")
     public CqApiResponse scheduleTask(@RequestBody Map<String, Object> params) {

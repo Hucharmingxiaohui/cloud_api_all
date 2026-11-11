@@ -20,6 +20,10 @@ public class CqDockTaskRecordEntity {
     @TableField("business_id")
     private String businessId;
 
+    /** 接收任务时的上级Code快照；历史NULL不可从配置或点位反推。 */
+    @TableField("sub_code")
+    private String subCode;
+
     @TableField("task_name")
     private String taskName;
 

@@ -89,8 +89,6 @@ public class CqDockPictureReportService {
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
     @Autowired
     private PatrolHostSocketClient patrolHostSocketClient;
-    @Value("${normalStation.stationCode}")
-    private String normalStationCode;
     @Autowired
     private CqDockProperties cqDockProperties;
     @Autowired
@@ -114,6 +112,10 @@ public class CqDockPictureReportService {
      * 终态任务轮询图片；传输完成后才落库、下载、分析和上报。
      */
     public boolean fetchSaveAndReport(String taskCode, String taskName, String euaTaskId) {
+        CqDockTaskRecordEntity record = requireReportRecord(taskCode, euaTaskId);
+        if (Objects.equals(record.getReportToPatrol(), 0)) {
+            return fetchSaveAndAnalyseOnly(taskCode, taskName, euaTaskId);
+        }
 //      获取并本地保存图片
         if (fetchAndSavePictures(taskCode, taskName, euaTaskId) < 0) return false;
 //      原图先统一上报，避免分析服务异常导致上级完全收不到图片
@@ -456,7 +458,8 @@ public class CqDockPictureReportService {
 
     private boolean shouldReportToPatrol(CqDockTaskPictureEntity row) {
         CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
-        return record == null || record.getReportToPatrol() == null || record.getReportToPatrol() == 1;
+        return record != null && Objects.equals(record.getBusinessId(), row.getBusinessId())
+                && !Objects.equals(record.getReportToPatrol(), 0);
     }
 
     private TemParamEntity parseInfraredCoordinate(String coordinate) {
@@ -559,6 +562,9 @@ public class CqDockPictureReportService {
      * 原图先统一上传 FTP 并上报巡视上级；reportStatus 仅标记原图上报状态。
      */
     private synchronized void reportOriginalPictures(String taskCode, String taskName, String euaTaskId) {
+        CqDockTaskRecordEntity record = requireReportRecord(taskCode, euaTaskId);
+        if (Objects.equals(record.getReportToPatrol(), 0)) return;
+        final String subCode = record.getSubCode();
         List<CqDockTaskPictureEntity> rows = cqDockTaskPictureMapper.selectList(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
                 .eq(CqDockTaskPictureEntity::getBusinessId, taskCode)
                 .eq(CqDockTaskPictureEntity::getEuaTaskId, euaTaskId));
@@ -596,7 +602,7 @@ public class CqDockPictureReportService {
             log.info("CQ无待上报原图: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
             return;
         }
-        sendPatrolResultItems(items);
+        sendPatrolResultItems(items, subCode);
         log.info("CQ原图统一上报完成: taskCode={}, euaTaskId={}, 图片数={}, item数={}",
                 taskCode, euaTaskId, rows.size(), items.size());
 
@@ -614,6 +620,9 @@ public class CqDockPictureReportService {
      */
     private void reportSingleAnalysisResult(CqDockTaskPictureEntity row) {
         try {
+            CqDockTaskRecordEntity record = requireReportRecord(row.getBusinessId(), row.getEuaTaskId());
+            if (Objects.equals(record.getReportToPatrol(), 0)) return;
+            final String subCode = record.getSubCode();
             String fileType = row.getPointType() != null && row.getPointType() == POINT_TYPE_INFRARED ? "1" : "2";
             String filePath;
             if (row.getPointType() != null && row.getPointType() == POINT_TYPE_INFRARED) {
@@ -626,7 +635,7 @@ public class CqDockPictureReportService {
             item.setValue(defaultText(row.getPointVal()));
             item.setValue_unit(defaultText(Objects.equals(row.getPointType(), POINT_TYPE_INFRARED)
                     ? row.getPointVal() : row.getPointValUnit()));
-            sendPatrolResultItems(Lists.newArrayList(item));
+            sendPatrolResultItems(Lists.newArrayList(item), subCode);
             log.info("CQ分析结果增量上报完成: taskCode={}, euaTaskId={}, pictureName={}, filePath={}",
                     row.getBusinessId(), row.getEuaTaskId(), row.getPictureName(), filePath);
         } catch (Exception e) {
@@ -640,8 +649,20 @@ public class CqDockPictureReportService {
         }
     }
 
-    private void sendPatrolResultItems(List<PatrolResultItem> items) {
-        PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", normalStationCode);
+    private CqDockTaskRecordEntity requireReportRecord(String taskCode, String euaTaskId) {
+        CqDockTaskRecordEntity record = findTaskRecord(euaTaskId);
+        if (record == null || !Objects.equals(taskCode, record.getBusinessId())
+                || !Objects.equals(euaTaskId, record.getEuaTaskId())) {
+            throw new IllegalStateException("EUA任务历史不完整，缺少匹配任务记录及原始站点Code，拒绝上报");
+        }
+        if (!Objects.equals(record.getReportToPatrol(), 0) && !StringUtils.hasText(record.getSubCode())) {
+            throw new IllegalStateException("EUA任务历史不完整，缺少原始站点Code，拒绝上报；请核实原报文后人工补录");
+        }
+        return record;
+    }
+
+    private void sendPatrolResultItems(List<PatrolResultItem> items, String subCode) {
+        PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("61", "", subCode);
         commandData.addItems(items);
         if (!patrolHostSocketClient.sendCommand(commandData, PatrolResultItem.class)) {
             throw new IllegalStateException("EUA巡视结果发送失败");
@@ -859,8 +880,7 @@ public class CqDockPictureReportService {
             return null;
         }
         return cqDockTaskRecordMapper.selectOne(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
-                .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId)
-                .last("LIMIT 1"));
+                .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId));
     }
 
     private String downloadPicture(String pictureId, String pictureUrl, String taskCode, String pictureName) throws Exception {

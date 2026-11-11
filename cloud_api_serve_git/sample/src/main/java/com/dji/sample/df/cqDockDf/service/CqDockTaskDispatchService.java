@@ -54,13 +54,22 @@ public class CqDockTaskDispatchService {
 
     public CqDockTaskDispatchResult dispatchByBay(String bayId, String taskCode, String taskName,
                                                   String fixedStartTime, boolean reportToPatrol) {
+        return dispatchByBay(bayId, taskCode, taskName, fixedStartTime, reportToPatrol, null);
+    }
+
+    public CqDockTaskDispatchResult dispatchByBay(String bayId, String taskCode, String taskName,
+                                                  String fixedStartTime, boolean reportToPatrol, String subCode) {
+        subCode = StringUtils.hasText(subCode) ? subCode.trim() : null;
+        if (reportToPatrol && subCode == null) {
+            return CqDockTaskDispatchResult.failed(taskCode, taskName, bayId, null, "上级EUA任务缺少站点Code(subCode)，拒绝下发");
+        }
         log.info("开始执行EUA任务: taskCode={}, bayId={}, taskName={}, fixedStartTime={}, reportToPatrol={}",
                 taskCode, bayId, taskName, fixedStartTime, reportToPatrol);
         String routeId = resolveRouteId(bayId);
         log.info("EUA任务匹配航线: taskCode={}, bayId={}, routeId={}", taskCode, bayId, routeId);
         if (!StringUtils.hasText(routeId)) {
             String msg = "未在df_uni_point中匹配到航线";
-            saveTaskRecord(taskCode, taskName, bayId, null, null, null, msg, null, false, reportToPatrol);
+            saveTaskRecord(taskCode, taskName, bayId, null, null, null, msg, null, false, reportToPatrol, null, subCode);
             return CqDockTaskDispatchResult.failed(taskCode, taskName, bayId, null, msg);
         }
 
@@ -71,13 +80,13 @@ public class CqDockTaskDispatchService {
         log.info("EUA任务准备调用下级任务下发: taskCode={}, bayId={}, routeId={}, request={}",
                 taskCode, bayId, routeId, JSONObject.toJSONString(request));
 
+        CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, bayId, routeId, null, null,
+                "待下发", null, false, reportToPatrol, null, subCode);
         CqApiResponse response = cqDockApiService.assignTask(request);
         boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
         String euaTaskId = extractEuaTaskId(response);
         String msg = response == null ? "EUA接口无响应" : response.getMsg();
-        saveTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId,
-                response == null ? null : response.getCode(), msg,
-                response == null ? null : response.getRawBody(), success, reportToPatrol);
+        updateTaskRecord(record, response, success, euaTaskId, msg);
 
         CqDockTaskDispatchResult result = new CqDockTaskDispatchResult();
         result.setSuccess(success);
@@ -116,8 +125,11 @@ public class CqDockTaskDispatchService {
     }
 
     public String validatePointDispatch(String pointCodes, String subCode) {
+        if (!StringUtils.hasText(subCode)) {
+            throw new IllegalArgumentException("上级EUA任务缺少站点Code(subCode)，拒绝下发");
+        }
         List<String> codes = normalizePointCodes(pointCodes);
-        resolvePointRoute(codes, subCode);
+        resolvePointRoute(codes, subCode.trim());
         return String.join(",", codes);
     }
 
@@ -129,6 +141,10 @@ public class CqDockTaskDispatchService {
     private CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
                                                     String taskName, String fixedStartTime, boolean reportToPatrol,
                                                     String expectedRouteId) {
+        subCode = StringUtils.hasText(subCode) ? subCode.trim() : null;
+        if (reportToPatrol && subCode == null) {
+            return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, "上级EUA任务缺少站点Code(subCode)，拒绝下发");
+        }
         List<String> codes = normalizePointCodes(pointCodes);
         String snapshot = JSONObject.toJSONString(codes);
         String routeId;
@@ -138,26 +154,27 @@ public class CqDockTaskDispatchService {
                 if (!expectedRouteId.equals(routeId)) throw new IllegalArgumentException("计划航线ID已变化，请重新选择点位并保存");
             }
         } catch (IllegalArgumentException e) {
-            savePointTaskRecord(taskCode, taskName, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot);
+            saveTaskRecord(taskCode, taskName, null, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot, subCode);
             return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, e.getMessage());
         }
         CqAssignTaskRequest request = new CqAssignTaskRequest();
         request.setTaskName(taskName);
         request.setBusinessId(taskCode);
         request.setRouteId(routeId);
+        CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, null, routeId, null, null,
+                "待下发", null, false, reportToPatrol, snapshot, subCode);
         CqApiResponse response;
         try {
             response = cqDockApiService.assignTask(request);
         } catch (Exception e) {
             log.error("EUA点位任务下发异常: taskCode={}, pointCodes={}", taskCode, snapshot, e);
-            savePointTaskRecord(taskCode, taskName, routeId, null, null, e.getMessage(), null, false, reportToPatrol, snapshot);
+            updateTaskRecord(record, null, false, null, e.getMessage());
             return CqDockTaskDispatchResult.failed(taskCode, taskName, null, routeId, e.getMessage());
         }
         boolean success = response != null && (Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200));
         String euaTaskId = extractEuaTaskId(response);
         String msg = response == null ? "EUA接口无响应" : response.getMsg();
-        savePointTaskRecord(taskCode, taskName, routeId, euaTaskId, response == null ? null : response.getCode(),
-                msg, response == null ? null : response.getRawBody(), success, reportToPatrol, snapshot);
+        updateTaskRecord(record, response, success, euaTaskId, msg);
         CqDockTaskDispatchResult result = new CqDockTaskDispatchResult();
         result.setSuccess(success);
         result.setTaskCode(taskCode);
@@ -223,25 +240,12 @@ public class CqDockTaskDispatchService {
         return response.getData().getString("taskId");
     }
 
-    private void saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
+    private CqDockTaskRecordEntity saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
                                 String euaTaskId, Integer responseCode, String responseMsg,
-                                String rawResponse, boolean success, boolean reportToPatrol) {
-        saveTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId, responseCode, responseMsg,
-                rawResponse, success, reportToPatrol, null);
-    }
-
-    private void savePointTaskRecord(String taskCode, String taskName, String routeId, String euaTaskId,
-                                     Integer responseCode, String responseMsg, String rawResponse, boolean success,
-                                     boolean reportToPatrol, String snapshot) {
-        saveTaskRecord(taskCode, taskName, null, routeId, euaTaskId, responseCode, responseMsg,
-                rawResponse, success, reportToPatrol, snapshot);
-    }
-
-    private void saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
-                                String euaTaskId, Integer responseCode, String responseMsg,
-                                String rawResponse, boolean success, boolean reportToPatrol, String pointCodes) {
+                                String rawResponse, boolean success, boolean reportToPatrol, String pointCodes, String subCode) {
         CqDockTaskRecordEntity record = new CqDockTaskRecordEntity();
         record.setBusinessId(taskCode);
+        record.setSubCode(subCode);
         record.setTaskName(taskName);
         record.setBayId(bayId);
         record.setPointCodes(pointCodes);
@@ -256,8 +260,24 @@ public class CqDockTaskDispatchService {
         record.setCreateTime(now);
         record.setUpdateTime(now);
         int inserted = cqDockTaskRecordMapper.insert(record);
-        if (pointCodes != null && inserted != 1) {
+        if (inserted != 1) {
             throw new IllegalStateException("EUA任务记录保存失败");
+        }
+        return record;
+    }
+
+    private void updateTaskRecord(CqDockTaskRecordEntity accepted, CqApiResponse response, boolean success,
+                                  String euaTaskId, String message) {
+        CqDockTaskRecordEntity update = new CqDockTaskRecordEntity();
+        update.setId(accepted.getId());
+        update.setEuaTaskId(euaTaskId);
+        update.setResponseCode(response == null ? null : response.getCode());
+        update.setResponseMsg(message);
+        update.setRawResponse(response == null ? null : response.getRawBody());
+        update.setSuccess(success ? 1 : 0);
+        update.setUpdateTime(new Date());
+        if (cqDockTaskRecordMapper.updateById(update) != 1) {
+            throw new IllegalStateException("EUA任务响应记录保存失败");
         }
     }
 }

@@ -8,11 +8,12 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.df.cqDockDf.dao.CqEuaPlanMapper;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -45,8 +46,8 @@ public class CqDockTaskStatusHandler {
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
-    @Value("${normalStation.stationCode}")
-    private String normalStationCode;
+    @Autowired
+    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
 
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
         startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, true);
@@ -130,12 +131,24 @@ public class CqDockTaskStatusHandler {
                 return;
             }
             int progress = extractProgress(data, mappedState);
-            boolean reportToPatrol = Boolean.parseBoolean(detail.getOrDefault("reportToPatrol", "true"));
+            CqDockTaskRecordEntity record = cqDockTaskRecordMapper.selectOne(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                    .eq(CqDockTaskRecordEntity::getBusinessId, taskCode)
+                    .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId));
+            if (record == null || !Objects.equals(taskCode, record.getBusinessId())
+                    || !Objects.equals(euaTaskId, record.getEuaTaskId())) {
+                log.warn("EUA任务历史不完整，缺少匹配的任务记录，跳过上报: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+                return;
+            }
+            boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
+            if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
+                log.warn("EUA任务历史不完整，缺少原始站点Code，跳过Type41/61上报，需核实原报文后人工补录: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+                return;
+            }
             log.info("EUA任务状态查询结果: taskCode={}, euaTaskId={}, euaStatus={}, mappedState={}, progress={}, reportToPatrol={}, data={}",
                     taskCode, euaTaskId, euaStatus, mappedState, progress, reportToPatrol, data);
             if (reportToPatrol) {
                 sendTaskStatus(taskCode, detail.get("taskName"), euaTaskId, mappedState, progress,
-                        detail.get("fixedStartTime"), euaStatus);
+                        detail.get("fixedStartTime"), euaStatus, record.getSubCode());
             }
             log.info("准备更新EUA任务状态监控进度: taskCode={}, mappedState={}, progress={}", taskCode, mappedState, progress);
             redisUtils.addOneValue(MONITOR_HASH + ":" + taskCode, "lastState", mappedState);
@@ -250,7 +263,7 @@ public class CqDockTaskStatusHandler {
     }
 
     private void sendTaskStatus(String taskCode, String taskName, String euaTaskId, String mappedState,
-                                int progress, String fixedStartTime, String euaStatus) {
+                                int progress, String fixedStartTime, String euaStatus, String subCode) {
         PatrolStatusItem item = new PatrolStatusItem();
         item.setTask_patrolled_id(euaTaskId);
         item.setTask_name(taskName);
@@ -269,7 +282,7 @@ public class CqDockTaskStatusHandler {
         commandData.setSendCode(centerConfig.getStationCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
-        commandData.setCode(normalStationCode);
+        commandData.setCode(subCode);
         boolean sendSuccess = patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
         if (sendSuccess) {
             log.info("上报EUA任务状态成功: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
