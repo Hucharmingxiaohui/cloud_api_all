@@ -2,6 +2,7 @@ package com.dji.sample.manage.model.enums;
 
 import com.dji.sample.manage.model.receiver.*;
 import com.dji.sdk.cloudapi.property.PropertySetEnum;
+import com.dji.sdk.cloudapi.property.ThermalCurrentPaletteStyleSet;
 import com.fasterxml.jackson.annotation.JsonValue;
 
 import java.util.Arrays;
@@ -27,7 +28,7 @@ public enum PropertySetFieldEnum {
 
 //    EXIT_WAYLINE_WHEN_RC_LOST(PropertySetEnum.EXIT_WAYLINE_WHEN_RC_LOST, .class),
 //
-//    THERMAL_CURRENT_PALETTE_STYLE(PropertySetEnum.THERMAL_CURRENT_PALETTE_STYLE, .class),
+    THERMAL_CURRENT_PALETTE_STYLE(PropertySetEnum.THERMAL_CURRENT_PALETTE_STYLE, ThermalCurrentPaletteStyleSet.class),
 //
 //    THERMAL_GAIN_MODE(PropertySetEnum.THERMAL_GAIN_MODE, .class),
 //
@@ -41,9 +42,9 @@ public enum PropertySetFieldEnum {
 
     private final PropertySetEnum property;
 
-    private final Class<? extends BasicDeviceProperty> clazz;
+    private final Class<?> clazz;
 
-    PropertySetFieldEnum(PropertySetEnum property, Class<? extends BasicDeviceProperty> clazz) {
+    PropertySetFieldEnum(PropertySetEnum property, Class<?> clazz) {
         this.property = property;
         this.clazz = clazz;
     }
@@ -57,7 +58,7 @@ public enum PropertySetFieldEnum {
         return property.getProperty();
     }
 
-    public Class<? extends BasicDeviceProperty> getClazz() {
+    public Class<?> getClazz() {
         return clazz;
     }
 

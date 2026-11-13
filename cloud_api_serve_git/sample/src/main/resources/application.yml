@@ -203,6 +203,8 @@ singlePointUrl: D:\KmzKml\
 createKmzUrl: D:\KmzKml\KMZ
 #上级巡视对接开关
 switch:
+  # 启用前必须部署sql/upgrade_20261105_center_ordinary_task.sql
+  centerOrdinaryTaskEnable: false
 #  centerNormalTcpEnable: true
 #  centerOtherTcpEnable: true
 #  centerNormalTcpMsgEnable: true
@@ -409,5 +411,28 @@ construction-analysis:
 
 ordinary-report:
   template-path: /dji/java/templates/report-excel-templates.xls
+  # 仅报告按同类型照片序号与航点预置位数值降序逐位匹配，关闭时保留完整名称匹配
+  sequence-matching-enabled: false
+
+thermal:
+  #cli为测温工具 sdk为大疆测温sdk
+  provider: cli
+  cli:
+    executable: /opt/python3.12.6/python-headless-3.12.6-linux-aarch64/bin/dji-thermal-cli
+    arguments:
+      - process
+      - --input-dir
+      - "{inputDir}"
+      - --output-dir
+      - "{outputDir}"
+      - -o
+      - "temp_c:tiff"
+      - --distance
+      - embedded
+      - --jobs
+      - "1"
+    timeout-seconds: 60
+    max-file-bytes: 67108864
+    max-pixels: 4194304
 
 

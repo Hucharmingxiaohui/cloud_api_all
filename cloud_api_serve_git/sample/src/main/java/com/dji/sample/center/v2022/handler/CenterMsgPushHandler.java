@@ -11,7 +11,10 @@ import com.dji.sample.center.v2022.tool.BaseItem;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointCount.PointCount;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
+import org.springframework.util.StringUtils;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -32,8 +35,8 @@ public class CenterMsgPushHandler {
     private CenterNormalConfig centerNormalConfig;
     @Autowired
     private ICenterToUavPlanMapper iCenterToUavPlanMapper;
-    @Value("${normalStation.stationCode}")
-    private String normalStationCode;
+    @Autowired
+    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
 
 
     /**
@@ -113,9 +116,23 @@ public class CenterMsgPushHandler {
         }
         if (list != null && list.size() > 0) {
             if (euaTask) {
-                PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("41", "", normalStationCode);
-                commandData.addItems(list);
-                patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
+                for (BaseItem baseItem : list) {
+                    if (!(baseItem instanceof PatrolStatusItem)) continue;
+                    PatrolStatusItem item = (PatrolStatusItem) baseItem;
+                    CqDockTaskRecordEntity record = cqDockTaskRecordMapper.selectOne(Wrappers.<CqDockTaskRecordEntity>lambdaQuery()
+                            .eq(CqDockTaskRecordEntity::getEuaTaskId, item.getTask_patrolled_id())
+                            .eq(CqDockTaskRecordEntity::getBusinessId, item.getTask_code()));
+                    if (record == null || !Objects.equals(record.getBusinessId(), item.getTask_code())
+                            || !Objects.equals(record.getEuaTaskId(), item.getTask_patrolled_id())
+                            || Objects.equals(record.getReportToPatrol(), 0) || !StringUtils.hasText(record.getSubCode())) {
+                        log.warn("EUA起始状态未上报：平台内任务或历史不完整、缺少原始站点Code: taskCode={}, euaTaskId={}",
+                                item.getTask_code(), item.getTask_patrolled_id());
+                        continue;
+                    }
+                    PatrolHostCommand commandData = patrolHostSocketClient.getBaseCommand("41", "", record.getSubCode());
+                    commandData.addItems(java.util.Collections.singletonList(item));
+                    patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
+                }
                 return;
             }
             PatrolHostCommand commandData = new PatrolHostCommand();

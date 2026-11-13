@@ -35,15 +35,6 @@
           <el-button
             class="new_btn"
             type="primary"
-            :icon="Document"
-            @click="viewReport()"
-            :disabled="reportBusy"
-          >
-            查看报告
-          </el-button>
-          <el-button
-            class="new_btn"
-            type="primary"
             :icon="Refresh"
             @click="resetReport()"
             :disabled="reportBusy"

@@ -74,6 +74,8 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("fjReport/api/v1/")
 public class UavReportController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
 
     private boolean isConstruction(WaylineJobEntity job) {
         if (job == null || job.getPlanId() == null) return false;
@@ -144,6 +146,9 @@ public class UavReportController {
         WaylineJobEntity constructionCandidate = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));
         if (isConstruction(constructionCandidate)) return Result.warn("工地任务仅允许通过工地结果页手动提交分析");
         boolean fromJobMonitor = jsonObject.getBooleanValue("fromJobMonitor");
+        if (centerOrdinaryTasks.findJob(jobId) != null) {
+            return Result.analyzing("上级普通航线任务仅在媒体稳定后处理冻结选中点位，不执行全航线分析");
+        }
         log.info("图片保存分析请求: jobId={}, fromJobMonitor={}, caller={}", jobId, fromJobMonitor,
                 httpRequest == null ? "internal" : httpRequest.getRemoteAddr());
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));

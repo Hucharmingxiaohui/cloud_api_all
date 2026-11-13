@@ -64,6 +64,14 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class JobControlHandler {
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryStatusSender centerOrdinaryStatus;
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.CenterOrdinaryMediaService centerOrdinaryMedia;
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.dao.CenterOrdinaryTaskMapper centerOrdinaryTaskMapper;
 
     @Autowired
     private PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
@@ -141,6 +149,12 @@ public class JobControlHandler {
         log.info("开始监控任务状态: taskCode={}, taskName={}", taskCode, taskName);
     }
 
+    public static void ensureCenterOrdinaryMonitoring(String jobId, String taskName) {
+        Map<String,Long> entry = new HashMap<>();
+        entry.put(taskName, System.currentTimeMillis());
+        monitoringTasks.putIfAbsent(jobId, entry);
+    }
+
     /**
      * 定时任务：每3秒检查一次任务状态
      */
@@ -182,6 +196,10 @@ public class JobControlHandler {
             WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
                     .eq(WaylineJobEntity::getJobId, jobId)
             );
+            if (waylineJobEntity == null && centerOrdinaryTasks.findJob(taskCode) != null) {
+                log.warn("上级普通任务关联的DJI执行不存在，禁止回退到全局jobId: jobId={}", taskCode);
+                return;
+            }
             if (waylineJobEntity == null) {
                 Object jobIdObj = redisUtils.get("jobId");
                 if (jobIdObj != null) {
@@ -197,6 +215,11 @@ public class JobControlHandler {
             }
             WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
             Integer status = waylineJobDTO.getStatus();
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity ordinaryTask = centerOrdinaryTasks.findJob(jobId);
+            if (ordinaryTask != null) {
+                processCenterOrdinary(ordinaryTask, waylineJobEntity, waylineJobDTO, taskCode);
+                return;
+            }
             String isCenterTask = redisUtils.get("isCenterTask").toString();
             // 如果状态为2（执行中），上报状态
             if (status == 2) {
@@ -273,6 +296,30 @@ public class JobControlHandler {
 
     static int normalizeUploadCount(Integer count) {
         return count == null ? 0 : count;
+    }
+
+    private void processCenterOrdinary(com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity task,
+            WaylineJobEntity job, WaylineJobDTO dto, String monitoringKey) throws Exception {
+        if (!"DISPATCHED".equals(task.getStatus())) {
+            clearMonitoringState(monitoringKey);
+            return;
+        }
+        Integer status = dto.getStatus();
+        centerOrdinaryStatus.observed(task, job, dto);
+        if (Integer.valueOf(3).equals(status)) {
+            int uploaded = normalizeUploadCount(dto.getUploadedCount());
+            int total = normalizeUploadCount(dto.getMediaCount());
+            if (total == 0 && waitForZeroTotalTimeout(monitoringKey)) return;
+            if (uploaded < total) return;
+            if (!isCompletedUploadStable(monitoringKey, uploaded, total)) return;
+            centerOrdinaryMedia.complete(task, job);
+            clearMonitoringState(monitoringKey);
+        } else if (Integer.valueOf(-1).equals(status) || Integer.valueOf(4).equals(status)
+                || Integer.valueOf(5).equals(status) || Integer.valueOf(7).equals(status)) {
+            centerOrdinaryTaskMapper.finish(task.getId(), "DISPATCHED", Integer.valueOf(4).equals(status) ? "CANCELLED" : "FAILED",
+                    "飞行取消、失败或中断，status=" + status + "，error_code=" + job.getErrorCode() + "，禁止自动重飞");
+            clearMonitoringState(monitoringKey);
+        }
     }
 
     /**

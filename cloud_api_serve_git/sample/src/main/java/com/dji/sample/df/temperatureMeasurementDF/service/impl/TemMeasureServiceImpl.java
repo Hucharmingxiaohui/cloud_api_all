@@ -6,6 +6,8 @@ import com.dji.sample.df.temperatureMeasurementDF.modol.TemParamEntity;
 import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
 import com.dji.sample.df.temperatureMeasurementDF.service.IFileServiceDF;
 import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
+import com.dji.sample.df.temperatureMeasurementDF.thermal.ThermalCli;
+import com.dji.sample.df.temperatureMeasurementDF.thermal.ThermalProperties;
 import com.dji.sample.df.commonDf.util.DeleteFile;
 import com.dji.sample.media.model.MediaFileEntity;
 import com.jcraft.jsch.ChannelExec;
@@ -36,6 +38,10 @@ import java.util.Optional;
 public class TemMeasureServiceImpl implements TemMeasureService {
     @Autowired
     private IFileServiceDF fileService;
+    @Autowired
+    private ThermalProperties thermalProperties;
+    @Autowired
+    private ThermalCli thermalCli;
     //1.根据workspace_id file_id下载图片并返回温度，点测温返回温度（坐标），区域测温返回最大、最小温度坐标
     @Value("${singlePointUrl}")
     private String singlePointUrl;
@@ -63,12 +69,18 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
     @Override
     public TemResultEntity getTemByWorkSpaceIdAndFileId(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return getTemByCliMedia(workspace_id, file_id, temParamEntity);
+        }
         return remoteThermalEnabled
                 ? getTemByRemoteServer(workspace_id, file_id, temParamEntity)
                 : getTemByLocalFile(workspace_id, file_id, temParamEntity);
     }
 
     public TemResultEntity getTemByLocalFile(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return getTemByCliMedia(workspace_id, file_id, temParamEntity);
+        }
         log.info("测温开始，workspaceId={}, fileId={}", workspace_id, file_id);
         DeleteFile deleteFile = new DeleteFile();
         //0存储温度结构
@@ -340,6 +352,21 @@ public class TemMeasureServiceImpl implements TemMeasureService {
      */
     @Override
     public TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity) {
+        return getTemByLocalImagePath(imagePath, temParamEntity, false);
+    }
+
+    @Override
+    public TemResultEntity measureWholeImage(String imagePath) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return thermalCli.measureWholeImage(Path.of(imagePath));
+        }
+        return getTemByLocalImagePath(imagePath, new TemParamEntity(), true);
+    }
+
+    private TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity, boolean wholeImage) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return thermalCli.measure(Path.of(imagePath), temParamEntity);
+        }
         log.info("EUA红外测温开始，imagePath={}", imagePath);
         TemResultEntity temResultEntity = new TemResultEntity();
         DeleteFile deleteFile = new DeleteFile();
@@ -420,6 +447,11 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             return temResultEntity;
         }
         //4点测温 / 区域测温（保留EUA本地原图，只清理measure.raw）
+        if (wholeImage) {
+            temParamEntity.setLeft_top_x(0); temParamEntity.setLeft_top_y(0);
+            temParamEntity.setRight_bottom_x(temperatureMatrix[0].length - 1);
+            temParamEntity.setRight_bottom_y(temperatureMatrix.length - 1);
+        }
         if (temParamEntity.getPoint_x() != null && temParamEntity.getPoint_y() != null) {
             double roundedNum = Math.round(temperatureMatrix[temParamEntity.getPoint_y()][temParamEntity.getPoint_x()] * 10) / 10.0;
             temResultEntity.setPoint_tem(roundedNum);
@@ -463,6 +495,29 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         return temResultEntity;
     }
 
+    private TemResultEntity getTemByCliMedia(String workspaceId, String fileId, TemParamEntity parameters) {
+        TemResultEntity result = new TemResultEntity();
+        Optional<MediaFileEntity> media = fileService.getMediaByFileId(workspaceId, fileId);
+        if (media == null || media.isEmpty()) {
+            result.setError("图像信息没有存入数据库");
+            return result;
+        }
+        try {
+            URL url = fileService.getObjectUrl(workspaceId, fileId);
+            if (url == null) throw new IOException("Missing object URL");
+            var connection = url.openConnection();
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(10000);
+            try (InputStream source = connection.getInputStream()) {
+                return thermalCli.measure(source, parameters);
+            }
+        } catch (IOException e) {
+            log.warn("CLI 红外原图读取失败", e);
+            result.setError("图像信息没有存入minio或读取失败");
+            return result;
+        }
+    }
+
     private String formatTemResult(TemResultEntity result) {
         if (result.getError() != null) {
             return "失败，error=" + result.getError();
@@ -480,6 +535,9 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
 
     public TemResultEntity getTemByRemoteServer(String workspace_id, String file_id, TemParamEntity temParamEntity) {
+        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
+            return getTemByCliMedia(workspace_id, file_id, temParamEntity);
+        }
         log.info("测温开始，workspaceId={}, fileId={}", workspace_id, file_id);
         DeleteFile deleteFile = new DeleteFile();
         TemResultEntity temResultEntity = new TemResultEntity();

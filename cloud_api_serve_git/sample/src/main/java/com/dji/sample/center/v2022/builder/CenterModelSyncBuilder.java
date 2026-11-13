@@ -148,11 +148,12 @@ public class CenterModelSyncBuilder {
         }
         if("true".equals(stationPoints)) {
 
-                List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
-                if (uniPoints != null && uniPoints.size() > 0) {
+//          List<UniPoint> uniPoints = uniPointMapper.selectListByMap(new HashMap());
+            List<UniPoint> uniPoints = uniPointMapper.selectList(new LambdaQueryWrapper<UniPoint>().eq(UniPoint::getSubCode, subCode));
+            if (uniPoints != null && uniPoints.size() > 0) {
                     for (UniPoint entity : uniPoints) {
                         PatrolUavPointModelItem item = new PatrolUavPointModelItem();
-                        item.setStation_code(subCode);
+                        item.setStation_code(entity.getSubCode());
                         item.setStation_name(entity.getSubName());
                         item.setArea_id(Optional.ofNullable(entity.getAreaId()).orElse(""));
                         item.setArea_name(Optional.ofNullable(entity.getAreaName()).orElse(""));

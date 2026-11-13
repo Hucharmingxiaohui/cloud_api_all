@@ -8,11 +8,12 @@ import com.dji.sample.center.v2022.command.base.PatrolHostCommand;
 import com.dji.sample.center.v2022.command.upload.PatrolStatusItem;
 import com.dji.sample.center.v2022.handler.PatrolHostSocketClient;
 import com.dji.sample.df.cqDockDf.dao.CqEuaPlanMapper;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
 import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -45,8 +46,45 @@ public class CqDockTaskStatusHandler {
     private PatrolHostSocketClient patrolHostSocketClient;
     @Autowired
     private CenterNormalConfig centerConfig;
-    @Value("${normalStation.stationCode}")
-    private String normalStationCode;
+    @Autowired
+    private CqDockTaskRecordMapper cqDockTaskRecordMapper;
+
+    public String syncResults(Long recordId) {
+        CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
+        if (record == null || !Objects.equals(record.getSuccess(), 1)
+                || !StringUtils.hasText(record.getBusinessId()) || !StringUtils.hasText(record.getEuaTaskId())) {
+            throw new IllegalArgumentException("任务记录不存在或未成功下发，不能同步结果");
+        }
+        boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
+        if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
+            throw new IllegalStateException("任务缺少原始站点Code，请核实原报文后补录，不能同步结果");
+        }
+        CqApiResponse response = cqDockApiService.taskStatus(record.getEuaTaskId());
+        if (response == null || Boolean.FALSE.equals(response.getSuccess())
+                || (response.getCode() != null && !Objects.equals(response.getCode(), 200))
+                || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
+            throw new IllegalStateException("EUA任务状态查询失败，请稍后重试");
+        }
+        JSONObject data = response.getData();
+        if (data == null || !record.getEuaTaskId().equals(data.getString("taskId"))) {
+            throw new IllegalStateException("EUA任务状态返回的taskId缺失或不匹配，请核实任务");
+        }
+        String state = data.getString("status");
+        if (state == null || !state.matches("[0-6]")) {
+            throw new IllegalStateException("EUA任务状态无效，请稍后重试或核实EUA响应");
+        }
+        if (!"1".equals(state)) {
+            String[] labels = {"待执行", "已完成", "执行中", "失败", "已下发待执行", "暂停", "终止"};
+            throw new IllegalStateException("任务是" + labels[Integer.parseInt(state)] + "状态，暂时不能同步结果");
+        }
+        cqDockPictureReportService.syncResults(record, () -> {
+            if (reportToPatrol) {
+                sendTaskStatus(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(),
+                        "1", 100, null, "1", record.getSubCode());
+            }
+        });
+        return "已提交同步，已有图片记录和本地原图复用，重新分析；可见光分析结果等待回调";
+    }
 
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
         startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, true);
@@ -130,12 +168,24 @@ public class CqDockTaskStatusHandler {
                 return;
             }
             int progress = extractProgress(data, mappedState);
-            boolean reportToPatrol = Boolean.parseBoolean(detail.getOrDefault("reportToPatrol", "true"));
+            CqDockTaskRecordEntity record = cqDockTaskRecordMapper.selectOne(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                    .eq(CqDockTaskRecordEntity::getBusinessId, taskCode)
+                    .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId));
+            if (record == null || !Objects.equals(taskCode, record.getBusinessId())
+                    || !Objects.equals(euaTaskId, record.getEuaTaskId())) {
+                log.warn("EUA任务历史不完整，缺少匹配的任务记录，跳过上报: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+                return;
+            }
+            boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
+            if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
+                log.warn("EUA任务历史不完整，缺少原始站点Code，跳过Type41/61上报，需核实原报文后人工补录: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+                return;
+            }
             log.info("EUA任务状态查询结果: taskCode={}, euaTaskId={}, euaStatus={}, mappedState={}, progress={}, reportToPatrol={}, data={}",
                     taskCode, euaTaskId, euaStatus, mappedState, progress, reportToPatrol, data);
             if (reportToPatrol) {
                 sendTaskStatus(taskCode, detail.get("taskName"), euaTaskId, mappedState, progress,
-                        detail.get("fixedStartTime"), euaStatus);
+                        detail.get("fixedStartTime"), euaStatus, record.getSubCode());
             }
             log.info("准备更新EUA任务状态监控进度: taskCode={}, mappedState={}, progress={}", taskCode, mappedState, progress);
             redisUtils.addOneValue(MONITOR_HASH + ":" + taskCode, "lastState", mappedState);
@@ -250,7 +300,7 @@ public class CqDockTaskStatusHandler {
     }
 
     private void sendTaskStatus(String taskCode, String taskName, String euaTaskId, String mappedState,
-                                int progress, String fixedStartTime, String euaStatus) {
+                                int progress, String fixedStartTime, String euaStatus, String subCode) {
         PatrolStatusItem item = new PatrolStatusItem();
         item.setTask_patrolled_id(euaTaskId);
         item.setTask_name(taskName);
@@ -269,7 +319,7 @@ public class CqDockTaskStatusHandler {
         commandData.setSendCode(centerConfig.getStationCode());
         commandData.setReceiveCode(centerConfig.getServerCode());
         commandData.setType("41");
-        commandData.setCode(normalStationCode);
+        commandData.setCode(subCode);
         boolean sendSuccess = patrolHostSocketClient.sendCommand(commandData, PatrolStatusItem.class);
         if (sendSuccess) {
             log.info("上报EUA任务状态成功: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
@@ -277,6 +327,7 @@ public class CqDockTaskStatusHandler {
         } else {
             log.warn("上报EUA任务状态失败，TCP可能未连接: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
                     taskCode, euaTaskId, euaStatus, mappedState, progress);
+            throw new IllegalStateException("EUA任务状态上报失败，请检查上级连接后重试同步");
         }
     }
 

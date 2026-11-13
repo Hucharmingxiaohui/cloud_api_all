@@ -350,7 +350,9 @@ public class PubWaylineJobPlanDfServiceImpl implements PubWaylineJobPlanDfServic
         System.out.println(param);
 
         //更新状态
-        pubWaylineJobPlanDfMapper.updateById(pubWaylineJobPlanDfEntity);
+        if (pubWaylineJobPlanDfEntity.getCenterOrdinaryTaskId() == null) {
+            pubWaylineJobPlanDfMapper.updateById(pubWaylineJobPlanDfEntity);
+        }
         HttpResultResponse httpResultResponse = flightTaskService.publishFlightTask(param, customClaim, pubWaylineJobPlanDfEntity);
         return httpResultResponse;
     }

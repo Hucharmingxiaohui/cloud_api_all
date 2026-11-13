@@ -70,6 +70,16 @@ export const getEuaTaskRecordPage = async function (data: any): Promise<IWorkspa
   return result.data
 }
 
+export const getEuaTaskExecutionStatus = async function (taskId: string): Promise<unknown> {
+  const result = await request.post('/api/cqDock/task/status', { taskId }, { timeout: 15000 })
+  return result.data
+}
+
+export const syncEuaTaskResults = async function (recordId: number | string): Promise<IWorkspaceResponse<any>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-record/sync-results`, undefined, { params: { id: recordId }, timeout: 30000 })
+  return result.data
+}
+
 export const getEuaTaskPictureList = async function (data: any): Promise<IWorkspaceResponse<any>> {
   const result = await request.post(`${HTTP_PREFIX}/task-picture/list`, data)
   return result.data

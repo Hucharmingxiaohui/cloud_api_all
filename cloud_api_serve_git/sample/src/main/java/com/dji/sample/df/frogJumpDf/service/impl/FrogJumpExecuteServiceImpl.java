@@ -12,6 +12,7 @@ import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.enums.WaylineJobStatusEnum;
 import com.dji.sample.wayline.service.IWaylineJobService;
 import com.dji.sample.wayline.service.IWaylineRedisService;
+import com.dji.sample.wayline.service.impl.MissionThermalPaletteService;
 import com.dji.sdk.cloudapi.wayline.FlighttaskProgress;
 import com.dji.sdk.cloudapi.wayline.FlighttaskExecuteRequest;
 import com.dji.sdk.cloudapi.wayline.MultiDockTask;
@@ -71,6 +72,9 @@ public class FrogJumpExecuteServiceImpl implements FrogJumpExecuteService {
     @Qualifier("SDKWaylineService")
     private AbstractWaylineService abstractWaylineService;
 
+    @Autowired
+    private MissionThermalPaletteService missionThermalPaletteService;
+
     @Override
     public HttpResultResponse execute(FrogJumpExecuteParam param) {
         log.info("Frog jump execute start: flightId={}, takeoffDockSn={}, landingDockSn={}, inputDroneSn={}",
@@ -108,6 +112,16 @@ public class FrogJumpExecuteServiceImpl implements FrogJumpExecuteService {
         if (!deviceRedisService.checkDeviceOnline(param.getLandingDockSn())) {
             log.warn("Frog jump execute blocked: landing dock offline, flightId={}, landingDockSn={}", param.getFlightId(), param.getLandingDockSn());
             return HttpResultResponse.error("Landing dock is offline.");
+        }
+
+        try {
+            missionThermalPaletteService.beforeExecute(param.getTakeoffDockSn());
+        } catch (RuntimeException ex) {
+            waylineJobService.updateJob(WaylineJobDTO.builder().jobId(param.getFlightId())
+                    .executeTime(LocalDateTime.now()).completedTime(LocalDateTime.now())
+                    .status(WaylineJobStatusEnum.FAILED.getVal()).build());
+            log.error("Thermal palette preflight failed; frog jump flightId={}: {}", param.getFlightId(), ex.getMessage());
+            return HttpResultResponse.error("Thermal palette preflight failed; flight was not executed: " + ex.getMessage());
         }
 
         FlighttaskExecuteRequest request = new FlighttaskExecuteRequest()

@@ -428,7 +428,7 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
             point.setTaskSubType(pointExcel.getTaskSubType());
             point.setTaskType(pointExcel.getTaskType());
             point.setAppearanceType(Optional.ofNullable(pointExcel.getAppearanceType()).map(Integer::valueOf).orElse(null));
-            //point.set(Optional.ofNullable(pointExcel.getIs_obj()).map(Integer::valueOf).orElse(null));
+            point.setIsObj(StringUtils.isBlank(pointExcel.getIsObj()) ? null : Integer.valueOf(pointExcel.getIsObj()));
 
             /*String pointCode = dfUniPointMapper.selectDfUniPointByName(pointExcel.getPoint_name(), component.getComponent_id(), pointExcel.getSub_code());
             if (StringUtil.isEmpty(pointCode)) {
@@ -458,6 +458,13 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
 
     @Override
     public Map<String, Object> selectList(Map map) {
+        if (Boolean.TRUE.equals(map.get("exportAll"))) {
+            Map<String, Object> query = new HashMap<>(map);
+            query.remove("page");
+            query.remove("pageSize");
+            query.remove("startPos");
+            return Collections.singletonMap("list", uniPointMapper2.selectListByMap(query));
+        }
         PageUtil.setPageArgs(map);
         List<UniPoint> uniPoints = uniPointMapper2.selectListByMap(map);
         int count = uniPointMapper2.selectListCount(map);

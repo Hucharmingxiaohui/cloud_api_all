@@ -1,6 +1,8 @@
 package com.dji.sample.df.substationDf.controller;
 
 import com.df.framework.vo.Result;
+import com.df.framework.annotation.Excel;
+import com.df.server.utils.PointDataTypeUtils;
 import com.df.server.utils.ExcelUtil;
 import com.dji.sample.df.substationDf.model.entity.UniPointImportExcel2;
 import com.dji.sample.df.substationDf.service.ImportPointService;
@@ -101,7 +103,9 @@ public class ImportPointController {
                 try {
                     // 针对填写的每行点位数据新增点位信息
                     point = points.get(i);
-                    point.setPointCode(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                    if (org.apache.commons.lang3.StringUtils.isBlank(point.getPointCode())) {
+                        point.setPointCode(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+                    }
                     importPointService.importPoint(point);
                     successCount++;
                 } catch (Exception e) {
@@ -144,7 +148,7 @@ public class ImportPointController {
         try (InputStream input = new FileInputStream(file);
              Workbook workbook = WorkbookFactory.create(input);
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            ensureStationNameColumn(workbook.getSheetAt(0));
+            prepareTemplate(workbook.getSheetAt(0));
             workbook.write(output);
             content = output.toByteArray();
         }
@@ -179,8 +183,7 @@ public class ImportPointController {
         }
 
         Map<String, Object> query = new HashMap<>(params);
-        query.put("page", 1);
-        query.put("pageSize", 100000);
+        query.put("exportAll", true);
         Map<String, Object> result = importPointService.selectList(query);
         List<com.dji.sample.center.entity.UniPoint> points =
                 (List<com.dji.sample.center.entity.UniPoint>) result.get("list");
@@ -189,7 +192,7 @@ public class ImportPointController {
              Workbook workbook = new XSSFWorkbook(input);
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.getSheetAt(0);
-            ensureStationNameColumn(sheet);
+            prepareTemplate(sheet);
             Row templateRow = sheet.getLastRowNum() >= 1 ? sheet.getRow(1) : null;
             CellStyle[] styles = new CellStyle[sheet.getRow(0).getLastCellNum()];
             for (int i = 0; i < styles.length; i++) {
@@ -222,7 +225,8 @@ public class ImportPointController {
     private void writePointRow(Row row, com.dji.sample.center.entity.UniPoint point, CellStyle[] styles) {
         Object[] values = {
                 "", point.getSubCode(), point.getSubName(), point.getAreaName(), point.getBayName(), point.getDeviceName(), point.getDeviceType(),
-                point.getComponentName(), point.getPointCode(), point.getPointName(), "uav",
+                point.getComponentName(), point.getPointCode(), point.getPointName(),
+                point.getPointType() == null ? null : String.join(",", PointDataTypeUtils.judgeIntDataType(point.getPointType())),
                 point.getMeterType(), point.getAppearanceType(), point.getSaveTypeList(), point.getRecognitionTypeList(),
                 point.getPhase(), point.getLevel(), point.getPointDes(), point.getMapPos(), point.getUpperValue(), point.getLowerValue(),
                 point.getTaskType(), point.getTaskSubType(), point.getIsObj(), point.getWaylineId(), point.getPicType(),
@@ -232,25 +236,34 @@ public class ImportPointController {
             Cell cell = row.createCell(i);
             if (i < styles.length && styles[i] != null) cell.setCellStyle(styles[i]);
             Object value = values[i];
-            if (value instanceof Number) cell.setCellValue(((Number) value).doubleValue());
-            else cell.setCellValue(value == null ? "" : String.valueOf(value));
+            cell.setCellValue(value == null ? "" : String.valueOf(value));
         }
     }
 
-    private void ensureStationNameColumn(Sheet sheet) {
+    private void prepareTemplate(Sheet sheet) {
         Row header = sheet.getRow(0);
+        Map<String, CellStyle> styles = new HashMap<>();
+        Map<String, Integer> widths = new HashMap<>();
         for (Cell cell : header) {
-            if ("变电站名称".equals(cell.getStringCellValue())) return;
+            String name = cell.getStringCellValue();
+            styles.put(name, cell.getCellStyle());
+            widths.put(name, sheet.getColumnWidth(cell.getColumnIndex()));
         }
-        for (Cell cell : header) {
-            if ("变电站编码".equals(cell.getStringCellValue())) {
-                int column = cell.getColumnIndex() + 1;
-                sheet.shiftColumns(column, header.getLastCellNum() - 1, 1);
-                Cell nameHeader = header.createCell(column);
-                nameHeader.setCellStyle(cell.getCellStyle());
-                nameHeader.setCellValue("变电站名称");
-                sheet.setColumnWidth(column, sheet.getColumnWidth(column - 1));
-                return;
+        CellStyle defaultStyle = header.getCell(0).getCellStyle();
+        for (int c = header.getLastCellNum() - 1; c >= 0; c--) {
+            Cell cell = header.getCell(c);
+            if (cell != null) header.removeCell(cell);
+        }
+        int column = 0;
+        for (java.lang.reflect.Field field : UniPointImportExcel2.class.getDeclaredFields()) {
+            Excel excel = field.getAnnotation(Excel.class);
+            if (excel != null) {
+                String name = excel.name();
+                Cell cell = header.createCell(column);
+                cell.setCellValue(name);
+                cell.setCellStyle(styles.getOrDefault(name, defaultStyle));
+                sheet.setColumnWidth(column, widths.getOrDefault(name, sheet.getDefaultColumnWidth() * 256));
+                column++;
             }
         }
     }
