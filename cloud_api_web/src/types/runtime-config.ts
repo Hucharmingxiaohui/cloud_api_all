@@ -19,6 +19,8 @@ export interface CloudRendererConfig {
 }
 
 export interface RuntimeConfig {
+  /** 工地巡检部署隐藏其他专业菜单；默认关闭，仅布尔 true 开启 */
+  constructionOnly?: boolean
   baseURL?: string
   kmzURL?: string
   websocketURL?: string

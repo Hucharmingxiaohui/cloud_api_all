@@ -15,6 +15,8 @@ public class ConstructionNativeAnalysisGateway implements ConstructionAnalysisGa
     private final ObjectProvider<ConstructionTaskService> tasks;
     private final AnalysisClient client;
     private final AnalysisService engine;
+    @org.springframework.beans.factory.annotation.Autowired private LocalThermalAnalyzer thermal;
+    @javax.annotation.PostConstruct public void configureThermal(){engine.setThermalAnalyzer(thermal);}
 
     public ConstructionNativeAnalysisGateway(ObjectProvider<ConstructionTaskService> tasks,
             @Value("${construction-analysis.algorithm-url:}") String url,
@@ -59,7 +61,27 @@ public class ConstructionNativeAnalysisGateway implements ConstructionAnalysisGa
             catch(RuntimeException e){throw e;}catch(Exception e){throw new IOException(e);}
         }
     }
-    public boolean configured(){return client.configured();}
+    public boolean configured(){return client.configured()||(thermal!=null&&thermal.available());}
+    public boolean checkConnection(WaylineJobEntity job)throws Exception {
+        return Boolean.TRUE.equals(checkCapabilities(job).get("connected"));
+    }
+    public Map<String,Object> checkCapabilities(WaylineJobEntity job)throws Exception {
+        Collection<Map<String,Object>> photos=service().analysisMetadata(job).values();
+        boolean remote=photos.stream().anyMatch(p->!Boolean.TRUE.equals(p.get("excluded"))&&!((List<?>)p.get("checks")).isEmpty());
+        boolean local=photos.stream().anyMatch(p->!Boolean.TRUE.equals(p.get("excluded"))&&LocalThermalAnalyzer.requested(p));
+        boolean remoteReady=!remote,localReady=!local;List<String> reasons=new ArrayList<>();
+        if(remote){
+            if(!client.configured())reasons.add("可见光分析服务未配置");
+            else try{
+                Map<String,Object> health=client.health();remoteReady="ok".equals(health.get("status"));
+                if(!remoteReady)reasons.add("分析服务HTTP已响应，但健康检查返回的status不是协议要求的ok，请核对/health响应内容");
+            }catch(Exception e){reasons.add("可见光分析服务健康检查失败，请核对地址、连接及/health响应格式");}
+        }
+        if(local){localReady=thermal!=null&&thermal.available();if(!localReady)reasons.add("本任务冻结配置启用了红外测温，但本地SDK未就绪：请检查construction.thermal.enabled、executable及后端运行用户的文件执行权限");}
+        if(!remote&&!local)reasons.add("本任务没有启用任何可执行检测项，请核对任务冻结配置与照片排除情况");
+        boolean ready=(remote||local)&&remoteReady&&localReady;
+        return Map.of("connected",ready,"remote",remote?(remoteReady?"ready":"failed"):"not_required","thermal",local?(localReady?"ready":"failed"):"not_required","message",ready?"本任务所需分析能力检查通过":String.join("；",reasons));
+    }
     @Override public boolean checkConnection(){return client.configured()&&"ok".equals(client.health().get("status"));}
     @Override public String submit(String b,String j,List<Path> p){throw AnalysisStore.error(org.springframework.http.HttpStatus.CONFLICT,"原生算法提交必须携带工作空间任务及冻结配置，请使用任务分析入口");}
     @Override public Map<String,Object> query(String b,String r){throw AnalysisStore.error(org.springframework.http.HttpStatus.CONFLICT,"原生算法查询必须携带工作空间任务，请使用任务批次入口");}

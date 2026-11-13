@@ -73,6 +73,14 @@ public class ConstructionTaskService {
         return job;
     }
 
+    // Check the task row directly: a removed plan or missing photos must not be
+    // mistaken for a deleted task, and database failures must stop the import.
+    boolean sourceTaskExists(String workspace, String jobId) {
+        return jobs.selectCount(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId)
+                .eq(WaylineJobEntity::getWorkspaceId, workspace)) > 0;
+    }
+
     private List<MediaFileEntity> media(WaylineJobEntity job) {
         if (job.getJobId().startsWith("offline-")) {
             try {
@@ -255,6 +263,11 @@ public class ConstructionTaskService {
         if (gateway == null) throw error(HttpStatus.SERVICE_UNAVAILABLE, "工地算法接口尚未配置，未提交分析");
         return gateway;
     }
+    public boolean checkConnection(WaylineJobEntity job)throws Exception {return gateway() instanceof ConstructionNativeAnalysisGateway?nativeGateway().checkConnection(job):checkConnection();}
+    public Map<String,Object> checkCapabilities(WaylineJobEntity job)throws Exception {
+        if(gateway() instanceof ConstructionNativeAnalysisGateway)return nativeGateway().checkCapabilities(job);
+        boolean ready=checkConnection();return Map.of("connected",ready,"message",ready?"分析主机连接正常":"分析主机连接失败");
+    }
     public boolean checkConnection() throws Exception { return gateway().checkConnection(); }
 
     public Map<String, Object> submit(WaylineJobEntity job, String requestId) throws Exception {
@@ -415,8 +428,8 @@ public class ConstructionTaskService {
                 if(thermal!=visible){
                     Map<String,Object> ir=(Map<String,Object>)policy.get("infrared");p.put("type",thermal?"infrared":"visible");p.put("checks",thermal?List.of():policy.get("visible_checks"));p.put("ready",true);
                     p.put("waypoint_index",point.get("index"));p.put("policy_source",point.get("source"));p.put("infrared_temperature_enabled",thermal&&Boolean.TRUE.equals(ir.get("enabled")));
-                    if(thermal&&Boolean.TRUE.equals(ir.get("enabled")))throw error(HttpStatus.CONFLICT,"V1.0算法协议尚未提供红外测温能力；冻结的温度异常检测不能执行，不会改用火灾烟雾检测");
-                    p.put("infrared_temperature",Map.of("status","not_requested","message","本照片未请求红外测温"));
+                    if(thermal&&Boolean.TRUE.equals(ir.get("enabled")))p.put("infrared_policy",new LinkedHashMap<>(ir));
+                    p.put("infrared_temperature",Map.of("status",thermal&&Boolean.TRUE.equals(ir.get("enabled"))?"queued":"not_requested","message",thermal&&Boolean.TRUE.equals(ir.get("enabled"))?"等待平台本地测温":"本照片未请求红外测温"));
                 }
             }
             if(!Boolean.TRUE.equals(p.get("excluded"))&&!Boolean.TRUE.equals(p.get("ready")))throw error(HttpStatus.CONFLICT,"任务缺少有效冻结检测配置、唯一拍摄航点或明确_T/_V镜头标记："+file.getFileName());

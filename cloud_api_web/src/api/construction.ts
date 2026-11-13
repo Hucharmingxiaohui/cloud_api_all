@@ -41,7 +41,8 @@ export interface ConstructionCheckResult { code: string; status: string; count?:
 export interface ConstructionAnalysisPhoto {
   file_id: string; name: string; area_id?: string; type: string; checks: string[]; excluded?: boolean
   waypoint_index?: number; policy_source?: string; metadataSource?: string; status?: string; message?: string; image_url?: string
-  infrared_temperature_enabled?: boolean; infrared_temperature?: { status: string; message?: string }
+  infrared_temperature_enabled?: boolean
+  infrared_temperature?: { status: string; message?: string; max_temperature_c?: number; min_temperature_c?: number; average_temperature_c?: number; threshold_c?: number; min_hotspot_pixels?: number; hotspot_count?: number; abnormal?: boolean; hotspots?: Array<{ rect: number[]; pixels: number; max_temperature_c: number }> }
   result?: { checks?: ConstructionCheckResult[]; image_error?: string; [key: string]: unknown }
 }
 export interface ConstructionAnalysis {
@@ -98,7 +99,7 @@ export async function archiveConstructionPhotos (jobId: string) { return unwrap<
 export async function assignConstructionPhotos (jobId: string, body: { file_ids: string[]; expected_revision: number; area_id?: string; excluded: boolean; reason?: string }) {
   return unwrap<ConstructionResult>(await request.post(`${base(jobId)}/photo-associations`, body))
 }
-export async function checkConstructionHost (jobId: string) { return unwrap<{ connected: boolean }>(await request.post(`${base(jobId)}/analysis/check`)) }
+export async function checkConstructionHost (jobId: string) { return unwrap<{ connected: boolean; remote?: string; thermal?: string; message?: string }>(await request.post(`${base(jobId)}/analysis/check`)) }
 export async function submitConstructionAnalysis (jobId: string, requestId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis`, { request_id: requestId })) }
 export async function refreshConstructionAnalysis (jobId: string) { return unwrap<ConstructionAnalysis>(await request.post(`${base(jobId)}/analysis/refresh`)) }
 const batchBase = (jobId: string, batchId: string) => `${base(jobId)}/analysis/batches/${encodeURIComponent(batchId)}`

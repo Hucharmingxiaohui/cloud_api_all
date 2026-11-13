@@ -53,8 +53,7 @@ public class ConstructionTaskController {
     }
     @PostMapping("/analysis/check")
     public HttpResultResponse check(HttpServletRequest request, @PathVariable String jobId) throws Exception {
-        job(request, jobId);
-        return HttpResultResponse.success(Map.of("connected", service.checkConnection()));
+        return HttpResultResponse.success(service.checkCapabilities(job(request,jobId)));
     }
     @PostMapping("/analysis")
     public HttpResultResponse submit(HttpServletRequest request, @PathVariable String jobId, @RequestBody Map<String, String> body) throws Exception {

@@ -54,6 +54,9 @@ vite.config.ts.*
 # 定向编译/浏览器验证临时工作区，不入库
 .construction-backend/
 
+# Screenshot tooling stores machine-specific browser session IDs here.
+md/**/.browser.json
+
 # 本地瓦片缓存与3D模型资产（体积大，不入库）
 map_xyz_9/
 public/model/Model/

@@ -41,6 +41,7 @@ foreach ($name in @('CreateKml.java','CreateWpml.java')) {
 }
 $sources += "$javaRoot/df/constructionDf/ConstructionNativeAnalysisGateway.java"
 $sources += Get-ChildItem "$javaRoot/df/constructionAnalysisDf" -Filter '*.java' | ForEach-Object FullName
+$sources += "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionAnalysisDf/ConstructionThermalChecks.java"
 $arguments = @('--release','11','-encoding','UTF-8','-cp', ('"' + $classpath.Replace('\','/') + '"'), '-d', ('"' + $classesRoot.Replace('\','/') + '"'))
 $arguments += $sources | ForEach-Object { '"' + $_.Replace('\','/') + '"' }
 $argFile = Join-Path $checkRoot 'plans-javac.args'
@@ -85,4 +86,6 @@ if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionAnalysi
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionSweepChecks'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionAnalysisDf.ConstructionThermalChecks'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

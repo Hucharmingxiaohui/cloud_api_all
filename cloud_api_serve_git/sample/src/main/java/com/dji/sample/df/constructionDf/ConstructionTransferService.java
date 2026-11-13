@@ -154,7 +154,10 @@ public class ConstructionTransferService {
             if(data.length>16777216)throw bad("任务描述文件过大");
             Map<String,Object> doc=json.readValue(data,new TypeReference<Map<String,Object>>(){});validate(doc);
             String digest=hash(json.writeValueAsBytes(doc));String id="offline-"+key(identity(doc));
-            if(deployment().equals(map(doc.get("origin")).get("deployment")))return Map.of("status","SKIPPED","message","本机来源任务，无需重复导入");
+            Map<String,Object> origin=map(doc.get("origin"));
+            boolean ownSource=deployment().equals(origin.get("deployment"));
+            if(ownSource&&tasks.sourceTaskExists(string(origin,"workspace"),string(origin,"job_id")))
+                return Map.of("status","SKIPPED","message","本机原任务仍存在，无需重复导入；仅原图缺失不会自动覆盖恢复");
             Map<String,Object> existing=tasks.imported(w,id);
             if(!existing.isEmpty()) {
                 if(!digest.equals(existing.get("import_digest")))throw bad("同一来源任务已有不同版本，保留本机数据，请人工核对");
@@ -180,7 +183,7 @@ public class ConstructionTransferService {
                 write(stage.resolve("transfer.json"),doc);
                 Path destination=parent.resolve(key(id));if(Files.exists(destination))throw bad("离线任务目标目录已存在，请检查本地记录");
                 Files.move(stage,destination,StandardCopyOption.ATOMIC_MOVE);
-                return Map.of("status","IMPORTED","job_id",id,"message","已接收，可查看结果并手动提交分析");
+                return Map.of("status","IMPORTED","job_id",id,"message",ownSource?"本机原任务已删除，已恢复为离线接收结果，可查看照片并重新分析":"已接收，可查看结果并手动提交分析");
             } finally {
                 if(Files.exists(stage))try(var paths=Files.walk(stage)){for(Path p:paths.sorted(Comparator.reverseOrder()).collect(Collectors.toList()))Files.deleteIfExists(p);}
             }

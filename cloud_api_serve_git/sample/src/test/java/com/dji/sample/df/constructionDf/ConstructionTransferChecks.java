@@ -48,7 +48,15 @@ public class ConstructionTransferChecks {
                 public Map<String,Object> query(String b,String r){return Map.of("status","SUCCEEDED","result",Map.of());}
             };
             ObjectProvider<ConstructionAnalysisGateway> provider=proxy(ObjectProvider.class,(p,m,a)->gateway);
-            ConstructionTaskService source=new ConstructionTaskService(null,null,media,files,redis,provider,root.resolve("source-data").toString());
+            com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(),"transfer-jobs"),WaylineJobEntity.class);
+            boolean[] sourceExists={true};
+            boolean[] lookupFails={false};
+            var jobs=proxy(com.dji.sample.wayline.dao.IWaylineJobMapper.class,(p,m,a)->{
+                if(lookupFails[0])throw new IllegalStateException("database unavailable");
+                if(m.getName().equals("selectCount"))return sourceExists[0]?1:0;
+                throw new UnsupportedOperationException(m.getName());
+            });
+            ConstructionTaskService source=new ConstructionTaskService(jobs,null,media,files,redis,provider,root.resolve("source-data").toString());
             Map<String,Object> snapshot=Map.of("overall_id","route","points",List.of(ConstructionOverallChecks.point(1,"WP1"),ConstructionOverallChecks.point(2,"WP2")),"bindings",List.of(Map.of("area_id","a","area_name","工作面A","waypoints",List.of(1)),Map.of("area_id","b","area_name","工作面B","waypoints",List.of(2))));
             var overall=new ConstructionOverallService(null,null,null,null,null){@Override public Map<String,Object> jobSnapshot(String w,String j){return snapshot;}};
             Field field=ConstructionTaskService.class.getDeclaredField("overall");field.setAccessible(true);field.set(source,overall);
@@ -86,6 +94,27 @@ public class ConstructionTransferChecks {
             check(third.receive("third-w",outbound).get("job_id").equals(id),"re-export preserves original provenance");
             check(((Number)thirdTasks.detail(thirdTasks.requireJob("third-w",id)).get("association_revision")).intValue()==1,"re-export carries manual decisions");
             check(sender.receive("source-workspace",exported).get("status").equals("SKIPPED"),"own source skipped");
+            check(((List<?>)sender.status("source-workspace").get("tasks")).isEmpty(),"existing native task creates no offline duplicate");
+            // Simulate deleting the original task and all its local photos.
+            sourceExists[0]=false;
+            try(var walk=Files.walk(source.dir(nativeJob))){for(Path path:walk.sorted(Comparator.reverseOrder()).collect(Collectors.toList()))Files.delete(path);}
+            lookupFails[0]=true;
+            reject(()->sender.receive("source-workspace",exported));
+            check(((List<?>)sender.status("source-workspace").get("tasks")).isEmpty(),"database failure never treated as deletion");
+            lookupFails[0]=false;
+            for(String mode:List.of("missing","corrupt","traversal"))reject(()->sender.receive("source-workspace",root.resolve(mode+".zip")));
+            Path selfInbox=Paths.get((String)sender.status("source-workspace").get("inbox"));
+            Files.copy(exported,selfInbox.resolve("restore.zip"));
+            Map<String,Object> restored=sender.scan("source-workspace");
+            check("IMPORTED".equals(((List<Map<String,Object>>)restored.get("receipts")).get(0).get("status")),"deleted own source restored through scanner");
+            WaylineJobEntity restoredJob=source.requireJob("source-workspace",id);
+            check(restoredJob.getPlanId()==null,"restoration never recreates executable plan");
+            check(Arrays.equals(Files.readAllBytes(source.photo(restoredJob,"image-1")),Files.readAllBytes(original)),"own-source restoration recovers original bytes");
+            source.assignPhotos(restoredJob,Map.of("file_ids",List.of("image-1"),"expected_revision",0,"area_id","b","excluded",false),"operator");
+            check("SKIPPED".equals(sender.receive("source-workspace",exported).get("status")),"restored source deduplicated");
+            check(((Number)source.detail(restoredJob).get("association_revision")).intValue()==1,"repeat restore preserves local edits");
+            reject(()->sender.receive("source-workspace",root.resolve("conflict.zip")));
+            check(((List<?>)sender.status("source-workspace").get("tasks")).size()==1,"self restore publishes exactly one result");
             Files.write(inbox.resolve("invalid.zip"),new byte[]{1,2,3});
             Map<String,Object> failed=receiver.scan(w);
             check("FAILED".equals(((List<Map<String,Object>>)failed.get("receipts")).get(0).get("status")),"scanner reports failed packages");

@@ -113,8 +113,9 @@ import DockControlPanel from '/@/components/devices/drone_control/dock-control.v
 import OutdoorRenderer from '/@/components/cloudRenderer/OutdoorRenderer.vue'
 import { isCloudRendererEnabled } from '/@/components/cloudRenderer/cloudRendererConfig'
 
-const cloudRendererEnabled = isCloudRendererEnabled()
-const isFlatMap = ref(!cloudRendererEnabled) // 是否二维地图
+const cloudRendererEnabled = computed(isCloudRendererEnabled)
+const isFlatMap = ref(!cloudRendererEnabled.value) // 是否二维地图
+watch(cloudRendererEnabled, enabled => { if (!enabled) isFlatMap.value = true })
 const isMounted = ref(false) // 是否已经完成初始化
 
 const body = {

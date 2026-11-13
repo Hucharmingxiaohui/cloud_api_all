@@ -23,6 +23,10 @@ public class AnalysisService implements AutoCloseable {
     final AnalysisStore store;
     private final AnalysisMetadata metadata;
     private final AnalysisClient client;
+    private LocalThermalAnalyzer thermal;
+    public void setThermalAnalyzer(LocalThermalAnalyzer value){this.thermal=value;}
+    private boolean local(Map<String,Object> p){return thermal!=null && LocalThermalAnalyzer.requested(p);}
+    private List<Map<String,Object>> remotePhotos(Map<String,Object> b){return photos(b).stream().filter(p->!local(p)).collect(Collectors.toList());}
     final int maxPhotos;
     final long maxFile,maxTotal;
     private final Set<String> pending=ConcurrentHashMap.newKeySet();
@@ -96,7 +100,7 @@ public class AnalysisService implements AutoCloseable {
     private List<Map<String,Object>> batchesInternal(String w,String t)throws IOException {
         List<Map<String,Object>> all=store.batches(w,t);
         for(Map<String,Object> b:all)if("SUBMITTING".equals(b.get("status"))&&!pending.contains(key(w,t,(String)b.get("batchId")))) {
-            b.put("status","UNKNOWN");b.put("message","Submission interrupted; remote acceptance unknown. Do not resubmit.");persist(w,t,b);
+            b.put("status",Boolean.TRUE.equals(b.get("localOnly"))?"FAILED":"UNKNOWN");b.put("message",Boolean.TRUE.equals(b.get("localOnly"))?"本地红外测温因服务重启中断，请重新分析；已有结果保留":"Submission interrupted; remote acceptance unknown. Do not resubmit.");persist(w,t,b);
         }
         return all;
     }
@@ -104,22 +108,23 @@ public class AnalysisService implements AutoCloseable {
         authorize(w,t);AnalysisStore.id(requestId);
         for(Map<String,Object> b:batchesInternal(w,t))if(requestId.equals(b.get("requestId")))return b;
         for(Map<String,Object> b:batchesInternal(w,t))if(!TERMINAL.contains(b.get("status")))throw error(HttpStatus.CONFLICT,"An active or uncertain batch already exists");
-        if(!client.configured())throw error(HttpStatus.SERVICE_UNAVAILABLE,"Algorithm service is not configured");
+
         Map<String,Object> task=task(w,t);List<Map<String,Object>> selected=new ArrayList<>();long total=0;
         Map<String,Path> files=store.scan(w,t);
         for(Map<String,Object> p:photos(task)) {
             if(Boolean.TRUE.equals(p.get("excluded")))continue;
             if(!Boolean.TRUE.equals(p.get("ready")))throw error(HttpStatus.CONFLICT,"Confirm metadata for every included photo");
-            if(((List<?>)p.get("checks")).isEmpty())continue;
+            if(((List<?>)p.get("checks")).isEmpty()&&!local(p))continue;
             long size=Files.size(files.get(p.get("id")));total+=size;
             if(size==0||size>maxFile||total>maxTotal||selected.size()>=maxPhotos)throw error(HttpStatus.PAYLOAD_TOO_LARGE,"Complete task exceeds configured image limits; it cannot be split");
             Map<String,Object> frozen=new LinkedHashMap<>(p);frozen.put("sha256",digest(store.bytes(files.get(p.get("id")),maxFile)));frozen.put("status","QUEUED");frozen.put("message",null);frozen.put("result",null);frozen.put("imageUrl",null);selected.add(frozen);
         }
+        if(selected.stream().anyMatch(p->!local(p))&&!client.configured())throw error(HttpStatus.SERVICE_UNAVAILABLE,"可见光分析服务未配置");
         if(selected.isEmpty())throw error(HttpStatus.CONFLICT,"No photos selected for analysis");
         if(executor.getQueue().remainingCapacity()==0)throw error(HttpStatus.SERVICE_UNAVAILABLE,"Analysis submission queue is full");
         Map<String,Object> b=new LinkedHashMap<>();String batch=UUID.randomUUID().toString();
         b.put("batchId",batch);b.put("requestId",requestId);b.put("taskId",t);b.put("remoteId",null);b.put("status","SUBMITTING");b.put("finished",0);b.put("total",selected.size());b.put("message",null);b.put("createdAt",Instant.now().toString());b.put("areas",List.of());b.put("photos",selected);b.put("reportReady",false);
-        b.putAll(store.frozenBatchMetadata(w,t));
+        b.putAll(store.frozenBatchMetadata(w,t));b.put("localOnly",selected.stream().allMatch(this::local));
         persist(w,t,b);String key=key(w,t,batch);pending.add(key);
         try{executor.execute(()->send(w,t,batch));}catch(RejectedExecutionException e){pending.remove(key);b.put("status","FAILED");b.put("message","Submission queue unavailable; no request sent");persist(w,t,b);}
         return b;
@@ -136,7 +141,25 @@ public class AnalysisService implements AutoCloseable {
                 Path file=files.get(p.get("id"));if(file==null||!store.originalName(w,t,(String)p.get("id"),file).equals(p.get("fileName")))throw error(HttpStatus.CONFLICT,"Original file changed after batch freeze");
                 byte[] bytes=store.bytes(file,maxFile);total+=bytes.length;if(total>maxTotal)throw error(HttpStatus.PAYLOAD_TOO_LARGE,"Task exceeds configured total limit");
                 if(!digest(bytes).equals(p.get("sha256")))throw error(HttpStatus.CONFLICT,"Original bytes changed after batch freeze");
+                if(local(p)){
+                    try {
+                        LocalThermalAnalyzer.Output output=thermal.analyze(bytes,(Map<String,Object>)p.get("infrared_policy"));
+                        p.put("infrared_temperature",output.result);p.put("result",Map.of("checks",List.of(),"infrared_temperature",output.result));
+                        Path directory=store.batch(w,t,batch);validateJpeg(output.image);store.writeBytes(store.file(store.file(directory,"images"),p.get("id")+".jpg"),output.image);
+                        p.put("imageUrl",base(t)+"/batches/"+batch+"/photos/"+p.get("id")+"/result");p.put("status","SUCCEEDED");
+                    }catch(Exception failure){
+                        if(failure instanceof InterruptedException)Thread.currentThread().interrupt();
+                        String reason=failure.getMessage()==null?"本地红外测温失败":failure.getMessage();
+                        p.put("infrared_temperature",Map.of("status","failed","message",reason));p.put("result",Map.of("checks",List.of(),"image_error",reason));p.put("status","PARTIAL");p.put("message",reason);
+                    }
+                    persist(w,t,b);continue;
+                }
                 Map<String,Object> image=new LinkedHashMap<>();image.put("id",p.get("id"));image.put("area_id",p.get("areaId"));image.put("type",p.get("type"));image.put("checks",p.get("checks"));image.put("data",Base64.getEncoder().encodeToString(bytes));images.add(image);
+            }
+            b.put("finished",photos(b).size()-images.size());
+            if(images.isEmpty()){
+                b.put("areas",localAreas(b,Set.of()));b.put("status","SUCCEEDED");
+                b.put("message",photos(b).stream().anyMatch(p->"PARTIAL".equals(p.get("status")))?"本地红外测温已结束，部分照片测温失败，请查看逐图原因":"本地红外测温完成，请查看热点及温度结果");return;
             }
             // The algorithm idempotency key includes workspace/task via the globally unique local batch ID.
             sending=true;Map<String,Object> response=client.submit(Map.of("request_id",batch,"images",images));
@@ -161,8 +184,8 @@ public class AnalysisService implements AutoCloseable {
         try {
             Map<String,Object> remote=client.poll((String)b.get("remoteId"));String status=String.valueOf(remote.get("status"));
             if(!Set.of("queued","running","completed","failed").contains(status))throw error(HttpStatus.BAD_GATEWAY,"Invalid algorithm status");
-            int total=photos(b).size();if(!integer(remote.get("total"))||((Number)remote.get("total")).intValue()!=total||!integer(remote.get("finished"))||((Number)remote.get("finished")).intValue()>total)throw error(HttpStatus.BAD_GATEWAY,"Invalid algorithm progress");
-            b.put("finished",remote.get("finished"));
+            int total=remotePhotos(b).size();if(!integer(remote.get("total"))||((Number)remote.get("total")).intValue()!=total||!integer(remote.get("finished"))||((Number)remote.get("finished")).intValue()>total)throw error(HttpStatus.BAD_GATEWAY,"Invalid algorithm progress");
+            b.put("finished",((Number)remote.get("finished")).intValue()+photos(b).size()-total);
             if(status.equals("completed")) {
                 if(((Number)remote.get("finished")).intValue()!=total)throw error(HttpStatus.BAD_GATEWAY,"Completed batch has incomplete progress");
                 b.put("areas",validateAreas(b,remote.get("areas")));boolean complete=true;
@@ -180,7 +203,7 @@ public class AnalysisService implements AutoCloseable {
     }
     private List<Map<String,Object>> validateAreas(Map<String,Object> batch,Object raw) {
         if(!(raw instanceof List))throw error(HttpStatus.BAD_GATEWAY,"Missing area results");
-        Set<Object> expected=photos(batch).stream().map(p->p.get("areaId")).filter(Objects::nonNull).collect(Collectors.toSet());Set<Object> seen=new HashSet<>();List<Map<String,Object>> result=new ArrayList<>();
+        Set<Object> expected=remotePhotos(batch).stream().map(p->p.get("areaId")).filter(Objects::nonNull).collect(Collectors.toSet());Set<Object> seen=new HashSet<>();List<Map<String,Object>> result=new ArrayList<>();
         for(Object item:(List<?>)raw) {
             if(!(item instanceof Map))throw error(HttpStatus.BAD_GATEWAY,"Invalid area result");
             Map<String,Object> area=new LinkedHashMap<>((Map<String,Object>)item);Object id=area.get("area_id"),status=area.get("status");
@@ -191,7 +214,7 @@ public class AnalysisService implements AutoCloseable {
             if(!Set.of("success","not_requested").contains(status)&&(!(area.get("message") instanceof String)||((String)area.get("message")).isBlank()))throw error(HttpStatus.BAD_GATEWAY,"Non-success area requires explanation");
             result.add(area);
         }
-        if(!seen.equals(expected))throw error(HttpStatus.BAD_GATEWAY,"Missing area result");return result;
+        if(!seen.equals(expected))throw error(HttpStatus.BAD_GATEWAY,"Missing area result");result.addAll(localAreas(batch,expected));return result;
     }
     @SuppressWarnings("unchecked") private boolean consistentPersonAreas(Map<String,Object> b) {
         for(Map<String,Object> area:(List<Map<String,Object>>)b.get("areas")) {
@@ -204,6 +227,10 @@ public class AnalysisService implements AutoCloseable {
             }
         }
         return true;
+    }
+    private List<Map<String,Object>> localAreas(Map<String,Object> batch,Set<Object> existing){
+        Set<Object> seen=new HashSet<>(existing);List<Map<String,Object>> values=new ArrayList<>();
+        for(Map<String,Object> p:photos(batch))if(local(p)&&p.get("areaId")!=null&&seen.add(p.get("areaId"))){Map<String,Object> area=new LinkedHashMap<>();area.put("area_id",p.get("areaId"));area.put("status","not_requested");area.put("count",null);area.put("message","该工作面本批次仅进行本地红外测温，未请求人数统计");values.add(area);}return values;
     }
     private static boolean integer(Object v){return v instanceof Number&&Double.isFinite(((Number)v).doubleValue())&&((Number)v).doubleValue()>=0&&((Number)v).doubleValue()<=Integer.MAX_VALUE&&((Number)v).doubleValue()==((Number)v).intValue();}
     private static void validateCount(Map<String,Object> value) {

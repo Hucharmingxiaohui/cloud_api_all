@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory, RouteRecordRaw, RouteLocation } from 'vue-router'
 import { ERouterName } from '/@/types/index'
 import { ref } from 'vue'
+import { loadCloudRendererConfig } from '/@/components/cloudRenderer/cloudRendererConfig'
+import { message } from 'ant-design-vue'
 
 // 扩展路由元信息类型（移除index/parentIndex，保留核心配置）
 declare module 'vue-router' {
@@ -9,6 +11,8 @@ declare module 'vue-router' {
     cache?: boolean
     /** 是否显示在菜单中 */
     showInMenu?: boolean
+    /** 工地巡检部署模式下隐藏该菜单及其子菜单 */
+    hideInConstructionMode?: boolean
     /** 是否在新窗口打开 */
     newWindow?: boolean
     /** 菜单标签（优先使用，无则使用name） */
@@ -92,6 +96,7 @@ const routes: Array<RouteRecordRaw> = [
             meta: {
               showInMenu: true,
               label: '风机管理',
+              hideInConstructionMode: true,
               cache: true
             }
           },
@@ -143,6 +148,7 @@ const routes: Array<RouteRecordRaw> = [
             meta: {
               showInMenu: true,
               label: '光伏管理',
+              hideInConstructionMode: true,
               position: 'left',
               cache: false
             },
@@ -208,6 +214,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           showInMenu: true,
           label: '点位管理',
+          hideInConstructionMode: true,
           position: 'left',
           cache: true
         }
@@ -231,6 +238,7 @@ const routes: Array<RouteRecordRaw> = [
         meta: {
           showInMenu: true,
           label: 'EUA设备监控',
+          hideInConstructionMode: true,
           position: 'left',
           cache: false
         }
@@ -330,6 +338,7 @@ const routes: Array<RouteRecordRaw> = [
             meta: {
               showInMenu: true,
               label: '光伏板计划',
+              hideInConstructionMode: true,
               cache: true
             }
           },
@@ -352,6 +361,7 @@ const routes: Array<RouteRecordRaw> = [
             meta: {
               showInMenu: true,
               label: '风机计划',
+              hideInConstructionMode: true,
               cache: true
             }
           },
@@ -373,6 +383,7 @@ const routes: Array<RouteRecordRaw> = [
             meta: {
               showInMenu: true,
               label: 'EUA飞行计划',
+              hideInConstructionMode: true,
               cache: true
             }
           },
@@ -670,8 +681,14 @@ const router = createRouter({
 })
 
 // 全局路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   isLoading.value = true
+  // Read before components mount, including direct links and login redirects.
+  if (!to.path.startsWith('/pilot')) {
+    try { await loadCloudRendererConfig() } catch (error) {
+      message.warning('平台云渲染配置读取失败，暂不启用云渲染；请在云渲染配置页重新读取')
+    }
+  }
   next()
 })
 

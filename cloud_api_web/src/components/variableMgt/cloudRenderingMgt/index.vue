@@ -1,6 +1,7 @@
 <template>
   <div class="cloud-management">
     <div class="page-title">云渲染管理</div>
+    <el-alert v-if="cloudRendererConfigError" :title="cloudRendererConfigError" type="error" :closable="false" />
 
     <el-tabs v-model="activeTab" class="cloud-tabs" @tab-change="handleTabChange">
       <el-tab-pane label="室外渲染配置" name="outdoor">
@@ -8,14 +9,14 @@
           <div class="panel-heading">
             <div>
               <h3>Outdoor 渲染配置</h3>
-              <p>配置云渲染服务、3DGS 文件和 WebRTC 连接参数。</p>
+              <p>配置由平台统一保存，所有浏览器共用。开关立即保存，其余参数点击“保存并重连”生效。</p>
             </div>
             <el-tag :type="connectionTagType">{{ connectionStatus }}</el-tag>
           </div>
 
           <el-form label-position="top" class="settings-form">
             <el-form-item label="启用室外云渲染">
-              <el-switch v-model="form.enabled" active-text="已启用" inactive-text="未启用" />
+              <el-switch v-model="form.enabled" :loading="saving" :disabled="!cloudRendererConfigReady || saving" active-text="已启用" inactive-text="未启用" @change="saveEnabled" />
             </el-form-item>
             <el-form-item label="云渲染服务地址">
               <el-input v-model="form.baseURL" placeholder="http://127.0.0.1:3000" />
@@ -51,8 +52,9 @@
 
           <div class="actions">
             <el-button type="primary" :loading="testing" :disabled="!form.enabled" @click="testConnection">测试连接</el-button>
-            <el-button type="success" :loading="saving" @click="saveOutdoor">保存并重连</el-button>
-            <el-button @click="resetConfig">恢复部署配置</el-button>
+            <el-button type="success" :loading="saving" :disabled="!cloudRendererConfigReady || saving" @click="saveOutdoor">保存并重连</el-button>
+            <el-button :disabled="saving" @click="reloadConfig">重新读取平台配置</el-button>
+            <el-button :disabled="!cloudRendererConfigReady || saving" @click="resetConfig">恢复部署默认值</el-button>
           </div>
         </div>
       </el-tab-pane>
@@ -143,10 +145,10 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import OutdoorRenderer from '/@/components/cloudRenderer/OutdoorRenderer.vue'
 import { CloudRendererClient, cloudRendererClient } from '/@/components/cloudRenderer/cloudRendererClient'
-import { fetchRendererResources, getCloudRendererConfig, resetCloudRendererConfig, saveCloudRendererConfig } from '/@/components/cloudRenderer/cloudRendererConfig'
+import { cloudRendererConfigError, cloudRendererConfigReady, loadCloudRendererConfig, getCloudRendererConfigRevision, fetchRendererResources, getCloudRendererConfig, resetCloudRendererConfig, saveCloudRendererConfig } from '/@/components/cloudRenderer/cloudRendererConfig'
 import type { CloudRendererConfig } from '/@/types/runtime-config'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -164,6 +166,7 @@ const saving = ref(false)
 const pointClouds = ref<string[]>([])
 const referenceTilesets = ref<string[]>([])
 const form = reactive<CloudRendererConfig>(getCloudRendererConfig())
+let formRevision = getCloudRendererConfigRevision()
 const turnServer = reactive({
   urls: form.iceServers[0]?.urls || '',
   username: form.iceServers[0]?.username || '',
@@ -237,7 +240,8 @@ async function saveOutdoor () {
   saving.value = true
   try {
     const config = buildConfig('outdoor')
-    saveCloudRendererConfig(config)
+    await saveCloudRendererConfig(config, formRevision)
+    formRevision = getCloudRendererConfigRevision()
     if (!config.enabled) {
       cloudRendererClient.close()
       connectionStatus.value = '未启用'
@@ -256,12 +260,17 @@ async function saveOutdoor () {
 }
 
 async function resetConfig () {
-  Object.assign(form, resetCloudRendererConfig())
-  const server = form.iceServers[0]
-  turnServer.urls = server?.urls || ''
-  turnServer.username = server?.username || ''
-  turnServer.credential = server?.credential || ''
   try {
+    await ElMessageBox.confirm('将部署默认值保存为整个平台的云渲染配置，其他浏览器重新进入页面后也会使用此配置。是否继续？', '恢复部署默认值')
+  } catch { return }
+  saving.value = true
+  try {
+    Object.assign(form, await resetCloudRendererConfig(formRevision))
+    formRevision = getCloudRendererConfigRevision()
+    const server = form.iceServers[0]
+    turnServer.urls = server?.urls || ''
+    turnServer.username = server?.username || ''
+    turnServer.credential = server?.credential || ''
     if (!form.enabled) {
       cloudRendererClient.close()
       connectionStatus.value = '未启用'
@@ -271,8 +280,40 @@ async function resetConfig () {
     await cloudRendererClient.restart('outdoor')
     ElMessage.success('已恢复部署配置并重连')
   } catch (error) {
-    ElMessage.error('已恢复配置，但云渲染重连失败')
-  }
+    ElMessage.error(error instanceof Error ? error.message : '恢复配置或重连失败')
+  } finally { saving.value = false }
+}
+
+async function reloadConfig () {
+  saving.value = true
+  try {
+    await loadCloudRendererConfig()
+    Object.assign(form, getCloudRendererConfig())
+    formRevision = getCloudRendererConfigRevision()
+    const server = form.iceServers[0]
+    turnServer.urls = server?.urls || ''
+    turnServer.username = server?.username || ''
+    turnServer.credential = server?.credential || ''
+    if (!form.enabled) cloudRendererClient.close()
+    ElMessage.success('已读取平台配置')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '读取配置失败')
+  } finally { saving.value = false }
+}
+
+async function saveEnabled () {
+  saving.value = true
+  const previous = getCloudRendererConfig()
+  try {
+    await saveCloudRendererConfig({ ...previous, enabled: form.enabled }, formRevision)
+    formRevision = getCloudRendererConfigRevision()
+    if (!form.enabled) cloudRendererClient.close()
+    connectionStatus.value = form.enabled ? '已启用' : '未启用'
+    ElMessage.success(form.enabled ? '已保存：启用室外云渲染' : '已保存：关闭室外云渲染')
+  } catch (error) {
+    form.enabled = previous.enabled
+    ElMessage.error(error instanceof Error ? error.message : '开关保存失败')
+  } finally { saving.value = false }
 }
 
 async function startAlign () {
@@ -281,7 +322,14 @@ async function startAlign () {
     return
   }
   alignStarting.value = true
-  saveCloudRendererConfig(buildConfig('align'))
+  try {
+    await saveCloudRendererConfig(buildConfig('align'), formRevision)
+    formRevision = getCloudRendererConfigRevision()
+  } catch (error) {
+    alignStarting.value = false
+    ElMessage.error(error instanceof Error ? error.message : '配置保存失败')
+    return
+  }
   if (alignStarted.value) {
     alignStarted.value = false
     await nextTick()
@@ -324,7 +372,7 @@ function sendAlign (action: string, payload: Record<string, any> = {}) {
   alignRendererClient.sendAlignCommand(action, payload)
 }
 
-onMounted(loadResources)
+onMounted(() => { if (cloudRendererConfigReady.value && form.enabled) loadResources() })
 onBeforeUnmount(clearAlignStartTimer)
 </script>
 

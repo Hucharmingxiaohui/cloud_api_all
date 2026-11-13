@@ -236,8 +236,9 @@ const showDockLive = ref<boolean>(false)
 const router = useRouter()
 let workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
-const cloudRendererEnabled = isCloudRendererEnabled()
-const isFlatMap = ref(!cloudRendererEnabled) // 是否二维地图
+const cloudRendererEnabled = computed(isCloudRendererEnabled)
+const isFlatMap = ref(!cloudRendererEnabled.value) // 是否二维地图
+watch(cloudRendererEnabled, enabled => { if (!enabled) isFlatMap.value = true })
 const isMounted = ref(false) // 是否已经完成初始化
 
 // 无人机视频---------------------------------------------------

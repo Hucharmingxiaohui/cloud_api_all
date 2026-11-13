@@ -1,5 +1,5 @@
 <template>
-  <main class="construction-shell ctr-shell" v-loading="busy">
+  <main class="construction-shell ctr-shell" :class="{ 'analysis-focused': tab === 'analysis' }" v-loading="busy">
     <header class="result-heading">
       <div class="heading-title"><span class="eyebrow">工地巡检 / 任务结果</span><h2>{{ detail?.name || '工地巡检任务结果' }}</h2><p>任务编号 <span>{{ detail?.job_id || jobId }}</span></p></div>
       <div class="heading-actions"><el-button :disabled="!detail?.media_complete || busy" @click="exportTask">导出离线任务包</el-button><el-button @click="load">刷新结果</el-button><el-button @click="back">返回飞行任务</el-button></div>
@@ -53,19 +53,29 @@
             </el-tab-pane>
 
             <el-tab-pane label="分析与结果" name="analysis">
+              <section class="analysis-console evidence-console">
+                <div class="batch-heading"><div><span class="eyebrow">分析记录</span><h3>批次与图像证据</h3></div><span class="badge info">{{ batches.length }} 个批次</span></div>
+                <el-select class="batch-selector" :model-value="selectedBatchId" placeholder="选择分析批次" :disabled="busy" style="width:100%" @change="selectBatch"><el-option v-for="batch in batches" :key="batch.batch_id" :value="batch.batch_id" :label="batchLabel(batch)" /></el-select>
+                <el-alert v-if="pollError" :title="pollError" type="warning" :closable="false" show-icon />
+                <div v-if="selectedBatch" class="batch-progress"><span>{{ statusText(selectedBatch.status || '') }}</span><el-progress :percentage="batchProgress" :show-text="false" /><b>{{ selectedBatch.finished ?? '—' }} / {{ selectedBatch.total ?? '—' }} 张已处理</b></div>
+                <p v-if="selectedBatch?.message" class="inline-notice">{{ batchMessageText(selectedBatch.message) }}</p>
+                <ConstructionAnalysisResults v-if="tab === 'analysis'" :key="jobId + selectedBatchId" :photos="analysisPhotos" :job-id="jobId" :batch-id="selectedBatchId" :area-label="activeAreaName" :area-name="areaName" @preview="previewEvidence" />
+                <p class="helper">批次完成仅表示结果已取回，不代表所有检测成功或现场无隐患。未勾选检测项、已排除照片不会参与检测；原图仍保留。不将单图或各区域人数相加作为全工地去重总数。</p>
+                <details v-if="selectedBatch" class="batch-audit"><summary>本批次冻结的排除记录与检测策略（只读）</summary><p v-for="(decision, id) in selectedBatch.association_decisions || {}" :key="id">{{ id }}：{{ decision.excluded ? '已排除 · ' + decision.reason : '确认区域 · ' + decision.area_id }}</p><p class="helper">检测列表仅包含本批次实际提交的照片。下方为执行时策略快照，可核对未勾选项及红外关闭策略；缺失的历史快照不使用当前配置补齐。</p><pre style="white-space:pre-wrap">{{ selectedBatch.overall_route?.analysis_config ? JSON.stringify(selectedBatch.overall_route.analysis_config, null, 2) : '该历史批次未提供冻结检测策略' }}</pre></details>
+              </section>
               <div class="analysis-workspace">
-                <section class="analysis-console">
+                <details class="analysis-console control-disclosure" :open="!analysisComplete"><summary>分析操作 <span>{{ statusLabel }} · 展开查看连接与提交</span></summary>
                   <div class="section-title"><div><span class="eyebrow">站内图像分析</span><h3>回站后，一次提交本次任务</h3></div><span class="badge" :class="analysisComplete ? 'success' : 'info'">{{ statusLabel }}</span></div>
-                  <div class="analysis-steps"><div :class="{ done: detail.media_complete }"><b>01</b><span>照片收齐<small>{{ detail.media_complete ? '已完成' : '等待采集完成' }}</small></span></div><div :class="{ done: connected }"><b>02</b><span>连接主机<small>{{ connected === null ? '未检查' : connected ? '连接正常' : '连接失败' }}</small></span></div><div :class="{ done: !!detail.analysis.batch_id }"><b>03</b><span>手动分析<small>{{ detail.analysis.batch_id ? '已有分析批次' : '待提交' }}</small></span></div><div :class="{ done: analysisComplete }"><b>04</b><span>结果回传<small>{{ analysisComplete ? '分析完成' : '等待分析结果' }}</small></span></div></div>
+                  <div class="analysis-steps"><div :class="{ done: detail.media_complete }"><b>01</b><span>照片收齐<small>{{ detail.media_complete ? '已完成' : '等待采集完成' }}</small></span></div><div :class="{ done: connected }"><b>02</b><span>检查能力<small>{{ connected === null ? '未检查' : connected ? '能力就绪' : '检查未通过' }}</small></span></div><div :class="{ done: !!detail.analysis.batch_id }"><b>03</b><span>手动分析<small>{{ detail.analysis.batch_id ? '已有分析批次' : '待提交' }}</small></span></div><div :class="{ done: analysisComplete }"><b>04</b><span>结果回传<small>{{ analysisComplete ? '分析完成' : '等待分析结果' }}</small></span></div></div>
                   <el-alert v-if="!detail.analysis_configured" title="分析服务尚未配置，当前可查看及归档本地照片。" type="info" :closable="false" show-icon />
-                  <p v-if="detail.analysis.message" class="inline-notice">{{ detail.analysis.message }}</p>
-                  <div class="analysis-rows"><div><span>分析主机</span><b>{{ connected === null ? '未检查' : connected ? '可连接' : '不可连接' }}</b></div><div><span>当前批次</span><b>{{ detail.analysis.batch_id || '尚未提交' }}</b></div></div>
-                  <div class="analysis-actions"><el-button :disabled="busy || !detail.analysis_configured" @click="check">检查分析主机</el-button><el-button type="primary" :disabled="!canSubmit" @click="submit">{{ detail.analysis.batch_id ? '重新分析' : '开始分析' }}</el-button><el-button :disabled="busy || !detail.analysis_configured" @click="refresh">刷新批次 / 查询进度</el-button></div>
+                  <p v-if="detail.analysis.message" class="inline-notice">{{ batchMessageText(detail.analysis.message) }}</p>
+                  <div class="analysis-rows"><div><span>任务分析能力</span><b>{{ connected === null ? '未检查' : connected ? '已就绪' : '未就绪' }}</b></div><div><span>当前批次</span><b>{{ detail.analysis.batch_id || '尚未提交' }}</b></div></div>
+                  <div v-if="capabilities" class="capability-status"><p v-if="capabilities.remote">可见光分析服务：{{ capabilityLabel(capabilities.remote) }}</p><p v-if="capabilities.thermal">本地红外 SDK：{{ capabilityLabel(capabilities.thermal) }}</p><el-alert v-if="capabilities.message" :title="capabilities.message" :type="connected ? 'success' : 'warning'" :closable="false" show-icon /></div><div class="analysis-actions"><el-button :disabled="busy" @click="check">检查分析能力</el-button><el-button type="primary" :disabled="!canSubmit" @click="submit">{{ detail.analysis.batch_id ? '重新分析' : '开始分析' }}</el-button><el-button :disabled="busy || !detail.analysis_configured" @click="refresh">刷新批次 / 查询进度</el-button></div>
                   <p class="helper">{{ submitHint }}。提交覆盖本次任务全部待分析照片，不受左侧区域筛选影响。</p>
                   <el-alert v-if="pendingSubmit" title="上次提交响应未确认，已保留原请求标识。请刷新批次核对；不会自动创建新分析任务。" type="warning" :closable="false" />
                   <el-button v-if="pendingSubmit" :disabled="busy" @click="sendAnalysis">使用原请求标识确认提交</el-button>
-                  <p class="helper">检测项自动读取执行时冻结快照，不读取当前配置、不逐图编辑。红外测温不等于火灾烟雾检测；当前 V1.0 不支持测温时会由服务端明确阻断，不能视为正常。</p>
-                </section>
+                  <p class="helper">检测项自动读取执行时冻结快照，不读取当前配置、不逐图编辑。红外测温在平台本地执行，可见光检测提交站内分析服务；温度异常不直接等同失火。</p>
+                </details>
                 <section class="analysis-results"><div class="section-title"><h3>{{ activeAreaName }} · 人数统计</h3><span>同一工作面跨角度去重</span></div>
                   <div v-if="areaCounts.length" class="people-grid"><article v-for="item in areaCounts" :key="item.area_id"><span>{{ areaName(item.area_id) }}</span><strong>{{ item.status === 'success' && Number.isInteger(item.count) && item.count >= 0 ? item.count : '—' }}<small>人</small></strong><p>{{ countStatus(item.status) }}</p><small v-if="item.message">{{ item.message }}</small></article></div>
                   <el-empty v-else :description="detail.analysis.result ? '当前结果尚未包含该区域的去重人数' : '尚无已回传的分析结果；未分析不代表无隐患'" :image-size="80" />
@@ -73,26 +83,10 @@
                   <details v-if="detail.analysis.result" class="raw-result"><summary>查看服务返回的原始结果</summary><pre>{{ JSON.stringify(detail.analysis.result, null, 2) }}</pre></details>
                 </section>
               </div>
-              <section class="analysis-console">
-                <h3>历史批次与逐图结果</h3>
-                <el-select :model-value="selectedBatchId" placeholder="选择分析批次" :disabled="busy" style="width:100%" @change="selectBatch"><el-option v-for="batch in batches" :key="batch.batch_id" :value="batch.batch_id" :label="batchLabel(batch)" /></el-select>
-                <el-alert v-if="pollError" :title="pollError" type="warning" :closable="false" show-icon />
-                <p v-if="selectedBatch">{{ statusText(selectedBatch.status || '') }} · 已处理 {{ selectedBatch.finished ?? '—' }} / {{ selectedBatch.total ?? '—' }} 张（非成功数） · 请求标识 {{ selectedBatch.request_id || '历史记录未提供' }}</p>
-                <p v-if="selectedBatch?.message" class="inline-notice">{{ selectedBatch.message }}</p>
-                <p class="helper">批次完成仅表示结果已取回，不代表所有检测成功或现场无隐患。未勾选检测项、已排除照片不会参与检测；原图仍保留。不将单图或各区域人数相加作为全工地去重总数。</p>
-                <details v-if="selectedBatch"><summary>本批次冻结的排除记录与检测策略（只读）</summary><p v-for="(decision, id) in selectedBatch.association_decisions || {}" :key="id">{{ id }}：{{ decision.excluded ? '已排除 · ' + decision.reason : '确认区域 · ' + decision.area_id }}</p><p class="helper">检测列表仅包含本批次实际提交的照片。下方为执行时策略快照，可核对未勾选项及红外关闭策略；缺失的历史快照不使用当前配置补齐。</p><pre style="white-space:pre-wrap">{{ selectedBatch.overall_route?.analysis_config ? JSON.stringify(selectedBatch.overall_route.analysis_config, null, 2) : '该历史批次未提供冻结检测策略' }}</pre></details>
-                <el-table :data="analysisPhotos" row-key="file_id" max-height="620" style="width:100%">
-                  <el-table-column label="照片 / 冻结配置" min-width="250"><template #default="{ row }"><b>{{ row.name }}</b><p>{{ areaName(row.area_id) }} · {{ typeText(row.type) }} · 航点 {{ row.waypoint_index ?? '未匹配' }}</p><small>检测项：{{ row.checks.map(checkText).join('、') || '未勾选可见光检测项' }}</small><p>配置来源：{{ sourceText(row.policy_source) }} · {{ row.metadataSource || '执行时冻结快照' }}</p><small v-if="row.excluded">已排除：{{ row.message || '详见照片归属记录' }}</small><small v-if="row.infrared_temperature_enabled"> · 请求红外测温（V1.0 暂不支持）</small></template></el-table-column>
-                  <el-table-column label="逐图状态" min-width="150"><template #default="{ row }">{{ row.excluded ? '已排除' : statusText(row.status || '') }}<p>{{ row.message }}</p><p v-if="row.infrared_temperature">红外：{{ statusText(row.infrared_temperature.status) }} {{ row.infrared_temperature.message }}</p></template></el-table-column>
-                  <el-table-column label="检测结果" min-width="320"><template #default="{ row }"><div v-for="(item, index) in row.result?.checks || []" :key="item.code + index"><b>{{ checkText(item.code) }}</b> · {{ statusText(item.status) }}<span v-if="item.code === 'person_count'"> · 单图人数 {{ countText({ status: item.status, count: item.count ?? null }) }}</span><span v-if="item.boxes"> · {{ item.boxes.length }} 个框</span><span v-if="item.label"> · {{ item.label }}（{{ item.score ?? '未返回置信度' }}）</span><p>{{ item.message }}</p></div><span v-if="!row.result">尚无检测结果，不能判断无隐患</span><p v-if="row.result?.image_error">标注图缺失：{{ row.result.image_error }}</p><details v-if="row.result"><summary>完整结果 / 坐标与置信度</summary><pre style="white-space:pre-wrap">{{ JSON.stringify(row.result, null, 2) }}</pre></details></template></el-table-column>
-                  <el-table-column label="证据" width="115"><template #default="{ row }"><el-button link @click="previewEvidence(row)">原图 / 标注图</el-button></template></el-table-column>
-                </el-table>
-                <el-empty v-if="!analysisPhotos.length" description="暂无逐图结果；旧批次缺少冻结元数据时仅保留原记录，不补用当前配置。" />
-              </section>
             </el-tab-pane>
 
             <el-tab-pane label="巡检报告" name="report">
-              <section class="report-panel"><div class="section-title"><div><span class="eyebrow">按分析批次留存</span><h3>工地巡检报告</h3></div><el-button :disabled="busy" @click="refresh">刷新报告列表</el-button></div><p class="helper">仅结果取回完成的批次可生成 Word 报告；部分检测不可用、失败和缺失证据会如实保留，不转换成“全部正常”。生成与下载是两个独立操作，历史报告不会被重新分析覆盖。</p><el-table :data="batches" row-key="batch_id"><el-table-column label="分析批次" min-width="260"><template #default="{ row }">{{ batchLabel(row) }}<p>{{ row.message }}</p></template></el-table-column><el-table-column label="报告状态" width="150"><template #default="{ row }">{{ row.report_ready ? '已生成' : '尚未生成' }}</template></el-table-column><el-table-column label="操作" min-width="240"><template #default="{ row }"><el-button :disabled="busy || !reportAllowed(row)" @click="generateReport(row)">{{ row.report_ready ? '重新生成' : '生成 Word 报告' }}</el-button><el-button type="primary" :disabled="busy || !reportAllowed(row) || !row.report_ready" @click="downloadReport(row)">下载</el-button></template></el-table-column></el-table><el-empty v-if="!batches.length" description="暂无分析批次，请先在“分析与结果”中开始分析。" /></section>
+              <section class="report-panel"><div class="section-title"><div><span class="eyebrow">按分析批次留存</span><h3>工地巡检报告</h3></div><el-button :disabled="busy" @click="refresh">刷新报告列表</el-button></div><p class="helper">仅结果取回完成的批次可生成 Word 报告；部分检测不可用、失败和缺失证据会如实保留，不转换成“全部正常”。生成与下载是两个独立操作，历史报告不会被重新分析覆盖。</p><el-table :data="batches" row-key="batch_id"><el-table-column label="分析批次" min-width="260"><template #default="{ row }">{{ batchLabel(row) }}<p>{{ batchMessageText(row.message) }}</p></template></el-table-column><el-table-column label="报告状态" width="150"><template #default="{ row }">{{ row.report_ready ? '已生成' : '尚未生成' }}</template></el-table-column><el-table-column label="操作" min-width="240"><template #default="{ row }"><el-button :disabled="busy || !reportAllowed(row)" @click="generateReport(row)">{{ row.report_ready ? '重新生成' : '生成 Word 报告' }}</el-button><el-button type="primary" :disabled="busy || !reportAllowed(row) || !row.report_ready" @click="downloadReport(row)">下载</el-button></template></el-table-column></el-table><el-empty v-if="!batches.length" description="暂无分析批次，请先在“分析与结果”中开始分析。" /></section>
             </el-tab-pane>
           </el-tabs>
         </section>
@@ -116,7 +110,7 @@
     <el-dialog v-model="photoVisible" title="巡检照片" width="min(1240px, 94vw)" top="5vh" class="construction-photo-dialog" append-to-body @closed="zoom = 1">
       <div v-if="selectedPhoto" class="viewer-layout"><div class="viewer-stage" v-loading="previewBusy"><div class="viewer-canvas"><img v-if="photoUrl" :src="photoUrl" :alt="selectedPhoto.name" :style="{ width: (zoom * 100) + '%', maxHeight: zoom === 1 ? '58vh' : 'none' }" @error="previewError = '图片无法解码，可下载原图使用专用软件查看'"><p v-if="previewError" class="viewer-error">{{ previewError }} <el-button @click="preview(selectedPhoto)">重试</el-button></p></div><div class="viewer-controls"><el-button :disabled="previewIndex <= 0 || previewBusy" @click="movePreview(-1)">← 上一张</el-button><span>{{ previewIndex + 1 }} / {{ previewPhotos.length }}</span><el-button :disabled="previewIndex >= previewPhotos.length - 1 || previewBusy" @click="movePreview(1)">下一张 →</el-button><el-button @click="zoom = zoom === 1 ? 2 : 1">{{ zoom === 1 ? '放大 2×' : '适应窗口' }}</el-button></div></div><aside class="viewer-info"><span>原始采集照片</span><h3>{{ selectedPhoto.name }}</h3><dl><dt>巡检区域</dt><dd>{{ selectedPhoto.area_name || areaName(selectedPhoto.area_id) }}</dd><dt>拍摄航点</dt><dd>{{ selectedPhoto.waypoint_index ? '航点 ' + selectedPhoto.waypoint_index : '未关联' }}</dd><dt>保存状态</dt><dd>已归档至本部署端</dd></dl><p v-if="selectedPhoto.association_message">{{ selectedPhoto.association_message }}</p><el-button type="primary" :disabled="!photoUrl || previewBusy" @click="downloadPhoto">下载原图</el-button><small>当前为采集原图，非算法标注结果图。</small></aside></div>
     </el-dialog>
-    <el-dialog v-model="evidenceVisible" title="本批次照片证据" width="min(1240px, 94vw)" append-to-body @closed="releaseEvidence"><div v-loading="evidenceBusy" style="display:flex;gap:20px;flex-wrap:wrap"><section style="flex:1;min-width:260px"><h3>原始采集照片</h3><img v-if="evidenceOriginal" :src="evidenceOriginal" alt="原始采集照片" style="max-width:100%" /><p v-else>{{ evidenceOriginalError || '正在读取原图' }}</p></section><section style="flex:1;min-width:260px"><h3>本批次算法标注图</h3><img v-if="evidenceResult" :src="evidenceResult" alt="本批次算法标注图" style="max-width:100%" /><p v-else>{{ evidenceResultError || '本照片尚无标注图，不能据此判断正常' }}</p></section></div></el-dialog>
+    <el-dialog v-model="evidenceVisible" title="本批次照片证据" width="min(1240px, 94vw)" append-to-body @closed="releaseEvidence"><div v-loading="evidenceBusy" style="display:flex;gap:20px;flex-wrap:wrap"><section style="flex:1;min-width:260px"><h3>原始采集照片</h3><img v-if="evidenceOriginal" :src="evidenceOriginal" alt="原始采集照片" style="max-width:100%" /><p v-else>{{ evidenceOriginalError || '正在读取原图' }}</p></section><section style="flex:1;min-width:260px"><h3>{{ evidenceThermal ? '本批次本地测温热力图' : '本批次算法标注图' }}</h3><img v-if="evidenceResult" :src="evidenceResult" alt="本批次算法标注图" style="max-width:100%" /><p v-else>{{ evidenceResultError || '本照片尚无标注图，不能据此判断正常' }}</p></section></div></el-dialog>
   </main>
 </template>
 
@@ -128,19 +122,22 @@ import { ERouterName } from '/@/types'
 import { uuidv4 } from '/@/utils/uuid'
 import { getConstructionResult, archiveConstructionPhotos, checkConstructionHost, submitConstructionAnalysis, getConstructionPhoto, assignConstructionPhotos, exportConstructionTask, listConstructionBatches, getConstructionBatch, getConstructionResultPhoto, generateConstructionReport, downloadConstructionReport } from '/@/api/construction'
 import type { ConstructionResult, ConstructionAnalysis, ConstructionAnalysisPhoto } from '/@/api/construction'
-import { checkText, typeText, statusText, countText, errorText } from '../constructionAnalysis/model'
-import { createBatchPoller, reportAllowed, reportFileName, photoLens } from './task-analysis'
+import { statusText, errorText } from '../constructionAnalysis/model'
+import ConstructionAnalysisResults from './ConstructionAnalysisResults.vue'
+import { batchMessageText, createBatchPoller, reportAllowed, reportFileName, photoLens } from './task-analysis'
 
 type Photo = ConstructionResult['photos'][number]
 interface PhotoGroup { key: string; name: string; waypoints: number[]; photos: Photo[]; warn?: boolean }
 const props = defineProps<{ jobId: string }>()
 const router = useRouter(); const tab = ref('photos'); const busy = ref(false); const error = ref('')
 const detail = ref<ConstructionResult | null>(null); const connected = ref<boolean | null>(null)
+const capabilities = ref<{ remote?: string; thermal?: string; message?: string } | null>(null)
+function capabilityLabel (value: string) { return ({ ready: '已就绪', failed: '检查未通过', not_required: '本任务不需要' } as Record<string, string>)[value] || value }
 const exportPath = ref('')
 const batches = ref<ConstructionAnalysis[]>([]); const selectedBatchId = ref(''); const pollError = ref(''); const pendingSubmit = ref(false)
+const batchProgress = computed(() => selectedBatch.value?.total ? Math.max(0, Math.min(100, (selectedBatch.value.finished || 0) / selectedBatch.value.total * 100)) : 0)
 const selectedBatch = computed(() => batches.value.find(b => b.batch_id === selectedBatchId.value) || null)
 function batchLabel (batch: ConstructionAnalysis) { return `${batch.created_at ? new Date(batch.created_at).toLocaleString() : '历史批次'} · ${batch.batch_id} · ${statusText(batch.status || '')}` }
-function sourceText (source?: string) { return ({ default: '平台默认（执行时）', area: '区域覆盖（执行时）', waypoint: '航点覆盖（执行时）', point: '航点覆盖（执行时）' } as Record<string, string>)[source || ''] || source || '冻结来源缺失，不补用当前配置' }
 const analysisPhotos = computed<ConstructionAnalysisPhoto[]>(() => {
   const frozen = selectedBatch.value?.photos
   if (frozen) return frozen.filter(p => !selectedArea.value || selectedArea.value === 'all' || p.area_id === selectedArea.value || (selectedArea.value === '__excluded' && p.excluded))
@@ -186,7 +183,7 @@ const analysisComplete = computed(() => !detail.value?.analysis_stale && detail.
 const unresolvedCount = computed(() => detail.value?.unresolved_count ?? (overall.value ? detail.value?.photos.filter(p => !p.area_id && !p.excluded).length || 0 : 0))
 const associationLocked = computed(() => pendingSubmit.value || (!!detail.value?.analysis.batch_id && !['SUCCEEDED', 'FAILED'].includes(detail.value.analysis.status || '')) || batches.value.some(b => !!b.batch_id && !['SUCCEEDED', 'FAILED'].includes(b.status || '')))
 const canSubmit = computed(() => !busy.value && unresolvedCount.value === 0 && detail.value?.photos.some(p => !p.excluded) && connected.value === true && detail.value?.analysis_configured && detail.value?.media_complete && !associationLocked.value)
-const submitHint = computed(() => unresolvedCount.value ? '请先在本地照片页确认所有待定照片归属，或填写排除原因' : !detail.value?.analysis_configured ? '请先配置站内分析服务' : !detail.value.media_complete ? '等待本次飞行完成并收齐照片' : associationLocked.value ? '请查询已有批次，避免重复下发' : !detail.value.photos.some(p => !p.excluded) ? '所有照片均已排除，暂无可分析照片' : connected.value !== true ? '接入站内网络后，请先检查主机连接' : '已具备提交条件，重新分析将保留原批次记录')
+const submitHint = computed(() => unresolvedCount.value ? '请先在本地照片页确认所有待定照片归属，或填写排除原因' : !detail.value?.analysis_configured ? '请先配置站内分析服务' : !detail.value.media_complete ? '等待本次飞行完成并收齐照片' : associationLocked.value ? '请查询已有批次，避免重复下发' : !detail.value.photos.some(p => !p.excluded) ? '所有照片均已排除，暂无可分析照片' : connected.value !== true ? '请先检查本任务所需的分析能力；纯红外测温可在本地执行' : '已具备提交条件，重新分析将保留原批次记录')
 interface AreaCount { area_id: string; status: string; count: number | null; message?: string }
 const areaCounts = computed<AreaCount[]>(() => {
   const values = selectedBatch.value ? selectedBatch.value.areas || selectedBatch.value.result?.areas : detail.value?.analysis.result?.areas
@@ -266,7 +263,7 @@ async function loadThumbs () {
     }
   }))
 }
-async function check () { await run(async (token, job) => { const data = await checkConstructionHost(job); if (current(token)) connected.value = data.connected }) }
+async function check () { capabilities.value = null; connected.value = null; await run(async (token, job) => { const data = await checkConstructionHost(job); if (current(token)) { connected.value = data.connected; capabilities.value = data } }) }
 async function submit () {
   if (!canSubmit.value) return
   const job = props.jobId
@@ -303,9 +300,10 @@ async function downloadReport (batch: ConstructionAnalysis) {
     setTimeout(() => { if (downloadUrls.delete(url)) URL.revokeObjectURL(url) }, 1000)
   })
 }
-const evidenceVisible = ref(false); const evidenceBusy = ref(false); const evidenceOriginal = ref(''); const evidenceResult = ref(''); const evidenceOriginalError = ref(''); const evidenceResultError = ref(''); let evidenceEpoch = 0
+const evidenceThermal = ref(false); const evidenceVisible = ref(false); const evidenceBusy = ref(false); const evidenceOriginal = ref(''); const evidenceResult = ref(''); const evidenceOriginalError = ref(''); const evidenceResultError = ref(''); let evidenceEpoch = 0
 function releaseEvidence () { ++evidenceEpoch; for (const url of [evidenceOriginal.value, evidenceResult.value]) if (url) URL.revokeObjectURL(url); evidenceOriginal.value = ''; evidenceResult.value = ''; evidenceBusy.value = false }
 async function previewEvidence (photo: ConstructionAnalysisPhoto) {
+  evidenceThermal.value = !!photo.infrared_temperature_enabled
   releaseEvidence(); const token = evidenceEpoch; const job = props.jobId; const batchId = selectedBatchId.value
   evidenceVisible.value = true; evidenceBusy.value = true; evidenceOriginalError.value = ''; evidenceResultError.value = photo.result?.image_error || ''
   await Promise.all([
@@ -328,7 +326,7 @@ function release () { ++thumbEpoch; ++previewEpoch; for (const url of Object.val
 watch([selectedArea, keyword, archiveFilter], () => { page.value = 1 })
 watch(pagePhotos, () => { loadThumbs() })
 watch(filteredPhotos, photos => { page.value = Math.min(page.value, Math.max(1, Math.ceil(photos.length / 24))) })
-watch(() => props.jobId, () => { ++epoch; poller.reset(); release(); releaseEvidence(); evidenceVisible.value = false; batches.value = []; selectedBatchId.value = ''; pollError.value = ''; detail.value = null; exportPath.value = ''; error.value = ''; connected.value = null; busy.value = false; photoVisible.value = false; associationVisible.value = false; selectedArea.value = ''; keyword.value = ''; archiveFilter.value = 'all'; page.value = 1; tab.value = 'photos'; requestId = pendingRequests.get(props.jobId) || uuidv4(); pendingSubmit.value = pendingRequests.has(props.jobId); load() }, { immediate: true })
+watch(() => props.jobId, () => { ++epoch; poller.reset(); release(); releaseEvidence(); evidenceVisible.value = false; batches.value = []; selectedBatchId.value = ''; pollError.value = ''; detail.value = null; exportPath.value = ''; error.value = ''; connected.value = null; capabilities.value = null; busy.value = false; photoVisible.value = false; associationVisible.value = false; selectedArea.value = ''; keyword.value = ''; archiveFilter.value = 'all'; page.value = 1; tab.value = 'photos'; requestId = pendingRequests.get(props.jobId) || uuidv4(); pendingSubmit.value = pendingRequests.has(props.jobId); load() }, { immediate: true })
 onBeforeUnmount(() => { disposed = true; ++epoch; poller.dispose(); release(); releaseEvidence(); downloadUrls.forEach(url => URL.revokeObjectURL(url)); downloadUrls.clear() })
 </script>
 

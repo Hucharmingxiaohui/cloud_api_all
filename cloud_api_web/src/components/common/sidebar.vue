@@ -208,6 +208,8 @@ function getShowInMenuRoutes (routes) {
     if (!Array.isArray(routeList)) return
 
     for (const route of routeList) {
+      // Skip the complete subtree so hidden solar menus cannot surface as root entries.
+      if (CURRENT_CONFIG.constructionOnly === true && route.meta?.hideInConstructionMode) continue
       // 构建完整路径
       const fullPath = route.path
 
@@ -225,7 +227,7 @@ function getShowInMenuRoutes (routes) {
         // 递归处理子路由，构建子菜单（支持三级菜单）
         if (route.children && route.children.length > 0) {
           route.children.forEach(child => {
-            if (child.meta?.showInMenu === true) {
+            if (child.meta?.showInMenu === true && !(CURRENT_CONFIG.constructionOnly === true && child.meta.hideInConstructionMode)) {
               const childFullPath = child.path
               const childCopy = {
                 ...child.meta,
@@ -238,7 +240,7 @@ function getShowInMenuRoutes (routes) {
               // 处理三级菜单
               if (child.children && child.children.length > 0) {
                 child.children.forEach(grandChild => {
-                  if (grandChild.meta?.showInMenu === true) {
+                  if (grandChild.meta?.showInMenu === true && !(CURRENT_CONFIG.constructionOnly === true && grandChild.meta.hideInConstructionMode)) {
                     childCopy.children.push({
                       ...grandChild.meta,
                       path: grandChild.path,
