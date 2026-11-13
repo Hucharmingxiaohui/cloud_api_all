@@ -49,6 +49,43 @@ public class CqDockTaskStatusHandler {
     @Autowired
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
 
+    public String syncResults(Long recordId) {
+        CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
+        if (record == null || !Objects.equals(record.getSuccess(), 1)
+                || !StringUtils.hasText(record.getBusinessId()) || !StringUtils.hasText(record.getEuaTaskId())) {
+            throw new IllegalArgumentException("任务记录不存在或未成功下发，不能同步结果");
+        }
+        boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
+        if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
+            throw new IllegalStateException("任务缺少原始站点Code，请核实原报文后补录，不能同步结果");
+        }
+        CqApiResponse response = cqDockApiService.taskStatus(record.getEuaTaskId());
+        if (response == null || Boolean.FALSE.equals(response.getSuccess())
+                || (response.getCode() != null && !Objects.equals(response.getCode(), 200))
+                || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
+            throw new IllegalStateException("EUA任务状态查询失败，请稍后重试");
+        }
+        JSONObject data = response.getData();
+        if (data == null || !record.getEuaTaskId().equals(data.getString("taskId"))) {
+            throw new IllegalStateException("EUA任务状态返回的taskId缺失或不匹配，请核实任务");
+        }
+        String state = data.getString("status");
+        if (state == null || !state.matches("[0-6]")) {
+            throw new IllegalStateException("EUA任务状态无效，请稍后重试或核实EUA响应");
+        }
+        if (!"1".equals(state)) {
+            String[] labels = {"待执行", "已完成", "执行中", "失败", "已下发待执行", "暂停", "终止"};
+            throw new IllegalStateException("任务是" + labels[Integer.parseInt(state)] + "状态，暂时不能同步结果");
+        }
+        cqDockPictureReportService.syncResults(record, () -> {
+            if (reportToPatrol) {
+                sendTaskStatus(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(),
+                        "1", 100, null, "1", record.getSubCode());
+            }
+        });
+        return "已提交同步，已有图片记录和本地原图复用，重新分析；可见光分析结果等待回调";
+    }
+
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
         startMonitoring(taskCode, taskName, euaTaskId, fixedStartTime, true);
     }
@@ -290,6 +327,7 @@ public class CqDockTaskStatusHandler {
         } else {
             log.warn("上报EUA任务状态失败，TCP可能未连接: taskCode={}, euaTaskId={}, euaStatus={}, state={}, progress={}%",
                     taskCode, euaTaskId, euaStatus, mappedState, progress);
+            throw new IllegalStateException("EUA任务状态上报失败，请检查上级连接后重试同步");
         }
     }
 

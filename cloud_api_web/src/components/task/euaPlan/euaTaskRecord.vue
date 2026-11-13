@@ -22,7 +22,6 @@
         <el-table-column prop="planName" label="所属计划名称" min-width="160" show-overflow-tooltip />
         <el-table-column prop="businessId" label="本地任务编码" width="230" show-overflow-tooltip />
         <el-table-column prop="euaTaskId" label="EUA任务ID" width="180" show-overflow-tooltip />
-        <el-table-column prop="bayId" label="间隔ID" width="170" show-overflow-tooltip />
         <el-table-column prop="routeId" label="航线ID" width="170" show-overflow-tooltip />
         <el-table-column label="下发状态" width="100" align="center">
           <template #default="scope">
@@ -31,11 +30,18 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="responseMsg" label="响应信息" show-overflow-tooltip />
+        <el-table-column label="任务执行状态" width="150" align="center">
+          <template #default="scope">
+            <el-tag v-if="executionStatus(scope.row) === '已完成'" type="success">已完成</el-tag>
+            <el-tag v-else-if="executionStatus(scope.row) === '失败'" type="danger">失败</el-tag>
+            <span v-else>{{ executionStatus(scope.row) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" show-overflow-tooltip />
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="190" fixed="right" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="openTaskResult(scope.row)">任务结果</el-button>
+            <el-button link type="primary" :loading="syncLoading[scope.row.id]" @click="syncResults(scope.row)">结果同步</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -57,14 +63,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
-import { getEuaTaskRecordPage } from '/@/api/cq-eua-plan'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getEuaTaskExecutionStatus, getEuaTaskRecordPage, syncEuaTaskResults } from '/@/api/cq-eua-plan'
+import { createTaskStatusLoader } from './euaTaskStatus'
 
 const recordLoading = ref(false)
 const router = useRouter()
 const taskRecordData = ref<any[]>([])
+const executionStatuses = ref<Record<string, string>>({})
+const statusLoader = createTaskStatusLoader(getEuaTaskExecutionStatus)
+const syncLoading = reactive<Record<string, boolean>>({})
+
+function executionStatus (row: any) {
+  if ((row.success !== 1 && row.success !== '1') || !row.euaTaskId?.trim()) return '—'
+  return executionStatuses.value[row.euaTaskId] || '加载中'
+}
 
 const queryForm = reactive({
   taskName: '',
@@ -78,6 +94,8 @@ const recordPagination = reactive({
 })
 
 async function getTaskRecords () {
+  const token = statusLoader.begin()
+  executionStatuses.value = {}
   recordLoading.value = true
   try {
     const res = await getEuaTaskRecordPage({
@@ -86,13 +104,17 @@ async function getTaskRecords () {
       taskName: queryForm.taskName,
       euaTaskId: queryForm.euaTaskId
     })
+    if (!statusLoader.isCurrent(token)) return
     if (res.code === 0) {
       const data = res.data || {}
       taskRecordData.value = (data.records || []).map(normalizeTaskRecordRow)
       recordPagination.total = data.total || 0
+      statusLoader.load(token, taskRecordData.value, (id, text) => {
+        executionStatuses.value[id] = text
+      })
     }
   } finally {
-    recordLoading.value = false
+    if (statusLoader.isCurrent(token)) recordLoading.value = false
   }
 }
 
@@ -114,9 +136,25 @@ function openTaskResult (row: any) {
   router.push({ name: 'euaTaskResult', query: { businessId, euaTaskId, taskName: row.taskName, planName: row.planName } })
 }
 
+async function syncResults (row: any) {
+  const id = row.id
+  if (!id || syncLoading[id]) return
+  syncLoading[id] = true
+  try {
+    const res = await syncEuaTaskResults(id)
+    if (res.code === 0) ElMessage.success(typeof res.data === 'string' ? res.data : res.msg || '已提交同步')
+    else await ElMessageBox.alert(res.msg || '结果同步失败', '结果同步')
+  } catch (error: any) {
+    await ElMessageBox.alert(error?.response?.data?.msg || error?.message || '结果同步失败', '结果同步')
+  } finally {
+    syncLoading[id] = false
+  }
+}
+
 function normalizeTaskRecordRow (item: any) {
   return {
     ...item,
+    id: item.id,
     businessId: item.businessId || item.business_id || item.taskCode || item.task_code || '',
     taskCode: item.taskCode || item.task_code || item.businessId || item.business_id || '',
     taskName: item.taskName || item.task_name || '',
@@ -134,6 +172,8 @@ function normalizeTaskRecordRow (item: any) {
 onMounted(() => {
   getTaskRecords()
 })
+
+onBeforeUnmount(() => { statusLoader.begin() })
 </script>
 
 <style lang="scss" scoped>

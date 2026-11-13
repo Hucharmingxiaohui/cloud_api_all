@@ -9,6 +9,7 @@ import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskPictureListRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqEuaTaskRecordPageRequest;
 import com.dji.sample.df.cqDockDf.service.CqEuaPlanService;
 import com.dji.sample.df.cqDockDf.service.CqEuaTaskReportService;
+import com.dji.sample.df.cqDockDf.service.CqDockTaskStatusHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
@@ -39,6 +40,18 @@ public class CqEuaPlanController {
 
     @Resource
     private CqEuaTaskReportService cqEuaTaskReportService;
+
+    @Resource
+    private CqDockTaskStatusHandler cqDockTaskStatusHandler;
+
+    @PostMapping("/task-record/sync-results")
+    public Result syncResults(@RequestParam Long id) {
+        try {
+            return Result.success(cqDockTaskStatusHandler.syncResults(id));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.error(e.getMessage());
+        }
+    }
 
     @PostMapping("/task-report/generate")
     public Result generateTaskReport(@RequestBody CqEuaTaskPictureListRequest request) {

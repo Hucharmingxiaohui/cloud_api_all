@@ -51,6 +51,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import com.google.common.util.concurrent.Striped;
+import java.util.concurrent.locks.Lock;
 
 /**
  * 重庆EUA图片处理：EUA任务完成后查图落库 -> 原图先 FTP 上传并 Type=61 上报上级巡视系统
@@ -59,6 +61,24 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class CqDockPictureReportService {
+
+    // Shared by manual sync, polling and MQTT; bounded instance-owned locks, not task state.
+    private final Striped<Lock> taskLocks = Striped.lock(256);
+
+    public void syncResults(CqDockTaskRecordEntity record, Runnable reportCompleted) {
+        Lock lock = taskLocks.get(record.getEuaTaskId());
+        if (!lock.tryLock()) throw new IllegalStateException("此任务正在同步图片，请稍后重试");
+        try {
+            if (Objects.equals(record.getReportToPatrol(), 0)) {
+                fetchSaveAndAnalyseOnly(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
+            } else {
+                fetchSaveAndReport(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
+            }
+            reportCompleted.run();
+        } finally {
+            lock.unlock();
+        }
+    }
 
     private static final com.fasterxml.jackson.databind.ObjectReader POINT_SNAPSHOT_READER =
             new com.fasterxml.jackson.databind.ObjectMapper()
@@ -112,26 +132,42 @@ public class CqDockPictureReportService {
      * 终态任务轮询图片；传输完成后才落库、下载、分析和上报。
      */
     public boolean fetchSaveAndReport(String taskCode, String taskName, String euaTaskId) {
+        return fetchSaveAndReport(taskCode, taskName, euaTaskId, false);
+    }
+
+    private boolean fetchSaveAndReport(String taskCode, String taskName, String euaTaskId, boolean manual) {
+        Lock lock = taskLocks.get(euaTaskId);
+        lock.lock();
+        try {
         CqDockTaskRecordEntity record = requireReportRecord(taskCode, euaTaskId);
         if (Objects.equals(record.getReportToPatrol(), 0)) {
-            return fetchSaveAndAnalyseOnly(taskCode, taskName, euaTaskId);
+            return fetchSaveAndAnalyseOnly(taskCode, taskName, euaTaskId, manual);
         }
 //      获取并本地保存图片
-        if (fetchAndSavePictures(taskCode, taskName, euaTaskId) < 0) return false;
+        if (fetchAndSavePictures(taskCode, taskName, euaTaskId, manual) < 0) return false;
 //      原图先统一上报，避免分析服务异常导致上级完全收不到图片
         reportOriginalPictures(taskCode, taskName, euaTaskId);
 //      后续分析结果按张增量上报
         startAnalysisAndReport(taskCode, taskName, euaTaskId);
         return true;
+        } finally { lock.unlock(); }
     }
 
     /**
      * 平台内EUA计划入口：HTTP查图 -> 落库+本地保存 -> 可见光分析/红外测温，不向上级巡视系统上报Type=61。
      */
     public boolean fetchSaveAndAnalyseOnly(String taskCode, String taskName, String euaTaskId) {
-        if (fetchAndSavePictures(taskCode, taskName, euaTaskId) < 0) return false;
+        return fetchSaveAndAnalyseOnly(taskCode, taskName, euaTaskId, false);
+    }
+
+    private boolean fetchSaveAndAnalyseOnly(String taskCode, String taskName, String euaTaskId, boolean manual) {
+        Lock lock = taskLocks.get(euaTaskId);
+        lock.lock();
+        try {
+        if (fetchAndSavePictures(taskCode, taskName, euaTaskId, manual) < 0) return false;
         startAnalysisOnly(taskCode, euaTaskId);
         return true;
+        } finally { lock.unlock(); }
     }
 
     /**
@@ -144,6 +180,9 @@ public class CqDockPictureReportService {
             return;
         }
 
+        Lock lock = taskLocks.get(euaTaskId);
+        lock.lock();
+        try {
         CqDockTaskRecordEntity record = findTaskRecord(euaTaskId);
         if (record == null) {
             log.warn("EUA MQTT图片任务记录不存在，忽略: topic={}, euaTaskId={}, kept=0, ignored=1", topic, euaTaskId);
@@ -162,6 +201,7 @@ public class CqDockPictureReportService {
         savePicture(taskCode, taskName, euaTaskId, picture, "mqtt");
         log.info("EUA MQTT图片已入库/本地保存: topic={}, taskCode={}, euaTaskId={}, pictureName={}, totalNum={}",
                 topic, taskCode, euaTaskId, picture.getString("pictureName"), picture.getString("totalNum"));
+        } finally { lock.unlock(); }
     }
 
     /**
@@ -188,6 +228,14 @@ public class CqDockPictureReportService {
             log.warn("CQ分析回调未找到对应图片记录: requestId={}", requestId);
             return;
         }
+
+        Lock lock = taskLocks.get(row.getEuaTaskId());
+        lock.lock();
+        try {
+        // A manual resubmission may have replaced requestId while this callback waited.
+        row = cqDockTaskPictureMapper.selectOne(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
+                .eq(CqDockTaskPictureEntity::getRequestId, requestId).last("LIMIT 1"));
+        if (row == null) return;
 
         String code = "2002";
         String pointValUnit = "算法分析失败（没有分析结果）";
@@ -255,29 +303,40 @@ public class CqDockPictureReportService {
         } else if (!shouldReportToPatrol(row)) {
             log.info("CQ平台内EUA任务可见光分析完成，不上报巡视: taskCode={}, pictureName={}", row.getBusinessId(), row.getPictureName());
         }
+        } finally { lock.unlock(); }
     }
 
     private int fetchAndSavePictures(String taskCode, String taskName, String euaTaskId) {
+        return fetchAndSavePictures(taskCode, taskName, euaTaskId, false);
+    }
+
+    private int fetchAndSavePictures(String taskCode, String taskName, String euaTaskId, boolean manual) {
         CqApiResponse response = cqDockApiService.pictureList(euaTaskId);
         if (response == null || Boolean.FALSE.equals(response.getSuccess())
                 || (response.getCode() != null && !Objects.equals(response.getCode(), 200))
                 || !(Boolean.TRUE.equals(response.getSuccess()) || Objects.equals(response.getCode(), 200))) {
             log.warn("EUA图片列表获取失败: taskCode={}, euaTaskId={}, msg={}", taskCode, euaTaskId, response == null ? null : response.getMsg());
+            if (manual) throw new IllegalStateException("EUA图片列表查询失败，请稍后重试");
             return -1;
         }
         JSONObject data = response.getData();
         if (data == null || !euaTaskId.equals(data.getString("taskId"))) {
             log.warn("EUA图片列表taskId缺失或不匹配: expected={}, actual={}",
                     euaTaskId, data == null ? null : data.getString("taskId"));
+            if (manual) throw new IllegalStateException("EUA图片列表taskId缺失或不匹配，请核实任务");
             return -1;
         }
-        if (!"2".equals(data.getString("status"))) return -1;
+        if (!"2".equals(data.getString("status"))) {
+            if (manual) throw new IllegalStateException("图片传输中，请稍后重试");
+            return -1;
+        }
         if (!(data.get("pictureList") instanceof JSONArray)) {
             throw new IllegalArgumentException("EUA pictureList必须是数组");
         }
         List<JSONObject> pictures = extractPictures(response.getData());
         if (pictures.isEmpty()) {
             log.info("EUA图片列表为空: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+            if (manual) throw new IllegalStateException("任务已完成，但EUA未返回图片，请核实任务图片和传输状态");
             return 0;
         }
         CqDockTaskRecordEntity record = StringUtils.hasText(taskCode) && StringUtils.hasText(euaTaskId)
@@ -286,6 +345,9 @@ public class CqDockPictureReportService {
                 .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId)
                 .last("LIMIT 1")) : null;
         Set<String> allowedPointCodes = loadAllowedPointCodes(record);
+        if (manual && (allowedPointCodes == null || allowedPointCodes.isEmpty())) {
+            throw new IllegalStateException("任务点位快照或间隔点位缺失/无效，不能匹配图片，请核实任务点位");
+        }
         if (allowedPointCodes == null) {
             String bayId = record == null ? null : record.getBayId();
             log.warn("EUA图片间隔过滤失败，忽略本次列表: taskCode={}, euaTaskId={}, bayId={}, reason={}, kept=0, ignored={}",
@@ -300,6 +362,8 @@ public class CqDockPictureReportService {
         }
         int count = 0;
         int kept = 0;
+        List<CqDockTaskPictureEntity> saved = new ArrayList<>();
+        Set<String> identities = new HashSet<>();
         for (JSONObject picture : pictures) {
             String pointId = firstText(picture, "pointId", "deviceId", "photoPointId");
             if (!StringUtils.hasText(pointId) || !allowedPointCodes.contains(pointId.trim())) {
@@ -307,8 +371,15 @@ public class CqDockPictureReportService {
             }
             kept++;
             parsePointType(picture);
+            if (manual && !StringUtils.hasText(firstText(picture, "id", "pictureId", "photoId"))) {
+                throw new IllegalStateException("EUA图片缺少图片ID，不能安全重复同步，请核实图片接口");
+            }
+            String identity = firstText(picture, "id", "pictureId", "photoId");
+            if (StringUtils.hasText(identity) && !identities.add(identity)) continue;
 //          保存图片
-            if (savePicture(taskCode, taskName, euaTaskId, picture, "http") != null) {
+            CqDockTaskPictureEntity row = savePicture(taskCode, taskName, euaTaskId, picture, "http");
+            if (row != null) {
+                saved.add(row);
                 count++;
             } else {
                 return -1;
@@ -316,6 +387,24 @@ public class CqDockPictureReportService {
         }
         log.info("EUA图片间隔过滤完成: taskCode={}, euaTaskId={}, bayId={}, kept={}, ignored={}",
                 taskCode, euaTaskId, record.getBayId(), kept, pictures.size() - kept);
+        if (manual && saved.isEmpty()) {
+            throw new IllegalStateException("任务已完成，但没有匹配任务点位的图片；请核实EUA pictureList.pointId及任务点位快照，不能按名称猜测点位");
+        }
+        // Only reset after every selected original is safely available. Old callbacks use the old requestId.
+        if (manual) {
+            for (CqDockTaskPictureEntity row : saved) {
+                if (resolveUniPoint(row) == null) {
+                    throw new IllegalStateException("任务图片点位不存在：pointId=" + row.getPointId() + "，请核实点位表");
+                }
+            }
+            for (CqDockTaskPictureEntity row : saved) {
+                cqDockTaskPictureMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqDockTaskPictureEntity>()
+                        .eq(CqDockTaskPictureEntity::getId, row.getId())
+                        .set(CqDockTaskPictureEntity::getAnalysisStatus, ANALYSIS_PENDING)
+                        .set(CqDockTaskPictureEntity::getRequestId, null)
+                        .set(CqDockTaskPictureEntity::getUpdateTime, new Date()));
+            }
+        }
         return count;
     }
 
@@ -561,7 +650,7 @@ public class CqDockPictureReportService {
     /**
      * 原图先统一上传 FTP 并上报巡视上级；reportStatus 仅标记原图上报状态。
      */
-    private synchronized void reportOriginalPictures(String taskCode, String taskName, String euaTaskId) {
+    private void reportOriginalPictures(String taskCode, String taskName, String euaTaskId) {
         CqDockTaskRecordEntity record = requireReportRecord(taskCode, euaTaskId);
         if (Objects.equals(record.getReportToPatrol(), 0)) return;
         final String subCode = record.getSubCode();
@@ -834,7 +923,7 @@ public class CqDockPictureReportService {
         try {
             if (!StringUtils.hasText(entity.getLocalPath()) || !Files.isRegularFile(Paths.get(entity.getLocalPath()))
                     || Files.size(Paths.get(entity.getLocalPath())) == 0) {
-                entity.setLocalPath(downloadPicture(pictureId, pictureUrl, taskCode, providedName));
+                entity.setLocalPath(downloadPicture(pictureId, pictureUrl, taskCode, providedName, euaTaskId));
                 entity.setPictureName(Paths.get(entity.getLocalPath()).getFileName().toString());
             }
             if (!Objects.equals(entity.getReportStatus(), 1)) {
@@ -883,12 +972,13 @@ public class CqDockPictureReportService {
                 .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId));
     }
 
-    private String downloadPicture(String pictureId, String pictureUrl, String taskCode, String pictureName) throws Exception {
+    private String downloadPicture(String pictureId, String pictureUrl, String taskCode, String pictureName, String euaTaskId) throws Exception {
         Path root = Paths.get(cqDockProperties.getPictureLocalPath()).toAbsolutePath().normalize();
         if (!StringUtils.hasText(taskCode) || taskCode.contains("/") || taskCode.contains("\\")
                 || taskCode.contains(":") || taskCode.equals(".") || taskCode.equals(".."))
             throw new IllegalArgumentException("EUA任务路径无效");
-        Path dir = root.resolve(taskCode).normalize();
+        Path dir = root.resolve(taskCode).resolve(UUID.nameUUIDFromBytes(
+                euaTaskId.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString()).normalize();
         Files.createDirectories(dir);
         if (!dir.toRealPath().startsWith(root.toRealPath())) throw new IllegalArgumentException("EUA任务路径无效");
         Path part = Files.createTempFile(dir, ".eua-", ".part");
@@ -905,7 +995,10 @@ public class CqDockPictureReportService {
             validateImage(part);
             String name = StringUtils.hasText(pictureName) ? pictureName : headerName;
             if (!StringUtils.hasText(name)) name = UUID.randomUUID() + ".jpg";
-            Path target = dir.resolve(safePictureName(name));
+            // A real picture ID, not pointId or a shared camera filename, owns the file.
+            String prefix = StringUtils.hasText(pictureId)
+                    ? UUID.nameUUIDFromBytes(pictureId.getBytes(java.nio.charset.StandardCharsets.UTF_8)) + "_" : "";
+            Path target = dir.resolve(prefix + safePictureName(name));
             Files.move(part, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             return target.toAbsolutePath().toString();
