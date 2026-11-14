@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <!-- <div class="header1">任务管理</div> -->
-    <div class="operation">
+    <div ref="queryBar" class="operation">
       <el-form :inline="true" :model="queryForm" label-position="right" class="task-query-form">
         <el-form-item label="任务名称" class="query-item query-item-name">
           <el-input
@@ -9,6 +9,17 @@
             placeholder="请输入任务名称"
             class="custom-input"
           ></el-input>
+        </el-form-item>
+        <el-form-item label="机场" class="query-item query-item-select">
+          <el-select v-model="queryForm.dockSn" placeholder="请选择机场" filterable clearable :loading="dockOptionsLoading" :teleported="false" class="select-operation">
+            <el-option v-for="dock in dockOptions" :key="dock.device_sn" :value="dock.device_sn" :label="dock.nickname || dock.device_sn" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="航线名称" class="query-item query-item-name">
+          <el-input v-model="queryForm.waylineName" placeholder="请输入航线名称" class="custom-input" clearable />
+        </el-form-item>
+        <el-form-item label="计划名称" class="query-item query-item-name">
+          <el-input v-model="queryForm.planName" placeholder="请输入计划名称" class="custom-input" clearable />
         </el-form-item>
         <el-form-item label="执行方式:" class="query-item query-item-select">
           <el-select
@@ -93,13 +104,17 @@
         </el-form-item>
       </el-form>
     </div>
-    <div class="content">
-      <el-button :aria-expanded="showTransfers" aria-controls="construction-transfers" @click="showTransfers = !showTransfers">{{ showTransfers ? '收起离线接收' : '离线接收工地巡检结果' }}</el-button>
-      <div v-show="showTransfers" id="construction-transfers">
-        <ConstructionTransfers ref="transfers" />
+    <div ref="taskContent" class="content">
+      <div ref="transferBar" class="transfer-bar">
+        <el-button :aria-expanded="showTransfers" aria-controls="construction-transfers" @click="showTransfers = !showTransfers">{{ showTransfers ? '收起离线接收' : '离线接收工地巡检结果' }}</el-button>
+        <div v-show="showTransfers" id="construction-transfers">
+          <ConstructionTransfers ref="transfers" />
+        </div>
       </div>
-      <div class="table-container">
+      <div ref="tableContainer" class="table-container">
         <el-table
+          class="task-table"
+          :max-height="tableMaxHeight"
           :data="plansData.data"
           stripe
           @selection-change="handleSelectionChange"
@@ -327,7 +342,7 @@
           </el-table-column>
         </el-table>
       </div>
-      <div class="pagination-container">
+      <div ref="taskPagination" class="pagination-container">
         <!-- 分页 -->
         <el-pagination
           v-model:current-page="paginationProp.current"
@@ -352,7 +367,7 @@ import { onMounted, watch, provide, reactive, ref, nextTick, onUnmounted } from 
 import { IPage } from '/@/api/http/type'
 import { deleteTask, updateTaskStatus, UpdateTaskStatus, getWaylineJobs, Task, uploadMediaFileNow, getTaskResult, poweroffCf, batchDeleteTaskApi, deleteOtherTask, getWaylineBreakpoint, breakpointResume } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
-import { ELocalStorageKey, ERouterName } from '/@/types/enums'
+import { ELocalStorageKey, ERouterName, EDeviceTypeName } from '/@/types/enums'
 import { useFormatTask } from './use-format-task'
 import { TaskStatus, TaskProgressInfo, TaskProgressStatus, TaskProgressWsStatusMap, MediaStatus, MediaStatusProgressInfo, TaskMediaHighestPriorityProgressInfo } from '/@/types/task'
 import { useTaskWsEvent } from './use-task-ws-event'
@@ -362,14 +377,62 @@ import { ExclamationCircleOutlined, UploadOutlined } from '@ant-design/icons-vue
 import { useRouter } from 'vue-router'
 import { CONSTRUCTION_PLAN_TYPE, isConstructionTask } from '../construction/constructionTaskType'
 import ConstructionTransfers from '../construction/ConstructionTransfers.vue'
-import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo } from '/@/api/manage'
+import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, isAnalyzedApi, startTaskAnasisyApi, getAllWorkspaceInfo, getBindingDevices } from '/@/api/manage'
+import { Device } from '/@/types/device'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
 import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
 const router = useRouter()
 const transfers = ref<InstanceType<typeof ConstructionTransfers>>()
 const showTransfers = ref(false)
-function refreshTasks () { getPlans(); transfers.value?.refresh() }
+const queryBar = ref<HTMLElement>()
+const taskContent = ref<HTMLElement>()
+const transferBar = ref<HTMLElement>()
+const tableContainer = ref<HTMLElement>()
+const taskPagination = ref<HTMLElement>()
+const tableMaxHeight = ref<number>()
+let tableResizeObserver: ResizeObserver | undefined
+let tableResizeFrame: number | undefined
+
+function updateTableMaxHeight () {
+  if (!taskContent.value || !tableContainer.value || !taskPagination.value) return
+  const height = Math.max(1, Math.floor(
+    taskContent.value.getBoundingClientRect().bottom -
+    tableContainer.value.getBoundingClientRect().top -
+    taskPagination.value.getBoundingClientRect().height
+  ))
+  if (tableMaxHeight.value !== height) tableMaxHeight.value = height
+}
+
+function scheduleTableResize () {
+  if (tableResizeFrame !== undefined) return
+  tableResizeFrame = window.requestAnimationFrame(() => {
+    tableResizeFrame = undefined
+    updateTableMaxHeight()
+  })
+}
+
+onMounted(() => {
+  updateTableMaxHeight()
+  tableResizeObserver = new ResizeObserver(scheduleTableResize)
+  for (const element of [taskContent.value, queryBar.value, transferBar.value, taskPagination.value]) {
+    if (element) tableResizeObserver.observe(element)
+  }
+  window.addEventListener('resize', scheduleTableResize)
+})
+
+onUnmounted(() => {
+  tableResizeObserver?.disconnect()
+  window.removeEventListener('resize', scheduleTableResize)
+  if (tableResizeFrame !== undefined) window.cancelAnimationFrame(tableResizeFrame)
+})
+
+function refreshTasks () {
+  body.page = 1
+  paginationProp.current = 1
+  getPlans()
+  transfers.value?.refresh()
+}
 
 const selectedData = ref([])
 // 存储已处理的任务ID，避免重复分析
@@ -382,6 +445,9 @@ let analysisTimer: number | null = null // 定时器引用
 
 const queryForm = reactive({
   name: '', // 任务名称
+  dockSn: '',
+  waylineName: '',
+  planName: '',
   taskType: '', // 执行方式：0立即1定时
   planType: '', // 计划类型：0点位航线 1风机 2兴趣点环绕 3普通航线 4光伏
   startTime: '', // 任务开始时间
@@ -422,6 +488,30 @@ function isRowSelectable (row, index) {
 
 const store = useMyStore()
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
+const dockOptions = ref<Device[]>([])
+const dockOptionsLoading = ref(false)
+
+async function loadDockOptions () {
+  dockOptionsLoading.value = true
+  try {
+    const options: Device[] = []
+    let page = 1
+    let total = 0
+    do {
+      const res = await getBindingDevices(workspaceId, { page, page_size: 100, total: 0 }, EDeviceTypeName.Dock)
+      if (res.code !== 0) throw new Error(res.message || '机场列表加载失败')
+      options.push(...res.data.list)
+      total = res.data.pagination.total
+      if (!res.data.list.length) break
+      page++
+    } while (options.length < total)
+    dockOptions.value = Array.from(new Map(options.map(dock => [dock.device_sn, dock])).values())
+  } catch (_) {
+    ElMessage.error('机场列表加载失败，请刷新重试')
+  } finally {
+    dockOptionsLoading.value = false
+  }
+}
 const userId = ref(localStorage.getItem(ELocalStorageKey.UserId)!)
 const body: IPage = {
   page: 1,
@@ -569,11 +659,16 @@ async function onBreakpointResume (row: any) {
 // 重置
 function reset () {
   queryForm.name = ''
+  queryForm.dockSn = ''
+  queryForm.waylineName = ''
+  queryForm.planName = ''
   queryForm.taskType = ''
   queryForm.planType = ''
   queryForm.startTime = ''
   queryForm.endTime = ''
   queryForm.taskMode = ''
+  body.page = 1
+  paginationProp.current = 1
   getPlans()
 }
 // ----------------------------------------------------------------调用算法进行结果分析-------------------------------------------------------------------
@@ -823,6 +918,7 @@ useTaskWsEvent({
 
 onMounted(() => {
   getPlans()
+  loadDockOptions()
   initAnalysisStatusCheck()
 })
 
@@ -838,6 +934,7 @@ onUnmounted(() => {
 // 分页事件
 function handleSizeChange (val: number) {
   paginationProp.pageSize = val
+  paginationProp.current = 1
   refreshData(paginationProp)
 }
 function handleCurrentChange (val: number) {
@@ -958,8 +1055,11 @@ function toTaskVideo (val: any) {
 
 <style lang="scss" scoped>
 .container {
-  // height: 100%;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
   // padding: 10px;
   display: flex;
   flex-direction: column;
@@ -1019,9 +1119,12 @@ function toTaskVideo (val: any) {
   color: #c7dcff;
 }
 .content {
-  margin: 15px 12px 0 12px;
-  max-height: calc(100vh - 300px);
-  overflow-y: auto;
+  margin: 15px 12px 16px 12px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .main-box {
   display: flex;
@@ -1048,10 +1151,17 @@ function toTaskVideo (val: any) {
 }
 
 .table-container {
-  flex-grow: 1;
+  flex: 0 1 auto;
+  min-height: 0;
   overflow: hidden;
-  // height: 500px;
-  overflow-y: auto;
+}
+
+.task-table {
+  --el-table-bg-color: #011C4B;
+}
+
+.transfer-bar {
+  flex-shrink: 0;
 }
 
 // .box-left:hover {
@@ -1100,6 +1210,7 @@ function toTaskVideo (val: any) {
 // 操作部分
 .operation {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   background-color: rgba(1, 36, 98, 1);
   border-radius: 4px;
@@ -1312,15 +1423,11 @@ function toTaskVideo (val: any) {
 }
 
 .pagination-container {
-  position: absolute;
-  bottom: 40px;
-  /* 距离底部的距离，可调整 */
-  left: 50%;
-  /* 距离右边的距离，可调整 */
-  transform: translateX(-50%);
   display: flex;
   justify-content: center;
   align-items: center;
+  flex-shrink: 0;
+  padding-top: 12px;
 }
 
 /* 修改未点击时的数字方块背景颜色 */

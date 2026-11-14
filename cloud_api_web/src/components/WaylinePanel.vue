@@ -133,6 +133,10 @@
         <el-table
           :data="waylinesData.data"
           stripe
+          border
+          table-layout="fixed"
+          scrollbar-always-on
+          style="min-width: 1500px"
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="55" />
@@ -141,14 +145,14 @@
               {{ scope.$index + (paginationProp.current - 1) * paginationProp.pageSize + 1 }}
             </template>
           </el-table-column>
-          <el-table-column label="航线编号" show-overflow-tooltip="true">
+          <el-table-column label="航线编号" width="370" min-width="350" show-overflow-tooltip="true">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.id }}</div>
+              <el-button link type="primary" class="wayline-id-copy" title="点击复制 ID" @click.stop="copyWaylineId(scope.row.id)">{{ scope.row.id }}</el-button>
             </template>
           </el-table-column>
-          <el-table-column label="航线名称" show-overflow-tooltip="true">
+          <el-table-column label="航线名称" width="360" min-width="320" show-overflow-tooltip="true">
             <template #default="scope">
-              <div class="ellipsis">{{ scope.row.name }}</div>
+              <div class="wayline-name" :title="scope.row.name">{{ scope.row.name }}</div>
             </template>
           </el-table-column>
           <!-- <el-table-column label="专业类型">
@@ -319,6 +323,7 @@ import { useRouter } from 'vue-router'
 import { uuidv4 } from '/@/utils/uuid'
 import { PostElementsBody } from '/@/types/mapLayer'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
+import { copyText } from '/@/utils/copy-text'
 import {
   generateLineContent,
   generatePointContent,
@@ -359,6 +364,11 @@ const selectedData = ref([]) // 表格选中的记录
 const waylinesData = reactive({
   data: [] as WaylineFile[]
 })
+
+async function copyWaylineId (id: string) {
+  if (await copyText(id)) ElMessage.success('航线 ID 已复制')
+  else ElMessage.error('复制失败，请检查浏览器权限')
+}
 
 const root = getRoot()
 
@@ -931,7 +941,8 @@ const uploadFile = async () => {
 
 .container {
   // height: 100%;
-  width: 100vw;
+  width: 100%;
+  min-width: 0;
   // padding: 10px;
   display: flex;
   flex-direction: column;
@@ -945,6 +956,22 @@ const uploadFile = async () => {
   /* 隐藏超出部分 */
   text-overflow: ellipsis;
   /* 显示省略号 */
+}
+
+.wayline-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.wayline-id-copy {
+  font-family: monospace;
+  font-size: 13px;
+  padding: 0;
+}
+
+.table-container {
+  min-width: 0;
+  overflow: auto;
 }
 
 .main-box {

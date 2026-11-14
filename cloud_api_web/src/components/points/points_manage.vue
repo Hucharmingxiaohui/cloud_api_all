@@ -101,40 +101,40 @@
       </div>
       <div class="point-main-panel">
       <div class="table-container">
-        <el-table ref="pointTableRef" :data="tableData" stripe class="point-table" @selection-change="handleSelectionChange">
-          <el-table-column type="selection"  align="center" width="60"></el-table-column>
+        <el-table ref="pointTableRef" :data="tableData" height="100%" stripe border table-layout="fixed" scrollbar-always-on class="point-table" @selection-change="handleSelectionChange">
+          <el-table-column type="selection"  align="center" width="60" min-width="60" resizable></el-table-column>
           <el-table-column
             type="index"
             align="center"
             label="序号"
-            width="60"
+            width="60" min-width="60" resizable
           />
-          <el-table-column label="点位名称" prop="point_name" align="center" min-width="110" show-overflow-tooltip>
+          <el-table-column label="点位名称" prop="point_name" align="center" width="150" min-width="110" resizable show-overflow-tooltip>
             <template #default="scope">
               <div class="ellipsis">{{ scope.row.point_name }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="变电站名称" prop="sub_name" align="center" min-width="90" show-overflow-tooltip>
+          <el-table-column label="变电站名称" prop="sub_name" align="center" width="150" min-width="90" resizable show-overflow-tooltip>
           </el-table-column>
-          <el-table-column label="区域名称" prop="area_name" align="center" min-width="80" show-overflow-tooltip>
+          <el-table-column label="区域名称" prop="area_name" align="center" width="140" min-width="80" resizable show-overflow-tooltip>
           </el-table-column>
-          <el-table-column label="间隔名称" prop="bay_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
-          <el-table-column label="主设备名称" prop="device_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
-          <el-table-column label="部件名称" prop="component_name" align="center" min-width="80" show-overflow-tooltip></el-table-column>
-          <el-table-column label="关联航线名称" align="center" min-width="110" show-overflow-tooltip>
+          <el-table-column label="间隔名称" prop="bay_name" align="center" width="140" min-width="80" resizable show-overflow-tooltip></el-table-column>
+          <el-table-column label="主设备名称" prop="device_name" align="center" width="160" min-width="80" resizable show-overflow-tooltip></el-table-column>
+          <el-table-column label="部件名称" prop="component_name" align="center" width="140" min-width="80" resizable show-overflow-tooltip></el-table-column>
+          <el-table-column label="关联航线名称" align="center" width="180" min-width="110" resizable show-overflow-tooltip>
             <template #default="scope">
               {{ getWaylineName(scope.row.wayline_id) }}
             </template>
           </el-table-column>
-          <el-table-column label="关联航线id" prop="wayline_id" align="center" width="90" show-overflow-tooltip></el-table-column>
-          <el-table-column label="关联航点号" prop="wayline_point_pos" align="center" width="95"></el-table-column>
-          <el-table-column label="图片类型" prop="pic_type" align="center" width="90">
+          <el-table-column label="关联航线id" prop="wayline_id" align="center" width="180" min-width="120" resizable show-overflow-tooltip></el-table-column>
+          <el-table-column label="关联航点号" prop="wayline_point_pos" align="center" width="110" min-width="95" resizable></el-table-column>
+          <el-table-column label="图片类型" prop="pic_type" align="center" width="100" min-width="90" resizable>
             <template #default="scope">
               {{ scope.row.pic_type === 0? '可见光':'红外' }}
             </template>
           </el-table-column>
-          <el-table-column label="绑定EUA航线名称" prop="eua_route_name" align="center" min-width="160" show-overflow-tooltip />
-          <el-table-column label="操作" align="center" width="260">
+          <el-table-column label="绑定EUA航线名称" prop="eua_route_name" align="center" width="200" min-width="160" resizable show-overflow-tooltip />
+          <el-table-column label="操作" align="center" width="260" min-width="260" resizable>
             <template #default="scope">
               <el-button link type="primary" :disabled="pointsLoading" @click="showEuaBind([scope.row])">绑定EUA航线</el-button>
               <el-button
@@ -891,8 +891,11 @@ async function exportPointData () {
 }
 
 .container {
-    // height: 100%;
+    height: 100%;
     width: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
     // min-width: 1500px;
     // padding: 10px;
     display: flex;
@@ -903,6 +906,8 @@ async function exportPointData () {
 
 .table-container {
     flex-grow: 1;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
     height: 100%;
     display: flex;
@@ -915,18 +920,8 @@ async function exportPointData () {
     min-height: 0;
     // el-table 默认白底，行数不足时拉伸区域会露白，统一为主题底色
     background-color: #011C4B;
-
-    :deep(.el-table__inner-wrapper) {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    :deep(.el-table__body-wrapper) {
-        flex: 1;
-        overflow-y: auto;
-        background-color: #011C4B;
-    }
+    min-width: 0;
+    width: 100%;
 }
 
 .ellipsis {
@@ -984,6 +979,7 @@ async function exportPointData () {
 // 操作部分
 .operation {
     display: flex;
+    flex-shrink: 0;
     // justify-items: center; /* 这里可能是错误的，flexbox 中应该使用 justify-content */
     align-items: center;
     /* 这个会确保 label 在垂直方向居中 */
@@ -1078,17 +1074,23 @@ async function exportPointData () {
 
 .content {
     margin: 15px 12px 0 12px;
-    height: calc(100vh - 220px);
-    max-height: none;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
 .point-content {
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 64px;
+    grid-template-rows: minmax(0, 1fr) auto;
     gap: 12px;
-    height: calc(100vh - 220px);
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    flex: 1;
+    height: auto;
 }
 
 .point-tree-panel {
@@ -1113,6 +1115,7 @@ async function exportPointData () {
 }
 
 .point-tree {
+    box-sizing: border-box;
     height: calc(100% - 42px);
     overflow: auto;
     padding: 8px 6px 12px 4px;
@@ -1147,6 +1150,7 @@ async function exportPointData () {
 
 .point-main-panel {
     min-width: 0;
+    min-height: 0;
     height: 100%;
     overflow: hidden;
 }
@@ -1253,6 +1257,7 @@ async function exportPointData () {
     justify-content: center;
     align-items: flex-start;
     min-height: 64px;
+    box-sizing: border-box;
     padding-top: 16px;
 }
 
