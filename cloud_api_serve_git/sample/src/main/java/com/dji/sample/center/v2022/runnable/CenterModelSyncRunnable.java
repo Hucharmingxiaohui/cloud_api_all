@@ -48,23 +48,25 @@ public class CenterModelSyncRunnable extends CenterMessageBaseRunnable {
                 String []file_paths = file_path.split(";");
                 for (int i = 0;i< file_paths.length;i++)
                 {
-                    modelBuilder.uploadModelFile(file_paths[i]);
+                    if (!modelBuilder.uploadModelFile(file_paths[i])) {
+                        throw new IllegalStateException("Model upload failed: " + file_paths[i]);
+                    }
                 }
             }
 
             //给中心端发送模型同步响应
-            this.sendModelSyncResponse(items);
+            this.sendModelSyncResponse(items, "200");
         } catch (Exception e) {
-            e.printStackTrace();
             log.error("【巡视上级模型同步指令】处理异常，巡视上级IP：{}，异常信息：{}", this.centerIp, e.getMessage());
+            this.sendModelSyncResponse(new ArrayList<>(), "500");
         }
     }
 
     /**
      * 发送模型同步响应
      */
-    private void sendModelSyncResponse(List<BaseItem> items) {
-        PatrolHostCommand response = patrolHostSocketClient.getBaseCommand("251", "4", "200");
+    private void sendModelSyncResponse(List<BaseItem> items, String code) {
+        PatrolHostCommand response = patrolHostSocketClient.getBaseCommand("251", "4", code);
         response.addItems(items);
         this.patrolHostSocketClient.responseCommand(response, PatrolUavModelItem.class, requestSerialNum);
     }

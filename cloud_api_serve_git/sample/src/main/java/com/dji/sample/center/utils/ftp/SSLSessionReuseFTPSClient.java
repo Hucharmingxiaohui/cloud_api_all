@@ -3,8 +3,6 @@ package com.dji.sample.center.utils.ftp;
 import org.apache.commons.net.ftp.FTPSClient;
 import org.apache.commons.net.io.CopyStreamEvent;
 import org.apache.commons.net.io.Util;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.SSLSession;
 import javax.net.ssl.SSLSessionContext;
@@ -19,14 +17,15 @@ import java.net.Socket;
 import java.util.Locale;
 
 public class SSLSessionReuseFTPSClient extends FTPSClient {
-    private static final Logger logger = LoggerFactory.getLogger(SSLSessionReuseFTPSClient.class);
 
     public SSLSessionReuseFTPSClient() {
-        super(true);
+        this(true);
     }
 
     public SSLSessionReuseFTPSClient(boolean isImplicit) {
         super(isImplicit);
+        // This cross-port JSSE cache strategy uses TLS 1.2 sessions, not TLS 1.3 tickets.
+        setEnabledProtocols(new String[]{"TLSv1.2"});
     }
 
     /**
@@ -70,7 +69,7 @@ public class SSLSessionReuseFTPSClient extends FTPSClient {
         if (socket instanceof SSLSocket) {
             // Control socket is SSL
             final SSLSession session = ((SSLSocket) _socket_).getSession();
-            if (session.isValid()) {
+            if (session.isValid() && "TLSv1.2".equals(session.getProtocol())) {
                 final SSLSessionContext context = session.getSessionContext();
                 try {
                     final Field sessionHostPortCache = context.getClass().getDeclaredField("sessionHostPortCache");
@@ -84,13 +83,22 @@ public class SSLSessionReuseFTPSClient extends FTPSClient {
                     method.invoke(cache, String
                             .format("%s:%s", socket.getInetAddress().getHostAddress(), String.valueOf(socket.getPort()))
                             .toLowerCase(Locale.ROOT), session);
-                } catch (NoSuchFieldException e) {
-                    throw new IOException(e);
                 } catch (Exception e) {
-                    throw new IOException(e);
+                    try {
+                        socket.close();
+                    } catch (IOException closeError) {
+                        e.addSuppressed(closeError);
+                    }
+                    throw new IOException("FTPS TLS session cache access failed; context="
+                            + (context == null ? "null" : context.getClass().getName())
+                            + ", Java=" + System.getProperty("java.version")
+                            + ". This strategy requires SunJSSE. On Java 9+ add application JVM options: "
+                            + "--add-opens java.base/sun.security.ssl=ALL-UNNAMED "
+                            + "--add-opens java.base/sun.security.util=ALL-UNNAMED", e);
                 }
             } else {
-                throw new IOException("Invalid SSL Session");
+                socket.close();
+                throw new IOException("FTPS requires a valid TLSv1.2 control session for data reuse; protocol=" + session.getProtocol());
             }
         }
     }

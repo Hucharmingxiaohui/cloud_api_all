@@ -104,6 +104,8 @@ public class CqDockPictureReportService {
     @Autowired
     private CqDockApiService cqDockApiService;
     @Autowired
+    private CqDockInfraredMockScenario infraredMockScenario;
+    @Autowired
     private CqDockTaskPictureMapper cqDockTaskPictureMapper;
     @Autowired
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
@@ -521,16 +523,19 @@ public class CqDockPictureReportService {
     }
 
     private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint, boolean reportToPatrol) {
-        String coordinate = uniPoint.getInfraredImageCoordinate();
-        TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
-        if (temParamEntity == null) {
-            markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
-            throw new IllegalStateException("红外图片坐标无效");
-        }
-        TemResultEntity temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
-        if (temResult.getError() != null) {
-            markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
-            throw new IllegalStateException("红外测温失败");
+        TemResultEntity temResult = infraredMockScenario.temperature(row.getEuaTaskId(), row.getPictureId(), row.getPointId());
+        if (temResult == null) {
+            String coordinate = uniPoint.getInfraredImageCoordinate();
+            TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
+            if (temParamEntity == null) {
+                markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
+                throw new IllegalStateException("红外图片坐标无效");
+            }
+            temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
+            if (temResult.getError() != null) {
+                markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
+                throw new IllegalStateException("红外测温失败");
+            }
         }
         row.setPointVal("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
         row.setPointValUnit("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
@@ -985,7 +990,15 @@ public class CqDockPictureReportService {
         try {
             String headerName;
             try (java.io.OutputStream output = Files.newOutputStream(part)) {
-                if (StringUtils.hasText(pictureId)) {
+                if (infraredMockScenario.ownsTask(euaTaskId)) {
+                    // A registered task, not an ID prefix alone, owns these fixture bytes.
+                    JSONArray fixtures = infraredMockScenario.pictures(euaTaskId);
+                    boolean belongs = fixtures.stream().anyMatch(p -> pictureId != null && pictureId.equals(((JSONObject) p).getString("id")));
+                    if (!belongs) throw new IllegalArgumentException("场景图片与任务不匹配");
+                    headerName = infraredMockScenario.download(pictureId, output);
+                } else if (infraredMockScenario.ownsPicture(pictureId)) {
+                    throw new IllegalArgumentException("场景图片与任务不匹配");
+                } else if (StringUtils.hasText(pictureId)) {
                     headerName = cqDockApiService.downloadFile(pictureId, output);
                 } else {
                     if (!StringUtils.hasText(pictureUrl)) throw new IllegalArgumentException("EUA图片标识为空");

@@ -6,6 +6,10 @@ import com.dji.sample.component.AuthInterceptor;
 import com.dji.sample.df.cqDockDf.model.dto.CqAssignTaskRequest;
 import com.dji.sample.df.cqDockDf.model.dto.CqTaskIdRequest;
 import com.dji.sample.df.cqDockDf.config.CqDockProperties;
+import com.dji.sample.df.cqDockDf.service.CqDockInfraredMockScenario;
+import com.dji.sample.df.cqDockDf.dao.CqDockTaskRecordMapper;
+import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -36,6 +40,10 @@ public class CqDockMockController {
     private final Map<String, Scenario> scenarios = new ConcurrentHashMap<>();
     @Autowired
     private CqDockProperties properties;
+    @Autowired
+    private CqDockInfraredMockScenario infraredMockScenario;
+    @Autowired
+    private CqDockTaskRecordMapper taskRecordMapper;
 
     private static class Scenario {
         volatile String taskStatus;
@@ -75,6 +83,14 @@ public class CqDockMockController {
     @PostMapping("/task/assign_task")
     public JSONObject assignTask(@RequestBody CqAssignTaskRequest request) {
         String id = "mock-task-" + UUID.randomUUID();
+        if (infraredMockScenario.matches(request.getRouteId(), CqDockInfraredMockScenario.STATION)) {
+            CqDockTaskRecordEntity record = taskRecordMapper.selectOne(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                    .eq(CqDockTaskRecordEntity::getBusinessId, request.getBusinessId())
+                    .eq(CqDockTaskRecordEntity::getRouteId, request.getRouteId())
+                    .orderByDesc(CqDockTaskRecordEntity::getId).last("LIMIT 1"));
+            String registered = record == null ? null : infraredMockScenario.register(request.getRouteId(), record.getSubCode());
+            if (registered != null) id = registered;
+        }
         Scenario scenario = new Scenario();
         scenario.taskStatus = "2";
         scenario.routeId = request.getRouteId();
@@ -101,7 +117,10 @@ public class CqDockMockController {
         if (scenario == null) return missing();
         synchronized (scenario) {
             JSONObject data = scenario.pictures(request.getTaskId());
-            if (scenario.completeAt > 0) data.put("pictureList", buildMockPictures(scenario.routeId));
+            if (scenario.completeAt > 0) {
+                JSONArray fixture = infraredMockScenario.pictures(request.getTaskId());
+                data.put("pictureList", fixture != null ? fixture : buildMockPictures(scenario.routeId));
+            }
             return success(data);
         }
     }
@@ -154,6 +173,14 @@ public class CqDockMockController {
             @RequestHeader("access_secret") String accessSecret) throws IOException {
         if (!Objects.equals(properties.getAccessKey(), accessKey) || !Objects.equals(properties.getAccessSecret(), accessSecret))
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (infraredMockScenario.ownsPicture(fileId)) {
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            String name = infraredMockScenario.download(fileId, output);
+            MediaType type = name.toLowerCase(Locale.ROOT).endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+            return ResponseEntity.ok().contentType(type)
+                    .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment()
+                            .filename(name, java.nio.charset.StandardCharsets.UTF_8).build().toString()).body(output.toByteArray());
+        }
         String[] names = {"visible1.jpg", "visible2.jpg", "ir1.jpg", "ir2.jpg"};
         for (int i = 0; i < names.length; i++) {
             if (("mock-pic-" + (i + 1)).equals(fileId)) {

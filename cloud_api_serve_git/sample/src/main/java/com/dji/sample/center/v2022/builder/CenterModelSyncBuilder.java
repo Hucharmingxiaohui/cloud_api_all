@@ -204,12 +204,21 @@ public class CenterModelSyncBuilder {
      *
      * @param fileName
      */
-    public void uploadModelFile(String fileName) {
+    public boolean uploadModelFile(String fileName) {
         String modelSavePath = centerFtpsNormalConfig.getFileSavePath();
         String localFile = String.format("%s/%s", modelSavePath, fileName);
         String destName = new File(localFile).getName();
         String destDir = fileName.substring(0, fileName.length() - destName.length());
-        FtpUtils.getInstance().uploadToCenterNormal(localFile, destDir, destName);
+        File source = new File(localFile).getAbsoluteFile();
+        if (!source.isFile() || source.length() == 0) {
+            log.error("上传模型失败：模型文件不存在或为空");
+            return false;
+        }
+        Boolean result = FtpUtils.getInstance().uploadToCenterNormal(localFile, destDir, destName);
+        if (!Boolean.TRUE.equals(result)) {
+            log.error("上传模型失败");
+        }
+        return Boolean.TRUE.equals(result);
     }
 
     /**
@@ -226,7 +235,10 @@ public class CenterModelSyncBuilder {
         if (!dir.exists()) {// 判断目录是否存在
             dir.mkdirs();
         }
-        CenterXmlTool.toFile(fullName, t);
+        CenterXmlTool.toFileChecked(fullName, t);
+        if (!file.isFile() || file.length() == 0) {
+            throw new IllegalStateException("Generated model XML is missing or empty: " + file.getAbsolutePath());
+        }
     }
 
     public String deviceTypeNum(String deviceName) {

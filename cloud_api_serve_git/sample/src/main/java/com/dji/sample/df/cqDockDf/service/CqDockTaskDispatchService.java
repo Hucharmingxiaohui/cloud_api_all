@@ -41,6 +41,8 @@ public class CqDockTaskDispatchService {
 
     @Resource
     private CqEuaRoutePointService cqEuaRoutePointService;
+    @Resource
+    private CqDockInfraredMockScenario infraredMockScenario;
 
     public CqDockTaskDispatchResult dispatchPlanPoints(String snapshot, String subCode, String expectedRouteId,
                                                        String expectedRouteName, String taskCode,
@@ -80,6 +82,7 @@ public class CqDockTaskDispatchService {
         log.info("EUA任务准备调用下级任务下发: taskCode={}, bayId={}, routeId={}, request={}",
                 taskCode, bayId, routeId, JSONObject.toJSONString(request));
 
+        infraredMockScenario.validateDispatch(routeId, subCode);
         CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, bayId, routeId, null, null,
                 "待下发", null, false, reportToPatrol, null, subCode);
         CqApiResponse response = cqDockApiService.assignTask(request);
@@ -161,6 +164,7 @@ public class CqDockTaskDispatchService {
         request.setTaskName(taskName);
         request.setBusinessId(taskCode);
         request.setRouteId(routeId);
+        infraredMockScenario.validateDispatch(routeId, subCode);
         CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, null, routeId, null, null,
                 "待下发", null, false, reportToPatrol, snapshot, subCode);
         CqApiResponse response;

@@ -43,4 +43,14 @@ public class CqDockProperties {
      * 本地联调：true 时跳过真实 FTP 上传，直接返回 mock 路径（无中心 FTP 环境时保证 Type=61 链路可验证）
      */
     private Boolean mockSkipFtp = false;
+
+    private boolean mockEnabled = false;
+
+    private MockScenario mockScenario = new MockScenario();
+
+    @Data
+    public static class MockScenario {
+        private boolean enabled = false;
+        private String sourcePath = "D:/test-pictures";
+    }
 }

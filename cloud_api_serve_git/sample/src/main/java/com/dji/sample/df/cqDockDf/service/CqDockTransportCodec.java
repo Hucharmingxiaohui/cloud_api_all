@@ -40,8 +40,8 @@ public class CqDockTransportCodec {
             byte[] decoded = cipher.doFinal(Base64.getDecoder().decode(input));
             return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
                     .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(decoded)).toString();
-        } catch (Exception ignored) {
-            throw new IllegalArgumentException("EUA数据加解密失败");
+        } catch (Exception e) {
+            throw new IllegalArgumentException("EUA数据加解密失败", e);
         }
     }
 
