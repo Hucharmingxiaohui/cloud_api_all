@@ -45,6 +45,9 @@ import java.util.stream.Collectors;
 public class CqEuaPlanService {
 
     @Resource
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
+    @Resource
     private FjFileConfig fjFileConfig;
 
     @Resource
@@ -101,6 +104,7 @@ public class CqEuaPlanService {
         CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveIds(request.getPointIds());
         Date now = new Date();
         CqEuaPlanEntity entity = new CqEuaPlanEntity();
+        entity.setPlanSource("PLATFORM");
         entity.setPlanName(request.getPlanName().trim());
         applySelection(entity, selection);
         entity.setRemark(request.getRemark());
@@ -120,6 +124,7 @@ public class CqEuaPlanService {
         if (entity == null) {
             throw new IllegalArgumentException("计划不存在");
         }
+        requirePlatformPlan(entity);
         validatePlan(request.getPlanName(), request.getEnabled());
         CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveIds(request.getPointIds());
         entity.setPlanName(request.getPlanName().trim());
@@ -137,6 +142,8 @@ public class CqEuaPlanService {
         if (id == null) {
             throw new IllegalArgumentException("计划ID不能为空");
         }
+        CqEuaPlanEntity plan = cqEuaPlanMapper.selectById(id);
+        if (plan != null) requirePlatformPlan(plan);
         cqEuaPlanMapper.deleteById(id);
     }
 
@@ -148,6 +155,7 @@ public class CqEuaPlanService {
         if (plan == null) {
             throw new IllegalArgumentException("计划不存在");
         }
+        requirePlatformPlan(plan);
         if (plan.getEnabled() != null && plan.getEnabled() == 0) {
             throw new IllegalArgumentException("计划已停用");
         }
@@ -160,9 +168,59 @@ public class CqEuaPlanService {
         String taskCode = "EUA_PLAN_" + plan.getId() + "_" + timestamp;
         String taskName = plan.getPlanName() + "_" + timestamp;
         String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchPlanPoints(
-                selection.getPointCodes(), plan.getSubCode(), plan.getRouteId(), plan.getRouteName(),
-                taskCode, taskName, fixedStartTime);
+        return executeLinkedPlan(plan, selection.getPointCodes(), taskCode, taskName, fixedStartTime, false);
+    }
+
+    public CqDockTaskDispatchResult executePatrolPlan(CqEuaPlanEntity plan, String fixedStartTime) {
+        if (!"PATROL".equals(plan.getPlanSource()) || plan.getId() == null
+                || !StringUtils.hasText(plan.getPatrolTaskCode())) {
+            throw new IllegalArgumentException("巡视计划来源或原始任务编码无效");
+        }
+        org.springframework.transaction.support.TransactionTemplate preparation =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        preparation.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        // Claim and task intent must commit together, before the EUA HTTP endpoint can observe them.
+        CqDockTaskRecordEntity prepared = preparation.execute(status -> {
+            int claimed = cqEuaPlanMapper.update(null,
+                    new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqEuaPlanEntity>()
+                            .eq(CqEuaPlanEntity::getId, plan.getId())
+                            .isNull(CqEuaPlanEntity::getLastTaskCode)
+                            .set(CqEuaPlanEntity::getLastTaskCode, plan.getPatrolTaskCode())
+                            .set(CqEuaPlanEntity::getLastExecuteStatus, 2)
+                            .set(CqEuaPlanEntity::getLastExecuteMsg, "下发准备已持久化，请勿重复下发；中断后需核实EUA接收情况")
+                            .set(CqEuaPlanEntity::getUpdateTime, new Date()));
+            return claimed == 1 ? cqDockTaskDispatchService.preparePatrolPlan(plan) : null;
+        });
+        if (prepared == null) {
+            CqEuaPlanEntity existing = cqEuaPlanMapper.selectById(plan.getId());
+            CqDockTaskDispatchResult result = new CqDockTaskDispatchResult();
+            result.setTaskCode(plan.getPatrolTaskCode());
+            result.setTaskName(plan.getPlanName());
+            result.setRouteId(plan.getRouteId());
+            result.setEuaTaskId(existing == null ? null : existing.getLastEuaTaskId());
+            result.setSuccess(existing != null && StringUtils.hasText(existing.getLastEuaTaskId()));
+            result.setResponseMsg("巡视任务已接收，不重复下发");
+            return result;
+        }
+        return executeLinkedPlan(plan, plan.getPointCodes(), plan.getPatrolTaskCode(), plan.getPlanName(), fixedStartTime, true, prepared);
+    }
+
+    private CqDockTaskDispatchResult executeLinkedPlan(CqEuaPlanEntity plan, String snapshot, String taskCode,
+            String taskName, String fixedStartTime, boolean patrol) {
+        return executeLinkedPlan(plan, snapshot, taskCode, taskName, fixedStartTime, patrol, null);
+    }
+
+    private CqDockTaskDispatchResult executeLinkedPlan(CqEuaPlanEntity plan, String snapshot, String taskCode,
+            String taskName, String fixedStartTime, boolean patrol, CqDockTaskRecordEntity prepared) {
+        CqDockTaskDispatchResult result;
+        try {
+            result = prepared != null ? cqDockTaskDispatchService.assignPreparedRecord(prepared, fixedStartTime)
+                    : cqDockTaskDispatchService.dispatchLinkedPlan(snapshot, plan.getSubCode(), plan.getRouteId(),
+                    taskCode, taskName, fixedStartTime, plan.getId(), patrol);
+        } catch (Exception e) {
+            log.error("EUA计划执行异常: planId={}, taskCode={}", plan.getId(), taskCode, e);
+            result = CqDockTaskDispatchResult.failed(taskCode, taskName, null, plan.getRouteId(), e.getMessage());
+        }
         plan.setLastTaskCode(taskCode);
         plan.setLastEuaTaskId(result.getEuaTaskId());
         plan.setLastExecuteTime(new Date());
@@ -170,7 +228,7 @@ public class CqEuaPlanService {
         plan.setLastExecuteMsg(result.getResponseMsg());
         plan.setUpdateTime(new Date());
         // Only write execution metadata: a concurrently edited selection must not be overwritten.
-        cqEuaPlanMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqEuaPlanEntity>()
+        int updated = cqEuaPlanMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqEuaPlanEntity>()
                 .eq(CqEuaPlanEntity::getId, plan.getId())
                 .set(CqEuaPlanEntity::getLastTaskCode, plan.getLastTaskCode())
                 .set(CqEuaPlanEntity::getLastEuaTaskId, plan.getLastEuaTaskId())
@@ -178,7 +236,14 @@ public class CqEuaPlanService {
                 .set(CqEuaPlanEntity::getLastExecuteStatus, plan.getLastExecuteStatus())
                 .set(CqEuaPlanEntity::getLastExecuteMsg, plan.getLastExecuteMsg())
                 .set(CqEuaPlanEntity::getUpdateTime, plan.getUpdateTime()));
+        if (updated != 1) throw new IllegalStateException("EUA计划执行结果保存失败，请核实飞行任务记录，勿重复下发");
         return result;
+    }
+
+    private void requirePlatformPlan(CqEuaPlanEntity plan) {
+        if ("PATROL".equals(plan.getPlanSource())) {
+            throw new IllegalArgumentException("巡视任务计划保留原始下发快照，不允许手工执行、编辑或删除");
+        }
     }
 
     public List<CqEuaBayOption> bayOptions() {
@@ -208,8 +273,10 @@ public class CqEuaPlanService {
         int pageSize = request.getPageSize() == null || request.getPageSize() <= 0 ? 10 : request.getPageSize();
         String businessPrefix = request.getPlanId() == null ? null : "EUA_PLAN_" + request.getPlanId() + "_";
         LambdaQueryWrapper<CqDockTaskRecordEntity> wrapper = new LambdaQueryWrapper<CqDockTaskRecordEntity>()
-                .likeRight(CqDockTaskRecordEntity::getBusinessId, "EUA_PLAN_")
-                .likeRight(StringUtils.hasText(businessPrefix), CqDockTaskRecordEntity::getBusinessId, businessPrefix)
+                .and(w -> w.likeRight(CqDockTaskRecordEntity::getBusinessId, "EUA_PLAN_")
+                        .or().isNotNull(CqDockTaskRecordEntity::getPlanId))
+                .and(request.getPlanId() != null, w -> w.eq(CqDockTaskRecordEntity::getPlanId, request.getPlanId())
+                        .or().likeRight(CqDockTaskRecordEntity::getBusinessId, businessPrefix))
                 .like(StringUtils.hasText(request.getTaskName()), CqDockTaskRecordEntity::getTaskName, request.getTaskName())
                 .like(StringUtils.hasText(request.getEuaTaskId()), CqDockTaskRecordEntity::getEuaTaskId, request.getEuaTaskId())
                 .orderByDesc(CqDockTaskRecordEntity::getCreateTime)
@@ -217,6 +284,10 @@ public class CqEuaPlanService {
         IPage<CqDockTaskRecordEntity> result = cqDockTaskRecordMapper.selectPage(new Page<>(page, pageSize), wrapper);
         Map<Long, List<CqDockTaskRecordEntity>> byPlan = new LinkedHashMap<>();
         for (CqDockTaskRecordEntity record : result.getRecords()) {
+            if (record.getPlanId() != null) {
+                byPlan.computeIfAbsent(record.getPlanId(), key -> new ArrayList<>()).add(record);
+                continue;
+            }
             String code = record.getBusinessId();
             if (code != null && code.matches("EUA_PLAN_[0-9]+_[0-9]+")) {
                 try {
@@ -302,6 +373,11 @@ public class CqEuaPlanService {
         plan.setPointCount(0);
         plan.setRequiresPointSelection(true);
         if (!StringUtils.hasText(plan.getPointCodes())) return;
+        if ("PATROL".equals(plan.getPlanSource())) {
+            plan.setPointCount(cqEuaRoutePointService.parseCodes(plan.getPointCodes()).size());
+            plan.setRequiresPointSelection(false);
+            return;
+        }
         try {
             plan.setPointCount(cqEuaRoutePointService.parseCodes(plan.getPointCodes()).size());
             CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveSnapshot(

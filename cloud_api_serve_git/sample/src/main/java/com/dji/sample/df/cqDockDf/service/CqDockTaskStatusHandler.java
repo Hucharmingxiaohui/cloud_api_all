@@ -51,11 +51,15 @@ public class CqDockTaskStatusHandler {
 
     public String syncResults(Long recordId) {
         CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
+        boolean linkedPatrol = record != null && "PATROL".equals(record.getTaskSource()) && record.getPlanId() != null;
+        return syncResults(record, !linkedPatrol && record != null && !Objects.equals(record.getReportToPatrol(), 0), !linkedPatrol);
+    }
+
+    private String syncResults(CqDockTaskRecordEntity record, boolean reportToPatrol, boolean legacy) {
         if (record == null || !Objects.equals(record.getSuccess(), 1)
                 || !StringUtils.hasText(record.getBusinessId()) || !StringUtils.hasText(record.getEuaTaskId())) {
             throw new IllegalArgumentException("任务记录不存在或未成功下发，不能同步结果");
         }
-        boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
         if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
             throw new IllegalStateException("任务缺少原始站点Code，请核实原报文后补录，不能同步结果");
         }
@@ -77,13 +81,24 @@ public class CqDockTaskStatusHandler {
             String[] labels = {"待执行", "已完成", "执行中", "失败", "已下发待执行", "暂停", "终止"};
             throw new IllegalStateException("任务是" + labels[Integer.parseInt(state)] + "状态，暂时不能同步结果");
         }
-        cqDockPictureReportService.syncResults(record, () -> {
+        Runnable completed = () -> {
             if (reportToPatrol) {
                 sendTaskStatus(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(),
                         "1", 100, null, "1", record.getSubCode());
             }
-        });
+        };
+        if (legacy) cqDockPictureReportService.syncResults(record, completed);
+        else cqDockPictureReportService.syncResults(record, reportToPatrol, completed);
         return "已提交同步，已有图片记录和本地原图复用，重新分析；可见光分析结果等待回调";
+    }
+
+    public String syncResultsAndReport(Long recordId) {
+        CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
+        if (record == null || !"PATROL".equals(record.getTaskSource()) || record.getPlanId() == null
+                || !Objects.equals(record.getReportToPatrol(), 1)) {
+            throw new IllegalArgumentException("仅上级巡视任务支持结果同步上报");
+        }
+        return syncResults(record, true, false);
     }
 
     public void startMonitoring(String taskCode, String taskName, String euaTaskId, String fixedStartTime) {
@@ -202,8 +217,8 @@ public class CqDockTaskStatusHandler {
                     processed = cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
                 }
                 if (!processed) return;
-                if (!reportToPatrol) {
-                    updateEuaPlanExecuteStatus(taskCode, "1".equals(euaStatus), "EUA任务结束，状态=" + euaStatus);
+                if (!reportToPatrol || record.getPlanId() != null) {
+                    updateEuaPlanExecuteStatus(record, "1".equals(euaStatus), "EUA任务结束，状态=" + euaStatus);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);
@@ -225,20 +240,24 @@ public class CqDockTaskStatusHandler {
         return result;
     }
 
-    private void updateEuaPlanExecuteStatus(String taskCode, boolean success, String message) {
+    private void updateEuaPlanExecuteStatus(CqDockTaskRecordEntity record, boolean success, String message) {
+        String taskCode = record.getBusinessId();
         if (!StringUtils.hasText(taskCode)) {
             return;
         }
-        CqEuaPlanEntity plan = cqEuaPlanMapper.selectOne(new LambdaQueryWrapper<CqEuaPlanEntity>()
+        CqEuaPlanEntity plan = record.getPlanId() != null ? cqEuaPlanMapper.selectById(record.getPlanId())
+                : cqEuaPlanMapper.selectOne(new LambdaQueryWrapper<CqEuaPlanEntity>()
                 .eq(CqEuaPlanEntity::getLastTaskCode, taskCode)
                 .last("LIMIT 1"));
         if (plan == null) {
             return;
         }
-        plan.setLastExecuteStatus(success ? 1 : 0);
-        plan.setLastExecuteMsg(message);
-        plan.setUpdateTime(new Date());
-        cqEuaPlanMapper.updateById(plan);
+        cqEuaPlanMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<CqEuaPlanEntity>()
+                .eq(CqEuaPlanEntity::getId, plan.getId())
+                .eq(CqEuaPlanEntity::getLastTaskCode, taskCode)
+                .set(CqEuaPlanEntity::getLastExecuteStatus, success ? 1 : 0)
+                .set(CqEuaPlanEntity::getLastExecuteMsg, message)
+                .set(CqEuaPlanEntity::getUpdateTime, new Date()));
     }
 
     private String extractStatus(JSONObject data) {
