@@ -346,6 +346,21 @@ public class FlightTaskServiceImpl extends AbstractWaylineService implements IFl
             saveFrogJumpTaskPair(waylineJob, createJobParam);
         }
 
+        if (TaskTypeEnum.IMMEDIATE == waylineJob.getTaskType() && !isFrogJumpMode(createJobParam)) {
+            try {
+                missionThermalPaletteService.powerOnBeforePrepare(waylineJob.getDockSn());
+            } catch (RuntimeException ex) {
+                waylineJobService.updateJob(WaylineJobDTO.builder()
+                        .workspaceId(waylineJob.getWorkspaceId()).jobId(waylineJob.getJobId())
+                        .executeTime(LocalDateTime.now()).completedTime(LocalDateTime.now())
+                        .status(WaylineJobStatusEnum.FAILED.getVal()).build());
+                log.error("Thermal palette power-on preflight failed; job={}, dock={}: {}",
+                        waylineJob.getJobId(), waylineJob.getDockSn(), ex.getMessage(), ex);
+                throw new IllegalStateException("Thermal palette preflight failed; flight was not prepared: "
+                        + ex.getMessage(), ex);
+            }
+        }
+
         boolean isSuccess = isFrogJumpMode(createJobParam)
                 ? this.prepareFrogJumpFlightTask(waylineJob, createJobParam)
                 : this.prepareFlightTask(waylineJob);

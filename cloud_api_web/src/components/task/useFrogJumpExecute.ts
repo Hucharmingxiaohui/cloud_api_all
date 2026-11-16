@@ -55,6 +55,7 @@ async function executeNormalPlan (plan: any, onSuccess: () => void) {
     ElMessage.error(res.message || '任务下发失败')
     return
   }
+  ElMessage.success('任务下发成功')
   onSuccess()
 }
 
@@ -72,6 +73,7 @@ async function executeFrogJumpPlan (plan: any, onSuccess: () => void) {
     ElMessage.error(res.message || '蛙跳任务下发失败')
     return
   }
+  ElMessage.success('蛙跳任务下发成功')
   onSuccess()
 }
 
