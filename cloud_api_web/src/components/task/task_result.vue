@@ -42,6 +42,17 @@
             重置报告
           </el-button>
           <el-button
+            v-if="resultType === 3"
+            class="new_btn"
+            type="primary"
+            :icon="Refresh"
+            :loading="syncImagesBusy"
+            :disabled="syncImagesBusy"
+            @click="syncImages"
+          >
+            同步图片结果
+          </el-button>
+          <el-button
             class="new_btn"
             type="primary"
             @click="goBackToTaskList"
@@ -549,7 +560,7 @@ import { useRouter } from 'vue-router'
 import { CURRENT_CONFIG as config } from '/@/api/http/config'
 import { downloadFile } from '/@/utils/common'
 import { Search, Download, Document, Upload, Refresh, Delete } from '@element-plus/icons-vue'
-import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi, previewCollectionReportApi } from '/@/api/media'
+import { downloadMediaFile, getTaskResultTypeApi, getFlyTaskResultApi, downloadOriginImageZipApi, importLabelImageApi, downloadFlyTaskReportApi, downloadImageZipApi, createFlyTaskReportApi, downloadThumbnail, deleteFlyTaskReportApi, previewCollectionReportApi, syncOrdinaryImagesApi } from '/@/api/media'
 import { getDefectTypeMapApi, updateDefectTypeApi } from '/@/api/turbine/defect.ts'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import TempDet from '/@/components/task/tempDet.vue'
@@ -557,6 +568,22 @@ import TempCalibration from '/@/components/task/tempCalibration.vue'
 import { getImageUrl } from '/@/common/url'
 import { renderAsync } from 'docx-preview'
 import { ElMessage, ElMessageBox } from 'element-plus'
+const syncImagesBusy = ref(false)
+
+async function syncImages () {
+  if (syncImagesBusy.value) return
+  syncImagesBusy.value = true
+  try {
+    const response = await syncOrdinaryImagesApi(jobInfo.job_id)
+    if (response.code !== 0) throw new Error(response.message || '图片同步失败')
+    await getFiles()
+    ElMessage.success('当前已上传图片结果同步成功')
+  } catch (error: any) {
+    ElMessage.error(error?.response?.data?.message || error?.message || '图片同步失败，请重试')
+  } finally {
+    syncImagesBusy.value = false
+  }
+}
 const reportBusy = ref(false)
 let reportMounted = true
 function clearOrdinaryReportPreview () {
@@ -920,7 +947,7 @@ async function handleCorrection () {
  * */
 const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)!
 async function getFiles () {
-  getFlyTaskResultApi({
+  return getFlyTaskResultApi({
     job_id: jobInfo.job_id,
     workspace_id: workspaceId,
     page: paginationProp.current,

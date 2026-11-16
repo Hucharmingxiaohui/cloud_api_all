@@ -182,33 +182,43 @@ public class PictureSaveHandler {
             }
             return Result.success(map);
         }else if(pubWaylineJobPlanDfEntity.getPlanType()==3){
-//          普通航线图片保存
-            Map map = new HashMap();
-            int index = 0;
-            for (MediaFileEntity mediaFileEntity : djiFiles) {
-                URL url = fileService.getObjectUrl(workspaceEntity.getWorkspaceId(), mediaFileEntity.getFileId());
-                String fileName;
-                if (index < points.size()) {
-                    String pointName = points.getString(index);
-                    fileName = pointName;
-                } else {
-                    fileName = mediaFileEntity.getFileName() != null ?
-                            mediaFileEntity.getFileName() :
-                            "file_" + mediaFileEntity.getFileId() + ".dat";
-                }
-                String regId="1";
-//              普通照片regId保存形式为：1
-                String filePictrueUrl = fileConfig.getRecfilePath()+fileConfig.getRecfileNativePath();
-                String localFilePath = downloadAndConvertToJpeg2(regId,url.toString(), fileName, filePictrueUrl, jobId,fileConfig.getRecfileNativePath());
-                log.info("保存对应点位-----");
-                map.put(fileName, localFilePath);
-                index++;
-            }
-            return Result.success(map);
+            return Result.success(saveOrdinaryImages(waylineJobEntity, djiFiles));
         }else {
             return Result.success(new HashMap<>());
         }
 
+    }
+
+    public Map<String, String> syncOrdinaryImages(WaylineJobEntity job) throws IOException {
+        if (centerOrdinaryTasks.findJob(job.getJobId()) != null) {
+            throw new IllegalArgumentException("上级普通航线选中点位任务不支持全量图片同步");
+        }
+        List<MediaFileEntity> media = iFileMapperDf.selectList(new LambdaQueryWrapper<MediaFileEntity>()
+                .eq(MediaFileEntity::getJobId, job.getJobId())
+                .eq(MediaFileEntity::getWorkspaceId, job.getWorkspaceId())
+                .orderByAsc(MediaFileEntity::getId));
+        return saveOrdinaryImages(job, media);
+    }
+
+    private Map<String, String> saveOrdinaryImages(WaylineJobEntity job, List<MediaFileEntity> media) throws IOException {
+        if (job.getJobId() == null || !job.getJobId().matches("[a-zA-Z0-9_-]+")) {
+            throw new IllegalArgumentException("任务标识无效");
+        }
+        Map<String, String> saved = new java.util.LinkedHashMap<>();
+        for (MediaFileEntity file : media) {
+            String name = file.getFileName();
+            if (name == null || !name.toLowerCase(java.util.Locale.ROOT).matches(".*\\.(jpe?g|png|bmp|tiff?)$")) continue;
+            if (name.contains("/") || name.contains("\\") || name.contains(":")) {
+                throw new IllegalArgumentException("图片文件名无效");
+            }
+            URL url = fileService.getObjectUrl(job.getWorkspaceId(), file.getFileId());
+            if (url == null) throw new IOException("无法获取图片下载地址");
+            String path = downloadAndConvertToJpeg2("1", url.toString(), name,
+                    fileConfig.getRecfilePath() + fileConfig.getRecfileNativePath(),
+                    job.getJobId(), fileConfig.getRecfileNativePath());
+            saved.put(name, path);
+        }
+        return saved;
     }
 
     public static String downloadAndConvertToJpeg(String url, String localFileName, String filePictrueUrl,String jobId) throws IOException {
@@ -273,7 +283,7 @@ public class PictureSaveHandler {
         localFileName = fileNameWithoutExt + ".jpg";
 
         String localFilePath = tempDir + "/" + regId+"_"+localFileName;
-
+        Path staging = Files.createTempFile(tempPath, ".image-", ".tmp");
         try {
             // 检查URL是否以jpg/jpeg结尾（不区分大小写）
             String lowerUrl = url.toLowerCase();
@@ -286,7 +296,7 @@ public class PictureSaveHandler {
                 System.out.println("检测到JPEG格式，直接下载保存...");
 
                 try (InputStream in = new URL(url).openStream();
-                     FileOutputStream out = new FileOutputStream(localFilePath)) {
+                     FileOutputStream out = new FileOutputStream(staging.toFile())) {
                     byte[] buffer = new byte[4096];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
@@ -308,7 +318,7 @@ public class PictureSaveHandler {
                 }
 
                 // 创建JPG文件并保存
-                File outputFile = new File(localFilePath);
+                File outputFile = staging.toFile();
                 boolean success = ImageIO.write(image, "jpg", outputFile);
 
                 if (!success) {
@@ -318,11 +328,20 @@ public class PictureSaveHandler {
                 System.out.println("图片成功转换为JPEG格式: " + localFilePath);
             }
 
+            if (Files.size(staging) == 0) throw new IOException("图片内容为空");
+            try {
+                Files.move(staging, Paths.get(localFilePath), java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(staging, Paths.get(localFilePath), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
             return nativePath + jobId + "/" + regId+"_"+localFileName;
 
         } catch (IOException e) {
             System.err.println("图片处理失败: " + e.getMessage());
             throw e;
+        } finally {
+            Files.deleteIfExists(staging);
         }
     }
 

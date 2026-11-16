@@ -3,6 +3,11 @@ import request, { CommonListResponse, IPage, IWorkspaceResponse } from '/@/api/h
 const HTTP_PREFIX = '/media/api/v1'
 const HTTP_PREFIX_TWO = '/fjReport/api/v1'
 
+export async function syncOrdinaryImagesApi (jobId: string): Promise<IWorkspaceResponse<{}>> {
+  const result = await request.post(`${HTTP_PREFIX_TWO}/syncOrdinaryImages`, { jobId }, { timeout: 300000 })
+  return result.data
+}
+
 // Get Media Files
 export const getMediaFiles = async function (wid: string, pagination: IPage): Promise<IWorkspaceResponse<any>> {
   const url = `${HTTP_PREFIX}/files/${wid}/files?page=${pagination.page}&page_size=${pagination.page_size}`
