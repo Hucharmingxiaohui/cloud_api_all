@@ -310,7 +310,7 @@ const planBody = reactive({
   poi_orbit_num: 1,
   username: 'pilot',
   plan_type: type.value,
-  rth_altitude: '',
+  rth_altitude: type.value === '3' ? '50' : '',
   out_of_control: 0, // 默认返回
   enable_status: 0,
   plan_priority: 1
