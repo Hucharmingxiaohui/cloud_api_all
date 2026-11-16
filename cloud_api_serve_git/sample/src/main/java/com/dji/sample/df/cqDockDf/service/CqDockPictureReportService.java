@@ -66,10 +66,14 @@ public class CqDockPictureReportService {
     private final Striped<Lock> taskLocks = Striped.lock(256);
 
     public void syncResults(CqDockTaskRecordEntity record, Runnable reportCompleted) {
+        syncResults(record, !Objects.equals(record.getReportToPatrol(), 0), reportCompleted);
+    }
+
+    public void syncResults(CqDockTaskRecordEntity record, boolean reportToPatrol, Runnable reportCompleted) {
         Lock lock = taskLocks.get(record.getEuaTaskId());
         if (!lock.tryLock()) throw new IllegalStateException("此任务正在同步图片，请稍后重试");
         try {
-            if (Objects.equals(record.getReportToPatrol(), 0)) {
+            if (!reportToPatrol) {
                 fetchSaveAndAnalyseOnly(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
             } else {
                 fetchSaveAndReport(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
@@ -486,6 +490,7 @@ public class CqDockPictureReportService {
                     measureInfrared(row, uniPoint, reportToPatrol);
                 } else {
 //                  可见光图片对接分析
+                    row.setAnalysisReportToPatrol(reportToPatrol ? 1 : 0);
                     if (submitVisibleAnalysis(row, uniPoint, taskName, euaTaskId)) {
                         pendingCallback++;
                     }
@@ -551,6 +556,7 @@ public class CqDockPictureReportService {
     }
 
     private boolean shouldReportToPatrol(CqDockTaskPictureEntity row) {
+        if (Objects.equals(row.getAnalysisReportToPatrol(), 0)) return false;
         CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
         return record != null && Objects.equals(record.getBusinessId(), row.getBusinessId())
                 && !Objects.equals(record.getReportToPatrol(), 0);

@@ -16,6 +16,12 @@ public class CqEuaPlanEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("plan_source")
+    private String planSource;
+
+    @TableField("patrol_task_code")
+    private String patrolTaskCode;
+
     @TableField("plan_name")
     private String planName;
 

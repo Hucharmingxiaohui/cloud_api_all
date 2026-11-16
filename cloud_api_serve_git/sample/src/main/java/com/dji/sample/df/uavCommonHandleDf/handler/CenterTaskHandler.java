@@ -8,7 +8,7 @@ import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.component.redis.RedisOpsUtils;
 import com.dji.sample.common.model.CustomClaim;
 import com.dji.sample.df.cqDockDf.model.dto.CqDockTaskDispatchResult;
-import com.dji.sample.df.cqDockDf.service.CqDockTaskDispatchService;
+import com.dji.sample.df.cqDockDf.service.CqEuaPatrolPlanService;
 import com.dji.sample.df.electricInspectionDf.dao.PubWaylineJobPlanDfMapper;
 import com.dji.sample.df.electricInspectionDf.model.PubWaylineJobPlanDfEntity;
 import com.dji.sample.df.electricInspectionDf.service.PubWaylineJobPlanDfService;
@@ -46,8 +46,8 @@ public class CenterTaskHandler {
     private IWaylineJobMapper waylineJobMapper;
     @Autowired
     UniPointMapper2 uniPointMapper2;
-    @Autowired
-    private CqDockTaskDispatchService cqDockTaskDispatchService;
+    @javax.annotation.Resource
+    private CqEuaPatrolPlanService cqEuaPatrolPlanService;
 
     @Value("${solar.center-plan-prefix:上级}")
     private String solarCenterPlanPrefix;
@@ -435,7 +435,7 @@ public class CenterTaskHandler {
      */
     private TaskExecutionResult executeCqDockTask(String pointCodes, String subCode, String taskCode, String taskName, String fixedStartTime) {
         try {
-            CqDockTaskDispatchResult result = cqDockTaskDispatchService.dispatchByPoints(pointCodes, subCode, taskCode, taskName, fixedStartTime, true);
+            CqDockTaskDispatchResult result = cqEuaPatrolPlanService.createAndExecute(pointCodes, subCode, taskCode, taskName, fixedStartTime);
             return result.isSuccess() ? TaskExecutionResult.success(result.getEuaTaskId()) : TaskExecutionResult.failed();
         } catch (Exception e) {
             log.error("EUA点位任务执行失败: taskCode={}", taskCode, e);
