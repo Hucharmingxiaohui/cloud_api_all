@@ -325,7 +325,7 @@
             <strong>文件大小:</strong>
             <input
               type="text"
-              :value="Number(selectedImage.size).toFixed(2) + 'M'"
+              :value="formatImageSize(selectedImage.size)"
               class="info-input"
               readonly
             />
@@ -478,7 +478,7 @@
             <strong>文件大小:</strong>
             <input
               type="text"
-              :value="Number(selectedImage.size).toFixed(2) + 'M'"
+              :value="formatImageSize(selectedImage.size)"
               class="info-input"
               readonly
             />
@@ -1065,7 +1065,7 @@ async function openPreviewModal (row: any) {
   selectedImage.value.Temp = ''
   selectedImage.value.width = 0
   selectedImage.value.height = 0
-  selectedImage.value.size = 0.00
+  selectedImage.value.size = null
   // 将弹窗显示状态设为 true
   previewVisible.value = true
 
@@ -1081,10 +1081,15 @@ async function openPreviewAnaysisModal (row:any) {
   selectedImage.value.Temp = ''
   selectedImage.value.width = 0
   selectedImage.value.height = 0
-  selectedImage.value.size = 0.00
+  selectedImage.value.size = null
   // 将弹窗显示状态设为 true
   previewAnaysisVisible.value = true
   getImageAttributes(row.defect_image_url)
+}
+
+function formatImageSize (size: number | null | undefined): string {
+  if (size == null || !Number.isFinite(size)) return '--'
+  return size < 0.01 ? `${(size * 1024).toFixed(2)}KB` : `${size.toFixed(2)}M`
 }
 
 // 获取图片属性信息
@@ -1096,23 +1101,16 @@ async function getImageAttributes (Url: string) {
     // 获取图片信息
     const img = new Image()
 
-    const imageInfo = await new Promise<{ width: number; height: number; size: number }>((resolve, reject) => {
+    const imageInfo = await new Promise<{ width: number; height: number; size: number | null }>((resolve, reject) => {
       img.onload = async () => {
         try {
           // 获取文件大小
-          let fileSize = 0.0
-          // 如果是远程图片，尝试获取文件大小
-          if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-            try {
-              const response = await fetch(imageUrl, { method: 'HEAD' })
-              const contentLength = response.headers.get('content-length')
-              if (contentLength) {
-                const sizeInBytes = parseInt(contentLength, 10)
-                fileSize = parseFloat((sizeInBytes / (1024 * 1024)).toFixed(2))
-              }
-            } catch (e) {
-              console.warn('无法获取远程图片大小:', e)
-            }
+          let fileSize: number | null = null
+          try {
+            const response = await fetch(imageUrl)
+            if (response.ok) fileSize = (await response.blob()).size / (1024 * 1024)
+          } catch (e) {
+            console.warn('无法获取图片文件大小:', e)
           }
 
           resolve({
@@ -1148,13 +1146,13 @@ async function getImageAttributes (Url: string) {
     console.error('获取图片属性失败:', error)
     selectedImage.value.width = 0
     selectedImage.value.height = 0
-    selectedImage.value.size = 0.0
+    selectedImage.value.size = null
 
     // 返回默认值
     return {
       width: 0,
       height: 0,
-      size: 0.0
+      size: null
     }
   }
 }
