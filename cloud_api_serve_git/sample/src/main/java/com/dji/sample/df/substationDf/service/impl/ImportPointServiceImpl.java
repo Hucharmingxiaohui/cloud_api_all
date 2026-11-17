@@ -377,6 +377,9 @@ public class ImportPointServiceImpl extends ServiceImpl<UniPointMapper2, UniPoin
                 point.setDeviceType(Integer.valueOf(pointExcel.getDeviceType()));
             }
             point.setPointName(pointExcel.getPointName());
+            if (pointExcel.getWaylinePointName() != null) {
+                point.setWaylinePointName(pointExcel.getWaylinePointName());
+            }
             //获取点位类型枚举列表
             List<String> pointTypeList = Arrays.asList(StringUtils.split(pointExcel.getPointType(), ","));
             int pointType = PointDataTypeUtils.judgeDataTypeList(pointTypeList);
