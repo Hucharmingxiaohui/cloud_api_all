@@ -46,6 +46,10 @@ public class UniPointImportExcel2 {
 
     @Excel(name = "点位名称")
     private String pointName;
+
+    @Excel(name = "航线点位名称")
+    private String waylinePointName;
+
     /**
      * camera=摄像机点位,robot=机器人点位,uav=无人机点位,voice=声纹点位,online=在线监测点位
      */

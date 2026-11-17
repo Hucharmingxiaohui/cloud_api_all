@@ -58,6 +58,7 @@
              导入点位
             </el-button>
           </el-upload>
+          <el-button class="new_btn" type="primary" :icon="Upload" @click="prefixImportVisible = true">前缀导入点位</el-button>
           <el-button
             class="new_btn"
             type="primary"
@@ -222,6 +223,22 @@
         </template>
       </el-dialog>
 
+      <el-dialog v-model="prefixImportVisible" title="前缀导入点位" width="520px" :close-on-click-modal="false" :close-on-press-escape="!prefixImporting" :show-close="!prefixImporting" :before-close="closePrefixImport" @closed="resetPrefixImport">
+        <el-form label-width="100px" @submit.prevent="submitPrefixImport">
+          <el-form-item label="点位名称前缀" required>
+            <el-input v-model="pointNamePrefix" placeholder="请输入前缀，例如：航线1" :disabled="prefixImporting" />
+          </el-form-item>
+          <el-form-item label="Excel文件" required>
+            <input ref="prefixFileInput" type="file" accept=".xlsx,.xls" :disabled="prefixImporting" @change="selectPrefixImportFile" />
+          </el-form-item>
+          <el-alert v-if="prefixImportError" :title="prefixImportError" type="error" :closable="false" show-icon />
+        </el-form>
+        <template #footer>
+          <el-button :disabled="prefixImporting" @click="closePrefixImport(() => { prefixImportVisible = false })">取消</el-button>
+          <el-button type="primary" :loading="prefixImporting" :disabled="prefixImporting" @click="submitPrefixImport">导入</el-button>
+        </template>
+      </el-dialog>
+
       <!-- 点位编辑弹窗 -->
       <el-dialog
         v-model="pointEditVisible"
@@ -328,6 +345,69 @@ interface FileItem {
 }
 
 const fileList = ref<FileItem[]>([])
+const prefixImportVisible = ref(false)
+const prefixImporting = ref(false)
+const pointNamePrefix = ref('')
+const prefixImportFile = ref<File | null>(null)
+const prefixFileInput = ref<HTMLInputElement | null>(null)
+const prefixImportError = ref('')
+
+function resetPrefixImport () {
+  pointNamePrefix.value = ''
+  prefixImportFile.value = null
+  prefixImportError.value = ''
+  if (prefixFileInput.value) prefixFileInput.value.value = ''
+}
+
+function closePrefixImport (done: () => void) {
+  if (prefixImporting.value) return
+  resetPrefixImport()
+  done()
+}
+
+function selectPrefixImportFile (event: Event) {
+  prefixImportFile.value = (event.target as HTMLInputElement).files?.[0] || null
+  prefixImportError.value = ''
+}
+
+async function submitPrefixImport () {
+  if (prefixImporting.value) return
+  const prefix = pointNamePrefix.value.trim()
+  const file = prefixImportFile.value
+  prefixImportError.value = ''
+  if (!prefix) {
+    prefixImportError.value = '请输入点位名称前缀'
+    return
+  }
+  if (!file || !file.size) {
+    prefixImportError.value = '请选择要上传的文件'
+    return
+  }
+  if (!/\.(xlsx|xls)$/i.test(file.name)) {
+    prefixImportError.value = '只支持.xlsx或.xls格式的Excel文件'
+    return
+  }
+  const fileData = new FormData()
+  fileData.append('file', file, file.name)
+  fileData.append('pointNamePrefix', prefix)
+  prefixImporting.value = true
+  try {
+    const result = await importPointList(fileData)
+    const message = typeof result === 'string' ? result : result?.message
+    if (!message || !/成功:\s*\d+\s*条，失败:\s*0\s*条/.test(message)) {
+      prefixImportError.value = message || '导入失败，请稍后重试'
+      return
+    }
+    ElMessage.success(message)
+    resetPrefixImport()
+    prefixImportVisible.value = false
+    getPoinntList()
+  } catch (error: any) {
+    prefixImportError.value = error?.response?.data || error?.message || '导入失败，请稍后重试'
+  } finally {
+    prefixImporting.value = false
+  }
+}
 // 表格
 const tableData = ref([])
 

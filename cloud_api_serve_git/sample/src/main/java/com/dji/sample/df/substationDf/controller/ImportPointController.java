@@ -62,6 +62,7 @@ public class ImportPointController {
 
     @PostMapping("/import")
     public ResponseEntity<String> importPoint(@RequestPart("file") MultipartFile file ,
+                                              @RequestParam(value = "pointNamePrefix", required = false) String pointNamePrefix,
                                               HttpServletResponse response) throws Exception {
 
         // 1. 验证文件是否为空
@@ -103,6 +104,10 @@ public class ImportPointController {
                 try {
                     // 针对填写的每行点位数据新增点位信息
                     point = points.get(i);
+                    if (org.apache.commons.lang3.StringUtils.isNotBlank(pointNamePrefix)
+                            && org.apache.commons.lang3.StringUtils.isNotBlank(point.getPointName())) {
+                        point.setPointName(pointNamePrefix.trim() + "-" + point.getPointName());
+                    }
                     if (org.apache.commons.lang3.StringUtils.isBlank(point.getPointCode())) {
                         point.setPointCode(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
                     }
@@ -225,7 +230,7 @@ public class ImportPointController {
     private void writePointRow(Row row, com.dji.sample.center.entity.UniPoint point, CellStyle[] styles) {
         Object[] values = {
                 "", point.getSubCode(), point.getSubName(), point.getAreaName(), point.getBayName(), point.getDeviceName(), point.getDeviceType(),
-                point.getComponentName(), point.getPointCode(), point.getPointName(),
+                point.getComponentName(), point.getPointCode(), point.getPointName(), point.getWaylinePointName(),
                 point.getPointType() == null ? null : String.join(",", PointDataTypeUtils.judgeIntDataType(point.getPointType())),
                 point.getMeterType(), point.getAppearanceType(), point.getSaveTypeList(), point.getRecognitionTypeList(),
                 point.getPhase(), point.getLevel(), point.getPointDes(), point.getMapPos(), point.getUpperValue(), point.getLowerValue(),

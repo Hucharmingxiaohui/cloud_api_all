@@ -31,6 +31,9 @@ public class UniPoint {
     @TableField("point_name")
     private String pointName;
 
+    @TableField("wayline_point_name")
+    private String waylinePointName;
+
     /**
      * 点位类型 2机器人点位 3视频点位 4都有
      */
