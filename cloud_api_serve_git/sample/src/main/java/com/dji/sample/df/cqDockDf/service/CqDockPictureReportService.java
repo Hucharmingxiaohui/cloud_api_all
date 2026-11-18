@@ -515,9 +515,13 @@ public class CqDockPictureReportService {
         if (!StringUtils.hasText(row.getPointId())) {
             return null;
         }
-        return uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
-                .eq(UniPoint::getPointCode, row.getPointId().trim())
-                .last("LIMIT 1"));
+        CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
+        LambdaQueryWrapper<UniPoint> query = new LambdaQueryWrapper<UniPoint>()
+                .eq(UniPoint::getPointCode, row.getPointId().trim());
+        if (record != null && StringUtils.hasText(record.getSubCode())) {
+            query.eq(UniPoint::getSubCode, record.getSubCode());
+        }
+        return uniPointMapper2.selectOne(query.last("LIMIT 1"));
     }
 
     /**
@@ -917,9 +921,25 @@ public class CqDockPictureReportService {
         if (StringUtils.hasText(pointId)) {
             entity.setPointId(pointId.trim());
         }
-        if (StringUtils.hasText(pointName)) {
-            entity.setPointName(pointName);
+        if (!StringUtils.hasText(pointName) || pointType == null) {
+            UniPoint point = resolveUniPoint(entity);
+            if (point == null) {
+                throw new IllegalStateException("EUA图片缺少名称或类型且本地点位不存在：pointId=" + entity.getPointId());
+            }
+            if (!StringUtils.hasText(pointName)) {
+                pointName = point.getPointName();
+                if (!StringUtils.hasText(pointName)) {
+                    throw new IllegalStateException("EUA图片本地点位名称为空：pointId=" + entity.getPointId());
+                }
+            }
+            if (pointType == null) {
+                pointType = point.getPicType();
+                if (!Objects.equals(pointType, POINT_TYPE_VISIBLE) && !Objects.equals(pointType, POINT_TYPE_INFRARED)) {
+                    throw new IllegalStateException("EUA图片本地点位picType缺失或无效：pointId=" + entity.getPointId());
+                }
+            }
         }
+        entity.setPointName(pointName);
         // EUA photoStorage：1可见光、2红外；内部仍使用0/1。
         entity.setPointType(pointType);
         entity.setRawData(picture.toJSONString());
@@ -956,6 +976,7 @@ public class CqDockPictureReportService {
 
     private Integer parsePointType(JSONObject picture) {
         String value = picture.getString("photoStorage");
+        if (value == null) return null;
         if ("1".equals(value)) return POINT_TYPE_VISIBLE;
         if ("2".equals(value)) return POINT_TYPE_INFRARED;
         throw new IllegalArgumentException("未知EUA photoStorage: " + value);
