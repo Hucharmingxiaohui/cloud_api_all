@@ -101,6 +101,31 @@ public final class ConstructionAreaGeometry {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
+    public static List<String> parseTowerNos(String json) {
+        if (json == null || json.isEmpty()) throw new RuleException(404, "杆塔编号快照缺失");
+        try {
+            List<Object> raw = JSON.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<List<Object>>() { });
+            List<String> nos = new ArrayList<>();
+            for (Object item : raw) {
+                if (!(item instanceof String)) throw new RuleException(404, "杆塔编号快照无效");
+                String no = ((String) item).trim();
+                if (no.isEmpty()) throw new RuleException(404, "杆塔编号快照无效");
+                nos.add(no);
+            }
+            return nos;
+        } catch (RuleException e) { throw e; }
+        catch (Exception e) { throw new RuleException(404, "杆塔编号快照无效"); }
+    }
+
+    public static String toJsonStrings(List<String> values) {
+        StringBuilder builder = new StringBuilder("[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) builder.append(',');
+            builder.append('"').append(values.get(i).replace("\\", "\\\\").replace("\"", "\\\"")).append('"');
+        }
+        return builder.append(']').toString();
+    }
+
     public static List<Point> parse(String boundaryJson) {
         if (boundaryJson == null || boundaryJson.isEmpty()) throw new RuleException(404, "区域边界缺失");
         try {

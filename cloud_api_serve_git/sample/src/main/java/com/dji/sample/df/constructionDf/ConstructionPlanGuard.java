@@ -13,6 +13,11 @@ import java.util.*;
 /** Validation shared by the construction endpoint and the legacy dispatch path. */
 @Service
 public class ConstructionPlanGuard {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionLineTarget lineTargets;
+    private Map<String,Object> targetDetail(String w,String id) {
+        return ConstructionLineTarget.isLine(id) ? lineTargets.detail(w,id) : areas.detail(w,id);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
     private final ThreadLocal<String> dispatchPlan = new ThreadLocal<>();
     private final JdbcTemplate db;
@@ -38,7 +43,7 @@ public class ConstructionPlanGuard {
         if(!docks.isWorkspaceDock(workspace,sn)) throw new RuleException(400,"执行机巢须绑定到当前工作空间");
     }
     public Map<String,Object> route(String workspace,String area,String file,int version,boolean readFile) {
-        Map<String,Object> a=areas.detail(workspace,area);
+        Map<String,Object> a=targetDetail(workspace,area);
         if(Boolean.TRUE.equals(a.get("archived"))||!Boolean.TRUE.equals(a.get("enabled"))) throw new RuleException(400,"巡检区域已暂停或归档");
         if(((Number)a.get("version")).intValue()!=version) throw new RuleException(409,"区域版本已变化，请刷新并重新创建计划");
         Map<String,Object> r=routes.detail(workspace,area,file);
@@ -48,6 +53,9 @@ public class ConstructionPlanGuard {
         if(links.isEmpty()) throw new RuleException(409,"航线已解除区域关联");
         if(!"WGS84".equals(r.get("height_mode"))) throw new RuleException(409,"航线不是 WGS84 绝对航高，请重新生成 S 型航线后创建计划");
         Map<String,Object> result=new LinkedHashMap<>();result.put("area",a);result.put("wayline",r);result.put("file_sign",links.get(0).get("file_sign"));return result;
+    }
+    public void lineCoverage(String w,String id,String file,String sn) {
+        if(ConstructionLineTarget.isLine(id)) overall.validateLineCoverage(w,sn,targetDetail(w,id),routes.detail(w,id,file));
     }
     public void validate(PubWaylineJobPlanDfEntity p,boolean readFile) {
         Map<String,Object> link=relation(p.getWorkspaceId(),p.getPlanId());
@@ -61,6 +69,7 @@ public class ConstructionPlanGuard {
         } else snapshot=route(p.getWorkspaceId(),(String)link.get("area_id"),p.getFileId(),((Number)link.get("area_version")).intValue(),readFile);
         if(!Objects.equals(link.get("file_sign"),snapshot.get("file_sign"))) throw new RuleException(409,"航线文件已变化，请重新创建计划");
         dock(p.getWorkspaceId(),p.getDockSn());
+        if(!(frozen.get("overall_route") instanceof Map)) lineCoverage(p.getWorkspaceId(),(String)link.get("area_id"),p.getFileId(),p.getDockSn());
         if(Objects.equals(p.getTaskType(),1)&&(p.getBeginTime()==null||p.getBeginTime()<=System.currentTimeMillis())) throw new RuleException(400,"计划执行时间已过，请重新创建计划");
     }
     public PubWaylineJobPlanDfEntity resolve(String workspace,PubWaylineJobPlanDfEntity supplied) {

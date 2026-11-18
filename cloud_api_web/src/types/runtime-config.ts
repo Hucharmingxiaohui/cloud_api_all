@@ -18,7 +18,17 @@ export interface CloudRendererConfig {
   iceServers: CloudRendererIceServer[]
 }
 
+export interface FlightAirspaceConfig {
+  enabled: boolean
+  name: string
+  heightLabel: string
+  coordinateSystem: 'WGS84'
+  points: number[][]
+}
+
 export interface RuntimeConfig {
+  terrainElevation?: { enabled: boolean; url: string }
+  flightAirspace?: FlightAirspaceConfig
   /** 工地巡检部署隐藏其他专业菜单；默认关闭，仅布尔 true 开启 */
   constructionOnly?: boolean
   baseURL?: string

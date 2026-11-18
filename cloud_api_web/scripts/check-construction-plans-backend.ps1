@@ -16,12 +16,12 @@ if (!(Test-Path (Join-Path $SourceRoot 'ConstructionPlanChecks.java'))) {
   $sources += "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf/ConstructionPlanChecks.java"
 }
 $sources += "$javaRoot/df/constructionDf/ConstructionType.java"
-foreach ($name in @('ConstructionOverallService.java','ConstructionOverallController.java','ConstructionTaskService.java','ConstructionTaskController.java','ConstructionKmz.java','ConstructionPhotoNaming.java','ConstructionPreparationService.java','ConstructionPhotoAssociation.java','ConstructionTransferService.java','ConstructionTransferController.java','ConstructionAnalysisPolicy.java','ConstructionAnalysisConfigService.java','ConstructionAnalysisConfigController.java','ConstructionParkingController.java')) {
+foreach ($name in @('ConstructionOverallService.java','ConstructionOverallController.java','ConstructionTaskService.java','ConstructionTaskController.java','ConstructionKmz.java','ConstructionPhotoNaming.java','ConstructionPreparationService.java','ConstructionPhotoAssociation.java','ConstructionTransferService.java','ConstructionTransferController.java','ConstructionAnalysisPolicy.java','ConstructionAnalysisConfigService.java','ConstructionAnalysisConfigController.java','ConstructionParkingController.java','ConstructionTowerController.java')) {
   $staged = Join-Path $SourceRoot $name
   $installed = "$javaRoot/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
 }
-foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java','ConstructionAnalysisConfigChecks.java','ConstructionParkingChecks.java','ConstructionSweepChecks.java')) {
+foreach ($name in @('ConstructionOverallChecks.java','ConstructionOverallPlanChecks.java','ConstructionOrientedSuffixChecks.java','ConstructionFallbackChecks.java','ConstructionTransferChecks.java','ConstructionAnalysisConfigChecks.java','ConstructionParkingChecks.java','ConstructionSweepChecks.java','ConstructionTowerChecks.java')) {
   $staged = Join-Path $SourceRoot $name
   $installed = "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf/$name"
   if (Test-Path $staged) { $sources += $staged } elseif (Test-Path $installed) { $sources += $installed }
@@ -87,5 +87,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionSweepChecks'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if (Test-Path "$classesRoot/com/dji/sample/df/constructionDf/ConstructionTowerChecks.class") {
+  & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionDf.ConstructionTowerChecks'
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
 & (Join-Path $env:JAVA_HOME 'bin/java.exe') '-cp' $classpath 'com.dji.sample.df.constructionAnalysisDf.ConstructionThermalChecks'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

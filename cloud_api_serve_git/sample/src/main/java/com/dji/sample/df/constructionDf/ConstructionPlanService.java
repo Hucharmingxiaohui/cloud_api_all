@@ -18,6 +18,11 @@ import java.util.*;
 
 @Service
 public class ConstructionPlanService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionLineTarget lineTargets;
+    private Map<String,Object> targetDetail(String w,String id) {
+        return ConstructionLineTarget.isLine(id) ? lineTargets.detail(w,id) : areas.detail(w,id);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired private ConstructionOverallService overall;
     @org.springframework.beans.factory.annotation.Autowired private ConstructionAnalysisConfigService analysisConfig;
     private final JdbcTemplate db; private final PubWaylineJobPlanDfMapper plans;
@@ -55,7 +60,8 @@ public class ConstructionPlanService {
     @SuppressWarnings("unchecked")
     private Map<String,Object> createInternal(CustomClaim user,String area,Map<String,Object> body,Map<String,Object> overallRoute) {
         String w=user.getWorkspaceId();
-        if(db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,area).isEmpty()) throw new RuleException(404,"区域不存在");
+        if(ConstructionLineTarget.isLine(area)) lineTargets.lock(w,area);
+        else if(db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,area).isEmpty()) throw new RuleException(404,"区域不存在");
         String req=request(body);String digest=DigestUtils.md5DigestAsHex(encode(List.of(area,new TreeMap<>(body))).getBytes(StandardCharsets.UTF_8));
         List<Map<String,Object>> previous=db.queryForList("SELECT * FROM construction_plan WHERE workspace_id=? AND request_id=?",w,req);
         if(!previous.isEmpty()) { if(!digest.equals(previous.get(0).get("request_hash"))) throw new RuleException(409,"此请求已用于另一份计划");return detail(w,(String)previous.get(0).get("plan_id")); }
@@ -68,6 +74,7 @@ public class ConstructionPlanService {
             begin=((Number)raw).longValue();if(begin<=System.currentTimeMillis()+30000) throw new RuleException(400,"执行时间须至少晚于当前时间30秒");
         }
         guard.dock(w,dock);Map<String,Object> snapshot=overallRoute==null?guard.route(w,area,file,version,true):Map.of("overall_route",overallRoute,"file_sign",overallRoute.get("file_sign"));
+        if(overallRoute==null && ConstructionLineTarget.isLine(area)) guard.lineCoverage(w,area,file,dock);
         if(analysisConfig!=null){snapshot=new LinkedHashMap<>(snapshot);Map<String,Object> config=analysisConfig.freeze(w,area,file,overallRoute);if(!Objects.equals(snapshot.get("file_sign"),config.get("file_sign")))throw new RuleException(409,"航线文件已变化，请重新创建计划");snapshot.put("analysis_config",config);}
         PubWaylineJobPlanDfEntity p=new PubWaylineJobPlanDfEntity();
         p.setPlanId(UUID.randomUUID().toString());p.setWorkspaceId(w);p.setUsername(user.getUsername());p.setPlanSource("系统创建");
@@ -85,7 +92,7 @@ public class ConstructionPlanService {
         for(Map<String,Object> row:rows) decorate(w,row);return rows;
     }
     public List<Map<String,Object>> list(String w,String area,boolean archived) {
-        areas.detail(w,area);
+        targetDetail(w,area);
         List<Map<String,Object>> rows=db.queryForList("SELECT p.*,c.area_id,c.area_version,c.archived FROM pub_wayline_job_plan_df p JOIN construction_plan c ON c.plan_id=p.plan_id AND c.workspace_id=p.workspace_id WHERE c.workspace_id=? AND (c.area_id=? OR EXISTS (SELECT 1 FROM construction_overall_plan_area a WHERE a.workspace_id=c.workspace_id AND a.plan_id=c.plan_id AND a.area_id=?)) AND p.plan_type=6 AND (?=1 OR c.archived=0) ORDER BY p.id DESC",w,area,area,archived?1:0);
         for(Map<String,Object> row:rows) decorate(w,row);return rows;
     }

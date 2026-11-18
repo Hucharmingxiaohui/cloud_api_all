@@ -140,10 +140,10 @@ const selectedBatch = computed(() => batches.value.find(b => b.batch_id === sele
 function batchLabel (batch: ConstructionAnalysis) { return `${batch.created_at ? new Date(batch.created_at).toLocaleString() : '历史批次'} · ${batch.batch_id} · ${statusText(batch.status || '')}` }
 const analysisPhotos = computed<ConstructionAnalysisPhoto[]>(() => {
   const frozen = selectedBatch.value?.photos
-  if (frozen) return frozen.filter(p => !selectedArea.value || selectedArea.value === 'all' || p.area_id === selectedArea.value || (selectedArea.value === '__excluded' && p.excluded))
+  if (frozen) return frozen.filter(p => matchesSelection(p))
   if (selectedBatch.value) return []
   const points = detail.value?.overall_route?.analysis_config?.points || []
-  return (detail.value?.photos || []).filter(p => !selectedArea.value || selectedArea.value === 'all' || p.area_id === selectedArea.value || (selectedArea.value === '__excluded' && p.excluded)).map(photo => {
+  return (detail.value?.photos || []).filter(p => matchesSelection(p)).map(photo => {
     const matches = points.filter(point => point.photo_suffixes.some(suffix => new RegExp('(?:^|_)' + suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=_|\\.|$)').test(photo.name)))
     const point = matches.length === 1 && matches[0].area_id === photo.area_id ? matches[0] : undefined
     const type = photoLens(photo.name)
@@ -155,9 +155,20 @@ const overall = computed(() => detail.value?.overall_route?.overall_id ? detail.
 const areaGroups = computed<PhotoGroup[]>(() => {
   const d = detail.value; if (!d) return []
   if (!overall.value) return [{ key: 'all', name: d.overall_route?.bindings?.[0]?.area_name || '巡检照片', waypoints: [], photos: d.photos }]
-  const groups: PhotoGroup[] = (overall.value.bindings || []).map(b => ({ key: b.area_id, name: b.area_name || b.area_id, waypoints: b.waypoints || [], photos: d.photos.filter(p => !p.excluded && p.area_id === b.area_id) }))
-  const keys = new Set(groups.map(g => g.key))
-  const rest = d.photos.filter(p => !p.excluded && (!p.area_id || !keys.has(p.area_id)))
+  const groups: PhotoGroup[] = []
+  for (const b of overall.value.bindings || []) {
+    const photos = d.photos.filter(p => !p.excluded && p.area_id === b.area_id)
+    const spans = b.segments ? [...new Set(Object.values(b.segments))] : []
+    if (spans.length) {
+      for (const span of spans) groups.push({ key: `${b.area_id}#${span}`, name: `${b.area_name || b.area_id} · ${span}`, waypoints: b.waypoints || [], photos: photos.filter(p => p.segment === span) })
+      const unassigned = photos.filter(p => !p.segment || !spans.includes(p.segment))
+      if (unassigned.length) groups.push({ key: `${b.area_id}#__unassigned`, name: `${b.area_name || b.area_id} · 未标定档位`, waypoints: [], photos: unassigned })
+    } else {
+      groups.push({ key: b.area_id, name: b.area_name || b.area_id, waypoints: b.waypoints || [], photos })
+    }
+  }
+  const boundIds = new Set((overall.value.bindings || []).map(b => b.area_id))
+  const rest = d.photos.filter(p => !p.excluded && (!p.area_id || !boundIds.has(p.area_id)))
   if (rest.length) groups.push({ key: '__unmatched', name: '未匹配 / 未绑定', waypoints: [], photos: rest, warn: true })
   const excluded = d.photos.filter(p => p.excluded)
   if (excluded.length) groups.push({ key: '__excluded', name: '已排除分析', waypoints: [], photos: excluded, warn: true })
@@ -189,9 +200,31 @@ const areaCounts = computed<AreaCount[]>(() => {
   const values = selectedBatch.value ? selectedBatch.value.areas || selectedBatch.value.result?.areas : detail.value?.analysis.result?.areas
   if (detail.value?.analysis_stale && selectedBatch.value?.batch_id === detail.value.analysis.batch_id) return []
   if (!Array.isArray(values)) return []
-  return values.filter((v): v is AreaCount => !!v && typeof v.area_id === 'string' && typeof v.status === 'string').filter(v => !selectedArea.value || selectedArea.value === 'all' || v.area_id === selectedArea.value)
+  return values.filter((v): v is AreaCount => !!v && typeof v.area_id === 'string' && typeof v.status === 'string').filter(v => !selectedArea.value || selectedArea.value === 'all' || v.area_id === selectionBase())
 })
-function areaName (id?: string) { return areaGroups.value.find(g => g.key === id)?.name || id || (overall.value ? '未匹配 / 未绑定' : '巡检照片') }
+function areaName (id?: string) {
+  if (!id) return overall.value ? '未匹配 / 未绑定' : '巡检照片'
+  const exact = areaGroups.value.find(g => g.key === id)
+  if (exact) return exact.name
+  const lineGroup = areaGroups.value.find(g => g.key.startsWith(id + '#'))
+  return lineGroup ? lineGroup.name.split(' · ')[0] : id
+}
+function selectionBase () { const s = selectedArea.value; const idx = s.indexOf('#'); return idx > 0 ? s.slice(0, idx) : s }
+function matchesSelection (photo: { area_id?: string; segment?: string; excluded?: boolean }) {
+  const s = selectedArea.value
+  if (!s || s === 'all') return true
+  if (s === '__excluded') return !!photo.excluded
+  const idx = s.indexOf('#')
+  if (idx < 0) return photo.area_id === s
+  const base = s.slice(0, idx); const span = s.slice(idx + 1)
+  if (photo.area_id !== base) return false
+  if (span === '__unassigned') {
+    const binding = (overall.value?.bindings || []).find(b => b.area_id === base)
+    const spans = binding?.segments ? Object.values(binding.segments) : []
+    return !photo.segment || !spans.includes(photo.segment)
+  }
+  return photo.segment === span
+}
 function countStatus (status: string) { return ({ success: '区域去重人数', unavailable: '模型不可用', not_applicable: '不适用', unassessable: '无法判断', failed: '统计失败', not_requested: '未要求统计' } as Record<string, string>)[status] || '统计待确认' }
 
 const thumbs = ref<Record<string, string>>({}); let disposed = false; let epoch = 0; let thumbEpoch = 0; let requestId = uuidv4()

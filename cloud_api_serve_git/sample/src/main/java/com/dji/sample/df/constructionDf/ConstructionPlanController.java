@@ -18,6 +18,8 @@ public class ConstructionPlanController {
     }
     @GetMapping("/areas/{area}/plans") public HttpResultResponse<Object> list(HttpServletRequest r,@PathVariable String area,@RequestParam(defaultValue="false") boolean archived) {return run(r,u->service.list(u.getWorkspaceId(),area,archived));}
     @PostMapping("/areas/{area}/plans") public HttpResultResponse<Object> create(HttpServletRequest r,@PathVariable String area,@RequestBody Map<String,Object> body) {return run(r,u->service.create(u,area,body));}
+    @GetMapping("/lines/{line}/plans") public HttpResultResponse<Object> lineList(HttpServletRequest r,@PathVariable String line,@RequestParam(defaultValue="false") boolean archived) {return run(r,u->service.list(u.getWorkspaceId(),ConstructionLineTarget.key(line),archived));}
+    @PostMapping("/lines/{line}/plans") public HttpResultResponse<Object> lineCreate(HttpServletRequest r,@PathVariable String line,@RequestBody Map<String,Object> body) {return run(r,u->service.create(u,ConstructionLineTarget.key(line),body));}
     @PostMapping("/plans/{id}/dispatch") public HttpResultResponse<Object> dispatch(HttpServletRequest r,@PathVariable String id,@RequestBody Map<String,Object> body) {return run(r,u->service.dispatch(u,id,body));}
     @PostMapping("/plans/{id}/archive") public HttpResultResponse<Object> archive(HttpServletRequest r,@PathVariable String id) {return run(r,u->{service.archive(u.getWorkspaceId(),id);return null;});}
     @PostMapping("/plans/{id}/refresh-dispatch") public HttpResultResponse<Object> refresh(HttpServletRequest r,@PathVariable String id) {return run(r,u->service.refreshDispatch(u.getWorkspaceId(),id));}

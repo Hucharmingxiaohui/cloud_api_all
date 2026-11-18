@@ -11,17 +11,17 @@
         <p v-if="uploaded" class="upload-receipt">{{ uploaded.name }} 已保存到航线库。{{ editing ? '请完成工作面航点绑定。' : '尚未完成本次绑定，可继续解析。' }}<el-button v-if="!editing" link type="primary" :disabled="busy || formVisible" @click="inspect(uploaded.id)">重新解析</el-button></p>
         <p v-if="sn && !rows.length">当前机巢尚未配置总体航线</p>
         <button v-for="row in rows" :key="row.overall_id" class="route-card" :class="{ active: selected?.overall_id === row.overall_id }" :disabled="busy || editing || formVisible" @click="choose(row)"><strong>{{ row.name }}</strong><span>{{ row.bindings.length }} 个区域 · v{{ row.version }}</span><span :class="{ error: row.status !== 'VALID' }">{{ row.message }}</span></button>
-        <h3>完全覆盖区域</h3><button v-for="area in coveredAreas" :key="area.id" class="area-card" :disabled="busy || formVisible" @click="areaId = area.id">{{ area.name }}</button>
+        <h3>完全覆盖区域 / 线路</h3><button v-for="area in coveredAreas" :key="area.id" class="area-card" :disabled="busy || formVisible" @click="areaId = area.id">{{ targetLabel(area) }}</button>
       </aside>
       <section class="main-content">
-        <div class="overall-map"><ConstructionAreaMap :areas="mapAreas" :selected-id="areaId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :coverage-locked="editing || formVisible || libraryVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="sn" :wayline="preview" :selected-waypoints="checked" @coverage-change="coverageChanged" @select="areaId = $event" @select-waypoint="togglePoint" @refresh-docks="refreshDocks" /></div>
+        <div class="overall-map"><ConstructionAreaMap :areas="mapAreas" :lines="mapLines" :selected-line-id="selectedArea?.line?.line_id" :line-points="selectedArea?.line?.points || []" :line-name="selectedArea?.line?.name" :line-color="selectedArea?.line?.color" @select-line="areaId = 'line:' + $event" :selected-id="areaId || null" :boundary="selectedArea?.boundary || []" :editable="false" :disabled="busy || formVisible" :coverage-locked="editing || formVisible || libraryVisible" :docks="docks" :dock-error="dockError" :docks-loading="docksLoading" :active-dock-sn="sn" :wayline="preview" :selected-waypoints="checked" @coverage-change="coverageChanged" @select="areaId = $event" @select-waypoint="togglePoint" @refresh-docks="refreshDocks" /></div>
         <section v-if="draft" class="bindings-panel">
           <p v-if="draft.source_wayline_id" class="execution-notice">当前为平台补齐拍照标识的执行版，上传原件已保留。保存绑定后，计划将使用此执行版。</p>
           <div class="tools"><h3>{{ draft.name }} · {{ editing ? '编辑航点绑定' : '区域航点绑定' }}</h3><el-button v-if="!editing" :disabled="busy || formVisible" @click="edit">编辑 / 重新校验绑定</el-button></div>
           <template v-if="editing">
             <p>选择区域，勾选列表或点击地图航点后批量绑定。仅支持有唯一照片后缀的到点拍照；一个航点归属一个区域。</p>
             <p v-if="draft.points.length && !draft.points.some(p => eligible(p.index))" class="error" role="alert">当前没有可绑定的航点。请查看下表“绑定条件”：没有识别到后缀不等于没有拍照，可能是拍照动作未设置命名后缀；不同航点使用相同后缀也无法区分照片归属。</p>
-            <div class="tools"><el-select v-model="areaId" placeholder="选择完全覆盖的区域"><el-option v-for="area in coveredAreas" :key="area.id" :value="area.id" :label="area.name" /></el-select><el-button :disabled="!areaId || !checked.length || busy" @click="assign">绑定选中航点</el-button><el-button :disabled="!checked.length || busy" @click="unassign">取消选中航点绑定</el-button><el-button :disabled="busy" @click="suggest">按位置预选当前区域航点</el-button></div>
+            <div class="tools"><el-select v-model="areaId" placeholder="选择完全覆盖的区域或线路"><el-option v-for="area in coveredAreas" :key="area.id" :value="area.id" :label="targetLabel(area)" /></el-select><el-button :disabled="!areaId || !checked.length || busy" @click="assign">绑定选中航点</el-button><el-button :disabled="!checked.length || busy" @click="unassign">取消选中航点绑定</el-button><el-button :disabled="busy" @click="suggest">按位置预选区域航点</el-button></div>
           </template>
           <p v-if="!editing">{{ draft.bindings.map(b => `${b.area_name || areaName(b.area_id)}：航点${b.waypoints.join('、')}`).join('；') }}</p>
           <div v-if="selected && !editing" class="overall-detection-entry">
@@ -34,6 +34,7 @@
             <el-table-column label="拍照后缀" min-width="160"><template #default="{ row }">{{ row.photo_suffixes.join('、') || '未识别到拍照后缀' }}</template></el-table-column>
             <el-table-column label="绑定条件" min-width="230"><template #default="{ row }"><span :class="{ error: !!bindingIssue(row.index) }">{{ bindingIssue(row.index) || '可绑定' }}</span></template></el-table-column>
             <el-table-column label="绑定巡检区域" min-width="180"><template #default="{ row }">{{ areaName(assignments[row.index]) }}</template></el-table-column>
+            <el-table-column label="杆塔档位" min-width="150"><template #default="{ row }"><el-select v-if="boundLine(row.index)" :model-value="segments[row.index] || ''" size="small" clearable placeholder="自动按位置投影" :disabled="busy" @change="setSegment(row.index, $event)"><el-option v-for="option in spanOptions(row.index)" :key="option" :value="option" :label="option" /></el-select><span v-else class="muted">仅线路可设档</span></template></el-table-column>
           </el-table>
           <div v-if="editing" class="tools"><el-button type="primary" :disabled="busy || !Object.values(assignments).some(Boolean)" @click="save">保存绑定</el-button><el-button :disabled="busy" @click="cancelEdit">取消编辑</el-button><span>保存新版本后，旧计划需按新绑定重新创建。</span></div>
         </section>
@@ -69,27 +70,30 @@ import ConstructionAreaMap from './ConstructionAreaMap.vue'
 import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
 import ConstructionPlanForm from './ConstructionPlanForm.vue'
 import { useConstructionDocks } from './useConstructionDocks'
-import { areaCoverage, pointsWithinCoverage } from './dockCoverageGeometry'
+import { pointsWithinCoverage } from './dockCoverageGeometry'
 import { insideArea } from './constructionWaylineGeometry'
 import { getWaylineFiles, importSubKmzFile } from '/@/api/wayline'
-import { listConstructionAreas, listConstructionOverallRoutes, inspectConstructionOverallRoute, prepareConstructionOverallRoute, saveConstructionOverallRoute, listConstructionOverallPlans, dispatchConstructionPlan, archiveConstructionPlan, refreshConstructionDispatch } from '/@/api/construction'
+import { listConstructionAreas, listConstructionLines, listConstructionOverallRoutes, inspectConstructionOverallRoute, prepareConstructionOverallRoute, saveConstructionOverallRoute, listConstructionOverallPlans, dispatchConstructionPlan, archiveConstructionPlan, refreshConstructionDispatch } from '/@/api/construction'
 import type { ConstructionAreaRecord, ConstructionOverallRoute, ConstructionPlan, ConstructionWayline } from '/@/api/construction'
+import { lineTarget, targetCovered, targetLabel } from './constructionPatrolTarget'
+import type { PatrolTarget } from './constructionPatrolTarget'
 import { uuidv4 } from '/@/utils/uuid'
 const router = useRouter()
 const analysisVisible = ref(false)
 const { docks, error: dockError, loading: docksLoading, refresh: refreshDocks } = useConstructionDocks()
 const sn = ref(''); const radius = ref<number | null>(null); const busy = ref(false); const error = ref('')
-const areas = ref<ConstructionAreaRecord[]>([]); const areaId = ref(''); const rows = ref<ConstructionOverallRoute[]>([])
+const areas = ref<PatrolTarget[]>([]); const areaId = ref(''); const rows = ref<ConstructionOverallRoute[]>([])
 const selected = ref<ConstructionOverallRoute | null>(null); const draft = ref<ConstructionOverallRoute | null>(null); const editing = ref(false)
-const assignments = ref<Record<number, string>>({}); const checked = ref<number[]>([])
+const assignments = ref<Record<number, string>>({}); const checked = ref<number[]>([]); const segments = ref<Record<string, string>>({})
 const plans = ref<ConstructionPlan[]>([]); const archived = ref(false); const formVisible = ref(false)
 const libraryVisible = ref(false); const library = ref<Array<{ id: string; name: string }>>([]); const keyword = ref(''); const libraryPage = ref(1); const libraryTotal = ref(0)
 const fileInput = ref<HTMLInputElement | null>(null); const uploading = ref(false)
 const uploaded = ref<{ id: string; name: string } | null>(null)
 let epoch = 0; let plansEpoch = 0; const requests = new Map<string, string>()
-const mapAreas = computed(() => areas.value.map(a => ({ ...a, boundary: a.boundary || [] })))
+const mapLines = computed(() => areas.value.flatMap(a => a.line ? [a.line] : []))
+const mapAreas = computed(() => areas.value.filter(a => !a.line).map(a => ({ ...a, boundary: a.boundary || [] })))
 const selectedArea = computed(() => areas.value.find(a => a.id === areaId.value))
-const coveredAreas = computed(() => { const dock = docks.value.find(d => d.sn === sn.value); return dock && radius.value !== null ? areas.value.filter(a => a.enabled && !a.archived && areaCoverage(dock, radius.value!, a.boundary || []) === 'full') : [] })
+const coveredAreas = computed(() => { const dock = docks.value.find(d => d.sn === sn.value); return dock && radius.value !== null ? areas.value.filter(a => a.enabled && !a.archived && targetCovered(dock, radius.value!, a)) : [] })
 const currentCovered = computed(() => {
   const dock = docks.value.find(d => d.sn === sn.value)
   return !!selected.value && !!dock && radius.value !== null && selected.value.bindings.every(b => coveredAreas.value.some(a => a.id === b.area_id)) && pointsWithinCoverage(dock, radius.value, selected.value.points)
@@ -106,7 +110,7 @@ function coverageChanged (value: { sn: string; radius: number | null; loading: b
 async function refresh () {
   if (busy.value || editing.value || formVisible.value) return
   busy.value = true; error.value = ''
-  try { areas.value = await listConstructionAreas(); await refreshDocks() } catch (e) { error.value = message(e) } finally { busy.value = false }
+  try { areas.value = await listConstructionAreas(); try { areas.value.push(...(await listConstructionLines()).map(lineTarget)) } catch (cause) { error.value = '线路加载失败：' + message(cause) }; await refreshDocks() } catch (e) { error.value = message(e) } finally { busy.value = false }
   await loadRoutes()
 }
 async function loadRoutes () {
@@ -119,8 +123,11 @@ async function loadRoutes () {
   } catch (e) { if (token === epoch) error.value = message(e) } finally { if (token === epoch) busy.value = false }
 }
 function setDraft (row: ConstructionOverallRoute) {
-  draft.value = row; assignments.value = {}; checked.value = []
-  for (const b of row.bindings || []) for (const index of b.waypoints) assignments.value[index] = b.area_id
+  draft.value = row; assignments.value = {}; checked.value = []; segments.value = {}
+  for (const b of row.bindings || []) {
+    for (const index of b.waypoints) assignments.value[index] = b.area_id
+    if (b.segments) for (const [k, v] of Object.entries(b.segments)) segments.value[k] = v
+  }
 }
 async function choose (row: ConstructionOverallRoute) { selected.value = row; setDraft(row); areaId.value = row.bindings[0]?.area_id || ''; await loadPlans() }
 async function loadPlans () {
@@ -185,9 +192,17 @@ function bindingIssue (index: number) {
 }
 function eligible (index: number) { return !bindingIssue(index) }
 function togglePoint (index: number) { if (!editing.value || busy.value || !eligible(index)) return; checked.value = checked.value.includes(index) ? checked.value.filter(i => i !== index) : [...checked.value, index] }
-function assign () { if (!coveredAreas.value.some(a => a.id === areaId.value)) return; for (const i of checked.value) assignments.value[i] = areaId.value; checked.value = [] }
-function unassign () { for (const i of checked.value) delete assignments.value[i]; checked.value = [] }
-function suggest () { if (!selectedArea.value) return; checked.value = (draft.value?.points || []).filter(p => eligible(p.index) && insideArea(p, selectedArea.value!.boundary || [])).map(p => p.index) }
+function assign () { if (!coveredAreas.value.some(a => a.id === areaId.value)) return; for (const i of checked.value) { if (assignments.value[i] !== areaId.value) delete segments.value[i]; assignments.value[i] = areaId.value }; checked.value = [] }
+function unassign () { for (const i of checked.value) { delete assignments.value[i]; delete segments.value[i] }; checked.value = [] }
+function boundLine (index: number) { const id = assignments.value[index]; return id && id.startsWith('line:') ? areas.value.find(a => a.id === id)?.line || null : null }
+function spanOptions (index: number): string[] {
+  const nos = boundLine(index)?.tower_nos || []
+  const options: string[] = []
+  for (let i = 0; i + 1 < nos.length; i++) options.push(`${nos[i]}-${nos[i + 1]}`)
+  return options
+}
+function setSegment (index: number, label: string) { if (label) segments.value[index] = label; else delete segments.value[index] }
+function suggest () { if (!selectedArea.value) return; if (selectedArea.value.line) { ElMessage.info('线路不使用多边形预选，请手动勾选拍摄航点'); return }; checked.value = (draft.value?.points || []).filter(p => eligible(p.index) && insideArea(p, selectedArea.value!.boundary || [])).map(p => p.index) }
 async function cancelEdit () { try { await ElMessageBox.confirm('放弃未保存的航点绑定？', '取消编辑') } catch { return }; editing.value = false; if (selected.value) { setDraft(selected.value); await loadPlans() } else { draft.value = null; checked.value = [] } }
 async function save () {
   if (!draft.value || busy.value) return
@@ -195,7 +210,7 @@ async function save () {
   try {
     const ids = [...new Set(Object.values(assignments.value).filter(Boolean))]
     const bindings = ids.map(id => { const a = coveredAreas.value.find(a => a.id === id); if (!a) throw new Error('绑定区域已不在完全覆盖范围，请重新选择'); return { area_id: id, area_version: a.version, waypoints: Object.keys(assignments.value).map(Number).filter(i => assignments.value[i] === id) } })
-    const row = await saveConstructionOverallRoute({ dock_sn: sn.value, wayline_id: draft.value.wayline_id, file_sign: draft.value.file_sign, expected_version: draft.value.version, bindings })
+    const row = await saveConstructionOverallRoute({ dock_sn: sn.value, wayline_id: draft.value.wayline_id, file_sign: draft.value.file_sign, expected_version: draft.value.version, bindings, segments: Object.keys(segments.value).length ? segments.value : undefined })
     rows.value = [row, ...rows.value.filter(r => r.overall_id !== row.overall_id)]; editing.value = false; uploaded.value = null; await choose(row); ElMessage.success('总体航线绑定已保存')
   } catch (e) { error.value = message(e) } finally { busy.value = false }
 }
@@ -218,6 +233,7 @@ onBeforeUnmount(() => { epoch++; plansEpoch++ })
 refresh()
 </script>
 <style scoped>
+.muted { color: #7f9abb; font-size: 12px; }
 .overall-detection-entry { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin: 16px 0 8px; padding: 16px 18px; background: #14385b; border: 1px solid #429bdc; border-left: 4px solid #53cfff; border-radius: 8px; }
 .overall-detection-entry h3 { margin: 0 0 6px; color: #f3f9ff; font-size: 16px; }
 .overall-detection-entry p { margin: 0; color: #c9def4; line-height: 1.6; font-size: 13px; }

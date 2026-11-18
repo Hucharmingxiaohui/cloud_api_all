@@ -1,10 +1,10 @@
 <template>
   <el-dialog :model-value="true" title="新建工地巡检计划" width="620px" append-to-body :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
     <el-form label-width="110px" :disabled="saving">
-      <el-form-item :label="overallId ? '总体航线' : '巡检区域'"><strong>{{ area.name }} · v{{ area.version }}</strong></el-form-item>
+      <el-form-item :label="overallId ? '总体航线' : area.id.startsWith('line:') ? '巡检线路' : '巡检区域'"><strong>{{ area.name }} · v{{ area.version }}</strong></el-form-item>
       <el-form-item label="计划名称" required><el-input v-model="form.name" maxlength="50" placeholder="例如：一号区域每日巡检" data-testid="plan-name" /></el-form-item>
       <el-form-item label="巡检航线" required>
-        <el-select v-model="form.file_id" placeholder="请选择当前区域的有效航线" filterable style="width: 100%" @change="selectRoute">
+        <el-select v-model="form.file_id" placeholder="请选择当前巡检对象的有效航线" filterable style="width: 100%" @change="selectRoute">
           <el-option v-for="route in routes" :key="route.wayline_id" :value="route.wayline_id" :label="route.name" :disabled="route.status !== 'VALID' || (!overallId && route.height_mode !== 'WGS84')" />
         </el-select>
         <p class="form-note">{{ overallId ? '按当前总体航线的区域与航点绑定创建一个飞行任务。' : '仅可选择使用 WGS84 绝对航高的有效航线；旧的相对高度航线须重新生成后才可执行。' }}</p>

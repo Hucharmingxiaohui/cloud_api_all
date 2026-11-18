@@ -18,6 +18,11 @@ import java.util.regex.Pattern;
 /** Shared source or generated execution route, with versioned point ownership. */
 @Service
 public class ConstructionOverallService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionLineTarget lineTargets;
+    private Map<String,Object> targetDetail(String w,String id) {
+        return ConstructionLineTarget.isLine(id) ? lineTargets.detail(w,id) : areas.detail(w,id);
+    }
+
     @org.springframework.beans.factory.annotation.Autowired private ConstructionPreparationService preparation;
     private final JdbcTemplate db;
     private final ConstructionAreaService areas;
@@ -54,13 +59,22 @@ public class ConstructionOverallService {
     }
     @SuppressWarnings("unchecked")
     private void checkArea(String w,Map<String,Object> binding,Map<String,Object> center) {
-        Map<String,Object> area=areas.detail(w,(String)binding.get("area_id"));
+        Map<String,Object> area=targetDetail(w,(String)binding.get("area_id"));
         if(!Boolean.TRUE.equals(area.get("enabled"))||Boolean.TRUE.equals(area.get("archived"))) throw bad("绑定区域已暂停或归档："+area.get("name"));
         if(integer(binding.get("area_version"),1,Integer.MAX_VALUE)!=((Number)area.get("version")).intValue()) throw new RuleException(409,"区域版本变化，请重新确认航点绑定");
         List<Map<String,Object>> polygon=(List<Map<String,Object>>)area.get("boundary");
-        if(polygon==null||polygon.size()<3||polygon.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖区域："+area.get("name"));
+        if(polygon==null||polygon.size()<(ConstructionLineTarget.isLine((String)binding.get("area_id"))?2:3)||polygon.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖区域："+area.get("name"));
         binding.put("area_name",area.get("name"));
         binding.put("boundary",polygon);
+        if(ConstructionLineTarget.isLine((String)binding.get("area_id"))) binding.put("target_type","line");
+    }
+    @SuppressWarnings("unchecked")
+    public void validateLineCoverage(String w,String sn,Map<String,Object> line,Map<String,Object> route) {
+        Map<String,Object> center=coverage(w,sn);
+        List<Map<String,Object>> linePoints=(List<Map<String,Object>>)line.get("boundary");
+        List<Map<String,Object>> flightPoints=(List<Map<String,Object>>)route.get("points");
+        if(linePoints==null||linePoints.size()<2||linePoints.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖巡检线路");
+        if(flightPoints==null||flightPoints.size()<2||flightPoints.stream().anyMatch(p->!inside(center,p))) throw bad("巡检航线超出机巢当前覆盖范围");
     }
     public Map<String,Object> inspect(String w,String sn,String file) {
         var stored=files.getWaylineByWaylineId(w,file).orElseThrow(()->bad("当前工作空间未找到航线"));
@@ -123,9 +137,11 @@ public class ConstructionOverallService {
         if(Boolean.TRUE.equals(snapshot.get("needs_preparation"))) throw new RuleException(409,"请先生成拍照标识执行版后再绑定");
         List<Map<String,Object>> links=bindings(body.get("bindings"),(List<Map<String,Object>>)snapshot.get("points"));
         for(Map<String,Object> b:links) {
-            db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,b.get("area_id"));
+            if(ConstructionLineTarget.isLine((String)b.get("area_id"))) lineTargets.lock(w,(String)b.get("area_id"));
+            else db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",w,b.get("area_id"));
             checkArea(w,b,(Map<String,Object>)snapshot.get("coverage"));
         }
+        applySegments(w,body.get("segments"),links,(List<Map<String,Object>>)snapshot.get("points"));
         List<Map<String,Object>> old=db.queryForList("SELECT * FROM construction_overall_route WHERE workspace_id=? AND dock_sn=? AND wayline_id=? FOR UPDATE",w,sn,file);
         int version=old.isEmpty()?0:((Number)old.get(0).get("version")).intValue();
         if(version!=expected) throw new RuleException(409,"总体航线绑定已更新，请重新加载");
@@ -176,6 +192,46 @@ public class ConstructionOverallService {
         }
         return Map.of();
     }
+    /** 档位绑定：航点→线路 后再落到相邻杆塔档（如 A2-A3）。手动指定优先，未指定的按位置投影预填；仅对线路绑定的航点生效。 */
+    @SuppressWarnings("unchecked")
+    private void applySegments(String w,Object raw,List<Map<String,Object>> links,List<Map<String,Object>> points) {
+        Map<String,String> manual=new HashMap<>();
+        if(raw instanceof Map) for(Map.Entry<?,?> e:((Map<?,?>)raw).entrySet())
+            if(e.getValue() instanceof String) {
+                String s=((String)e.getValue()).trim();
+                if(!s.isEmpty()) manual.put(String.valueOf(e.getKey()),s);
+            }
+        for(Map<String,Object> b:links) {
+            String target=(String)b.get("area_id");
+            if(!ConstructionLineTarget.isLine(target)) continue;
+            Map<String,Object> line=lineTargets.detail(w,target);
+            Object nosRaw=line.get("tower_nos");
+            List<String> nos=nosRaw instanceof List ? (List<String>)nosRaw : List.of();
+            Object linePointsRaw=line.get("boundary");
+            List<Map<String,Object>> linePoints=linePointsRaw instanceof List ? (List<Map<String,Object>>)linePointsRaw : List.of();
+            if(nos.size()<2||linePoints.size()<2) continue;
+            Map<String,Object> segments=new LinkedHashMap<>();
+            for(Object waypointIndexObj:(List<Object>)b.get("waypoints")) {
+                int waypointIndex=((Number)waypointIndexObj).intValue();
+                String label=manual.remove(String.valueOf(waypointIndex));
+                if(label==null) {
+                    Map<String,Object> waypoint=points.get(waypointIndex-1);
+                    int span=ConstructionLineGeometry.nearestSpanIndex(
+                            linePoints.stream().map(p->new ConstructionAreaGeometry.Point(((Number)p.get("lng")).doubleValue(),((Number)p.get("lat")).doubleValue())).collect(java.util.stream.Collectors.toList()),
+                            new ConstructionAreaGeometry.Point(((Number)waypoint.get("lng")).doubleValue(),((Number)waypoint.get("lat")).doubleValue()));
+                    label=nos.get(span)+"-"+nos.get(span+1);
+                } else {
+                    boolean known=false;
+                    for(int i=0;i+1<nos.size();i++) if((nos.get(i)+"-"+nos.get(i+1)).equals(label)) { known=true; break; }
+                    if(!known) throw bad("档位 "+label+" 不在线路 "+line.get("name")+" 的杆塔链中");
+                }
+                segments.put(String.valueOf(waypointIndex),label);
+            }
+            b.put("segments",segments);
+        }
+        if(!manual.isEmpty()) throw bad("档位绑定只能用于线路对象上的航点");
+    }
+
     @SuppressWarnings("unchecked")
     public static Map<String,Object> matchPhoto(Map<String,Object> snapshot,String name) {
         if(snapshot.isEmpty()) return Map.of();
@@ -189,7 +245,12 @@ public class ConstructionOverallService {
         }
         if(matches.size()!=1) return Map.of("association","UNMATCHED","association_message",matches.isEmpty()?"照片名称未匹配拍照航点":"照片名称匹配多个航点");
         int index=matches.iterator().next();
-        for(Map<String,Object> b:(List<Map<String,Object>>)snapshot.get("bindings")) if(((List<Number>)b.get("waypoints")).stream().anyMatch(n->n.intValue()==index)) return Map.of("association","MATCHED","waypoint_index",index,"area_id",b.get("area_id"),"area_name",b.get("area_name"));
+        for(Map<String,Object> b:(List<Map<String,Object>>)snapshot.get("bindings")) if(((List<Number>)b.get("waypoints")).stream().anyMatch(n->n.intValue()==index)) {
+            Map<String,Object> result=new LinkedHashMap<>(Map.of("association","MATCHED","waypoint_index",index,"area_id",b.get("area_id"),"area_name",b.get("area_name")));
+            Object segments=b.get("segments");
+            if(segments instanceof Map) { Object segment=((Map<?,?>)segments).get(String.valueOf(index)); if(segment!=null) result.put("segment",segment); }
+            return result;
+        }
         return Map.of("association","UNBOUND","waypoint_index",index,"association_message","该航点未绑定巡检区域");
     }
 }

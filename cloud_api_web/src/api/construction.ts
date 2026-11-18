@@ -1,7 +1,7 @@
 import request from './http/request'
 
 export interface ConstructionPoint { lng: number; lat: number }
-export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[] }
+export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[]; segments?: Record<string, string> }
 export interface ConstructionDetectionPolicy {
   visible_checks: string[]
   infrared: { enabled: boolean; max_temperature_c: number | null; min_hotspot_pixels: number }
@@ -76,7 +76,7 @@ export interface ConstructionResult {
   analysis_configured: boolean
   analysis: ConstructionAnalysis
   overall_route?: Partial<ConstructionOverallRoute>
-  photos: Array<{ file_id: string; name: string; archived: boolean; association?: string; association_message?: string; waypoint_index?: number; area_id?: string; area_name?: string; excluded?: boolean }>
+  photos: Array<{ file_id: string; name: string; archived: boolean; association?: string; association_message?: string; waypoint_index?: number; area_id?: string; area_name?: string; segment?: string; excluded?: boolean }>
 }
 const base = (jobId: string) => `/api/construction/tasks/${encodeURIComponent(jobId)}`
 function unwrap<T> (response: { data: { code: number; data: T; message?: string } }): T {
@@ -139,6 +139,38 @@ export interface ConstructionAreaVersionRecord {
   gmt_create: string
 }
 export class ConstructionAreaConflictError extends Error {}
+export interface ConstructionLine {
+  line_id: string; name: string; type: string; color: string; enabled: boolean; notes: string
+  version: number; archived: boolean; points: ConstructionPoint[]; length_m: number
+  tower_ids?: string[] | null; tower_nos?: string[] | null
+  gmt_create?: string; gmt_modified?: string
+}
+export type ConstructionLineInput = Pick<ConstructionLine, 'name' | 'type' | 'color' | 'enabled' | 'notes' | 'points'> & { tower_ids?: string[] }
+export interface ConstructionTower { id: string; tower_no: string; lng: number; lat: number; created_at?: string; updated_at?: string }
+const towersBase = '/api/construction/towers'
+export async function listConstructionTowers () { return unwrapArea<ConstructionTower[]>(await request.get(towersBase), '杆塔列表加载失败') }
+export async function createConstructionTower (body: { tower_no: string; lng: number; lat: number }) { return unwrapArea<ConstructionTower>(await request.post(towersBase, body), '杆塔保存失败') }
+export async function updateConstructionTower (id: string, body: { tower_no: string; lng: number; lat: number; version?: number }) { return unwrapArea<ConstructionTower>(await request.put(`${towersBase}/${encodeURIComponent(id)}`, body), '杆塔更新失败') }
+export async function deleteConstructionTower (id: string) { return unwrapArea<null>(await request.delete(`${towersBase}/${encodeURIComponent(id)}`), '杆塔删除失败') }
+const linesBase = '/api/construction/lines'
+export async function listConstructionLines (params: { keyword?: string; enabled?: boolean | null; archived?: boolean } = {}) {
+  return unwrapArea<ConstructionLine[]>(await request.get(linesBase, { params }), '线路列表加载失败')
+}
+export async function getConstructionLine (id: string) {
+  return unwrapArea<ConstructionLine>(await request.get(`${linesBase}/${encodeURIComponent(id)}`), '线路详情加载失败')
+}
+export async function createConstructionLine (body: ConstructionLineInput) {
+  return unwrapArea<ConstructionLine>(await request.post(linesBase, body), '线路保存失败')
+}
+export async function updateConstructionLine (id: string, body: ConstructionLineInput & { expected_version: number }) {
+  return unwrapArea<ConstructionLine>(await request.put(`${linesBase}/${encodeURIComponent(id)}`, body), '线路保存失败')
+}
+export async function constructionLineHistory (id: string) {
+  return unwrapArea<ConstructionLine[]>(await request.get(`${linesBase}/${encodeURIComponent(id)}/versions`), '线路历史加载失败')
+}
+export async function archiveConstructionLine (id: string, archived: boolean, expected_version: number) {
+  return unwrapArea<ConstructionLine>(await request.post(`${linesBase}/${encodeURIComponent(id)}/archive`, { archived, expected_version }), '线路归档操作失败')
+}
 const areasBase = '/api/construction/areas'
 export interface ConstructionParkingPoint { id: string; name: string; lng: number; lat: number; radius_m: number; version: number }
 const parkingBase = '/api/construction/parking-points'
@@ -174,7 +206,8 @@ export interface ConstructionWayline {
   wayline_id: string; name: string; source: string; status: string; message: string
   area_version: number; points?: Array<ConstructionPoint & { height: number }>; height_mode?: string
 }
-const routesBase = (id: string) => `${areasBase}/${encodeURIComponent(id)}/waylines`
+const targetBase = (id: string) => id.startsWith('line:') ? `${linesBase}/${encodeURIComponent(id.slice(5))}` : `${areasBase}/${encodeURIComponent(id)}`
+const routesBase = (id: string) => `${targetBase(id)}/waylines`
 export async function bindConstructionWayline (id: string, version: number, waylineId: string) {
   return unwrapArea<ConstructionWayline>(await request.post(routesBase(id) + '/bind', { expected_version: version, wayline_id: waylineId }), '航线关联失败')
 }
@@ -212,10 +245,10 @@ export interface ConstructionPlanInput {
   rth_altitude: number; out_of_control: number; expected_version: number; request_id: string
 }
 export async function listConstructionPlans (area: string, archived = false) {
-  return unwrapArea<ConstructionPlan[]>(await request.get(`${areasBase}/${encodeURIComponent(area)}/plans`, { params: { archived } }), '计划列表加载失败')
+  return unwrapArea<ConstructionPlan[]>(await request.get(`${targetBase(area)}/plans`, { params: { archived } }), '计划列表加载失败')
 }
 export async function createConstructionPlan (area: string, body: ConstructionPlanInput) {
-  return unwrapArea<ConstructionPlan>(await request.post(`${areasBase}/${encodeURIComponent(area)}/plans`, body), '计划保存失败')
+  return unwrapArea<ConstructionPlan>(await request.post(`${targetBase(area)}/plans`, body), '计划保存失败')
 }
 export async function dispatchConstructionPlan (id: string, requestId: string) {
   return unwrapArea<{ status: string; job_id?: string; message: string }>(await request.post(`/api/construction/plans/${encodeURIComponent(id)}/dispatch`, { request_id: requestId }), '计划下发失败')
@@ -237,7 +270,7 @@ export async function inspectConstructionOverallRoute (sn: string, id: string) {
 export async function prepareConstructionOverallRoute (sn: string, id: string, sign: string) {
   return unwrapArea<ConstructionOverallRoute>(await request.post(overallBase + '/prepare', { dock_sn: sn, wayline_id: id, file_sign: sign }), '执行版航线生成失败')
 }
-export async function saveConstructionOverallRoute (body: { dock_sn: string; wayline_id: string; file_sign: string; expected_version: number; bindings: ConstructionOverallBinding[] }) {
+export async function saveConstructionOverallRoute (body: { dock_sn: string; wayline_id: string; file_sign: string; expected_version: number; bindings: ConstructionOverallBinding[]; segments?: Record<string, string> }) {
   return unwrapArea<ConstructionOverallRoute>(await request.post(overallBase, body), '总体航线绑定保存失败')
 }
 export async function listConstructionOverallPlans (id: string, archived = false) {

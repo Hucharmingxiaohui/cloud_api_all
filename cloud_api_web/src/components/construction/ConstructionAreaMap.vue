@@ -34,7 +34,7 @@
     </div>
     <div v-show="!floatingTools || toolPanel === 'parking'">
     <div v-if="floatingTools && parkingPicking" class="picking-notice">请在地图空白处单击选点。<button @click="toolPanel = ''">收起以便选点</button><button @click="parkingRef?.cancelPicking()">取消选点</button></div>
-    <ConstructionParkingPoints v-if="parkingEnabled && mapReady" ref="parkingRef" :map="map" :areas="areas" :docks="docks || []" :dock-sn="selectedDock" :locked="!!disabled || editable || !!mode" @select-area="selectCoveredArea" @picking="onParkingPicking" @editing="parkingEditing = $event" @selected="toolPanel = 'parking'" />
+    <ConstructionParkingPoints v-if="parkingEnabled && mapReady" ref="parkingRef" :map="map" :areas="areas" :docks="docks || []" :dock-sn="selectedDock" :locked="!!disabled || editable || !!mode || !!lineEditable || lineDrawing" @select-area="selectCoveredArea" @picking="onParkingPicking" @editing="parkingEditing = $event" @selected="toolPanel = 'parking'" />
     </div>
     </div>
     <div v-if="floatingTools && parkingPicking && !toolPanel" class="picking-status" @click.stop>请单击地图标定驻车点<button @click="toolPanel = 'parking'">返回参数</button><button @click="parkingRef?.cancelPicking()">取消选点</button></div>
@@ -52,7 +52,10 @@
       <span><b>{{ wayline.name }}</b> · {{ wayline.points.length }} 个航点 · 黄色线为当前航线</span>
       <button @click="renderWayline()">定位航线</button>
     </div>
+    <ConstructionElevationProfile v-if="wayline?.status === 'VALID' && wayline.points?.length" :points="wayline.points" :mode="wayline.height_mode" :map="mapReady ? map : undefined" />
     <div ref="containerRef" class="map-container" />
+    <ConstructionLineLayer v-if="mapReady" :map="map" :lines="lines || []" :selected-id="selectedLineId" :points="linePoints || []" :editable="lineEditable" :disabled="disabled || editable || !!mode || parkingPicking || parkingEditing" :color="lineColor" :name="lineName" @select="emit('select-line', $event)" @update:points="emit('update:line-points', $event)" @drawing="lineDrawing = $event; emit('drawing', $event)" />
+    <ConstructionTowerLayer v-if="mapReady" :map="map" :towers="towers || []" :selected-id="selectedTowerId" :picking="towerPicking" :disabled="disabled || editable || !!mode || lineEditable || lineDrawing || parkingPicking || parkingEditing" @select="emit('select-tower', $event)" @pick="emit('pick-tower', $event)" @cancel-picking="emit('cancel-tower-picking', $event)" />
     </div>
   </div>
 </template>
@@ -61,8 +64,13 @@
 import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CURRENT_CONFIG } from '/@/api/http/config'
+import { addFlightAirspace } from '/@/utils/flight-airspace'
+import { addMapDistance } from '/@/utils/map-distance'
 import { gcj02towgs84, wgs84togcj02 } from '/@/vendors/coordtransform'
-import type { ConstructionPoint, ConstructionWayline } from '/@/api/construction'
+import type { ConstructionLine, ConstructionPoint, ConstructionTower, ConstructionWayline } from '/@/api/construction'
+import ConstructionLineLayer from './ConstructionLineLayer.vue'
+import ConstructionTowerLayer from './ConstructionTowerLayer.vue'
+import ConstructionElevationProfile from './ConstructionElevationProfile.vue'
 import type { ConstructionDockMarker } from './useConstructionDocks'
 import { getDockCoverage, saveDockCoverage } from '/@/api/construction'
 import { areaCoverage, coverageBoundary } from './dockCoverageGeometry'
@@ -88,8 +96,18 @@ const props = defineProps<{
   wayline?: ConstructionWayline | null
   parkingEnabled?: boolean
   floatingTools?: boolean
+  lines?: ConstructionLine[]
+  selectedLineId?: string | null
+  linePoints?: ConstructionPoint[]
+  lineEditable?: boolean
+  lineColor?: string
+  lineName?: string
+  towers?: ConstructionTower[]
+  selectedTowerId?: string | null
+  towerPicking?: boolean
 }>()
-const emit = defineEmits(['select', 'update:boundary', 'drawing', 'refresh-docks', 'coverage-change', 'select-waypoint'])
+const emit = defineEmits(['select', 'update:boundary', 'drawing', 'refresh-docks', 'coverage-change', 'select-waypoint', 'select-line', 'update:line-points', 'select-tower', 'pick-tower', 'cancel-tower-picking'])
+const lineDrawing = ref(false)
 const selectedDock = ref('')
 const mapReady = ref(false); const parkingPicking = ref(false)
 const toolPanel = ref<'' | 'coverage' | 'parking'>('')
@@ -115,7 +133,7 @@ const coveredAreas = computed(() => {
     .sort((a, b) => (a.coverage === b.coverage ? a.area.name.localeCompare(b.area.name, 'zh-CN') : a.coverage === 'full' ? -1 : 1))
 })
 function selectCoveredArea (id: string) {
-  if (props.disabled || props.editable || mode.value) return
+  if (props.disabled || props.editable || props.lineEditable || lineDrawing.value || mode.value) return
   emit('select', id)
   const overlay = areaOverlays.get(id)
   if (map && overlay) map.setFitView([overlay], false, [60, 60, 60, 60])
@@ -226,7 +244,7 @@ function renderDocks () {
     const label = document.createElement('span'); label.className = 'dock-label'; label.textContent = dock.name
     content.append(icon, label)
     const marker = new AMap.Marker({ position: wgs84togcj02(dock.lng, dock.lat), content, offset: new AMap.Pixel(-18, -18), zIndex: 180, title: `${dock.name} · ${dock.sn}` })
-    marker.on('click', () => { if (mode.value || parkingPicking.value || props.disabled || props.coverageLocked) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
+    marker.on('click', () => { if (mode.value || parkingPicking.value || props.disabled || props.coverageLocked || props.lineEditable || lineDrawing.value) return; if (selectedDock.value === dock.sn) fitCoverage(); else selectedDock.value = dock.sn })
     map.add(marker); dockMarkers.set(dock.sn, marker)
   }
   if (selectedDock.value && !dockMarkers.has(selectedDock.value) && !props.coverageLocked) selectedDock.value = ''
@@ -308,7 +326,7 @@ function renderAreas () {
       bubble: true,
       extData: { id: area.id }
     })
-    overlay.on('click', () => { if (!mode.value && !parkingPicking.value) emit('select', area.id) })
+    overlay.on('click', () => { if (!mode.value && !parkingPicking.value && !props.disabled && !props.editable && !props.lineEditable && !lineDrawing.value) emit('select', area.id) })
     areaOverlays.set(area.id, overlay)
     map.add(overlay)
     const position = areaLabelPosition(area.boundary)
@@ -316,7 +334,7 @@ function renderAreas () {
     content.className = 'construction-area-label' + (area.id === props.selectedId ? ' selected' : '')
     content.textContent = area.name; content.title = area.name
     const label = new AMap.Marker({ position: wgs84togcj02(position.lng, position.lat), content, offset: new AMap.Pixel(0, 0), anchor: 'top-left', zIndex: 140, title: area.name })
-    label.on('click', () => { if (!mode.value && !parkingPicking.value && !props.disabled && !props.editable) emit('select', area.id) })
+    label.on('click', () => { if (!mode.value && !parkingPicking.value && !props.disabled && !props.editable && !props.lineEditable && !lineDrawing.value) emit('select', area.id) })
     areaLabels.push(label); map.add(label)
   }
   if (!mode.value && !boundaryDraft.value.length && areaOverlays.size) {
@@ -467,6 +485,8 @@ watch([() => props.areas, () => props.selectedId], renderAreas, { deep: false })
 watch(() => props.docks, renderDocks, { deep: true })
 watch(() => props.activeDockSn, value => { if (value && !props.independentCoverage) selectedDock.value = value; renderDocks() })
 
+let clearAirspace = () => {}
+let clearDistance = () => {}
 onMounted(() => {
   if (typeof AMap === 'undefined') {
     mapError.value = '高德地图脚本未加载，请检查 /amap/AMap3.js'
@@ -486,6 +506,8 @@ onMounted(() => {
       // 绘制场景关闭双击缩放，避免双击被地图缩放抢占
       doubleClickZoom: false
     })
+    clearAirspace = addFlightAirspace(AMap, map, containerRef.value, CURRENT_CONFIG.flightAirspace)
+    clearDistance = addMapDistance(AMap, map, containerRef.value, () => !!(props.disabled || props.editable || props.lineEditable || mode.value || lineDrawing.value || parkingPicking.value || parkingEditing.value))
     mouseTool = new AMap.MouseTool(map)
     mouseTool.on('draw', onDrawnHandler)
     canVertexEdit.value = typeof AMap.PolyEditor === 'function'
@@ -502,6 +524,8 @@ onMounted(() => {
   }
 })
 onBeforeUnmount(() => {
+  clearAirspace()
+  clearDistance()
   coverageEpoch++
   if (coverageOverlay) map?.remove(coverageOverlay)
   resizeObserver?.disconnect()
@@ -555,6 +579,9 @@ onUnmounted(() => { map?.destroy(); map = null })
 .wayline-preview-bar button { padding: 5px 12px; border: 1px solid #d9b852; border-radius: 4px; background: #38402d; color: #ffe392; cursor: pointer; }
 .area-map :deep(.construction-area-label) { display: block; width: max-content; max-width: 220px; transform: translate(-50%, -50%); padding: 5px 9px; border: 1px solid #689bd0; border-radius: 4px; background: #082646e8; color: #e7f3ff; font-size: 13px; line-height: 1.5; font-weight: 600; white-space: normal; overflow-wrap: anywhere; text-align: center; cursor: pointer; box-shadow: 0 2px 6px #00152b80; }
 .area-map :deep(.construction-area-label.selected) { border-color: #75e6ff; background: #145480ee; color: #fff; }
+.area-map :deep(.construction-line-label) { display:block; width:max-content; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:3px 7px; border:1px solid #ff9f43; border-radius:4px; background:#2e261ded; color:#fff1db; font-size:12px; transform:translate(-50%,-100%); cursor:pointer; }
+.area-map :deep(.construction-line-node) { display:grid; place-items:center; width:20px; height:20px; border:2px solid white; border-radius:50%; color:#10233b; font-size:11px; }
+.area-map :deep(.construction-tower-marker) { display:grid; place-items:center; min-width:18px; height:18px; padding:0 3px; border:1px solid #8fc4ff; border-radius:4px; background:#2d6cdf; color:#fff; font-size:10px; font-weight:600; transform:translate(-50%,-50%); cursor:pointer; box-shadow:0 1px 4px #0009; }
 .coverage-areas { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 8px 12px; max-height: 110px; overflow: auto; background: #0c2344; color: #a8bdd8; font-size: 12px; }
 .coverage-area { border: 1px solid #2d8e8c; background: #103e48; color: #93e7cf; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
 .coverage-area.partial { border-color: #a57f35; background: #3c3426; color: #ffda89; }

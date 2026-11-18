@@ -50,7 +50,7 @@ const busy = ref(false); const error = ref(''); const saved = ref(''); const sea
 const mode = ref('custom'); let baseline = ''; let alive = true
 const isRoute = computed(() => !!(props.context.wayline_id || props.context.overall_id))
 const target = computed(() => isRoute.value ? 'waypoint' : props.context.area_id ? 'area' : 'default')
-const title = computed(() => ({ waypoint: '航点检测配置', area: '工作面检测配置', default: '默认检测配置' }[target.value]))
+const title = computed(() => ({ waypoint: '航点检测配置', area: props.context.area_id?.startsWith('line:') ? '线路检测配置' : '工作面检测配置', default: '默认检测配置' }[target.value]))
 const activePoint = computed(() => data.value?.points?.find(p => p.index === activeIndex.value))
 const activeState = computed(() => isRoute.value ? activePoint.value : data.value?.area)
 const filteredPoints = computed(() => (data.value?.points || []).filter(p => `${p.index} ${p.area_name || ''}`.includes(search.value.trim())))

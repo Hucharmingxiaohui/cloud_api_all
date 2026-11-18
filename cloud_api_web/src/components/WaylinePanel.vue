@@ -71,6 +71,7 @@
             </el-button>
           </router-link>
 
+          <el-button class="new_btn1" type="primary" style="margin-left: 10px;" @click="showConversionDialog = true">航线转换</el-button>
           <el-upload
             :before-upload="beforeUpload"
             :show-file-list="false"
@@ -296,10 +297,12 @@
       <el-empty v-if="!boundPlansLoading && boundPlans.length === 0" description="该航线暂未绑定任何计划" />
     </el-dialog>
   </div>
+  <WaylineConversionDialog v-model="showConversionDialog" />
 </template>
 
 <script lang="ts" setup>
 import { reactive } from '@vue/reactivity'
+import WaylineConversionDialog from './wayline/WaylineConversionDialog.vue'
 import { message } from 'ant-design-vue'
 import { ElButton, ElDialog, ElUpload, ElMessageBox, ElMessage } from 'element-plus'
 import { onMounted, onUpdated, ref, computed, nextTick } from 'vue'
@@ -449,6 +452,7 @@ const updateDroneOption = (value) => {
   points[0].missionConfig.droneInfo.droneSubEnumValue = value[1]
 }
 const showSelectDialog = ref(false)
+const showConversionDialog = ref(false)
 // ==========================================================================跳转到航点界面==========================================================================================================
 // -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

@@ -22,6 +22,7 @@ if (!(Test-Path (Join-Path $SourceRoot 'ConstructionWaylineChecks.java'))) {
   $sources += @(Get-ChildItem "$backendRoot/sample/src/test/java/com/dji/sample/df/constructionDf" -Filter 'ConstructionWayline*Checks.java' | ForEach-Object FullName)
 }
 $sources += @(Get-ChildItem "$javaRoot/df/constructionDf" -Recurse -Filter '*.java' | Where-Object { $_.Name -match '^ConstructionArea' } | ForEach-Object FullName)
+$sources += @(Get-ChildItem "$javaRoot/df/constructionDf" -Recurse -Filter '*.java' | Where-Object { $_.Name -match '^ConstructionLine' } | ForEach-Object FullName)
 $sources += "$javaRoot/component/AuthInterceptor.java"
 foreach ($relative in @('wayline/service/IWaylineFileService.java','wayline/service/impl/WaylineFileServiceImpl.java')) {
   $staged = Join-Path $SourceRoot ([IO.Path]::GetFileName($relative))

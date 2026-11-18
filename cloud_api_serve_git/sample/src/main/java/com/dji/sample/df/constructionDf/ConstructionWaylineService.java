@@ -25,6 +25,11 @@ import java.util.*;
 
 @Service
 public class ConstructionWaylineService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionLineTarget lineTargets;
+    private Map<String,Object> targetDetail(String w,String id) {
+        return ConstructionLineTarget.isLine(id) ? lineTargets.detail(w,id) : areas.detail(w,id);
+    }
+
     private final ConstructionAreaService areas; private final JdbcTemplate db;
     private final IWaylineFileService files; private final IWaylineFileMapper mapper; private final OssServiceContext oss;
     private final ObjectMapper json=new ObjectMapper();
@@ -33,8 +38,9 @@ public class ConstructionWaylineService {
     }
     private RuleException bad(String message) { return new RuleException(400,message); }
     private Map<String,Object> lock(String workspace,String id) {
+        if(ConstructionLineTarget.isLine(id)) return lineTargets.lock(workspace,id);
         if(db.queryForList("SELECT id FROM construction_area WHERE workspace_id=? AND id=? FOR UPDATE",workspace,id).isEmpty()) throw new RuleException(404,"区域不存在");
-        return areas.detail(workspace,id);
+        return targetDetail(workspace,id);
     }
     private void writable(Map<String,Object> area,int version) {
         if(Boolean.TRUE.equals(area.get("archived"))||!Boolean.TRUE.equals(area.get("enabled"))) throw bad("区域已归档或暂停，不能创建或校验航线");
@@ -45,6 +51,10 @@ public class ConstructionWaylineService {
         for(Map<String,Object> p:(List<Map<String,Object>>)area.get("boundary")) result.add(new Point(((Number)p.get("lng")).doubleValue(),((Number)p.get("lat")).doubleValue()));
         return result;
     }
+    private void validateGeometry(ConstructionKmz parsed,Map<String,Object> target) {
+        if("line".equals(target.get("target_type"))) ConstructionLineTarget.validateWaypoints(parsed.points);
+        else ConstructionWaylineGeometry.validate(parsed.points,boundary(target));
+    }
     private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw bad("航线数据序列化失败"); } }
     private String hash(byte[] bytes) { return DigestUtils.md5DigestAsHex(bytes); }
     private String requestHash(Object value) { return hash(encode(value).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }
@@ -54,7 +64,7 @@ public class ConstructionWaylineService {
         List<Map<String,Object>> rows=db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND request_id=?",w,a,request);
         if(rows.isEmpty()) return null;
         if(!digest.equals(rows.get(0).get("request_hash"))) throw new RuleException(409,"提交标识已用于另一份航线，请重新开始创建");
-        return present(w,areas.detail(w,a),rows.get(0),true);
+        return present(w,targetDetail(w,a),rows.get(0),true);
     }
     @Transactional(rollbackFor=Exception.class)
     public Map<String,Object> upload(String w,String a,int version,String request,String name,byte[] bytes,String user) {
@@ -77,7 +87,7 @@ public class ConstructionWaylineService {
         if(wayline==null||wayline.getMissionConfig()==null||wayline.getFolder()==null||wayline.getFolder().getPlaceMarks()==null) throw bad("航线参数不完整");
         if(!"WGS84".equals(wayline.getFolder().getExecuteHeightMode())) throw bad("S 型航线必须使用 WGS84 椭球高模式");
         if(wayline.getFolder().getWaylineCoordinateSysParam()==null||!"WGS84".equals(wayline.getFolder().getWaylineCoordinateSysParam().getHeightMode())) throw bad("S 型航线模板必须使用 WGS84 椭球高模式");
-        if(!Float.isFinite(wayline.getFolder().getGlobalHeight())||wayline.getFolder().getGlobalHeight()<2||wayline.getFolder().getGlobalHeight()>1500) throw bad("WGS84 航高须为 2–1500 米");
+        if(!Float.isFinite(wayline.getFolder().getGlobalHeight())) throw bad("WGS84 椭球高必须是有限数值");
         if(wayline.getFolder().getPlaceMarks().stream().anyMatch(point->point.getUseGlobalHeight()!=1)) throw bad("S 型航线所有航点必须使用全局 WGS84 航高");
         if(wayline.getFolder().getPlaceMarks().size()<2||wayline.getFolder().getPlaceMarks().size()>2000) throw bad("航线需包含 2–2000 个航点");
         String name=wayline.getMissionConfig().getFileName();
@@ -98,7 +108,7 @@ public class ConstructionWaylineService {
     private Map<String,Object> save(String w,String a,Map<String,Object> area,String request,String digest,String name,byte[] bytes,String user,String source) {
         if(name==null||name.isBlank()||name.length()>100) throw bad("航线名称需为1–100字");
         ConstructionKmz parsed=ConstructionKmz.parse(bytes);
-        ConstructionWaylineGeometry.validate(parsed.points,boundary(area));
+        validateGeometry(parsed,area);
         org.springframework.web.multipart.MultipartFile upload=new org.springframework.web.multipart.MultipartFile() {
             public String getName() { return "file"; }
             public String getOriginalFilename() { return name.trim()+".kmz"; }
@@ -115,7 +125,7 @@ public class ConstructionWaylineService {
         return detail(w,a,waylineId);
     }
     public List<Map<String,Object>> list(String w,String a) {
-        Map<String,Object> area=areas.detail(w,a); List<Map<String,Object>> out=new ArrayList<>();
+        Map<String,Object> area=targetDetail(w,a); List<Map<String,Object>> out=new ArrayList<>();
         for(Map<String,Object> row:db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? ORDER BY created_at DESC",w,a)) out.add(present(w,area,row,false));
         return out;
     }
@@ -126,7 +136,7 @@ public class ConstructionWaylineService {
         byte[] bytes;
         try(InputStream input=oss.getObject(OssConfiguration.bucket,file.getObjectKey())) { if(input==null) throw bad("航线文件缺失"); bytes=ConstructionKmz.readBounded(input); }
         if(!hash(bytes).equals(file.getSign())) throw bad("航线文件与记录签名不一致");
-        ConstructionKmz parsed=ConstructionKmz.parse(bytes);ConstructionWaylineGeometry.validate(parsed.points,boundary(area));
+        ConstructionKmz parsed=ConstructionKmz.parse(bytes);validateGeometry(parsed,area);
         List<Map<String,Object>> existing=db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND wayline_id=?",w,a,id);
         if(existing.isEmpty()) {
             db.update("INSERT INTO construction_area_wayline (id,workspace_id,area_id,wayline_id,area_version,file_sign,source,request_id,request_hash,points_json,height_mode) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
@@ -137,14 +147,14 @@ public class ConstructionWaylineService {
         return detail(w,a,id);
     }
     private Map<String,Object> require(String w,String a,String id) {
-        areas.detail(w,a);
+        targetDetail(w,a);
         List<Map<String,Object>> rows=db.queryForList("SELECT * FROM construction_area_wayline WHERE workspace_id=? AND area_id=? AND wayline_id=?",w,a,id);
         if(rows.isEmpty()) throw new RuleException(404,"区域未关联该航线"); return rows.get(0);
     }
-    public Map<String,Object> detail(String w,String a,String id) { return present(w,areas.detail(w,a),require(w,a,id),true); }
+    public Map<String,Object> detail(String w,String a,String id) { return present(w,targetDetail(w,a),require(w,a,id),true); }
     private Map<String,Object> present(String w,Map<String,Object> area,Map<String,Object> row,boolean points) {
         Optional<GetWaylineListResponse> file=files.getWaylineByWaylineId(w,(String)row.get("wayline_id"));
-        String status="VALID",message="区域边界校验通过";
+        String status="VALID",message="line".equals(area.get("target_type"))?"线路航线文件校验通过（不限制多边形范围）":"区域边界校验通过";
         if(file.isEmpty()) { status="MISSING";message="航线已从航线库删除"; }
         else if(((Number)area.get("version")).intValue()!=((Number)row.get("area_version")).intValue()||!Objects.equals(file.get().getSign(),row.get("file_sign"))) { status="STALE";message="区域或航线已变化，请重新校验"; }
         else if(Boolean.TRUE.equals(area.get("archived"))||!Boolean.TRUE.equals(area.get("enabled"))) { status="DISABLED";message="区域已归档或暂停"; }
@@ -160,7 +170,7 @@ public class ConstructionWaylineService {
         GetWaylineListResponse file=files.getWaylineByWaylineId(w,id).orElseThrow(()->new RuleException(404,"航线已删除"));
         byte[] bytes;try(InputStream in=oss.getObject(OssConfiguration.bucket,file.getObjectKey())) { if(in==null) throw bad("航线文件缺失");bytes=ConstructionKmz.readBounded(in); }
         if(!hash(bytes).equals(file.getSign())) throw bad("航线文件与记录签名不一致");
-        ConstructionKmz parsed=ConstructionKmz.parse(bytes);ConstructionWaylineGeometry.validate(parsed.points,boundary(area));
+        ConstructionKmz parsed=ConstructionKmz.parse(bytes);validateGeometry(parsed,area);
         db.update("UPDATE construction_area_wayline SET area_version=?,file_sign=?,points_json=?,height_mode=? WHERE workspace_id=? AND area_id=? AND wayline_id=?",area.get("version"),file.getSign(),encode(parsed.preview),parsed.heightMode,w,a,id);
         return detail(w,a,id);
     }

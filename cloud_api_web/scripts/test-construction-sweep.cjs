@@ -27,7 +27,14 @@ assert.ok(result.points[0].lat < result.points[1].lat, 'first sweep heads north'
 assert.equal(resolveSweepAbsoluteHeight(100, 30), 130, 'dock ellipsoid height plus configured relative height becomes WGS84 route height')
 assert.equal(resolveSweepAbsoluteHeight(-25.5, 30), 4.5, 'negative WGS84 dock ellipsoid heights remain valid')
 assert.throws(() => resolveSweepAbsoluteHeight(undefined, 30), /椭球高/, 'missing dock ellipsoid height blocks route generation')
-assert.throws(() => resolveSweepAbsoluteHeight(1490, 20), /允许范围/, 'out-of-range absolute route height is blocked')
+assert.equal(resolveSweepAbsoluteHeight(1490, 20), 1510)
+assert.equal(resolveSweepAbsoluteHeight(2029.7882080078125, 100), 2129.7882080078125)
+assert.equal(resolveSweepAbsoluteHeight(2029, 1500), 3529)
+assert.equal(resolveSweepAbsoluteHeight(2029, 1), 2030)
+assert.throws(() => resolveSweepAbsoluteHeight(2029, 0), /相对/)
+assert.equal(resolveSweepAbsoluteHeight(-100, 30), -70)
+for (const missing of [null, undefined, '', '  ', false, NaN, Infinity]) assert.throws(() => resolveSweepAbsoluteHeight(missing, 30), /椭球高/)
+assert.throws(() => resolveSweepAbsoluteHeight(2029, 1501), /相对/)
 const headings = resolveWaypointHeadings([
   { lng: 120, lat: 36, placemark: { waypointHeadingParam: { waypointHeadingMode: 'followWayline' } } },
   { lng: 120, lat: 36.001, placemark: { waypointHeadingParam: { waypointHeadingMode: 'followWayline' } } },

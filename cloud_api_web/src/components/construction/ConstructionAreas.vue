@@ -2,17 +2,21 @@
   <main class="construction-shell">
     <div class="page-heading">
       <div>
-        <h2>施工区域</h2>
+        <h2>施工区域与线路</h2>
         <p>围绕机巢划定施工区域，管理巡检边界与历史版本。</p>
       </div>
       <div class="heading-actions">
+        <el-button :type="ledgerMode === 'areas' ? 'primary' : 'default'" @click="switchLedger('areas')">区域</el-button>
+        <el-button :type="ledgerMode === 'lines' ? 'primary' : 'default'" @click="switchLedger('lines')">线路</el-button>
+        <template v-if="ledgerMode === 'areas'">
         <el-button :disabled="editing || saving" @click="analysisContext = {}">默认检测配置</el-button>
         <el-checkbox v-model="showArchived" size="small" @change="load">显示已归档</el-checkbox>
         <el-button type="primary" @click="newArea">＋ 新建区域</el-button>
+        </template>
       </div>
     </div>
     <div class="area-layout">
-      <aside class="panel area-list">
+      <aside v-show="ledgerMode === 'areas'" class="panel area-list">
         <div class="panel-heading"><h3>区域台账</h3><span>{{ areas.length }} 个区域</span></div>
         <el-input v-model="keyword" placeholder="搜索区域名称，按回车查询" clearable aria-label="搜索区域名称" @keyup.enter="load" />
         <el-radio-group v-model="enabledFilter" size="small" class="filter-pills" aria-label="区域状态" @change="load">
@@ -35,25 +39,41 @@
           </button>
         </div>
       </aside>
+      <aside v-show="ledgerMode === 'lines'" ref="lineLedgerTarget" class="panel area-list" />
       <section class="panel area-editor">
         <ConstructionAreaMap
-          :areas="areas"
+          :areas="mapAreas"
+          :lines="lineMapState.lines"
           :selected-id="draft?.id ?? null"
           :boundary="draft?.boundary ?? []"
-          :editable="editing"
-          :disabled="saving"
+          :editable="ledgerMode === 'areas' && editing"
+          :disabled="saving || lineMapState.disabled"
+          :selected-line-id="lineMapState.selectedLineId"
+          :line-points="lineMapState.linePoints"
+          :line-editable="ledgerMode === 'lines' && lineMapState.lineEditable"
+          :line-color="lineMapState.lineColor"
+          :line-name="lineMapState.lineName"
+          :towers="lineMapState.towers"
+          :selected-tower-id="lineMapState.selectedTowerId"
+          :tower-picking="lineMapState.towerPicking"
+          :coverage-locked="editing || lineMapState.lineEditable"
           :docks="docks"
           :dock-error="dockError"
           :docks-loading="docksLoading"
-          :wayline="routePreview"
+          :wayline="ledgerMode === 'lines' ? linePreview : routePreview"
           parking-enabled
           floating-tools
           @refresh-docks="refreshDocks"
-          @drawing="drawing = $event"
+          @drawing="onMapDrawing"
           @select="onMapSelect"
-          @update:boundary="value => { if (draft) draft.boundary = value }"
+          @select-line="onMapSelectLine"
+          @select-tower="linesRef?.onSelectTower($event)"
+          @pick-tower="linesRef?.onPickTower($event)"
+          @cancel-tower-picking="linesRef?.cancelTowerPicking()"
+          @update:line-points="linesRef?.updatePoints($event)"
+          @update:boundary="value => { if (draft && editing) draft.boundary = value }"
         />
-        <div class="property-panel">
+        <div v-show="ledgerMode === 'areas'" class="property-panel">
           <section v-if="draft?.id && !editing" class="area-detection-entry">
             <span class="detection-level">工作面统一规则</span>
             <h3>{{ draft.name }}</h3>
@@ -87,8 +107,10 @@
           <div v-else class="property-empty"><span>◇</span><h4>选择一个施工区域</h4><p>从左侧台账选择区域查看详情，或点击“新建区域”在地图上绘制边界。</p><el-button type="primary" plain @click="newArea">新建区域</el-button></div>
           </template>
         </div>
+        <div v-show="ledgerMode === 'lines'" ref="linePropertiesTarget" class="property-panel line-property-target" />
       </section>
     </div>
+    <ConstructionLines ref="linesRef" :active="ledgerMode === 'lines'" :ledger-target="lineLedgerTarget" :properties-target="linePropertiesTarget" @map-state="lineMapState = $event" @preview="linePreview = $event" />
 
     <ConstructionAnalysisConfig v-if="analysisContext" :context="analysisContext" @close="analysisContext = null" />
     <el-drawer v-model="historyVisible" title="版本历史" size="420px">
@@ -103,12 +125,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import ConstructionAreaWaylines from './ConstructionAreaWaylines.vue'
+import ConstructionLines from './ConstructionLines.vue'
 import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
-import type { ConstructionConfigContext, ConstructionAreaRecord, ConstructionAreaVersionRecord, ConstructionPoint, ConstructionWayline } from '/@/api/construction'
+import type { ConstructionConfigContext, ConstructionAreaRecord, ConstructionAreaVersionRecord, ConstructionPoint, ConstructionWayline, ConstructionLine, ConstructionTower } from '/@/api/construction'
 import ConstructionAreaMap from './ConstructionAreaMap.vue'
 import { useConstructionDocks } from './useConstructionDocks'
 import { areaSquareMeters, validateBoundary } from './constructionModel'
@@ -118,8 +141,30 @@ import {
 } from '/@/api/construction'
 
 const route = useRoute()
+onMounted(async () => { if (typeof route.query.line === 'string') { await switchLedger('lines'); await linesRef.value?.onSelectLine(route.query.line) } })
+const ledgerMode = ref<'areas' | 'lines'>('areas')
+const linesRef = ref<{ confirmDiscard(): Promise<boolean>; deactivate(): void; onSelectLine(id: string): Promise<void>; updatePoints(points: ConstructionPoint[]): void; setDrawing(value: boolean): void; onSelectTower(id: string): void; onPickTower(point: ConstructionPoint): void; cancelTowerPicking(): void } | null>(null)
+const lineLedgerTarget = ref<HTMLElement | null>(null)
+const linePropertiesTarget = ref<HTMLElement | null>(null)
+const lineMapState = ref<{ lines: ConstructionLine[]; selectedLineId: string | null; linePoints: ConstructionPoint[]; lineEditable: boolean; lineColor?: string; lineName?: string; disabled: boolean; towers: ConstructionTower[]; selectedTowerId: string | null; towerPicking: boolean }>({ lines: [], selectedLineId: null, linePoints: [], lineEditable: false, disabled: false, towers: [], selectedTowerId: null, towerPicking: false })
+const mapAreas = ref<ConstructionAreaRecord[]>([])
+async function switchLedger (mode: 'areas' | 'lines') {
+  if (mode === ledgerMode.value || !await confirmDiscard()) return
+  if (ledgerMode.value === 'lines') linesRef.value?.deactivate()
+  else {
+    selectionSequence++
+    if (dirty.value && draft.value) {
+      const current = mapAreas.value.find(area => area.id === draft.value?.id)
+      if (current) applyRecord(current)
+      else draft.value = null
+    }
+    editingMode.value = false; drawing.value = false; markBaseline()
+  }
+  analysisContext.value = null; ledgerMode.value = mode
+}
 const detailTab = ref('routes')
 const routePreview = ref<ConstructionWayline | null>(null)
+const linePreview = ref<ConstructionWayline | null>(null)
 const routeBusy = ref(false)
 
 const categories = ['基础施工', '吊装作业', '道路施工', '材料堆场', '其他施工']
@@ -163,9 +208,12 @@ async function load () {
       enabled: enabledFilter.value === 'all' ? null : enabledFilter.value === 'on',
       archived: showArchived.value
     })
+    mapAreas.value = (await listConstructionAreas()).filter(area => !area.archived)
   } catch (error) { fail(error) } finally { loading.value = false }
 }
 async function confirmDiscard () {
+  if (ledgerMode.value === 'lines') return await linesRef.value?.confirmDiscard() !== false
+  if (saving.value) return false
   if (routeBusy.value) { ElMessage.info('航线操作正在处理，请稍候'); return false }
   if (!dirty.value) return true
   try {
@@ -207,9 +255,19 @@ async function editArea (area: ConstructionAreaRecord) {
   if (!await confirmDiscard()) return
   try { const record = await getConstructionArea(area.id); if (sequence !== selectionSequence) return; applyRecord(record); editingMode.value = true } catch (error) { if (sequence === selectionSequence) fail(error) }
 }
-function onMapSelect (id: string) {
-  const area = areas.value.find(item => item.id === id)
-  if (area) selectArea(area)
+async function onMapSelect (id: string) {
+  const area = mapAreas.value.find(item => item.id === id)
+  if (!area) return
+  if (ledgerMode.value !== 'areas') await switchLedger('areas')
+  if (ledgerMode.value === 'areas') await selectArea(area)
+}
+async function onMapSelectLine (id: string) {
+  if (ledgerMode.value !== 'lines') await switchLedger('lines')
+  if (ledgerMode.value === 'lines') await linesRef.value?.onSelectLine(id)
+}
+function onMapDrawing (value: boolean) {
+  if (ledgerMode.value === 'lines') linesRef.value?.setDrawing(value)
+  else drawing.value = value
 }
 function startEdit () { editingMode.value = true }
 async function cancelEdit () {
@@ -319,6 +377,7 @@ refreshDocks()
 .badge.info { color: #8fcfff; background: #12335e; }
 .area-editor { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 0; min-height: 0; padding: 0; overflow: hidden; }
 .property-panel { border-left: 1px solid #23436e; padding: 18px 16px; min-height: 0; overflow: auto; }
+.line-property-target { padding: 0; }
 .detail-tabs { margin-bottom: 18px; }
 .area-detection-entry { margin-bottom: 20px; padding: 14px; border: 1px solid #429bdc; border-top: 3px solid #53cfff; border-radius: 8px; background: linear-gradient(135deg, #173e68, #102c50); }
 .detection-level { color: #8fe3ff; font-size: 12px; font-weight: 600; }

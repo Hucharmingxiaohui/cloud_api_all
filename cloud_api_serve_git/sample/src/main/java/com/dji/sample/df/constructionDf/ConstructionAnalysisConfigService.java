@@ -15,6 +15,11 @@ import java.util.*;
 @Service
 @SuppressWarnings("unchecked")
 public class ConstructionAnalysisConfigService {
+    @org.springframework.beans.factory.annotation.Autowired private ConstructionLineTarget lineTargets;
+    private Map<String,Object> targetDetail(String w,String id) {
+        return ConstructionLineTarget.isLine(id) ? lineTargets.detail(w,id) : areas.detail(w,id);
+    }
+
     private final JdbcTemplate db;
     private final ConstructionAreaService areas;
     private final ConstructionWaylineService waylines;
@@ -41,11 +46,11 @@ public class ConstructionAnalysisConfigService {
             if(!Objects.equals(actual,route.get("file_sign")))throw new RuleException(409,"航线文件已变化，请重新校验总体绑定");
             Map<String,Object> ctx=new LinkedHashMap<>();ctx.put("route_key",key("overall:"+overallId,actual));ctx.put("file_sign",actual);ctx.put("route_version",route.get("version"));ctx.put("name",route.get("name"));
             Map<Integer,String> owners=new HashMap<>();Map<String,String> names=new HashMap<>();
-            for(Map<String,Object> b:(List<Map<String,Object>>)route.get("bindings")){areas.detail(w,(String)b.get("area_id"));names.put((String)b.get("area_id"),(String)b.get("area_name"));for(Number n:(List<Number>)b.get("waypoints"))owners.put(n.intValue(),(String)b.get("area_id"));}
+            for(Map<String,Object> b:(List<Map<String,Object>>)route.get("bindings")){targetDetail(w,(String)b.get("area_id"));names.put((String)b.get("area_id"),(String)b.get("area_name"));for(Number n:(List<Number>)b.get("waypoints"))owners.put(n.intValue(),(String)b.get("area_id"));}
             List<Map<String,Object>> points=new ArrayList<>();for(Map<String,Object> p:(List<Map<String,Object>>)route.get("points")){Map<String,Object> point=new LinkedHashMap<>(p);String a=owners.get(((Number)p.get("index")).intValue());point.put("area_id",a);point.put("area_name",names.get(a));points.add(point);}ctx.put("points",points);return ctx;
         }
         Map<String,Object> ctx=new LinkedHashMap<>();
-        if(area!=null&&!area.isBlank()) {Map<String,Object> a=areas.detail(w,area);ctx.put("area_id",area);ctx.put("area_name",a.get("name"));}
+        if(area!=null&&!area.isBlank()) {Map<String,Object> a=targetDetail(w,area);ctx.put("area_id",area);ctx.put("area_name",a.get("name"));}
         if(file==null||file.isBlank())return ctx;
         if(!ctx.containsKey("area_id"))throw new RuleException(400,"区域航线须指定所属工作面");
         Map<String,Object> route=waylines.detail(w,area,file);

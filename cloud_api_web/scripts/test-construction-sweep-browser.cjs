@@ -5,7 +5,7 @@ const path = require('node:path')
 const WebSocket = require('ws')
 async function main () {
   const cdp = process.env.CONSTRUCTION_CDP_URL || 'http://127.0.0.1:9231'
-  const base = process.env.CONSTRUCTION_PREVIEW_URL || 'http://127.0.0.1:8097'
+  const base = process.env.CONSTRUCTION_PREVIEW_URL || 'http://127.0.0.1:8098'
   const target = await (await fetch(`${cdp}/json/new?about:blank`, { method: 'PUT' })).json()
   const ws = new WebSocket(target.webSocketDebuggerUrl)
   await new Promise(resolve => ws.once('open', resolve))

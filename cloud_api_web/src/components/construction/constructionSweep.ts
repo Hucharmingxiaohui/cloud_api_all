@@ -7,10 +7,10 @@ export interface SweepPoint extends ConstructionPoint { capture: boolean }
 export function resolveSweepAbsoluteHeight (dockEllipsoidHeight: unknown, relativeHeight: unknown): number {
   const dockHeight = Number(dockEllipsoidHeight)
   const relative = Number(relativeHeight)
-  if (!Number.isFinite(dockHeight)) throw Error('当前机巢OSD缺少有效WGS84椭球高，请等待遥测更新后再生成航线')
-  if (!Number.isFinite(relative) || relative < 1 || relative > 1500) throw Error('相对机巢航高须为 1–1500 米')
+  if (dockEllipsoidHeight === null || dockEllipsoidHeight === undefined || String(dockEllipsoidHeight).trim() === '' || typeof dockEllipsoidHeight === 'boolean' || !Number.isFinite(dockHeight)) throw Error('当前机巢OSD缺少有效WGS84椭球高，请等待遥测更新后再生成航线')
+  if (typeof relativeHeight === 'boolean' || !Number.isFinite(relative) || relative < 1 || relative > 1500) throw Error('相对机巢航高须为 1–1500 米')
   const absolute = dockHeight + relative
-  if (!Number.isFinite(absolute) || absolute < 2 || absolute > 1500) throw Error('机巢椭球高加相对航高超出 WGS84 航高允许范围（2–1500 米）')
+  if (!Number.isFinite(absolute)) throw Error('计算得到的 WGS84 椭球高无效')
   return absolute
 }
 
