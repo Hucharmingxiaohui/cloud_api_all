@@ -70,7 +70,8 @@
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
                           <span class="title">{{ constructionAbsoluteHeight ? '全局航点高度 (WGS84 椭球高, m):' : '全局航点高度 (相对起飞点, m):' }}</span>
                         </div>
-                        <el-slider v-model="lineState.globalHeight" show-input :min="2" :max="1500" :disabled="constructionAbsoluteHeight" @change="updateLine" class="custom-el-slider"/>
+                        <div v-if="constructionAbsoluteHeight" style="color:#7de5ff;padding:12px 0">{{ Number(lineState.globalHeight).toFixed(2) }} m（机巢椭球高 + 相对航高）</div>
+                        <el-slider v-else v-model="lineState.globalHeight" show-input :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
                     </div>
                     <div class="latitude element-item" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
@@ -168,10 +169,11 @@
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
                     <div v-if="layerState.currentType != ''" style="margin-top: 30px;">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">相对起飞点高度 (m):</span>
-                          <el-checkbox  v-model="boolState.checked2" @change="changeLayer">跟随航线</el-checkbox>
+                          <span class="title">{{ constructionAbsoluteHeight ? 'WGS84 椭球高 (m):' : '相对起飞点高度 (m):' }}</span>
+                          <el-checkbox v-if="!constructionAbsoluteHeight" v-model="boolState.checked2" @change="changeLayer">跟随航线</el-checkbox>
                         </div>
-                        <el-input-number  class="custom-input-number" :disabled="boolState.checked2" v-model="pointState.flightHeight" :min="1" :max="1500" @change="changeLayer"/>
+                        <div v-if="constructionAbsoluteHeight" style="color:#7de5ff;padding:12px 0">{{ Number(lineState.globalHeight).toFixed(2) }} m（跟随航线）</div>
+                        <el-input-number v-else class="custom-input-number" :disabled="boolState.checked2" v-model="pointState.flightHeight" :min="1" :max="1500" @change="changeLayer"/>
                     </div>
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
                     <div v-if="layerState.currentType != ''" style="margin-top: 10px">
@@ -348,9 +350,10 @@
                   </div>
               </a-drawer> -->
         </div>
-        <div class="main-content">
+        <div class="main-content" :class="{ 'construction-height-layout': !!constructionAreaId }">
             <!-- 右侧内容 -->
             <div v-if="constructionAreaId" class="construction-editor-banner">{{ constructionArea ? `${constructionArea.name} · v${constructionArea.version}：巡检航点和航段须在蓝色边界内` : constructionError || '正在加载区域边界…' }}<button @click="router.push({ path: '/variableMgt/constructionAreas', query: { area: constructionAreaId } })">返回区域</button></div>
+            <ConstructionElevationProfile v-if="constructionAreaId" :points="elevationPoints" :mode="store.state.Points[0]?.folder?.executeHeightMode" />
             <showMap ref="myMap" :construction-mode="!!constructionAreaId" :construction-boundary="constructionArea?.boundary || []" :draft-storage-key="draftStorageKey" />
         </div>
     </div>
@@ -369,6 +372,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getConstructionArea, createConstructionWayline } from '/@/api/construction'
 import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
 import ConstructionSweepDialog from '/@/components/construction/ConstructionSweepDialog.vue'
+import ConstructionElevationProfile from '/@/components/construction/ConstructionElevationProfile.vue'
 import { useConstructionDocks } from '/@/components/construction/useConstructionDocks'
 import { resolveSweepAbsoluteHeight } from '/@/components/construction/constructionSweep'
 import { uuidv4 } from '/@/utils/uuid'
@@ -392,6 +396,13 @@ const constructionDockSn = ref('')
 const { docks: constructionDocks, refresh: refreshConstructionDocks } = useConstructionDocks()
 const constructionDock = computed(() => constructionDocks.value.find(dock => dock.sn === constructionDockSn.value) || null)
 const constructionAbsoluteHeight = computed(() => constructionAreaId && store.state.Points[0]?.folder?.executeHeightMode === 'WGS84')
+const elevationPoints = computed(() => {
+  const route = store.state.Points[0]
+  return (route?.elements || []).map(p => {
+    const coordinates = p.resource?.content?.geometry?.coordinates || []
+    return { lng: Number(coordinates[0]), lat: Number(coordinates[1]), height: p.Placemark?.useGlobalHeight === 1 ? route.folder?.globalHeight : p.Placemark?.height }
+  })
+})
 async function applySweep ({ result, settings }) {
   if (constructionSaving.value || !constructionArea.value) return
   if (!constructionDock.value) { ElMessage.error('请选择具有有效 WGS84 椭球高遥测的执行机巢'); return }
@@ -1366,6 +1377,9 @@ function closeDrawer () {
   background-color: #e0e0e08a;
   padding: 0;
 }
+.construction-height-layout { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.construction-height-layout :deep(.g-map-wrapper) { flex: 1; min-height: 240px; height: auto; }
+.construction-height-layout :deep(.elevation-review) { flex-shrink: 0; }
 .scrollbar {
     overflow: auto;
 }
