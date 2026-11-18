@@ -23,6 +23,7 @@ public class PatrolResultItem extends BaseItem {
     private String time;
     private String recognition_type;
     private String file_type;
+    private String data_type = "3";
     private String file_path;
     private String rectangle;
     private String task_patrolled_id;
@@ -123,6 +124,15 @@ public class PatrolResultItem extends BaseItem {
     @XmlAttribute(name = "file_type")
     public String getFile_type() {
         return this.file_type;
+    }
+
+    @XmlAttribute(name = "data_type")
+    public String getData_type() {
+        return this.data_type;
+    }
+
+    public void setData_type(String data_type) {
+        this.data_type = data_type;
     }
 
 

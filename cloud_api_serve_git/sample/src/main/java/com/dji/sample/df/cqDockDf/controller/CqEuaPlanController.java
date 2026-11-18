@@ -58,6 +58,15 @@ public class CqEuaPlanController {
         return Result.success(cqEuaTaskReportService.generate(request));
     }
 
+    @PostMapping("/task-record/sync-results-and-report")
+    public Result syncResultsAndReport(@RequestParam Long id) {
+        try {
+            return Result.success(cqDockTaskStatusHandler.syncResultsAndReport(id));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @GetMapping("/task-report/status")
     public Result taskReportStatus(@RequestParam(required = false) String businessId,
                                    @RequestParam(required = false) String euaTaskId) {

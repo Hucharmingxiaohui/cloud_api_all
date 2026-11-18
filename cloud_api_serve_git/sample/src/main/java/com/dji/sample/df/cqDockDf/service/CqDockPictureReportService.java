@@ -66,10 +66,14 @@ public class CqDockPictureReportService {
     private final Striped<Lock> taskLocks = Striped.lock(256);
 
     public void syncResults(CqDockTaskRecordEntity record, Runnable reportCompleted) {
+        syncResults(record, !Objects.equals(record.getReportToPatrol(), 0), reportCompleted);
+    }
+
+    public void syncResults(CqDockTaskRecordEntity record, boolean reportToPatrol, Runnable reportCompleted) {
         Lock lock = taskLocks.get(record.getEuaTaskId());
         if (!lock.tryLock()) throw new IllegalStateException("此任务正在同步图片，请稍后重试");
         try {
-            if (Objects.equals(record.getReportToPatrol(), 0)) {
+            if (!reportToPatrol) {
                 fetchSaveAndAnalyseOnly(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
             } else {
                 fetchSaveAndReport(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
@@ -103,6 +107,8 @@ public class CqDockPictureReportService {
 
     @Autowired
     private CqDockApiService cqDockApiService;
+    @Autowired
+    private CqDockInfraredMockScenario infraredMockScenario;
     @Autowired
     private CqDockTaskPictureMapper cqDockTaskPictureMapper;
     @Autowired
@@ -484,6 +490,7 @@ public class CqDockPictureReportService {
                     measureInfrared(row, uniPoint, reportToPatrol);
                 } else {
 //                  可见光图片对接分析
+                    row.setAnalysisReportToPatrol(reportToPatrol ? 1 : 0);
                     if (submitVisibleAnalysis(row, uniPoint, taskName, euaTaskId)) {
                         pendingCallback++;
                     }
@@ -508,9 +515,13 @@ public class CqDockPictureReportService {
         if (!StringUtils.hasText(row.getPointId())) {
             return null;
         }
-        return uniPointMapper2.selectOne(new LambdaQueryWrapper<UniPoint>()
-                .eq(UniPoint::getPointCode, row.getPointId().trim())
-                .last("LIMIT 1"));
+        CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
+        LambdaQueryWrapper<UniPoint> query = new LambdaQueryWrapper<UniPoint>()
+                .eq(UniPoint::getPointCode, row.getPointId().trim());
+        if (record != null && StringUtils.hasText(record.getSubCode())) {
+            query.eq(UniPoint::getSubCode, record.getSubCode());
+        }
+        return uniPointMapper2.selectOne(query.last("LIMIT 1"));
     }
 
     /**
@@ -521,16 +532,19 @@ public class CqDockPictureReportService {
     }
 
     private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint, boolean reportToPatrol) {
-        String coordinate = uniPoint.getInfraredImageCoordinate();
-        TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
-        if (temParamEntity == null) {
-            markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
-            throw new IllegalStateException("红外图片坐标无效");
-        }
-        TemResultEntity temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
-        if (temResult.getError() != null) {
-            markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
-            throw new IllegalStateException("红外测温失败");
+        TemResultEntity temResult = infraredMockScenario.temperature(row.getEuaTaskId(), row.getPictureId(), row.getPointId());
+        if (temResult == null) {
+            String coordinate = uniPoint.getInfraredImageCoordinate();
+            TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
+            if (temParamEntity == null) {
+                markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
+                throw new IllegalStateException("红外图片坐标无效");
+            }
+            temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
+            if (temResult.getError() != null) {
+                markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
+                throw new IllegalStateException("红外测温失败");
+            }
         }
         row.setPointVal("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
         row.setPointValUnit("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
@@ -546,6 +560,7 @@ public class CqDockPictureReportService {
     }
 
     private boolean shouldReportToPatrol(CqDockTaskPictureEntity row) {
+        if (Objects.equals(row.getAnalysisReportToPatrol(), 0)) return false;
         CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
         return record != null && Objects.equals(record.getBusinessId(), row.getBusinessId())
                 && !Objects.equals(record.getReportToPatrol(), 0);
@@ -906,9 +921,25 @@ public class CqDockPictureReportService {
         if (StringUtils.hasText(pointId)) {
             entity.setPointId(pointId.trim());
         }
-        if (StringUtils.hasText(pointName)) {
-            entity.setPointName(pointName);
+        if (!StringUtils.hasText(pointName) || pointType == null) {
+            UniPoint point = resolveUniPoint(entity);
+            if (point == null) {
+                throw new IllegalStateException("EUA图片缺少名称或类型且本地点位不存在：pointId=" + entity.getPointId());
+            }
+            if (!StringUtils.hasText(pointName)) {
+                pointName = point.getPointName();
+                if (!StringUtils.hasText(pointName)) {
+                    throw new IllegalStateException("EUA图片本地点位名称为空：pointId=" + entity.getPointId());
+                }
+            }
+            if (pointType == null) {
+                pointType = point.getPicType();
+                if (!Objects.equals(pointType, POINT_TYPE_VISIBLE) && !Objects.equals(pointType, POINT_TYPE_INFRARED)) {
+                    throw new IllegalStateException("EUA图片本地点位picType缺失或无效：pointId=" + entity.getPointId());
+                }
+            }
         }
+        entity.setPointName(pointName);
         // EUA photoStorage：1可见光、2红外；内部仍使用0/1。
         entity.setPointType(pointType);
         entity.setRawData(picture.toJSONString());
@@ -945,6 +976,7 @@ public class CqDockPictureReportService {
 
     private Integer parsePointType(JSONObject picture) {
         String value = picture.getString("photoStorage");
+        if (value == null) return null;
         if ("1".equals(value)) return POINT_TYPE_VISIBLE;
         if ("2".equals(value)) return POINT_TYPE_INFRARED;
         throw new IllegalArgumentException("未知EUA photoStorage: " + value);
@@ -985,7 +1017,15 @@ public class CqDockPictureReportService {
         try {
             String headerName;
             try (java.io.OutputStream output = Files.newOutputStream(part)) {
-                if (StringUtils.hasText(pictureId)) {
+                if (infraredMockScenario.ownsTask(euaTaskId)) {
+                    // A registered task, not an ID prefix alone, owns these fixture bytes.
+                    JSONArray fixtures = infraredMockScenario.pictures(euaTaskId);
+                    boolean belongs = fixtures.stream().anyMatch(p -> pictureId != null && pictureId.equals(((JSONObject) p).getString("id")));
+                    if (!belongs) throw new IllegalArgumentException("场景图片与任务不匹配");
+                    headerName = infraredMockScenario.download(pictureId, output);
+                } else if (infraredMockScenario.ownsPicture(pictureId)) {
+                    throw new IllegalArgumentException("场景图片与任务不匹配");
+                } else if (StringUtils.hasText(pictureId)) {
                     headerName = cqDockApiService.downloadFile(pictureId, output);
                 } else {
                     if (!StringUtils.hasText(pictureUrl)) throw new IllegalArgumentException("EUA图片标识为空");

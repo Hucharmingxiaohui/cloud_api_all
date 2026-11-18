@@ -60,6 +60,10 @@ public class CqDockTaskPictureEntity {
     @TableField("request_id")
     private String requestId;
 
+    /** Current analysis generation only; NULL preserves historical task-level reporting. */
+    @TableField("analysis_report_to_patrol")
+    private Integer analysisReportToPatrol;
+
     /**
      * 分析状态 0待分析 1已分析 2分析失败 3红外测温完成
      */

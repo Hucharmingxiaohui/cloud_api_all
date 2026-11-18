@@ -227,9 +227,29 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                 .eq(WaylineJobEntity::getWorkspaceId, workspaceId);
         // 动态添加 name 条件（模糊查询）
         if (map != null && map.containsKey("name")) {
-            String name = map.get("name").toString();
+            String name = map.get("name").toString().trim();
             if (com.dji.sample.center.utils.StringUtils.isNotBlank(name)) {
                 queryWrapper.like(WaylineJobEntity::getName, name);
+            }
+        }
+        if (map != null && map.containsKey("dockSn")) {
+            String dockSn = map.get("dockSn") == null ? "" : map.get("dockSn").toString().trim();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(dockSn)) {
+                queryWrapper.eq(WaylineJobEntity::getDockSn, dockSn);
+            }
+        }
+        if (map != null && map.containsKey("waylineName")) {
+            String waylineName = map.get("waylineName") == null ? "" : map.get("waylineName").toString().trim();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(waylineName)) {
+                queryWrapper.apply("EXISTS (SELECT 1 FROM wayline_file f WHERE f.wayline_id = wayline_job.file_id " +
+                        "AND f.workspace_id = wayline_job.workspace_id AND f.name LIKE {0})", "%" + waylineName + "%");
+            }
+        }
+        if (map != null && map.containsKey("planName")) {
+            String planName = map.get("planName") == null ? "" : map.get("planName").toString().trim();
+            if (com.dji.sample.center.utils.StringUtils.isNotBlank(planName)) {
+                queryWrapper.apply("EXISTS (SELECT 1 FROM pub_wayline_job_plan_df p WHERE p.plan_id = wayline_job.plan_id " +
+                        "AND p.workspace_id = wayline_job.workspace_id AND p.name LIKE {0})", "%" + planName + "%");
             }
         }
         // 动态添加 taskType 条件（精确匹配）
@@ -243,19 +263,8 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         if (map != null && map.containsKey("planType")) {
             String planType = map.get("planType").toString();
             if (com.dji.sample.center.utils.StringUtils.isNotBlank(planType)) {
-                List<String> planIds = pubWaylineJobPlanDfMapper.selectList(
-                                new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                                        .eq(PubWaylineJobPlanDfEntity::getPlanType, Integer.valueOf(planType))
-                                        .select(PubWaylineJobPlanDfEntity::getPlanId))
-                        .stream()
-                        .map(PubWaylineJobPlanDfEntity::getPlanId)
-                        .filter(com.dji.sample.center.utils.StringUtils::isNotBlank)
-                        .collect(Collectors.toList());
-                if (planIds.isEmpty()) {
-                    queryWrapper.eq(WaylineJobEntity::getPlanId, "__NO_MATCH_PLAN_ID__");
-                } else {
-                    queryWrapper.in(WaylineJobEntity::getPlanId, planIds);
-                }
+                queryWrapper.apply("EXISTS (SELECT 1 FROM pub_wayline_job_plan_df p WHERE p.plan_id = wayline_job.plan_id " +
+                        "AND p.workspace_id = wayline_job.workspace_id AND p.plan_type = {0})", Integer.valueOf(planType));
             }
         }
         // 动态添加任务时间范围条件，按任务开始时间筛选

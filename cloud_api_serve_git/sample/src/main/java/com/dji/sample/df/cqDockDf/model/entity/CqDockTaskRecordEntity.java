@@ -15,6 +15,12 @@ public class CqDockTaskRecordEntity {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    @TableField("plan_id")
+    private Long planId;
+
+    @TableField("task_source")
+    private String taskSource;
+
     /** 上级下发任务业务ID，用于和EUA任务建立映射关系 */
 //  对应的其实是巡视的计划编码plan_no
     @TableField("business_id")

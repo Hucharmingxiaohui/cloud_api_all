@@ -318,6 +318,29 @@ public class UavReportController {
         return pictureSaveAndAnalysis(jsonObject, null);
     }
 
+    @PostMapping("/syncOrdinaryImages")
+    public Result syncOrdinaryImages(@RequestBody JSONObject body, HttpServletRequest request) {
+        String jobId = body == null ? null : body.getString("jobId");
+        if (jobId == null || !jobId.matches("[a-zA-Z0-9_-]+")) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "任务标识无效");
+        }
+        WaylineJobEntity job = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>()
+                .eq(WaylineJobEntity::getJobId, jobId));
+        if (job == null) throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND, "任务不存在");
+        requireOrdinaryWorkspace(job, request);
+        if (!isOrdinary(job)) {
+            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.BAD_REQUEST, "仅普通航线任务支持同步图片结果");
+        }
+        try {
+            return Result.success(pictureSaveHandler.syncOrdinaryImages(job));
+        } catch (IllegalArgumentException e) {
+            return Result.error(e.getMessage());
+        } catch (IOException e) {
+            log.error("普通任务图片同步失败: jobId={}", jobId, e);
+            return Result.error("图片同步失败，请重试");
+        }
+    }
+
     @GetMapping("/isAnalyzed")
     public Result isAnalyzed(@RequestParam String jobId) {
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, jobId));

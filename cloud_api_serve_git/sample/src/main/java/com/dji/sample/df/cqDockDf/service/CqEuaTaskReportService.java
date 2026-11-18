@@ -272,7 +272,7 @@ public class CqEuaTaskReportService implements AutoCloseable {
             paragraph(doc, "2. 图片仅从现有本地存储读取，不访问远程图片地址。缺失、不可读取或格式不支持的图片以占位说明标识，不据此推定设备状态。", 12, false, ParagraphAlignment.LEFT);
             paragraph(doc, "3. 分析状态与结果按存储记录展示，分析状态数量非缺陷数量；待分析、失败、未知或未记录状态均不代表设备正常。", 12, false, ParagraphAlignment.LEFT);
             paragraph(doc, "4. 可见光结果与红外测温值仅供参考，设备缺陷认定及处置应结合现场情况进行人工复核；不补充未记录的诊断或阈值结论。", 12, false, ParagraphAlignment.LEFT);
-            paragraph(doc, "5. 当前图片模型未记录采集时间，明细统一标注“未记录”，不以图片入库或更新时间替代采集时间。", 12, false, ParagraphAlignment.LEFT);
+            paragraph(doc, "5. 采集时间读取图片原始数据，缺失或无效时标注“未记录”，不以图片入库或更新时间替代采集时间。", 12, false, ParagraphAlignment.LEFT);
 
             Map<String, List<CqDockTaskPictureEntity>> groups = pictures.stream().collect(Collectors.groupingBy(
                     p -> pointKey(p.getPointId()), LinkedHashMap::new, Collectors.toList()));
@@ -338,11 +338,31 @@ public class CqEuaTaskReportService implements AutoCloseable {
         org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblGrid grid = details.getCTTbl().addNewTblGrid();
         for (int width : widths) grid.addNewGridCol().setW(BigInteger.valueOf(width));
         String result = text(picture.getPointVal());
-        if (picture.getPointValUnit() != null && !picture.getPointValUnit().trim().isEmpty()) result += " " + picture.getPointValUnit();
+        if (picture.getPointValUnit() != null && !picture.getPointValUnit().trim().isEmpty()
+                && (picture.getPointVal() == null || !picture.getPointValUnit().trim().equals(picture.getPointVal().trim()))) result += " " + picture.getPointValUnit();
         tableRow(details.createRow(), String.valueOf(number), text(picture.getPointName()), type,
-                "未记录", analysisStatus(picture.getAnalysisStatus()), result);
+                parseCaptureTime(picture), analysisStatus(picture.getAnalysisStatus()), result);
         for (XWPFTableRow row : details.getRows()) for (int i = 0; i < widths.length; i++) row.getCell(i).setWidth(String.valueOf(widths[i]));
         image(doc, picture, Integer.valueOf(0).equals(picture.getPointType()));
+    }
+
+    private String parseCaptureTime(CqDockTaskPictureEntity picture) {
+        if (picture.getRawData() == null) return "未记录";
+        try {
+            com.fasterxml.jackson.databind.JsonNode data = json.readTree(picture.getRawData());
+            if (data == null || !data.isObject()) return "未记录";
+            for (String field : Arrays.asList("shootTime", "acquisitionTime", "captureTime")) {
+                com.fasterxml.jackson.databind.JsonNode value = data.get(field);
+                if (value == null || !value.isTextual()) continue;
+                String time = value.textValue();
+                java.time.format.DateTimeFormatter format = java.time.format.DateTimeFormatter
+                        .ofPattern("uuuu-MM-dd HH:mm:ss").withResolverStyle(java.time.format.ResolverStyle.STRICT);
+                try {
+                    return java.time.LocalDateTime.parse(time, format).format(format);
+                } catch (java.time.format.DateTimeParseException ignored) { }
+            }
+        } catch (IOException ignored) { }
+        return "未记录";
     }
 
     private void image(XWPFDocument doc, CqDockTaskPictureEntity picture, boolean analysis) {

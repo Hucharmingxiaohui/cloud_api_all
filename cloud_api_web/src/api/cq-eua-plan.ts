@@ -19,6 +19,8 @@ export interface EuaPlanPayload {
 
 export interface EuaPlanRow {
   id: number;
+  planSource?: 'PLATFORM' | 'PATROL';
+  patrolTaskCode?: string;
   planName: string;
   remark: string | null;
   enabled: number | null;
@@ -77,6 +79,11 @@ export const getEuaTaskExecutionStatus = async function (taskId: string): Promis
 
 export const syncEuaTaskResults = async function (recordId: number | string): Promise<IWorkspaceResponse<any>> {
   const result = await request.post(`${HTTP_PREFIX}/task-record/sync-results`, undefined, { params: { id: recordId }, timeout: 30000 })
+  return result.data
+}
+
+export const syncEuaTaskResultsAndReport = async function (recordId: number | string): Promise<IWorkspaceResponse<any>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-record/sync-results-and-report`, undefined, { params: { id: recordId }, timeout: 30000 })
   return result.data
 }
 

@@ -20,6 +20,10 @@
       <el-table :data="tableData" v-loading="loading" border style="width: 100%">
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="planName" label="计划名称" show-overflow-tooltip />
+        <el-table-column label="计划来源" width="100" align="center">
+          <template #default="scope">{{ scope.row.planSource === 'PATROL' ? '上级巡视' : '平台计划' }}</template>
+        </el-table-column>
+        <el-table-column prop="patrolTaskCode" label="上级任务编码" min-width="180" show-overflow-tooltip />
         <el-table-column prop="routeName" label="EUA航线名称" show-overflow-tooltip />
         <el-table-column prop="routeId" label="EUA航线ID" show-overflow-tooltip />
         <el-table-column prop="pointCount" label="点位数量" width="100" align="center">
@@ -41,9 +45,9 @@
         <el-table-column prop="lastExecuteTime" label="最近执行时间" width="180" show-overflow-tooltip />
         <el-table-column label="操作" width="260" fixed="right" align="center">
           <template #default="scope">
-            <el-button link type="primary" :disabled="!hasPlanPoints(scope.row) || executingIds.includes(scope.row.id)" :loading="executingIds.includes(scope.row.id)" @click="executePlan(scope.row)">立即执行</el-button>
-            <el-button link type="primary" @click="editPlan(scope.row)">编辑</el-button>
-            <el-button link type="danger" @click="removePlan(scope.row)">删除</el-button>
+            <el-button link type="primary" :disabled="scope.row.planSource === 'PATROL' || !hasPlanPoints(scope.row) || executingIds.includes(scope.row.id)" :loading="executingIds.includes(scope.row.id)" @click="executePlan(scope.row)">立即执行</el-button>
+            <el-button link type="primary" :disabled="scope.row.planSource === 'PATROL'" @click="editPlan(scope.row)">编辑</el-button>
+            <el-button link type="danger" :disabled="scope.row.planSource === 'PATROL'" @click="removePlan(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -302,6 +306,8 @@ function normalizePlanRow (item: any) {
   return {
     ...item,
     id: item.id,
+    planSource: item.planSource || item.plan_source || 'PLATFORM',
+    patrolTaskCode: item.patrolTaskCode || item.patrol_task_code || '',
     planName: item.planName || item.plan_name || item.name || '',
     routeId: item.routeId || item.route_id || item.waylineId || item.wayline_id || '',
     lastExecuteStatus: item.lastExecuteStatus ?? item.last_execute_status,

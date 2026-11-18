@@ -104,7 +104,16 @@ public class CenterXmlTool {
 
 
     public static <T> void toFile(String filename, T t) {
+        try {
+            toFileChecked(filename, t);
+        } catch (RuntimeException e) {
+            // Preserve the existing best-effort API for non-model callers.
+        }
+    }
+
+    public static <T> void toFileChecked(String filename, T t) {
         JAXBContext context = null;
+        File output = new File(filename).getAbsoluteFile();
         try {
             context = JAXBContext.newInstance(t.getClass());
             StringWriter writer = new StringWriter();
@@ -121,12 +130,14 @@ public class CenterXmlTool {
 
             //转化为String类型
             String stringXML = writer.toString();
-            FileWriter fWriter=new FileWriter(new File(filename));
-            fWriter.write(stringXML);
-            fWriter.close();
+            try (java.io.Writer fWriter = new java.io.OutputStreamWriter(
+                    new java.io.FileOutputStream(output), java.nio.charset.StandardCharsets.UTF_8)) {
+                fWriter.write(stringXML);
+            }
 
         } catch (Exception e) {
-            logger.error("{}", e);
+            logger.error("模型文件生成失败", e);
+            throw new IllegalStateException("Model XML serialization failed: " + output, e);
         }
     }
 

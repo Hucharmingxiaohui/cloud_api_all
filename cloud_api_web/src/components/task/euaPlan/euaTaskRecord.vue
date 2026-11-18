@@ -20,6 +20,9 @@
         <el-table-column type="index" label="序号" width="70" align="center" />
         <el-table-column prop="taskName" label="任务名称" min-width="230" show-overflow-tooltip />
         <el-table-column prop="planName" label="所属计划名称" min-width="160" show-overflow-tooltip />
+        <el-table-column label="任务来源" width="100" align="center">
+          <template #default="scope">{{ scope.row.taskSource === 'PATROL' ? '上级巡视' : '平台计划' }}</template>
+        </el-table-column>
         <el-table-column prop="businessId" label="本地任务编码" width="230" show-overflow-tooltip />
         <el-table-column prop="euaTaskId" label="EUA任务ID" width="180" show-overflow-tooltip />
         <el-table-column prop="routeId" label="航线ID" width="170" show-overflow-tooltip />
@@ -38,10 +41,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" show-overflow-tooltip />
-        <el-table-column label="操作" width="190" fixed="right" align="center">
+        <el-table-column label="操作" width="290" fixed="right" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="openTaskResult(scope.row)">任务结果</el-button>
-            <el-button link type="primary" :loading="syncLoading[scope.row.id]" @click="syncResults(scope.row)">结果同步</el-button>
+            <el-button link type="primary" :loading="syncLoading[scope.row.id]" :disabled="reportSyncLoading[scope.row.id]" @click="syncResults(scope.row)">结果同步</el-button>
+            <el-button v-if="scope.row.taskSource === 'PATROL'" link type="primary" :loading="reportSyncLoading[scope.row.id]" :disabled="syncLoading[scope.row.id]" @click="syncResultsAndReport(scope.row)">结果同步上报</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -67,7 +71,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getEuaTaskExecutionStatus, getEuaTaskRecordPage, syncEuaTaskResults } from '/@/api/cq-eua-plan'
+import { getEuaTaskExecutionStatus, getEuaTaskRecordPage, syncEuaTaskResults, syncEuaTaskResultsAndReport } from '/@/api/cq-eua-plan'
 import { createTaskStatusLoader } from './euaTaskStatus'
 
 const recordLoading = ref(false)
@@ -76,6 +80,7 @@ const taskRecordData = ref<any[]>([])
 const executionStatuses = ref<Record<string, string>>({})
 const statusLoader = createTaskStatusLoader(getEuaTaskExecutionStatus)
 const syncLoading = reactive<Record<string, boolean>>({})
+const reportSyncLoading = reactive<Record<string, boolean>>({})
 
 function executionStatus (row: any) {
   if ((row.success !== 1 && row.success !== '1') || !row.euaTaskId?.trim()) return '—'
@@ -138,7 +143,7 @@ function openTaskResult (row: any) {
 
 async function syncResults (row: any) {
   const id = row.id
-  if (!id || syncLoading[id]) return
+  if (!id || syncLoading[id] || reportSyncLoading[id]) return
   syncLoading[id] = true
   try {
     const res = await syncEuaTaskResults(id)
@@ -155,6 +160,8 @@ function normalizeTaskRecordRow (item: any) {
   return {
     ...item,
     id: item.id,
+    taskSource: item.taskSource || item.task_source || 'PLATFORM',
+    planId: item.planId || item.plan_id,
     businessId: item.businessId || item.business_id || item.taskCode || item.task_code || '',
     taskCode: item.taskCode || item.task_code || item.businessId || item.business_id || '',
     taskName: item.taskName || item.task_name || '',
@@ -166,6 +173,26 @@ function normalizeTaskRecordRow (item: any) {
     responseMsg: item.responseMsg || item.response_msg || '',
     success: item.success,
     createTime: item.createTime || item.create_time || ''
+  }
+}
+
+async function syncResultsAndReport (row: any) {
+  const id = row.id
+  if (row.taskSource !== 'PATROL' || !id || syncLoading[id] || reportSyncLoading[id]) return
+  reportSyncLoading[id] = true
+  try {
+    try {
+      await ElMessageBox.confirm('将重新同步并向巡视上级上报图片分析结果，是否继续？', '结果同步上报', { type: 'warning', confirmButtonText: '同步上报', cancelButtonText: '取消' })
+    } catch {
+      return
+    }
+    const res = await syncEuaTaskResultsAndReport(id)
+    if (res.code === 0) ElMessage.success(typeof res.data === 'string' ? res.data : res.msg || '已提交同步上报')
+    else await ElMessageBox.alert(res.msg || '结果同步上报失败', '结果同步上报')
+  } catch (error: any) {
+    await ElMessageBox.alert(error?.response?.data?.msg || error?.message || '结果同步上报失败', '结果同步上报')
+  } finally {
+    reportSyncLoading[id] = false
   }
 }
 

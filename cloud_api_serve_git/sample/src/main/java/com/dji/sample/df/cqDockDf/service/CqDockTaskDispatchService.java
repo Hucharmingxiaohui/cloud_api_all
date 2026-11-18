@@ -41,6 +41,8 @@ public class CqDockTaskDispatchService {
 
     @Resource
     private CqEuaRoutePointService cqEuaRoutePointService;
+    @Resource
+    private CqDockInfraredMockScenario infraredMockScenario;
 
     public CqDockTaskDispatchResult dispatchPlanPoints(String snapshot, String subCode, String expectedRouteId,
                                                        String expectedRouteName, String taskCode,
@@ -80,6 +82,7 @@ public class CqDockTaskDispatchService {
         log.info("EUA任务准备调用下级任务下发: taskCode={}, bayId={}, routeId={}, request={}",
                 taskCode, bayId, routeId, JSONObject.toJSONString(request));
 
+        infraredMockScenario.validateDispatch(routeId, subCode);
         CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, bayId, routeId, null, null,
                 "待下发", null, false, reportToPatrol, null, subCode);
         CqApiResponse response = cqDockApiService.assignTask(request);
@@ -141,6 +144,30 @@ public class CqDockTaskDispatchService {
     private CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
                                                     String taskName, String fixedStartTime, boolean reportToPatrol,
                                                     String expectedRouteId) {
+        return dispatchByPoints(pointCodes, subCode, taskCode, taskName, fixedStartTime, reportToPatrol,
+                expectedRouteId, null, reportToPatrol ? "PATROL" : "PLATFORM");
+    }
+
+    public CqDockTaskDispatchResult dispatchLinkedPlan(String snapshot, String subCode, String routeId,
+            String taskCode, String taskName, String fixedStartTime, Long planId, boolean patrol) {
+        return dispatchByPoints(String.join(",", cqEuaRoutePointService.parseCodes(snapshot)), subCode,
+                taskCode, taskName, fixedStartTime, patrol, routeId, planId, patrol ? "PATROL" : "PLATFORM");
+    }
+
+    public CqDockTaskRecordEntity preparePatrolPlan(com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity plan) {
+        List<String> codes = cqEuaRoutePointService.parseCodes(plan.getPointCodes());
+        if (!StringUtils.hasText(plan.getSubCode()) || !Objects.equals(plan.getRouteId(), resolvePointRoute(codes, plan.getSubCode()))) {
+            throw new IllegalArgumentException("巡视计划站点或航线已变化，拒绝下发");
+        }
+        infraredMockScenario.validateDispatch(plan.getRouteId(), plan.getSubCode());
+        return saveTaskRecord(plan.getPatrolTaskCode(), plan.getPlanName(), null, plan.getRouteId(), null, null,
+                "下发准备已持久化；若进程中断请核实EUA接收情况，勿重复下发", null, false, true,
+                plan.getPointCodes(), plan.getSubCode(), plan.getId(), "PATROL");
+    }
+
+    private CqDockTaskDispatchResult dispatchByPoints(String pointCodes, String subCode, String taskCode,
+            String taskName, String fixedStartTime, boolean reportToPatrol, String expectedRouteId,
+            Long planId, String taskSource) {
         subCode = StringUtils.hasText(subCode) ? subCode.trim() : null;
         if (reportToPatrol && subCode == null) {
             return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, "上级EUA任务缺少站点Code(subCode)，拒绝下发");
@@ -154,15 +181,25 @@ public class CqDockTaskDispatchService {
                 if (!expectedRouteId.equals(routeId)) throw new IllegalArgumentException("计划航线ID已变化，请重新选择点位并保存");
             }
         } catch (IllegalArgumentException e) {
-            saveTaskRecord(taskCode, taskName, null, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot, subCode);
+            saveTaskRecord(taskCode, taskName, null, null, null, null, e.getMessage(), null, false, reportToPatrol, snapshot, subCode, planId, taskSource);
             return CqDockTaskDispatchResult.failed(taskCode, taskName, null, null, e.getMessage());
         }
+        infraredMockScenario.validateDispatch(routeId, subCode);
+        CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, null, routeId, null, null,
+                "待下发", null, false, reportToPatrol, snapshot, subCode, planId, taskSource);
+        return assignPreparedRecord(record, fixedStartTime);
+    }
+
+    public CqDockTaskDispatchResult assignPreparedRecord(CqDockTaskRecordEntity record, String fixedStartTime) {
+        String taskCode = record.getBusinessId();
+        String taskName = record.getTaskName();
+        String routeId = record.getRouteId();
+        String snapshot = record.getPointCodes();
+        boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
         CqAssignTaskRequest request = new CqAssignTaskRequest();
         request.setTaskName(taskName);
         request.setBusinessId(taskCode);
         request.setRouteId(routeId);
-        CqDockTaskRecordEntity record = saveTaskRecord(taskCode, taskName, null, routeId, null, null,
-                "待下发", null, false, reportToPatrol, snapshot, subCode);
         CqApiResponse response;
         try {
             response = cqDockApiService.assignTask(request);
@@ -243,7 +280,16 @@ public class CqDockTaskDispatchService {
     private CqDockTaskRecordEntity saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
                                 String euaTaskId, Integer responseCode, String responseMsg,
                                 String rawResponse, boolean success, boolean reportToPatrol, String pointCodes, String subCode) {
+        return saveTaskRecord(taskCode, taskName, bayId, routeId, euaTaskId, responseCode, responseMsg,
+                rawResponse, success, reportToPatrol, pointCodes, subCode, null, reportToPatrol ? "PATROL" : "PLATFORM");
+    }
+
+    private CqDockTaskRecordEntity saveTaskRecord(String taskCode, String taskName, String bayId, String routeId,
+            String euaTaskId, Integer responseCode, String responseMsg, String rawResponse, boolean success,
+            boolean reportToPatrol, String pointCodes, String subCode, Long planId, String taskSource) {
         CqDockTaskRecordEntity record = new CqDockTaskRecordEntity();
+        record.setPlanId(planId);
+        record.setTaskSource(taskSource);
         record.setBusinessId(taskCode);
         record.setSubCode(subCode);
         record.setTaskName(taskName);

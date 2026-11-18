@@ -435,4 +435,10 @@ thermal:
     max-file-bytes: 67108864
     max-pixels: 4194304
 
+# 红外调色盘
+mission:
+  thermal-palette:
+    enabled: true
+    style: 6
+
 
