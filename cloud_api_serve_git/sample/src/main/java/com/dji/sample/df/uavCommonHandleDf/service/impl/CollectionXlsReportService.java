@@ -9,6 +9,8 @@ import com.dji.sample.df.substationDf.dao.UniPointMapper2;
 import com.dji.sample.df.windDf.config.FjFileConfig;
 import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
 import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
+import com.dji.sample.manage.service.IDeviceRedisService;
+import com.dji.sdk.cloudapi.device.OsdDock;
 import lombok.extern.slf4j.Slf4j;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
 import org.apache.poi.hssf.usermodel.*;
@@ -33,6 +35,7 @@ public class CollectionXlsReportService {
     @Autowired private IFileMapperDf mediaMapper;
     @Autowired private UniPointMapper2 pointMapper;
     @Autowired private FjFileConfig fileConfig;
+    @Autowired private IDeviceRedisService deviceRedisService;
     @Autowired private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Value("${ordinary-report.template-path:./templates/report-excel-templates.xls}")
     private String templatePath;
@@ -131,13 +134,48 @@ public class CollectionXlsReportService {
             HSSFSheet sheet = book.getSheetAt(0);
             if (sheet.getRow(7) == null || sheet.getRow(0) == null || sheet.getRow(6) == null)
                 throw new IllegalArgumentException("普通报告模板结构不符合约定的前7行表头和第8行明细");
-            HSSFCellStyle[] styles = new HSSFCellStyle[14];
-            for (int c = 0; c < 14; c++) styles[c] = sheet.getRow(7).getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).getCellStyle();
+            boolean hasPictureType = "图片类型".equals(new DataFormatter().formatCellValue(sheet.getRow(6).getCell(8)));
+            HSSFCellStyle[] styles = new HSSFCellStyle[12];
+            HSSFCellStyle[] headerStyles = new HSSFCellStyle[12];
+            int[] widths = new int[12];
+            for (int c = 0; c < 12; c++) {
+                int source = hasPictureType || c < 8 ? c : c == 8 ? 7 : c - 1;
+                styles[c] = sheet.getRow(7).getCell(source, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).getCellStyle();
+                headerStyles[c] = sheet.getRow(6).getCell(source, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).getCellStyle();
+                widths[c] = sheet.getColumnWidth(source);
+            }
             for (int r = sheet.getLastRowNum(); r >= 7; r--) if (sheet.getRow(r) != null) sheet.removeRow(sheet.getRow(r));
-            for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) if (sheet.getMergedRegion(i).getLastRow() >= 7) sheet.removeMergedRegion(i);
-            put(sheet, 0, 4, text(job.getName())); put(sheet, 0, 10, "未提供");
-            put(sheet, 1, 4, text(operator) + "（生成操作人）"); put(sheet, 1, 10, time(System.currentTimeMillis()) + "（生成时间）");
-            put(sheet, 2, 4, time(job.getExecuteTime())); put(sheet, 2, 10, time(job.getCompletedTime()));
+            for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
+                CellRangeAddress region = sheet.getMergedRegion(i);
+                if (region.getLastRow() >= 6) sheet.removeMergedRegion(i);
+                else if (region.getLastColumn() > 11 || (region.getFirstRow() == 5 && region.getFirstColumn() == 0)) {
+                    sheet.removeMergedRegion(i);
+                    int lastColumn = 11;
+                    if (region.getFirstColumn() <= lastColumn && (region.getFirstColumn() < lastColumn || region.getFirstRow() < region.getLastRow())) {
+                        sheet.addMergedRegion(new CellRangeAddress(region.getFirstRow(), region.getLastRow(), region.getFirstColumn(), lastColumn));
+                    }
+                }
+            }
+            for (int r = 0; r <= 6; r++) {
+                HSSFRow row = sheet.getRow(r);
+                if (row == null) continue;
+                for (int c = row.getLastCellNum() - 1; c >= (r == 6 ? 0 : 12); c--) {
+                    if (row.getCell(c) != null) row.removeCell(row.getCell(c));
+                }
+            }
+            String[] headers = {"序号", "区域", "间隔", "设备", "部件", "点位", "重要等级", "数据来源", "图片类型", "采集时间", "巡视结果", "巡视图像"};
+            for (int c = 0; c < headers.length; c++) {
+                HSSFCell cell = sheet.getRow(6).createCell(c);
+                cell.setCellValue(headers[c]); cell.setCellStyle(headerStyles[c]);
+                sheet.setColumnWidth(c, widths[c]);
+            }
+            sheet.setColumnWidth(7, Math.max(widths[7], 24 * 256));
+            sheet.setColumnWidth(8, Math.max(widths[8], 10 * 256));
+            sheet.setColumnWidth(9, Math.max(widths[9], 22 * 256));
+            sheet.setColumnWidth(11, Math.max(widths[11], 24 * 256));
+            put(sheet, 0, 4, text(job.getName())); put(sheet, 0, 11, environment(job.getDockSn()));
+            put(sheet, 1, 4, text(operator) + "（生成操作人）"); put(sheet, 1, 11, time(System.currentTimeMillis()) + "（生成时间）");
+            put(sheet, 2, 4, time(job.getExecuteTime())); put(sheet, 2, 11, time(job.getCompletedTime()));
             long unique = matched.stream().map(p -> p.getId()).distinct().count();
             put(sheet, 5, 0, "巡检单位名称：" + String.join("、", stations));
             Path directory = null;
@@ -147,9 +185,9 @@ public class CollectionXlsReportService {
                 if (!directory.startsWith(base)) throw new IllegalArgumentException("原图目录无效");
             }
             HSSFPatriarch drawing = sheet.createDrawingPatriarch();
-            HSSFCellStyle resultStyle = book.createCellStyle(); resultStyle.cloneStyleFrom(styles[9]);
+            HSSFCellStyle resultStyle = book.createCellStyle(); resultStyle.cloneStyleFrom(styles[10]);
             resultStyle.setWrapText(true); resultStyle.setVerticalAlignment(VerticalAlignment.TOP);
-            sheet.setColumnWidth(9, Math.max(sheet.getColumnWidth(9), 24 * 256));
+            sheet.setColumnWidth(10, Math.max(sheet.getColumnWidth(10), 24 * 256));
             for (int i = 0; i < photos.size(); i++) {
                 MediaFileEntity photo = photos.get(i); UniPoint point = matched.get(i);
                 String name = photo.getFileName();
@@ -172,8 +210,10 @@ public class CollectionXlsReportService {
                             throw new IllegalArgumentException(temperature.getError());
                         if (!finite(temperature.getMax_tem()) || !finite(temperature.getMin_tem()) || !finite(temperature.getAverage_tem()))
                             throw new IllegalArgumentException("温度结果缺失或非有限值");
-                        result = String.format(Locale.ROOT, "最高温：%.1f℃；最低温：%.1f℃；平均温度：%.1f℃",
-                                temperature.getMax_tem(), temperature.getMin_tem(), temperature.getAverage_tem());
+                        double difference = temperature.getMax_tem() - temperature.getMin_tem();
+                        if (!Double.isFinite(difference) || difference < 0) throw new IllegalArgumentException("温度值异常");
+                        result = String.format(Locale.ROOT, "最高温：%.1f℃；最低温：%.1f℃；平均温度：%.1f℃；温差：%.1f℃",
+                                temperature.getMax_tem(), temperature.getMin_tem(), temperature.getAverage_tem(), difference);
                         thermalMeasured++;
                     } catch (RuntimeException e) {
                         String reason = measurementFailure(e);
@@ -186,15 +226,16 @@ public class CollectionXlsReportService {
                 HSSFRow row = sheet.createRow(rowNumber); row.setHeightInPoints(160);
                 String[] values = {String.valueOf(i + 1), text(point.getAreaName()), text(point.getBayName()), text(point.getDeviceName()),
                         text(point.getComponentName()), text(point.getPointName()), text(point.getLevel()),
-                        "无人机采集：" + name, time(photo.getCreateTime()), result, ""};
-                for (int c = 0; c < 14; c++) { HSSFCell cell = row.createCell(c); cell.setCellStyle(styles[c]); cell.setCellValue(c < values.length ? values[c] : ""); }
-                row.getCell(9).setCellStyle(resultStyle);
-                double width = sheet.getColumnWidthInPixels(10);
+                        "无人机采集：" + name, Integer.valueOf(0).equals(point.getPicType()) ? "可见光" : Integer.valueOf(1).equals(point.getPicType()) ? "红外" : "未提供",
+                        time(photo.getCreateTime()), result, ""};
+                for (int c = 0; c < values.length; c++) { HSSFCell cell = row.createCell(c); cell.setCellStyle(styles[c]); cell.setCellValue(values[c]); }
+                row.getCell(10).setCellStyle(resultStyle);
+                double width = sheet.getColumnWidthInPixels(11);
                 double height = 160 * 96.0 / 72;
                 double scale = Math.min((width - 4) / image.getWidth(), (height - 4) / image.getHeight());
                 int dx = Math.max(1, Math.min(1022, (int) (image.getWidth() * scale / width * 1024)));
                 int dy = Math.max(1, Math.min(254, (int) (image.getHeight() * scale / height * 256)));
-                HSSFClientAnchor anchor = new HSSFClientAnchor(1, 1, dx, dy, (short) 10, rowNumber, (short) 10, rowNumber);
+                HSSFClientAnchor anchor = new HSSFClientAnchor(1, 1, dx, dy, (short) 11, rowNumber, (short) 11, rowNumber);
                 anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_DONT_RESIZE);
                 drawing.createPicture(anchor, book.addPicture(bytes, Workbook.PICTURE_TYPE_JPEG));
             }
@@ -234,7 +275,7 @@ public class CollectionXlsReportService {
             sheet.getPrintSetup().setFitWidth((short) 1); sheet.getPrintSetup().setFitHeight((short) 0);
             sheet.setFitToPage(true); sheet.setAutobreaks(true);
             sheet.setRepeatingRows(new CellRangeAddress(0, 6, -1, -1));
-            book.setPrintArea(0, 0, 13, 0, 6 + photos.size() + extraRows);
+            book.setPrintArea(0, 0, 11, 0, 6 + photos.size() + extraRows);
             Files.createDirectories(output.getParent());
             temp = Files.createTempFile(output.getParent(), "collection-", ".tmp");
             try (OutputStream stream = Files.newOutputStream(temp)) { book.write(stream); }
@@ -245,6 +286,19 @@ public class CollectionXlsReportService {
     }
 
     private static boolean finite(Double value) { return value != null && Double.isFinite(value); }
+
+    private String environment(String dockSn) {
+        if (dockSn == null || dockSn.isBlank()) return "未提供";
+        OsdDock osd = deviceRedisService.getDeviceOsd(dockSn, OsdDock.class).orElse(null);
+        if (osd == null) return "未提供";
+        return "环境温度：" + environmentValue(osd.getEnvironmentTemperature(), "℃")
+                + "；湿度：" + environmentValue(osd.getHumidity(), "%")
+                + "；风速：" + environmentValue(osd.getWindSpeed(), "m/s");
+    }
+
+    private static String environmentValue(Number value, String unit) {
+        return value == null || !Double.isFinite(value.doubleValue()) ? "未提供" : value + unit;
+    }
 
     private static String bounded(String value) {
         return value == null ? "未提供" : value.replaceAll("[\\r\\n\\t]", " ").substring(0, Math.min(value.length(), 160));
@@ -267,9 +321,9 @@ public class CollectionXlsReportService {
         if (value.length() > 32767) throw new IllegalArgumentException("匹配异常说明超出 XLS 单元格文本上限");
         HSSFRow row = sheet.createRow(index);
         row.setHeightInPoints(Math.min(400, 30 + 15 * (value.length() / 80)));
-        for (int c = 0; c < 14; c++) { HSSFCell cell = row.createCell(c); cell.setCellStyle(style); }
+        for (int c = 0; c < 12; c++) { HSSFCell cell = row.createCell(c); cell.setCellStyle(style); }
         row.getCell(0).setCellValue(value);
-        sheet.addMergedRegion(new CellRangeAddress(index, index, 0, 13));
+        sheet.addMergedRegion(new CellRangeAddress(index, index, 0, 11));
     }
     private static void put(HSSFSheet sheet, int r, int c, String value) { sheet.getRow(r).getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).setCellValue(value); }
     private static String text(Object value) { return value == null || value.toString().isBlank() ? "未提供" : value.toString(); }
@@ -279,6 +333,8 @@ public class CollectionXlsReportService {
     public synchronized String preview(String jobId) {
         try (InputStream input = Files.newInputStream(reportPath(jobId)); HSSFWorkbook book = new HSSFWorkbook(input)) {
             HSSFSheet sheet = book.getSheetAt(0);
+            boolean hasPictureType = "图片类型".equals(new DataFormatter().formatCellValue(sheet.getRow(6).getCell(8)));
+            int imageColumn = hasPictureType ? 11 : 10;
             Map<Integer, HSSFPictureData> images = new HashMap<>();
             if (sheet.getDrawingPatriarch() != null) for (HSSFShape shape : sheet.getDrawingPatriarch().getChildren()) {
                 if (shape instanceof HSSFPicture) images.put(((HSSFClientAnchor) shape.getAnchor()).getRow1(), ((HSSFPicture) shape).getPictureData());
@@ -287,7 +343,7 @@ public class CollectionXlsReportService {
             DataFormatter formatter = new DataFormatter();
             for (int r = 0; r <= sheet.getLastRowNum(); r++) {
                 html.append("<tr>");
-                for (int c = 0; c < 14; c++) {
+                for (int c = 0; c < (hasPictureType ? 12 : 14); c++) {
                     CellRangeAddress merged = null;
                     for (CellRangeAddress region : sheet.getMergedRegions()) if (region.isInRange(r, c)) { merged = region; break; }
                     if (merged != null && (r != merged.getFirstRow() || c != merged.getFirstColumn())) continue;
@@ -296,7 +352,7 @@ public class CollectionXlsReportService {
                     html.append('>');
                     Row row = sheet.getRow(r);
                     html.append(escape(row == null ? "" : formatter.formatCellValue(row.getCell(c))));
-                    if (c == 10 && images.containsKey(r)) html.append("<img alt=\"巡检图片\" src=\"data:image/jpeg;base64,").append(Base64.getEncoder().encodeToString(images.get(r).getData())).append("\">");
+                    if (c == imageColumn && images.containsKey(r)) html.append("<img alt=\"巡检图片\" src=\"data:").append(images.get(r).getMimeType()).append(";base64,").append(Base64.getEncoder().encodeToString(images.get(r).getData())).append("\">");
                     html.append("</td>");
                 }
                 html.append("</tr>");
