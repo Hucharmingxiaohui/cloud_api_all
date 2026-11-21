@@ -15,6 +15,7 @@ import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.manage.service.IDeviceService;
 import com.dji.sample.media.model.MediaFileCountDTO;
 import com.dji.sample.media.model.MediaFileDTO;
+import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.media.service.IFileService;
 import com.dji.sample.media.service.IMediaRedisService;
 import com.dji.sample.media.service.IMediaService;
@@ -52,6 +53,9 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
 
     @Autowired
     private IFileService fileService;
+
+    @Autowired
+    private IFileMapper fileMapper;
 
     @Autowired
     private IWaylineJobService waylineJobService;
@@ -198,7 +202,7 @@ public class MediaServiceImpl extends AbstractMediaService implements IMediaServ
         }
         mediaFileCount.setBid(request.getBid());
         mediaFileCount.setTid(request.getTid());
-        mediaFileCount.setUploadedCount(mediaFileCount.getUploadedCount() + 1);
+        mediaFileCount.setUploadedCount(fileMapper.countUploadedFiles(dock.getWorkspaceId(), jobId));
 
 //      如果是不停机巡检任务，已上传图片要加上
         int videoPointNum=0;

@@ -8,6 +8,7 @@ import com.dji.sample.component.oss.service.impl.OssServiceContext;
 import com.dji.sample.manage.model.dto.DeviceDictionaryDTO;
 import com.dji.sample.manage.service.IDeviceDictionaryService;
 import com.dji.sample.media.dao.IFileMapper;
+import com.dji.sample.media.service.impl.MediaFilePersistence;
 import com.dji.sample.media.model.MediaFileDTO;
 import com.dji.sample.media.model.MediaFileEntity;
 import com.dji.sample.df.temperatureMeasurementDF.service.IFileServiceDF;
@@ -42,6 +43,9 @@ public class FileServiceDFImpl implements IFileServiceDF {
     private IFileMapper mapper;
 
     @Autowired
+    private MediaFilePersistence mediaFilePersistence;
+
+    @Autowired
     private IDeviceDictionaryService deviceDictionaryService;
 
     @Autowired
@@ -71,7 +75,8 @@ public class FileServiceDFImpl implements IFileServiceDF {
         MediaFileEntity fileEntity = this.fileUploadConvertToEntity(file);
         fileEntity.setWorkspaceId(workspaceId);
         fileEntity.setFileId(UUID.randomUUID().toString());
-        return mapper.insert(fileEntity);
+        return mediaFilePersistence.save(workspaceId, fileEntity.getJobId(), fileEntity.getObjectKey(),
+                fileEntity::setFileId, () -> mapper.insert(fileEntity));
     }
 
     @Override

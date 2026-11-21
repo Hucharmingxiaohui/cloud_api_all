@@ -42,6 +42,9 @@ public class FileServiceImpl implements IFileService {
     private IFileMapper mapper;
 
     @Autowired
+    private MediaFilePersistence mediaFilePersistence;
+
+    @Autowired
     private IDeviceDictionaryService deviceDictionaryService;
 
     @Autowired
@@ -75,8 +78,11 @@ public class FileServiceImpl implements IFileService {
         fileEntity.setWorkspaceId(workspaceId);
         String fileId = UUID.randomUUID().toString();
         fileEntity.setFileId(fileId);
-        mapperDf.getThumbnailByJobId(workspaceId,fileId);
-        return mapper.insert(fileEntity);
+        return mediaFilePersistence.save(workspaceId, fileEntity.getJobId(), fileEntity.getObjectKey(),
+                fileEntity::setFileId, () -> {
+                    mapperDf.getThumbnailByJobId(workspaceId, fileId);
+                    return mapper.insert(fileEntity);
+                });
     }
 
     @Override

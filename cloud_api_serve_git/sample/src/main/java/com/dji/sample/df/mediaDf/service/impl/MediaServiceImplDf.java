@@ -1,6 +1,7 @@
 package com.dji.sample.df.mediaDf.service.impl;
 
 import com.dji.sample.df.temperatureMeasurementDF.service.IFileServiceDF;
+import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.component.oss.model.OssConfiguration;
 import com.dji.sample.component.websocket.model.BizCodeEnum;
 import com.dji.sample.component.websocket.service.IWebSocketMessageService;
@@ -45,6 +46,9 @@ public class MediaServiceImplDf extends AbstractMediaService implements IMediaSe
 
     @Autowired
     private IFileServiceDF fileService;
+
+    @Autowired
+    private IFileMapper fileMapper;
 
     @Autowired
     private IWaylineJobService waylineJobService;
@@ -186,7 +190,7 @@ public class MediaServiceImplDf extends AbstractMediaService implements IMediaSe
         }
         mediaFileCount.setBid(request.getBid());
         mediaFileCount.setTid(request.getTid());
-        mediaFileCount.setUploadedCount(mediaFileCount.getUploadedCount() + 1);
+        mediaFileCount.setUploadedCount(fileMapper.countUploadedFiles(dock.getWorkspaceId(), jobId));
 
         // After all the files of the job are uploaded, delete the media file key.
         if (mediaFileCount.getUploadedCount() >= mediaFileCount.getMediaCount()) {

@@ -21,6 +21,7 @@ import com.dji.sample.manage.service.IDeviceRedisService;
 import com.dji.sample.manage.service.IDeviceService;
 import com.dji.sample.media.model.MediaFileCountDTO;
 import com.dji.sample.media.service.IFileService;
+import com.dji.sample.media.dao.IFileMapper;
 import com.dji.sample.wayline.dao.IWaylineJobMapper;
 import com.dji.sample.wayline.model.dto.WaylineJobDTO;
 import com.dji.sample.wayline.model.entity.WaylineJobEntity;
@@ -81,6 +82,9 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
 
     @Autowired
     private IFileService fileService;
+
+    @Autowired
+    private IFileMapper fileMapper;
 
     @Autowired
     private IDeviceRedisService deviceRedisService;
@@ -459,12 +463,11 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
         String key = RedisConst.MEDIA_HIGHEST_PRIORITY_PREFIX + entity.getDockSn();
         String countKey = RedisConst.MEDIA_FILE_PREFIX + entity.getDockSn();
         Object mediaFileCount = RedisOpsUtils.hashGet(countKey, entity.getJobId());
-        int dbUploadedSize = fileService.getFilesByWorkspaceAndJobId(entity.getWorkspaceId(), entity.getJobId()).size();
+        int dbUploadedSize = fileMapper.countUploadedFiles(entity.getWorkspaceId(), entity.getJobId());
 
 
         if (Objects.nonNull(mediaFileCount)) {
-            int redisUploadedCount = ((MediaFileCountDTO) mediaFileCount).getUploadedCount() + videoPointNum;
-            int uploadedCount = Math.max(redisUploadedCount, dbUploadedSize);
+            int uploadedCount = dbUploadedSize + videoPointNum;
             syncUnderReportedMediaCount(entity, builder, uploadedCount);
             builder.uploadedCount(uploadedCount)
                     .uploading(RedisOpsUtils.checkExist(key) && entity.getJobId().equals(((MediaFileCountDTO)RedisOpsUtils.get(key)).getJobId()));
@@ -485,7 +488,7 @@ public class WaylineJobServiceImpl implements IWaylineJobService {
                         .jobId(entity.getJobId())
                         .mediaCount(entity.getMediaCount())
                         .uploadedCount(uploadedSize).build());
-        return builder.build();
+        return builder.uploadedCount(uploadedSize).build();
     }
 
     private void syncUnderReportedMediaCount(WaylineJobEntity entity, WaylineJobDTO.WaylineJobDTOBuilder builder, int uploadedCount) {

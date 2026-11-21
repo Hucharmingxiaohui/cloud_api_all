@@ -21,6 +21,7 @@ import com.dji.sample.df.mediaDf.model.MediaFileDTO;
 import com.dji.sample.df.mediaDf.model.MediaFileEntity;
 import com.dji.sample.df.mediaDf.model.MediaThumbnailEntity;
 import com.dji.sample.df.mediaDf.service.IFileServiceDf;
+import com.dji.sample.media.service.impl.MediaFilePersistence;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointCount.PointCount;
 import com.dji.sample.df.thirdKmzDf.entity.pointResult.PointResult;
 import com.dji.sample.df.thirdKmzDf.service.WaylineKmzThirdService;
@@ -67,6 +68,9 @@ public class FileServiceImplDf implements IFileServiceDf {
 
     @Autowired
     private IFileMapperDf mapper;
+
+    @Autowired
+    private MediaFilePersistence mediaFilePersistence;
 
     @Autowired
     private IDeviceDictionaryService deviceDictionaryService;
@@ -121,7 +125,8 @@ public class FileServiceImplDf implements IFileServiceDf {
         MediaFileEntity fileEntity = this.fileUploadConvertToEntity(file);
         fileEntity.setWorkspaceId(workspaceId);
         fileEntity.setFileId(UUID.randomUUID().toString());
-        return mapper.insert(fileEntity);
+        return mediaFilePersistence.save(workspaceId, fileEntity.getJobId(), fileEntity.getObjectKey(),
+                fileEntity::setFileId, () -> mapper.insert(fileEntity));
     }
 
     @Override
