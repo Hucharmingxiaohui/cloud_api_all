@@ -5,6 +5,10 @@ import lombok.Data;
 
 @Data
 public class TemResultEntity {
+    private Integer maxX;
+    private Integer maxY;
+    private Integer matrixWidth;
+    private Integer matrixHeight;
     @JsonProperty("point_tem")
     private Double point_tem;//点测温结果
     @JsonProperty("point_position")

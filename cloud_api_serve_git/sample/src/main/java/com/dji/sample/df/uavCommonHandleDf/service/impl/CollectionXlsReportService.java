@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class CollectionXlsReportService {
     @Autowired private TemMeasureService temMeasureService;
+    @Autowired private com.dji.sample.media.service.IFileService fileService;
     @Autowired private IFileMapperDf mediaMapper;
     @Autowired private UniPointMapper2 pointMapper;
     @Autowired private FjFileConfig fileConfig;
@@ -204,7 +205,8 @@ public class CollectionXlsReportService {
                 String result = "正常";
                 if (Integer.valueOf(1).equals(point.getPicType())) {
                     try {
-                        TemResultEntity temperature = temMeasureService.measureWholeImage(imagePath.toString());
+                        TemResultEntity temperature = managed != null ? temMeasureService.measureWholeImage(imagePath.toString())
+                                : measureOriginal(photo);
                         if (temperature == null) throw new IllegalArgumentException("测温服务未返回结果");
                         if (temperature.getError() != null && !temperature.getError().isBlank())
                             throw new IllegalArgumentException(temperature.getError());
@@ -286,6 +288,29 @@ public class CollectionXlsReportService {
     }
 
     private static boolean finite(Double value) { return value != null && Double.isFinite(value); }
+
+    TemResultEntity measureOriginal(MediaFileEntity photo) {
+        log.info("普通报告从对象存储读取红外原图测温，任务={}，文件标识={}，不使用本地标注图测温", photo.getJobId(), photo.getFileId());
+        Path original = null;
+        try {
+            java.net.URL url = fileService.getObjectUrl(photo.getWorkspaceId(), photo.getFileId());
+            if (url == null) throw new IOException("Missing original URL");
+            original = Files.createTempFile("ordinary-report-", ".jpg");
+            java.net.URLConnection connection = url.openConnection();
+            connection.setConnectTimeout(10000); connection.setReadTimeout(10000);
+            try (InputStream source = connection.getInputStream()) {
+                Files.copy(source, original, StandardCopyOption.REPLACE_EXISTING);
+            }
+            log.debug("普通报告红外测温原图下载完成，任务={}，文件标识={}", photo.getJobId(), photo.getFileId());
+            return temMeasureService.measureWholeImage(original.toString());
+        } catch (IOException e) {
+            log.warn("普通报告红外测温原图读取失败，任务={}，文件标识={}", photo.getJobId(), photo.getFileId(), e);
+            throw new IllegalArgumentException("无法读取本地红外图片原始源", e);
+        } finally {
+            if (original != null) try { Files.deleteIfExists(original); }
+            catch (IOException e) { log.warn("无法清理普通报告测温原图临时文件", e); }
+        }
+    }
 
     private String environment(String dockSn) {
         if (dockSn == null || dockSn.isBlank()) return "未提供";

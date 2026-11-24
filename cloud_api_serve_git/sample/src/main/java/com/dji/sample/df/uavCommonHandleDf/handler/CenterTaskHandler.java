@@ -208,6 +208,7 @@ public class CenterTaskHandler {
         String taskName = taskDetail.get("taskName");
         String planType = taskDetail.get("planType");
         String fixedStartTime = taskDetail.get("fixedStartTime");
+//      重庆EUA任务和其他任务分开了
         int result = "5".equals(planType)
                 ? executeCqDockTask(singleDeviceId, taskDetail.get("subCode"), taskCode, taskName, fixedStartTime).getCode()
                 : executeTask(planType, singleDeviceId, taskCode, taskName, fixedStartTime);
@@ -247,7 +248,7 @@ public class CenterTaskHandler {
         }
         return taskDetail;
     }
-
+//  更新redis任务执行状态
     private void updateTaskStatus(String taskCode, Map<String, String> taskDetail, String status, int resultCode, String errorMsg) {
         taskDetail.put("status", status);
         taskDetail.put("resultCode", String.valueOf(resultCode));
@@ -446,7 +447,7 @@ public class CenterTaskHandler {
     private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity) throws SQLException {
         return dispatchExpressPlanResult(pubWaylineJobPlanDfEntity, pubWaylineJobPlanDfEntity.getName());
     }
-
+//  任务执行后，会在执行类中加入状态监控逻辑：JobControlHandler.startMonitoringTask
     private TaskExecutionResult dispatchExpressPlanResult(PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity, String jobName) throws SQLException {
         CustomClaim customClaim = new CustomClaim();
         customClaim.setWorkspaceId("e3dea0f5-37f2-4d79-ae58-490af3228069");

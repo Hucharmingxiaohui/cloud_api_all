@@ -45,6 +45,7 @@ public class FileControllerDf {
     private IFileServiceDf fileService;
     @Autowired private com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService centerOrdinaryTasks;
     @Autowired private javax.servlet.http.HttpServletRequest request;
+    @Autowired private com.dji.sample.df.windDf.config.FjFileConfig ordinaryImageConfig;
 
     @Autowired
     DefectEntityMapper defectEntityMapper;
@@ -259,10 +260,11 @@ public class FileControllerDf {
             for (int j = 0; j < filteredFiles.size(); j++) {
                 String fileName = filteredFiles.get(j).getFileName();
 //              对接分析服务唯一标识
-                String replace = fileName.replace(".jpeg", "");
+                int extension = fileName.lastIndexOf('.');
+                String replace = extension >= 0 ? fileName.substring(0, extension) : fileName;
                 String regId="1";
 //                  普通照片保存形式为：点位编码+照片类型+"_"+图片原名
-                String imagePath1="/ftpdir/admin_files/recfile_images/"+job_id+"/"+regId+"_"+replace+".jpg";
+                String imagePath1=java.nio.file.Paths.get(ordinaryImageConfig.getRecfilePath()+ordinaryImageConfig.getRecfileNativePath(), job_id, regId+"_"+replace+".jpg").toString();
                 String imageUrl1 = "/api/file/defect?path=" +
                         URLEncoder.encode(imagePath1, "UTF-8");
                 filteredFiles.get(j).setOriginalImageUrl(imageUrl1);

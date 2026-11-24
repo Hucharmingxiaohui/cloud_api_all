@@ -357,10 +357,17 @@ public class TemMeasureServiceImpl implements TemMeasureService {
 
     @Override
     public TemResultEntity measureWholeImage(String imagePath) {
-        if (thermalProperties.getProvider() == ThermalProperties.Provider.cli) {
-            return thermalCli.measureWholeImage(Path.of(imagePath));
+        log.info("红外全图测温开始，图片={}，测温工具={}", Path.of(imagePath).getFileName(), thermalProperties.getProvider());
+        TemResultEntity result = thermalProperties.getProvider() == ThermalProperties.Provider.cli
+                ? thermalCli.measureWholeImage(Path.of(imagePath))
+                : getTemByLocalImagePath(imagePath, new TemParamEntity(), true);
+        if (result == null || result.getError() != null && !result.getError().isBlank()) {
+            log.warn("红外全图测温失败，图片={}，原因={}", Path.of(imagePath).getFileName(), result == null ? "测温工具未返回结果" : result.getError());
+        } else {
+            log.info("红外全图测温完成，图片={}，最高温={}℃，最低温={}℃，最高温坐标=({}, {})，矩阵尺寸={}x{}",
+                    Path.of(imagePath).getFileName(), result.getMax_tem(), result.getMin_tem(), result.getMaxX(), result.getMaxY(), result.getMatrixWidth(), result.getMatrixHeight());
         }
-        return getTemByLocalImagePath(imagePath, new TemParamEntity(), true);
+        return result;
     }
 
     private TemResultEntity getTemByLocalImagePath(String imagePath, TemParamEntity temParamEntity, boolean wholeImage) {
@@ -376,7 +383,10 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             log.info("测温结束，结果={}", formatTemResult(temResultEntity));
             return temResultEntity;
         }
-        String targetFolder = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/temTest";
+        Path work = null;
+        try {
+        work = Files.createTempDirectory("thermal-sdk-");
+        String targetFolder = work.toString();
         //2根据图像生成raw图像（与getTemByLocalFile同一套测温SDK）
         String command = singlePointUrl + "dji_thermal_sdk_v1.6_20240927/utility/bin/linux/release_x64/dji_irp";
         String osName = System.getProperty("os.name").toLowerCase();
@@ -393,14 +403,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         try {
             Files.createDirectories(Path.of(targetFolder));
             ProcessBuilder processBuilder = new ProcessBuilder(cmd);
-            processBuilder.redirectErrorStream(true);
-            Process process = processBuilder.start();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                while (reader.readLine() != null) {
-                    // 丢弃SDK过程输出
-                }
-            }
-            int exitCode = process.waitFor();
+            int exitCode = runLocalSdk(processBuilder);
             if (exitCode != 0) {
                 temResultEntity.setError("生成raw格式温度图出错");
                 deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
@@ -409,6 +412,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             }
         } catch (Exception e) {
             deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             temResultEntity.setError("生成raw格式温度图出错");
             log.error("EUA红外生成raw格式温度图出错", e);
             log.info("测温结束，结果={}", formatTemResult(temResultEntity));
@@ -424,10 +428,7 @@ public class TemMeasureServiceImpl implements TemMeasureService {
             if (rawFile.length() != expectedSize) {
                 throw new IOException("File size mismatch. Expected: " + expectedSize + " bytes, but found: " + rawFile.length() + " bytes.");
             }
-            FileInputStream fis = new FileInputStream(rawFile);
-            byte[] buffer = new byte[(int) rawFile.length()];
-            fis.read(buffer);
-            fis.close();
+            byte[] buffer = Files.readAllBytes(rawFile.toPath());
             ByteBuffer byteBuffer = ByteBuffer.wrap(buffer);
             byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < height; i++) {
@@ -474,12 +475,17 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         Double sumTem = 0.0;
         Double temMax = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
         Double temMin = temperatureMatrix[temParamEntity.getLeft_top_y()][temParamEntity.getLeft_top_x()];
+        temResultEntity.setMatrixWidth(width); temResultEntity.setMatrixHeight(height);
+        temResultEntity.setMaxX(temParamEntity.getLeft_top_x());
+        temResultEntity.setMaxY(temParamEntity.getLeft_top_y());
         for (int i1 = 0; i1 < height1; i1++) {
             for (int j1 = 0; j1 < width1; j1++) {
                 double value = temperatureMatrix[i1 + temParamEntity.getLeft_top_y()][j1 + temParamEntity.getLeft_top_x()];
                 sumTem = sumTem + value;
                 if (value > temMax) {
                     temMax = value;
+                    temResultEntity.setMaxX(j1 + temParamEntity.getLeft_top_x());
+                    temResultEntity.setMaxY(i1 + temParamEntity.getLeft_top_y());
                 }
                 if (value < temMin) {
                     temMin = value;
@@ -493,6 +499,40 @@ public class TemMeasureServiceImpl implements TemMeasureService {
         deleteFile.deleteFileInFolder(targetFolder, "measure.raw");
         log.info("测温结束，结果={}", formatTemResult(temResultEntity));
         return temResultEntity;
+        } catch (IOException e) {
+            temResultEntity.setError("生成raw格式温度图出错");
+            log.warn("本地SDK测温临时文件处理失败", e);
+            return temResultEntity;
+        } finally {
+            if (work != null) {
+                try {
+                    Files.deleteIfExists(work.resolve("measure.raw"));
+                    Files.deleteIfExists(work);
+                } catch (IOException e) { log.warn("无法清理本地SDK测温临时目录 {}", work, e); }
+            }
+        }
+    }
+
+    int runLocalSdk(ProcessBuilder builder) throws IOException, InterruptedException {
+        return runLocalSdk(builder, 60);
+    }
+
+    int runLocalSdk(ProcessBuilder builder, int timeoutSeconds) throws IOException, InterruptedException {
+        log.debug("本地SDK测温进程启动，超时限制={}秒", timeoutSeconds);
+        Process process = builder.redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        try {
+            process.getOutputStream().close();
+            if (!process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)) {
+                log.warn("本地SDK测温进程超时，将终止进程，超时限制={}秒", timeoutSeconds);
+                throw new IOException("本地SDK测温超时");
+            }
+            log.debug("本地SDK测温进程结束，退出码={}", process.exitValue());
+            return process.exitValue();
+        } finally {
+            process.descendants().forEach(ProcessHandle::destroyForcibly);
+            if (process.isAlive()) process.destroyForcibly();
+            process.waitFor(2, java.util.concurrent.TimeUnit.SECONDS);
+        }
     }
 
     private TemResultEntity getTemByCliMedia(String workspaceId, String fileId, TemParamEntity parameters) {

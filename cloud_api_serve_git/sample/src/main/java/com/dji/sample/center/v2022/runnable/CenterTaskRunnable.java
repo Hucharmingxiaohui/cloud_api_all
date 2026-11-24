@@ -73,20 +73,23 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
 
     @Transactional(rollbackFor = Exception.class)
     public void taskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
-       log.info("开始处理下发任务");
-//      需要区分不同任务类型：风机任务、航点航线任务、光伏任务、EUA任务
-//      风机按设备、航点航线/光伏按间隔、EUA按点位下发。
+        log.info("开始处理下发任务");
+//      需要区分不同任务类型：普通航线任务、风机任务、光伏任务、EUA任务
+//      普通航线任务/EUA按点位下发;风机按设备;光伏按间隔。
         String taskCode = taskCommandItem.getTask_code();
         String taskName = taskCommandItem.getTask_name();
         int deviceLevel = taskCommandItem.getDevice_level();
         String deviceList = taskCommandItem.getDevice_list();
         String fixedStartTime = taskCommandItem.getFixed_start_time();
+//      1.普通航线任务（即变电站任务，按点位，planType=3）
+//      变电站任务没有用centerTaskHandler.addScheduledTask，用的com/dji/sample/df/centerOrdinary包自己的定时器执行逻辑，不过状态监控还是用的JobControlHandler.startMonitoringTask
         if (deviceLevel == 3 && ("true".equalsIgnoreCase(switchConfig.getCenterOrdinaryTaskEnable())
                 || "1".equals(switchConfig.getCenterOrdinaryTaskEnable()))
                 && (deviceList == null || deviceList.contains(",") || !deviceList.trim().endsWith("-bay"))) {
             AppContext.getBean(com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskService.class).accept(taskCommandItem, sub_code);
             return;
         }
+//      2.EUA平台任务（按点位，planType=5）
         String normalizedPoints = deviceLevel == 3 && isCqDockTaskEnabled()
                 ? cqDockTaskDispatchService.validatePointDispatch(deviceList, sub_code) : null;
         saveOrUpdateTaskPlan(taskCommandItem, sub_code);
@@ -95,7 +98,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                 centerTaskHandler.addScheduledTask(5, taskCode, fixedStartTime, normalizedPoints, taskName, sub_code);
                 return;
             }
-//          规定选一个设备：风机任务
+//      3.风机任务（按设备，planType=1）
             if (deviceLevel == 2) {
                 // 2. 检查设备列表是否只有一个ID
                 String[] deviceIds = deviceList.split(",");
@@ -116,7 +119,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                     }
                 }
             }else if (deviceLevel == 1) {
-//              规定选一个间隔：航点航线任务、光伏任务
+//      4.光伏任务（按间隔，planType=4）
                 String[] deviceIds = deviceList.split(",");
                 if (deviceIds.length == 1) {
                     String bayId = deviceIds[0].trim();
@@ -126,7 +129,7 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
                         centerTaskHandler.addScheduledTask(4, taskCode, fixedStartTime, orthophotoId, taskName);
                         return;
                     }
-//                  其他为航点航线任务
+//      5.航点航线任务（弃用，planType=0）
                     centerTaskHandler.addScheduledTask(0,taskCode, fixedStartTime,
                             bayId, taskName);
                 }

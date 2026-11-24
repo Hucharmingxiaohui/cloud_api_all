@@ -57,6 +57,8 @@ public class PictureSaveHandler {
     UniPointMapper2 uniPointMapper2;
     @Autowired
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
+    @Autowired
+    private com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService temMeasureService;
 
     public Result<Map> pictureSave(String jobId) throws IOException {
         if (centerOrdinaryTasks.findJob(jobId) != null) {
@@ -205,9 +207,13 @@ public class PictureSaveHandler {
             throw new IllegalArgumentException("任务标识无效");
         }
         Map<String, String> saved = new java.util.LinkedHashMap<>();
+        log.info("普通任务图片结果保存开始，任务={}，媒体数量={}", job.getJobId(), media.size());
         for (MediaFileEntity file : media) {
             String name = file.getFileName();
-            if (name == null || !name.toLowerCase(java.util.Locale.ROOT).matches(".*\\.(jpe?g|png|bmp|tiff?)$")) continue;
+            if (name == null || !name.toLowerCase(java.util.Locale.ROOT).matches(".*\\.(jpe?g|png|bmp|tiff?)$")) {
+                log.debug("普通任务图片结果跳过非图片媒体，任务={}，文件标识={}", job.getJobId(), file.getFileId());
+                continue;
+            }
             if (name.contains("/") || name.contains("\\") || name.contains(":")) {
                 throw new IllegalArgumentException("图片文件名无效");
             }
@@ -216,8 +222,21 @@ public class PictureSaveHandler {
             String path = downloadAndConvertToJpeg2("1", url.toString(), name,
                     fileConfig.getRecfilePath() + fileConfig.getRecfileNativePath(),
                     job.getJobId(), fileConfig.getRecfileNativePath());
+            if ("T".equals(extractTOrV(name))) {
+                Path local = Paths.get(fileConfig.getRecfilePath() + fileConfig.getRecfileNativePath(),
+                        job.getJobId(), "1_" + name.substring(0, name.lastIndexOf('.')) + ".jpg");
+                try {
+                    log.info("普通任务红外图片开始测温标注，任务={}，图片={}", job.getJobId(), name);
+                    OrdinaryThermalRenderer.annotate(local, temMeasureService.measureWholeImage(local.toString()));
+                    log.info("普通任务红外图片标注完成，任务={}，图片={}，仅更新本地结果图，保留对象存储原图", job.getJobId(), name);
+                } catch (Exception e) {
+                    log.warn("普通任务红外标注失败，保留下载原图，job={}，file={}", job.getJobId(), name, e);
+                }
+            }
             saved.put(name, path);
+            log.debug("普通任务图片结果保存完成，任务={}，图片={}", job.getJobId(), name);
         }
+        log.info("普通任务图片结果保存结束，任务={}，已保存图片数量={}", job.getJobId(), saved.size());
         return saved;
     }
 

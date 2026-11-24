@@ -67,6 +67,7 @@ final class TemperatureMatrix {
     TemResultEntity measure(TemParamEntity p) {
         if (p == null) throw new IllegalArgumentException("测温参数不能为空");
         TemResultEntity result = new TemResultEntity();
+        result.setMatrixWidth(width); result.setMatrixHeight(height);
         if (p.getPoint_x() != null || p.getPoint_y() != null) {
             check(p.getPoint_x(), p.getPoint_y());
             result.setPoint_tem(round(at(p.getPoint_x(), p.getPoint_y())));
@@ -78,7 +79,10 @@ final class TemperatureMatrix {
             double sum = 0, minimum = Double.POSITIVE_INFINITY, maximum = Double.NEGATIVE_INFINITY;
             for (int y = top; y <= bottom; y++) for (int x = left; x <= right; x++) {
                 double value = at(x, y); sum += value;
-                minimum = Math.min(minimum, value); maximum = Math.max(maximum, value);
+                minimum = Math.min(minimum, value);
+                if (value > maximum) {
+                    maximum = value; result.setMaxX(x); result.setMaxY(y);
+                }
             }
             result.setLeft_top_position(position(left, top)); result.setRight_bottum_position(position(right, bottom));
             result.setMin_tem(round(minimum)); result.setMax_tem(round(maximum));
