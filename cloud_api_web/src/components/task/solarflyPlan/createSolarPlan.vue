@@ -391,7 +391,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, onUnmounted, reactive, ref, toRaw, UnwrapRef, nextTick, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, toRaw, UnwrapRef, nextTick, watch, defineAsyncComponent } from 'vue'
 import { Promotion, Camera, Close } from '@element-plus/icons-vue'
 import { EDeviceTypeName, ELocalStorageKey, ERouterName } from '/@/types'
 import { useMyStore } from '/@/store'
@@ -405,7 +405,8 @@ import moment, { Moment } from 'moment'
 import { ElTable, ElTableColumn, ElFormItem, ElForm, ElInput, ElButton, ElSelect, ElOption, ElPagination, ElContainer, ElHeader, ElMain, ElFooter, ElDialog, ElMessage, ElMessageBox, ElText, ElLink, ElTag, ElTooltip } from 'element-plus'
 import loadSolarPanel from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
 import type { AccessoryDeviceMarker } from '/@/components/task/solarflyPlan/loadSolarPanel.vue'
-import Solar3DRouteEditor from '/@/components/cesium/Solar3DRouteEditor.vue'
+
+import { loadCesiumPage } from '/@/utils/cesium-loader'
 import SelectDock from '/@/pages/page-web/projects/dock.vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getAllWindTurbineApi, getAllInserestPointApi, getAllSolarPanelApi, getSolarPanelImgByIdApi, getOrthophotoListApi, getSolarPanelByIdApi } from '/@/api/turbine/turbineMgt'
@@ -414,6 +415,7 @@ import { AutoTaskRecommendation, computeAreaGeometry, DockPosition, recommendAut
 import { listSolarAccessories } from '/@/api/solar-accessory'
 import type { SolarAccessory } from '/@/api/solar-accessory'
 import { deviceTypes } from '/@/components/variableMgt/solarMgt/solarAccessoryMgt/accessoryModel'
+const Solar3DRouteEditor = defineAsyncComponent(() => loadCesiumPage(() => import('/@/components/cesium/Solar3DRouteEditor.vue')))
 const router = useRouter()
 const route = useRoute()
 const store = useMyStore()

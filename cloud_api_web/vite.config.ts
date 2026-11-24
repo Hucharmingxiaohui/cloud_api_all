@@ -147,9 +147,12 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
         }
       },
       vue(),
-      cesium({
-        injectCss: false, // 关闭自动注入 CSS
-      }),
+      {
+        ...cesium(),
+        // Copy/serve Cesium as before, but load it only through cesium-loader.
+        // An eager HTML script crashes Firefox 79 before the 2D app can start.
+        transformIndexHtml () { return [] }
+      },
       eslintPlugin({
         fix: true,
       }),
@@ -267,7 +270,6 @@ export default ({ command, mode }: ConfigEnv): UserConfigExport =>
               '@epicgames-ps/lib-pixelstreamingfrontend-ue5.4',
               '@epicgames-ps/lib-pixelstreamingfrontend-ui-ue5.4'
             ],
-            cesium: ['cesium', '@cesium-china/cesium-map'],
             antd: ['ant-design-vue'],
             'element-plus': ['element-plus'],
           }

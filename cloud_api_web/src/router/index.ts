@@ -3,6 +3,7 @@ import { ERouterName } from '/@/types/index'
 import { ref } from 'vue'
 import { loadCloudRendererConfig } from '/@/components/cloudRenderer/cloudRendererConfig'
 import { message } from 'ant-design-vue'
+import { loadCesiumPage } from '/@/utils/cesium-loader'
 
 // 扩展路由元信息类型（移除index/parentIndex，保留核心配置）
 declare module 'vue-router' {
@@ -548,7 +549,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/wayline/showWayline',
         name: 'showWayline',
-        component: () => import('/@/components/wayline/pathTracking.vue'),
+        component: () => loadCesiumPage(() => import('/@/components/wayline/pathTracking.vue')),
         meta: { showInMenu: false, cache: true }
       },
       {
@@ -590,7 +591,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/wayline/Model',
         name: 'model',
-        component: () => import('/@/components/cesium/3DMapPanel.vue'),
+        component: () => loadCesiumPage(() => import('/@/components/cesium/3DMapPanel.vue')),
         meta: { showInMenu: false, cache: true }
       },
       {
@@ -602,7 +603,7 @@ const routes: Array<RouteRecordRaw> = [
       {
         path: '/wayline/solar3d-editor',
         name: 'solar3dRouteEditor',
-        component: () => import('/@/components/cesium/Solar3DRouteEditor.vue'),
+        component: () => loadCesiumPage(() => import('/@/components/cesium/Solar3DRouteEditor.vue')),
         meta: { showInMenu: false, cache: true }
       },
       {

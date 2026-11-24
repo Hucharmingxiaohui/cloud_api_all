@@ -8,6 +8,9 @@ let routes
 const mod = { exports: {} }
 const router = { beforeEach () {}, afterEach () {}, onError () {} }
 const stubs = {
+  '/@/utils/cesium-loader': { loadCesiumPage: loader => loader() },
+  '/@/components/cloudRenderer/cloudRendererConfig': { loadCloudRendererConfig: async () => ({ enabled: false }) },
+  'ant-design-vue': { message: { warning () {} } },
   'vue-router': { createRouter: options => { routes = options.routes; return router }, createWebHistory: () => ({}) },
   '/@/types/index': { ERouterName: new Proxy({}, { get: (_, name) => name }) },
   vue: { ref: value => ({ value }) }

@@ -286,7 +286,6 @@ import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, ge
 import { RocketOutlined, EyeInvisibleOutlined, EyeOutlined, RobotOutlined, DoubleRightOutlined, CloseOutlined } from '@ant-design/icons-vue'
 import { EHmsLevel } from '/@/types/enums'
 // import Devicebox from '/@/components/devices/device-info.vue'
-import { TrustedServers } from 'cesium'
 import CustomTree from '/@/components/substationTree.vue'
 
 const activeKey = ref('EDeviceTypeName.Aircraft')
