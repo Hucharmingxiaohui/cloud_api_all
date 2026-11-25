@@ -115,7 +115,6 @@ public class CenterTaskHandler {
     /**
      * 定时扫描并执行任务（每分钟执行一次）
      */
-    @Scheduled(fixedRate = 60000)
     public void scanAndExecuteTasks() {
         try {
             // 获取当前时间

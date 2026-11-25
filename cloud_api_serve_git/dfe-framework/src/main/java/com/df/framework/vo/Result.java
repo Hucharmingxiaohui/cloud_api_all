@@ -70,27 +70,27 @@ public class Result<T> implements Serializable {
 
     // 返回成功结果，code默认，msg默认，data=null
     public static Result success() {
-        return new Result(Type.SUCCESS.value, Type.SUCCESS.name, null);
+        return new Result(Type.SUCCESS.getValue(), Type.SUCCESS.getName(), null);
     }
 
     // 返回成功结果，code默认，msg默认, data!={}
     public static Result success(Object data) {
-        return new Result(Type.SUCCESS.value, Type.SUCCESS.name, data);
+        return new Result(Type.SUCCESS.getValue(), Type.SUCCESS.getName(), data);
     }
 
     //返回成功结果, code默认, msg自定义，data=null
     public static Result success(String msg) {
-        return new Result(Type.SUCCESS.value, msg, null);
+        return new Result(Type.SUCCESS.getValue(), msg, null);
     }
 
     // 返回成功结果, code默认，msg自定义，data!=null
     public static Result success(Object data, String msg) {
-        return new Result(Type.SUCCESS.value, msg, data);
+        return new Result(Type.SUCCESS.getValue(), msg, data);
     }
 
     // 返回告警结果, code默认, msg自定义，data=null
     public static Result warn(String msg) {
-        return new Result(Type.WARN.value, msg, null);
+        return new Result(Type.WARN.getValue(), msg, null);
     }
 
     // 返回告警结果, code默认, msg自定义，data=null
@@ -100,7 +100,7 @@ public class Result<T> implements Serializable {
 
     // 返回失败结果, code默认, msg自定义，data=null
     public static Result error(String msg) {
-        return new Result(Type.ERROR.value, msg, null);
+        return new Result(Type.ERROR.getValue(), msg, null);
     }
 
     //返回失败结果code自定义, msg自定义，data=null
@@ -110,21 +110,21 @@ public class Result<T> implements Serializable {
 
     // 返回还在分析结果, code=601, msg自定义，data=null
     public static Result analyzing(String msg) {
-        return new Result(Type.ANALYZING.value, msg, null);
+        return new Result(Type.ANALYZING.getValue(), msg, null);
     }
 
     // 返回重复生成结果, code=602, msg自定义，data=null
     public static Result duplicate(String msg) {
-        return new Result(Type.DUPLICATE.value, msg, null);
+        return new Result(Type.DUPLICATE.getValue(), msg, null);
     }
 
     // 返回还在保存截图文件, code=603, msg自定义，data=null
     public static Result saving(String msg) {
-        return new Result(Type.SAVING.value, msg, null);
+        return new Result(Type.SAVING.getValue(), msg, null);
     }
 
     // 返回不是风机任务, code=604, msg自定义，data=null
     public static Result notfan(String msg) {
-        return new Result(Type.NOTFAN.value, msg, null);
+        return new Result(Type.NOTFAN.getValue(), msg, null);
     }
 }

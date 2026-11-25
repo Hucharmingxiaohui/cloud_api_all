@@ -50,7 +50,7 @@ public class CenterOrdinaryStatusSender {
     }
 
     private void send(CenterOrdinaryTaskEntity task, String key, String state, int progress, String description, Long executeTime) {
-        if (!("true".equalsIgnoreCase(config.getCenterOrdinaryTaskEnable()) || "1".equals(config.getCenterOrdinaryTaskEnable()))) return;
+        if (task.getPlanType()!=null && task.getPlanType()==5) return; // EUA adapter owns its status/result protocol.
         long now = System.currentTimeMillis();
         try {
             if (tasks.reserveStatusReport(task.getId(), key, now, now - 30_000L) != 1) return;

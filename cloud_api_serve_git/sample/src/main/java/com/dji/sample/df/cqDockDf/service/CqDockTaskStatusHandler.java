@@ -48,6 +48,8 @@ public class CqDockTaskStatusHandler {
     private CenterNormalConfig centerConfig;
     @Autowired
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.dao.CenterOrdinaryTaskMapper centerPatrolTasks;
 
     public String syncResults(Long recordId) {
         CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
@@ -192,6 +194,18 @@ public class CqDockTaskStatusHandler {
                 return;
             }
             boolean reportToPatrol = !Objects.equals(record.getReportToPatrol(), 0);
+            if (centerPatrolTasks.pendingEuaDispatch(record.getId()) > 0) {
+                log.info("上级EUA执行关联尚未提交，保留状态监控等待下次处理，任务编码={}，执行ID={}", taskCode, euaTaskId);
+                return;
+            }
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity upper = centerPatrolTasks.findEuaRecord(record.getId());
+            if (upper != null && (!Objects.equals(euaTaskId, upper.getEuaTaskId())
+                    || !("DISPATCHED".equals(upper.getStatus()) || "COMPLETED".equals(upper.getStatus())
+                    || "FAILED".equals(upper.getStatus())))) {
+                log.info("上级EUA执行真实ID或下发状态尚未确认，保留监控延后处理，不重新下发: taskCode={}, euaRecordId={}, euaTaskId={}, upperStatus={}",
+                        taskCode, record.getId(), euaTaskId, upper.getStatus());
+                return;
+            }
             if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
                 log.warn("EUA任务历史不完整，缺少原始站点Code，跳过Type41/61上报，需核实原报文后人工补录: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
                 return;
@@ -217,6 +231,8 @@ public class CqDockTaskStatusHandler {
                     processed = cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
                 }
                 if (!processed) return;
+                centerPatrolTasks.euaTerminal(record.getId(), euaTaskId,
+                        "1".equals(euaStatus) ? "COMPLETED" : "FAILED", "EUA原状态结果链路处理完成，状态=" + euaStatus);
                 if (!reportToPatrol || record.getPlanId() != null) {
                     updateEuaPlanExecuteStatus(record, "1".equals(euaStatus), "EUA任务结束，状态=" + euaStatus);
                 }

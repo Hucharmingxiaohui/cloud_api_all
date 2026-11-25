@@ -8,6 +8,19 @@ import java.util.List;
 
 @Mapper
 public interface CenterOrdinaryTaskMapper extends BaseMapper<CenterOrdinaryTaskEntity> {
+    @Select("SELECT COUNT(*) FROM df_center_ordinary_task WHERE plan_type=5 AND eua_record_id=#{record} AND status='DISPATCHING'")
+    int pendingEuaDispatch(@Param("record") long record);
+    @Update("UPDATE df_center_ordinary_task SET eua_record_id=#{record} WHERE id=#{id} AND plan_type=5 AND status='DISPATCHING' AND eua_record_id IS NULL")
+    int bindEuaRecord(@Param("id") long id, @Param("record") long record);
+
+    @Update("UPDATE df_center_ordinary_task SET eua_task_id=#{task},status='DISPATCHED' WHERE id=#{id} AND plan_type=5 AND status='DISPATCHING' AND eua_record_id IS NOT NULL AND eua_task_id IS NULL")
+    int euaDispatched(@Param("id") long id, @Param("task") String task);
+
+    @Select("SELECT * FROM df_center_ordinary_task WHERE upper_plan_id IS NOT NULL AND plan_type=5 AND eua_record_id=#{record}")
+    CenterOrdinaryTaskEntity findEuaRecord(@Param("record") long record);
+
+    @Update("UPDATE df_center_ordinary_task SET status=#{status},message=#{message} WHERE plan_type=5 AND eua_record_id=#{record} AND eua_task_id=#{task} AND status='DISPATCHED'")
+    int euaTerminal(@Param("record") long record, @Param("task") String task, @Param("status") String status, @Param("message") String message);
     @Select("SELECT * FROM df_center_ordinary_task WHERE status IN ('COMPLETED','FAILED','CANCELLED','EXPIRED','UNKNOWN','INCOMPLETE','REPORT_UNKNOWN') AND (status_report_key IS NULL OR status_report_key<>status) ORDER BY COALESCE(status_report_time,0),id LIMIT 100")
     List<CenterOrdinaryTaskEntity> pendingStatusReports();
 
@@ -23,14 +36,17 @@ public interface CenterOrdinaryTaskMapper extends BaseMapper<CenterOrdinaryTaskE
     @Select("SELECT * FROM df_center_ordinary_task WHERE job_id=#{job}")
     CenterOrdinaryTaskEntity findJob(@Param("job") String job);
 
-    @Select("SELECT * FROM df_center_ordinary_task WHERE status='SCHEDULED' AND scheduled_time<=#{now} ORDER BY scheduled_time,id LIMIT 100")
+    @Select("SELECT * FROM df_center_ordinary_task WHERE upper_plan_id IS NOT NULL AND status='SCHEDULED' AND scheduled_time<=#{now} ORDER BY scheduled_time,id LIMIT 100")
     List<CenterOrdinaryTaskEntity> due(@Param("now") long now);
 
-    @Select("SELECT * FROM df_center_ordinary_task WHERE status='DISPATCHED' AND job_id IS NOT NULL ORDER BY id LIMIT 1000")
+    @Select("SELECT * FROM df_center_ordinary_task WHERE (status='DISPATCHED' OR (status='REPORTING' AND plan_type IN (0,1,4))) AND job_id IS NOT NULL AND COALESCE(plan_type,3)<>5 ORDER BY id LIMIT 1000")
     List<CenterOrdinaryTaskEntity> monitoring();
 
     @Update("UPDATE df_center_ordinary_task SET status='DISPATCHING',claimed_time=#{now} WHERE id=#{id} AND status='SCHEDULED' AND scheduled_time<=#{now}")
     int claim(@Param("id") long id, @Param("now") long now);
+
+    @Update("UPDATE df_center_ordinary_task SET status='DISPATCHING',claimed_time=#{now} WHERE id=#{id} AND status='SCHEDULED'")
+    int claimImmediate(@Param("id") long id, @Param("now") long now);
 
     @Update("UPDATE df_center_ordinary_task SET job_id=#{job} WHERE id=#{id} AND status='DISPATCHING' AND job_id IS NULL")
     int bindJob(@Param("id") long id, @Param("job") String job);

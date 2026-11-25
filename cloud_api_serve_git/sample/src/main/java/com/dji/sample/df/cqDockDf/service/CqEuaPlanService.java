@@ -172,6 +172,11 @@ public class CqEuaPlanService {
     }
 
     public CqDockTaskDispatchResult executePatrolPlan(CqEuaPlanEntity plan, String fixedStartTime) {
+        return executePatrolPlan(plan, fixedStartTime, record -> { });
+    }
+
+    public CqDockTaskDispatchResult executePatrolPlan(CqEuaPlanEntity plan, String fixedStartTime,
+            java.util.function.Consumer<CqDockTaskRecordEntity> bindPrepared) {
         if (!"PATROL".equals(plan.getPlanSource()) || plan.getId() == null
                 || !StringUtils.hasText(plan.getPatrolTaskCode())) {
             throw new IllegalArgumentException("巡视计划来源或原始任务编码无效");
@@ -189,7 +194,10 @@ public class CqEuaPlanService {
                             .set(CqEuaPlanEntity::getLastExecuteStatus, 2)
                             .set(CqEuaPlanEntity::getLastExecuteMsg, "下发准备已持久化，请勿重复下发；中断后需核实EUA接收情况")
                             .set(CqEuaPlanEntity::getUpdateTime, new Date()));
-            return claimed == 1 ? cqDockTaskDispatchService.preparePatrolPlan(plan) : null;
+            if (claimed != 1) return null;
+            CqDockTaskRecordEntity record = cqDockTaskDispatchService.preparePatrolPlan(plan);
+            bindPrepared.accept(record);
+            return record;
         });
         if (prepared == null) {
             CqEuaPlanEntity existing = cqEuaPlanMapper.selectById(plan.getId());

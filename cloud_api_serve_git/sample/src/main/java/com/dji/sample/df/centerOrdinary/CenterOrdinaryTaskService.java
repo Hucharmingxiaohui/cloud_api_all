@@ -15,7 +15,6 @@ import com.dji.sample.df.uavCommonHandleDf.handler.JobControlHandler;
 import com.dji.sdk.common.HttpResultResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -34,6 +33,9 @@ public class CenterOrdinaryTaskService {
     private final Clock clock;
     @Autowired
     private CenterOrdinaryStatusSender statusSender;
+    @Autowired
+    @org.springframework.context.annotation.Lazy
+    private CenterPatrolService patrol;
 
     @Autowired
     public CenterOrdinaryTaskService(CenterOrdinaryTaskMapper tasks, UniPointMapper2 points,
@@ -51,14 +53,16 @@ public class CenterOrdinaryTaskService {
     }
 
     public CenterOrdinaryTaskEntity accept(CenterTaskCommandItem command, String subCode) {
+        return patrol.accept(command, subCode, "legacy");
+    }
+
+    CenterOrdinaryTaskEntity freeze(CenterTaskCommandItem command, String subCode) {
         if (!enabled()) throw new IllegalStateException("上级普通航线点位任务开关未开启");
         if (!StringUtils.hasText(subCode) || !StringUtils.hasText(command.getTask_code()) || !StringUtils.hasText(command.getTask_name()))
             throw new IllegalArgumentException("厂站、上级任务编码及名称不能为空");
         List<String> codes = CenterOrdinarySelection.codes(command.getDevice_list());
         long time = parseTime(command.getFixed_start_time());
         String codesJson = JSON.toJSONString(codes);
-        CenterOrdinaryTaskEntity old = tasks.findIdentity(subCode, command.getTask_code(), time);
-        if (old != null) return same(old, command, codesJson);
         if (time <= clock.millis()) throw new IllegalArgumentException("定时时间已过期，拒绝立即起飞");
         List<UniPoint> selected = points.selectList(new QueryWrapper<UniPoint>().eq("sub_code", subCode).in("point_code", codes).orderByAsc("point_code"));
         CenterOrdinarySelection.freeze(command.getDevice_list(), subCode, selected);
@@ -79,23 +83,11 @@ public class CenterOrdinaryTaskService {
         task.setScheduledTime(time); task.setFixedStartTime(command.getFixed_start_time()); task.setStatus("SCHEDULED");
         task.setRouteId(route); task.setPlanId(plan.getPlanId()); task.setPlanConfig(JSON.toJSONString(plan));
         task.setPointCodes(codesJson); task.setPointSnapshot(snapshot);
-        try {
-            if (tasks.insert(task) != 1) throw new IllegalStateException("上级普通任务保存失败");
-            return task;
-        } catch (DuplicateKeyException e) {
-            old = tasks.findIdentity(subCode, command.getTask_code(), time);
-            if (old == null) throw e;
-            return same(old, command, codesJson);
-        }
+        task.setPlanType(3); task.setWorkspaceId(plan.getWorkspaceId());
+        return task;
     }
 
-    private CenterOrdinaryTaskEntity same(CenterOrdinaryTaskEntity old, CenterTaskCommandItem c, String codes) {
-        if (!codes.equals(old.getPointCodes()) || !Objects.equals(c.getTask_name(), old.getTaskName()) || !"1".equals(c.getIsenable()))
-            throw new IllegalArgumentException("同一上级任务和定时时间已存在，禁止覆盖点位快照");
-        return old;
-    }
-
-    private long parseTime(String text) {
+    long parseTime(String text) {
         SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         format.setLenient(false);
         ParsePosition position = new ParsePosition(0);
@@ -107,11 +99,10 @@ public class CenterOrdinaryTaskService {
 
     @Scheduled(fixedDelay = 1000)
     public void scan() {
-        if (!enabled()) return;
         try {
             tasks.quarantine(clock.millis()-10*60_000L);
             tasks.quarantineReports(clock.millis()-24*60*60_000L);
-            for (CenterOrdinaryTaskEntity task : tasks.due(clock.millis())) dispatch(task);
+            for (CenterOrdinaryTaskEntity task : tasks.due(clock.millis())) patrol.dispatch(task.getId(), false);
             for (CenterOrdinaryTaskEntity task : tasks.monitoring()) JobControlHandler.ensureCenterOrdinaryMonitoring(task.getJobId(), task.getTaskName());
             for (CenterOrdinaryTaskEntity task : tasks.pendingStatusReports()) statusSender.terminal(task);
         } catch (Exception e) {
@@ -120,18 +111,21 @@ public class CenterOrdinaryTaskService {
     }
 
     public void dispatch(CenterOrdinaryTaskEntity task) {
+        patrol.dispatch(task.getId(), false);
+    }
+
+    void executeClaimed(CenterOrdinaryTaskEntity task, boolean immediate) {
         long now = clock.millis();
-        if (!enabled() || tasks.claim(task.getId(), now)!=1) return;
-        if (now-task.getScheduledTime()>60_000L) {
+        if (!immediate && now-task.getScheduledTime()>60_000L) {
             tasks.finish(task.getId(), "DISPATCHING", "EXPIRED", "错过定时时间超过60秒，禁止补飞");
             return;
         }
         try {
             PubWaylineJobPlanDfEntity plan = JSON.parseObject(task.getPlanConfig(), PubWaylineJobPlanDfEntity.class);
-            if (!Objects.equals(plan.getPlanType(), 3) || !Objects.equals(task.getRouteId(), plan.getFileId())
+            if (!Objects.equals(plan.getPlanType(), task.getPlanType()==null?3:task.getPlanType()) || !Objects.equals(task.getRouteId(), plan.getFileId())
                     || !Objects.equals(task.getPlanId(), plan.getPlanId())) throw new IllegalStateException("计划快照与任务航线不一致");
             // 到时新建执行，不能把模板原来的时间/周期重新下发或修改模板本身。
-            plan.setId(null); plan.setTaskType(0); plan.setBeginTime(task.getScheduledTime());
+            plan.setId(null); plan.setTaskType(0); plan.setBeginTime(immediate ? now : task.getScheduledTime());
             plan.setCenterOrdinaryTaskId(task.getId());
             CustomClaim user = new CustomClaim(); user.setWorkspaceId(plan.getWorkspaceId()); user.setUsername(plan.getUsername());
             HttpResultResponse response = execution.expressPlan(user, plan, task.getTaskName());
@@ -148,6 +142,7 @@ public class CenterOrdinaryTaskService {
     }
 
     public CenterOrdinaryTaskEntity findJob(String jobId) {
-        return enabled() && StringUtils.hasText(jobId) ? tasks.findJob(jobId) : null;
+        CenterOrdinaryTaskEntity task = StringUtils.hasText(jobId) ? tasks.findJob(jobId) : null;
+        return task != null && (task.getPlanType()==null || task.getPlanType()==3) ? task : null;
     }
 }

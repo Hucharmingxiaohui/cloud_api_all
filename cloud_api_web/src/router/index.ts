@@ -301,6 +301,7 @@ const routes: Array<RouteRecordRaw> = [
         },
         children: [
           // 子菜单 - 普通点位计划
+          { path: '/taskManage/centerPatrol', name: 'centerPatrol', component: () => import('/@/components/task/CenterPatrolTasks.vue'), meta: { showInMenu: true, label: '上级巡视任务', cache: false } },
           { path: '/taskManage/construction', redirect: '/taskManage/construction/plans', meta: { showInMenu: false } },
           { path: '/taskManage/construction/areas', redirect: '/variableMgt/constructionAreas', meta: { showInMenu: false } },
           { path: '/taskManage/construction/overall', name: 'constructionOverallRoutes', component: () => import('/@/components/construction/ConstructionOverallRoutes.vue'), meta: { showInMenu: false, cache: false } },

@@ -72,6 +72,18 @@ public class CenterTaskControlRunnable extends CenterMessageBaseRunnable {
      * 立即执行上级任务：从已保存的任务方案取设备信息，复用任务下发到点后的真实执行链路。
      */
     private void handleImmediateStart(PatrolHostCommandSimple commandSimple) {
+        try {
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity execution = AppContext
+                    .getBean(com.dji.sample.df.centerOrdinary.CenterPatrolService.class)
+                    .immediate(centerCode, commandSimple.getCode());
+            sendTaskControlResponse(execution.executionId(), "200");
+        } catch (Exception ex) {
+            log.warn("上级立即执行拒绝或状态未确认: taskCode={}, reason={}", commandSimple.getCode(), ex.getMessage(), ex);
+            sendTaskControlResponse("", "500");
+        }
+    }
+
+    private void legacyImmediateStart(PatrolHostCommandSimple commandSimple) {
         String centerPlanId = commandSimple.getCode();
         UniTaskPlanEntity entity = iUniTaskPlanMapper.selectOne(
                 Wrappers.lambdaQuery(UniTaskPlanEntity.class)

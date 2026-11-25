@@ -73,6 +73,11 @@ public class CenterTaskRunnable extends CenterMessageBaseRunnable {
 
     @Transactional(rollbackFor = Exception.class)
     public void taskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
+        AppContext.getBean(com.dji.sample.df.centerOrdinary.CenterPatrolService.class)
+                .accept(taskCommandItem, sub_code, centerCode);
+    }
+
+    private void legacyTaskHandle(CenterTaskCommandItem taskCommandItem, String sub_code) {
         log.info("开始处理下发任务");
 //      需要区分不同任务类型：普通航线任务、风机任务、光伏任务、EUA任务
 //      普通航线任务/EUA按点位下发;风机按设备;光伏按间隔。

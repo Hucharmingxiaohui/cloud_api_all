@@ -24,6 +24,10 @@ public class CqEuaPatrolPlanService {
 
     public CqDockTaskDispatchResult createAndExecute(String pointCodes, String subCode, String taskCode,
             String taskName, String fixedStartTime) {
+        return cqEuaPlanService.executePatrolPlan(freeze(pointCodes, subCode, taskCode, taskName), fixedStartTime);
+    }
+
+    public CqEuaPlanEntity freeze(String pointCodes, String subCode, String taskCode, String taskName) {
         if (!StringUtils.hasText(subCode) || !StringUtils.hasText(taskCode)
                 || taskCode.length() > 128 || subCode.trim().length() > 128) {
             throw new IllegalArgumentException("巡视任务缺少有效站点或原始任务编码");
@@ -62,7 +66,12 @@ public class CqEuaPatrolPlanService {
                 if (plan == null) throw e;
             }
         }
-        return cqEuaPlanService.executePatrolPlan(plan, fixedStartTime);
+        String normalized = cqDockTaskDispatchService.validatePointDispatch(pointCodes, subCode);
+        if (!JSON.parseArray(plan.getPointCodes(), String.class).equals(Arrays.asList(normalized.split(","))))
+            throw new IllegalArgumentException("同一巡视计划禁止覆盖已冻结点位");
+        if (!StringUtils.hasText(plan.getRouteId()) || !"PATROL".equals(plan.getPlanSource()))
+            throw new IllegalArgumentException("巡视计划来源或航线无效");
+        return plan;
     }
 
     private CqEuaPlanEntity find(String subCode, String taskCode) {

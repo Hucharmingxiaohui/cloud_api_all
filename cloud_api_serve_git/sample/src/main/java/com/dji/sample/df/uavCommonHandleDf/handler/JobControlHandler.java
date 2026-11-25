@@ -215,6 +215,11 @@ public class JobControlHandler {
             }
             WaylineJobDTO waylineJobDTO = waylineJobServiceimpl.entity2Dto(waylineJobEntity);
             Integer status = waylineJobDTO.getStatus();
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity managedTask = centerOrdinaryTaskMapper.findJob(jobId);
+            if (managedTask != null && managedTask.getPlanType() != null && managedTask.getPlanType() != 3) {
+                processManagedTask(managedTask, waylineJobEntity, waylineJobDTO, taskCode);
+                return;
+            }
             com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity ordinaryTask = centerOrdinaryTasks.findJob(jobId);
             if (ordinaryTask != null) {
                 processCenterOrdinary(ordinaryTask, waylineJobEntity, waylineJobDTO, taskCode);
@@ -296,6 +301,38 @@ public class JobControlHandler {
 
     static int normalizeUploadCount(Integer count) {
         return count == null ? 0 : count;
+    }
+
+    private void processManagedTask(com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity task,
+            WaylineJobEntity job, WaylineJobDTO dto, String monitoringKey) throws Exception {
+        if (!"DISPATCHED".equals(task.getStatus()) && !"REPORTING".equals(task.getStatus())) {
+            clearMonitoringState(monitoringKey); return;
+        }
+        centerOrdinaryStatus.observed(task, job, dto);
+        Integer status=dto.getStatus();
+        if (Integer.valueOf(3).equals(status)) {
+            int total=normalizeUploadCount(dto.getMediaCount()), uploaded=normalizeUploadCount(dto.getUploadedCount());
+            if (total==0 && waitForZeroTotalTimeout(monitoringKey)) return;
+            if (uploaded<total || !isCompletedUploadStable(monitoringKey,uploaded,total)) return;
+            if ("DISPATCHED".equals(task.getStatus())) {
+                if (centerOrdinaryTaskMapper.finish(task.getId(),"DISPATCHED","REPORTING","媒体稳定，处理本执行结果")!=1) return;
+                JSONObject request=new JSONObject(); request.put("jobId",job.getJobId()); request.put("fromJobMonitor",true);
+                Result started=uavReportController.pictureSaveAndAnalysis(request);
+                if(started.getCode()!=0) {
+                    centerOrdinaryTaskMapper.finish(task.getId(),"REPORTING","REPORT_UNKNOWN","结果处理未确认，需人工核验"); return;
+                }
+            }
+            Result analyzed=uavReportController.isAnalyzed(job.getJobId());
+            if(!Integer.valueOf(1).equals(analyzed.getData())) return;
+            // Commit the report claim before FTP/TCP side effects. An uncertain send is never replayed.
+            if(centerOrdinaryTaskMapper.finish(task.getId(),"REPORTING","REPORT_UNKNOWN","结果发送中，若中断需人工核验，禁止自动重发")!=1) return;
+            sendPatrolResult(task.getTaskCode(),task.getTaskName(),job);
+            centerOrdinaryTaskMapper.finish(task.getId(),"REPORT_UNKNOWN","COMPLETED","执行结果处理完成");
+            clearMonitoringState(monitoringKey);
+        } else if (Arrays.asList(-1,4,5,7).contains(status)) {
+            centerOrdinaryTaskMapper.finish(task.getId(),"DISPATCHED","FAILED","飞行失败/取消/中断，禁止自动重飞");
+            clearMonitoringState(monitoringKey);
+        }
     }
 
     private void processCenterOrdinary(com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity task,
@@ -566,8 +603,10 @@ public class JobControlHandler {
 
     public void sendPatrolResult(String taskCode, String taskName,WaylineJobEntity waylineJobEntity) {
         try {
-            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>()
-                    .eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()));
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity managed = centerOrdinaryTaskMapper.findJob(waylineJobEntity.getJobId());
+            PubWaylineJobPlanDfEntity pubWaylineJobPlanDfEntity = managed == null
+                    ? pubWaylineJobPlanDfMapper.selectOne(new LambdaQueryWrapper<PubWaylineJobPlanDfEntity>().eq(PubWaylineJobPlanDfEntity::getPlanId, waylineJobEntity.getPlanId()))
+                    : com.alibaba.fastjson.JSON.parseObject(managed.getPlanConfig(),PubWaylineJobPlanDfEntity.class);
             Integer planType = pubWaylineJobPlanDfEntity.getPlanType();
             String deviceSn = resolveDroneSnForReport(pubWaylineJobPlanDfEntity, waylineJobEntity);
             if(planType==1){
@@ -582,6 +621,7 @@ public class JobControlHandler {
             }
         } catch (Exception e) {
             log.error("上报巡视结果失败: taskCode={}", taskCode, e);
+            if(centerOrdinaryTaskMapper.findJob(waylineJobEntity.getJobId())!=null) throw new IllegalStateException("上级执行结果发送未确认");
         }
     }
 
@@ -590,7 +630,7 @@ public class JobControlHandler {
      * 遍历任务媒体文件，匹配风机站点点位，上传缺陷分析图并推送点位报文
      */
     private void sendFanPatrolResult(String taskCode, String taskName, WaylineJobEntity waylineJobEntity, String deviceSn) throws Exception {
-        HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), "e3dea0f5-37f2-4d79-ae58-490af3228069", 1L, 500L, new HashMap<>());
+        HttpResultResponse mediaFileByJobId = fileControllerDf.getMediaFileByJobId(waylineJobEntity.getJobId(), waylineJobEntity.getWorkspaceId(), 1L, 500L, new HashMap<>());
         PaginationData<MediaFileDTO> data1 = (PaginationData< MediaFileDTO >)mediaFileByJobId.getData();
         List<MediaFileDTO> list = data1.getList();
         for (MediaFileDTO mediaFileDTO : list) {
