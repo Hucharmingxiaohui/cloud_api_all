@@ -163,7 +163,8 @@ public class CenterModelSyncBuilder {
                         item.setUpper_value("");
                         item.setVideo_pos("");
                         item.setDevice_id(Optional.ofNullable(entity.getPointCode()).orElse(""));
-                        item.setDevice_name(Optional.ofNullable(entity.getPointName()).orElse(""));
+                        item.setDevice_name(com.dji.sample.center.utils.StationDeviceName.format(
+                                Optional.ofNullable(entity.getPointName()).orElse(""), entity.getPicType()));
                         item.setComponent_id(Optional.ofNullable(entity.getComponentId()).orElse(""));
                         item.setComponent_name(Optional.ofNullable(entity.getComponentName()).orElse(""));
                         item.setBay_id(Optional.ofNullable(entity.getBayId()).orElse(""));

@@ -812,7 +812,7 @@ public class JobControlHandler {
             item.setPatroldevice_code(deviceSn);
             item.setTask_name(taskName);
             item.setTask_code(taskCode);
-            item.setDevice_name(uniPoint.getPointName());
+            item.setDevice_name(com.dji.sample.center.utils.StationDeviceName.format(uniPoint.getPointName(), uniPoint.getPicType()));
             item.setDevice_id(uniPoint.getPointCode());
             item.setValue("");
             item.setUnit("");

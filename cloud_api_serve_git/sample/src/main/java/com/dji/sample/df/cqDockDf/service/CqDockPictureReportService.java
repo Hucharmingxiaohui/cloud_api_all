@@ -841,7 +841,7 @@ public class CqDockPictureReportService {
         item.setPatroldevice_code("--");
         item.setTask_name(taskName);
         item.setTask_code(taskCode);
-        item.setDevice_name(defaultText(entity.getPointName()));
+        item.setDevice_name(com.dji.sample.center.utils.StationDeviceName.format(defaultText(entity.getPointName()), entity.getPointType()));
         item.setDevice_id(defaultText(entity.getPointId()));
         item.setValue(defaultText(entity.getPointVal()));
         item.setValue_unit(defaultText(Objects.equals(entity.getPointType(), POINT_TYPE_INFRARED)

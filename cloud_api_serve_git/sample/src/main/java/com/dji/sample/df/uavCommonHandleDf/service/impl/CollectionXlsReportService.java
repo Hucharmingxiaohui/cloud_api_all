@@ -205,8 +205,7 @@ public class CollectionXlsReportService {
                 String result = "正常";
                 if (Integer.valueOf(1).equals(point.getPicType())) {
                     try {
-                        TemResultEntity temperature = managed != null ? temMeasureService.measureWholeImage(imagePath.toString())
-                                : measureOriginal(photo);
+                        TemResultEntity temperature = measureOriginal(photo);
                         if (temperature == null) throw new IllegalArgumentException("测温服务未返回结果");
                         if (temperature.getError() != null && !temperature.getError().isBlank())
                             throw new IllegalArgumentException(temperature.getError());

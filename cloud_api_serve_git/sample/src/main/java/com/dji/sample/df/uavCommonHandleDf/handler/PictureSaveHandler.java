@@ -59,6 +59,10 @@ public class PictureSaveHandler {
     PubWaylineJobPlanDfMapper pubWaylineJobPlanDfMapper;
     @Autowired
     private com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService temMeasureService;
+    @Autowired
+    private com.dji.sample.df.substationDf.dao.RecgPointsEntityMapper recgPointsEntityMapper;
+    @Autowired
+    private com.dji.sample.df.substationDf.dao.RecgFileEntityMapper recgFileEntityMapper;
 
     public Result<Map> pictureSave(String jobId) throws IOException {
         if (centerOrdinaryTasks.findJob(jobId) != null) {
@@ -203,6 +207,61 @@ public class PictureSaveHandler {
     }
 
     private Map<String, String> saveOrdinaryImages(WaylineJobEntity job, List<MediaFileEntity> media) throws IOException {
+        return saveOrdinaryImages(job, media, new HashMap<>());
+    }
+
+    /** 仅供媒体稳定后 CAS 领取成功的上级链路调用，不触发 AI、上报或重新执行。 */
+    public Map<String, String> saveCenterOrdinaryImages(
+            com.dji.sample.df.centerOrdinary.CenterOrdinaryTaskEntity task, WaylineJobEntity job,
+            List<MediaFileEntity> media, Map<MediaFileEntity, UniPoint> mapping) throws IOException {
+        if (!java.util.Objects.equals(task.getJobId(), job.getJobId())
+                || !java.util.Objects.equals(task.getRouteId(), job.getFileId())
+                || media.stream().anyMatch(f -> !java.util.Objects.equals(job.getJobId(), f.getJobId())
+                    || !java.util.Objects.equals(job.getWorkspaceId(), f.getWorkspaceId()))) {
+            throw new IllegalArgumentException("上级普通任务全量本地保存的任务、航线或媒体归属不一致");
+        }
+        Map<String, com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity> temperatures = new HashMap<>();
+        Map<String,String> relative = saveOrdinaryImages(job, media, temperatures);
+        Map<String,String> absolute = new java.util.LinkedHashMap<>();
+        relative.forEach((name, path) -> absolute.put(name, fileConfig.getRecfilePath() + path));
+        for (Map.Entry<MediaFileEntity, UniPoint> entry : mapping.entrySet()) {
+            String name = entry.getKey().getFileName();
+            if (absolute.containsKey(name)) persistOrdinaryResult(job, entry.getValue(), absolute.get(name), temperatures.get(name));
+        }
+        return absolute;
+    }
+
+    private void persistOrdinaryResult(WaylineJobEntity job, UniPoint point, String path,
+            com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity temperature) {
+        com.dji.sample.df.substationDf.model.entity.RecgPointsEntity row = new com.dji.sample.df.substationDf.model.entity.RecgPointsEntity();
+        row.setRequestId(java.util.UUID.randomUUID().toString());
+        row.setTaskPatrolledId(job.getJobId()); row.setSubCode(point.getSubCode());
+        row.setPointCode(point.getPointCode()); row.setPointName(point.getPointName()); row.setPicType(point.getPicType());
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.dji.sample.df.substationDf.model.entity.RecgPointsEntity> query =
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        query.eq("task_patrolled_id", job.getJobId()).eq("point_code", point.getPointCode()).eq("pic_type", point.getPicType());
+        com.dji.sample.df.substationDf.model.entity.RecgPointsEntity existing = recgPointsEntityMapper.selectOne(query);
+        if (existing != null) { row.setId(existing.getId()); row.setRequestId(existing.getRequestId()); }
+        if (temperature != null) {
+            row.setValid(1); row.setPointValUnit("正常");
+            row.setPointVal("最高温度："+temperature.getMax_tem()+",最低温度："+temperature.getMin_tem()+",平均温度："+temperature.getAverage_tem());
+        }
+        if (existing == null) recgPointsEntityMapper.insert(row); else recgPointsEntityMapper.update(row, query);
+        com.dji.sample.df.substationDf.model.entity.RecgFileEntity image = new com.dji.sample.df.substationDf.model.entity.RecgFileEntity();
+        image.setRequestId(row.getRequestId()); image.setTaskPatrolledId(job.getJobId()); image.setPointCode(point.getPointCode());
+        image.setPicType(point.getPicType()); image.setFilePath(path);
+        image.setFileType(Integer.valueOf(1).equals(point.getPicType()) ? "1" : "2");
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<com.dji.sample.df.substationDf.model.entity.RecgFileEntity> imageQuery =
+                new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        imageQuery.eq("task_patrolled_id", job.getJobId()).eq("point_code", point.getPointCode()).eq("pic_type", point.getPicType());
+        if (recgFileEntityMapper.selectOne(imageQuery) == null) recgFileEntityMapper.insert(image);
+        else recgFileEntityMapper.update(image, imageQuery);
+        log.info("上级普通任务本地识别结果已保存，不触发AI：任务={}，点位={}，类型={}，测温成功={}",
+                job.getJobId(), point.getPointCode(), point.getPicType(), temperature != null);
+    }
+
+    private Map<String, String> saveOrdinaryImages(WaylineJobEntity job, List<MediaFileEntity> media,
+            Map<String, com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity> temperatures) throws IOException {
         if (job.getJobId() == null || !job.getJobId().matches("[a-zA-Z0-9_-]+")) {
             throw new IllegalArgumentException("任务标识无效");
         }
@@ -227,7 +286,9 @@ public class PictureSaveHandler {
                         job.getJobId(), "1_" + name.substring(0, name.lastIndexOf('.')) + ".jpg");
                 try {
                     log.info("普通任务红外图片开始测温标注，任务={}，图片={}", job.getJobId(), name);
-                    OrdinaryThermalRenderer.annotate(local, temMeasureService.measureWholeImage(local.toString()));
+                    com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity temperature = temMeasureService.measureWholeImage(local.toString());
+                    OrdinaryThermalRenderer.annotate(local, temperature);
+                    temperatures.put(name, temperature);
                     log.info("普通任务红外图片标注完成，任务={}，图片={}，仅更新本地结果图，保留对象存储原图", job.getJobId(), name);
                 } catch (Exception e) {
                     log.warn("普通任务红外标注失败，保留下载原图，job={}，file={}", job.getJobId(), name, e);

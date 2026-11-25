@@ -152,8 +152,20 @@ public class FileControllerDf {
             if (job==null || !claim.getWorkspaceId().equals(job.getWorkspaceId()) || !claim.getWorkspaceId().equals(workspace_id))
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,"任务不存在");
             List<MediaFileDTO> selected=new ArrayList<>();
-            if (managed.getResultSnapshot()!=null) for (com.alibaba.fastjson.JSONObject row : com.alibaba.fastjson.JSON.parseArray(managed.getResultSnapshot(),com.alibaba.fastjson.JSONObject.class)) {
-                com.dji.sample.center.entity.UniPoint point=row.getObject("point",UniPoint.class);
+            // 平台展示任务全量媒体，不借用仅含上级选中点位的上报快照。
+            if (Integer.valueOf(3).equals(managed.getPlanType())) for (MediaFileDTO dto : fileService.getMediaDileByJobId3(job_id, workspace_id)) {
+                if (!job_id.equals(dto.getJobId())) continue;
+                if (map.get("fileName")!=null && (dto.getFileName()==null || !dto.getFileName().contains(map.get("fileName").toString()))) continue;
+                String name=dto.getFileName();
+                if (name==null || name.contains("/") || name.contains("\\") || name.contains(":")) continue;
+                int extension=name.lastIndexOf('.');
+                String path=java.nio.file.Paths.get(ordinaryImageConfig.getRecfilePath()+ordinaryImageConfig.getRecfileNativePath(),
+                        job_id,"1_"+(extension<0 ? name : name.substring(0,extension))+".jpg").toString();
+                dto.setOriginalImageUrl("/api/file/defect?path="+URLEncoder.encode(path,"UTF-8"));
+                selected.add(dto);
+            }
+            else if (managed.getResultSnapshot()!=null) for (com.alibaba.fastjson.JSONObject row : com.alibaba.fastjson.JSON.parseArray(managed.getResultSnapshot(),com.alibaba.fastjson.JSONObject.class)) {
+                UniPoint point=row.getObject("point",UniPoint.class);
                 MediaFileDTO dto=row.getObject("media",MediaFileDTO.class);
                 String path=row.getString("localPath");
                 List<String> codes=com.alibaba.fastjson.JSON.parseArray(managed.getPointCodes(),String.class);

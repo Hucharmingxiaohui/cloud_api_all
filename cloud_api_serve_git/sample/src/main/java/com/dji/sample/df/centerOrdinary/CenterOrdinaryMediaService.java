@@ -18,9 +18,11 @@ public class CenterOrdinaryMediaService {
     private final CenterOrdinaryTaskMapper tasks;
     private final IFileMapperDf files;
     private final CenterOrdinaryMediaTransport transport;
+    private final com.dji.sample.df.uavCommonHandleDf.handler.PictureSaveHandler pictures;
 
-    public CenterOrdinaryMediaService(CenterOrdinaryTaskMapper tasks, IFileMapperDf files, CenterOrdinaryMediaTransport transport) {
-        this.tasks=tasks; this.files=files; this.transport=transport;
+    public CenterOrdinaryMediaService(CenterOrdinaryTaskMapper tasks, IFileMapperDf files, CenterOrdinaryMediaTransport transport,
+            com.dji.sample.df.uavCommonHandleDf.handler.PictureSaveHandler pictures) {
+        this.tasks=tasks; this.files=files; this.transport=transport; this.pictures=pictures;
     }
 
     public void complete(CenterOrdinaryTaskEntity task, WaylineJobEntity job) throws Exception {
@@ -46,10 +48,13 @@ public class CenterOrdinaryMediaService {
             for (String issue:match.getIssues()) log.warn("上级普通任务媒体匹配跳过: recordId={}, issue={}",
                     task.getId(), JSON.toJSONString(bounded(issue,4096)));
             Map<MediaFileEntity,UniPoint> mapping=match.getMatchedMap();
+            Map<String,String> saved = pictures.saveCenterOrdinaryImages(task, job, routePhotos, mapping);
+            log.info("上级普通任务全量本地保存完成，仅上报冻结选中点位：任务={}，本地图={}，选中点位={}",
+                    job.getJobId(), saved.size(), requested.size());
             for (Map.Entry<MediaFileEntity,UniPoint> entry : mapping.entrySet()) {
                 MediaFileEntity file=entry.getKey(); UniPoint point=entry.getValue();
                 if (requested==null || !requested.contains(point.getPointCode())) continue;
-                // 先过滤再生成业务结果；未选照片不落入结果快照，也不会下载、分析或上传。
+                // 本地全量保存与上级结果隔离，未选照片不得进入上级快照或上传。
                 Map<String,Object> result = new LinkedHashMap<>();
                 result.put("point", point); result.put("media", file); result.put("analysis", "NOT_REQUESTED");
                 results.add(result); selected.add(file); points.add(point);
@@ -58,7 +63,8 @@ public class CenterOrdinaryMediaService {
             Set<String> reportedCodes = new HashSet<>();
             for (int i=0; i<selected.size(); i++) {
                 MediaFileEntity file = selected.get(i); UniPoint point = points.get(i);
-                String localPath = transport.store(task, job, point, file);
+                String localPath = saved.get(file.getFileName());
+                if (localPath == null) throw new IllegalStateException("选中图片未完成本地保存");
                 results.get(i).put("localPath", localPath);
                 if (tasks.saveResults(task.getId(), JSON.toJSONString(results))!=1) throw new IllegalStateException("图片结果保存失败");
                 String ftpPath = transport.report(task, job, point, file, localPath);

@@ -114,7 +114,8 @@ public class PatrolHostTaskResultUpload {
         item.setPatroldevice_code(deviceCode);
         item.setTask_name(plan.getPlanName());
         item.setTask_code(plan.getPlanNo());
-        item.setDevice_name(point.getPubWaylinePointDfEntity().getPointName());
+        item.setDevice_name(com.dji.sample.center.utils.StationDeviceName.format(
+                point.getPubWaylinePointDfEntity().getPointName(), point.getPubWaylinePointDfEntity().getTemType() == null ? 0 : 1));
         item.setDevice_id(point.getPubWaylinePointDfEntity().getPointCode());
         item.setValue("");
         item.setUnit("");
