@@ -96,6 +96,7 @@
 import { ref, computed, reactive, watch, onMounted, defineAsyncComponent } from 'vue'
 import { getNowTaskApi, getWaylineJobs } from '/@/api/wayline'
 import { useMyStore } from '/@/store'
+import { selectControlOsd } from '/@/store/osd'
 import { useTaskWsEvent } from '/@/components/task/use-task-ws-event'
 import { ELocalStorageKey, EDeviceTypeName } from '/@/types'
 import {
@@ -241,38 +242,14 @@ onMounted(() => {
 // 左侧视频流切换标签
 const activeTab = ref('load') // 默认选中负载直播标签
 
-watch(() => store?.state.deviceState, data => {
-  if (data.currentType === EDeviceTypeName.Gateway && data.gatewayInfo[data.currentSn]) {
-    if (osdVisible.value.gateway_sn !== '') {
-      deviceInfo.gateway = data.gatewayInfo[osdVisible.value.gateway_sn]
-    }
-  }
-
-  if (data.currentType === EDeviceTypeName.Aircraft && data.deviceInfo[data.currentSn]) {
-    // const coordinate = wgs84togcj02(data.deviceInfo[data.currentSn].longitude, data.deviceInfo[data.currentSn].latitude)
-    // deviceTsaUpdateHook.moveTo(data.currentSn, coordinate[0], coordinate[1])
-    if (osdVisible.value.sn !== '') {
-      deviceInfo.device = data.deviceInfo[osdVisible.value.sn]
-    }
-  }
-  if (data.currentType === EDeviceTypeName.Dock && data.dockInfo[data.currentSn]) {
-    // const coordinate = wgs84togcj02(data.dockInfo[data.currentSn].basic_osd?.longitude, data.dockInfo[data.currentSn].basic_osd?.latitude)
-    // deviceTsaUpdateHook.initMarker(EDeviceTypeName.Dock, EDeviceTypeName[EDeviceTypeName.Dock], data.currentSn, coordinate[0], coordinate[1])
-
-    // Check if basic_osd and sub_device exist before accessing them
-    const dock = data.dockInfo[osdVisible.value.gateway_sn]
-    if (dock && dock.basic_osd && dock.basic_osd.sub_device) {
-      if (osdVisible.value.is_dock && osdVisible.value.gateway_sn !== '') {
-        deviceInfo.dock = dock
-        deviceInfo.device = data.deviceInfo[dock.basic_osd.sub_device.device_sn ?? osdVisible.value.sn]
-      }
-    } else {
-      // Handle the case where sub_device is not available, or log an error if needed
-      console.warn('Dock or sub_device not found for gateway_sn:', osdVisible.value.gateway_sn)
-    }
-  }
+watch(() => selectControlOsd(store.state.deviceState, osdVisible.value), data => {
+  deviceInfo.gateway = data.gateway
+  deviceInfo.dock = data.dock || {} as DockOsd
+  deviceInfo.device = data.device
 }, {
-  deep: true
+  deep: true,
+  immediate: true,
+  flush: 'sync'
 })
 
 // 右侧标签切换

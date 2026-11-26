@@ -7,6 +7,7 @@ import { LayerType } from '/@/types/mapLayer'
 import { WaylineFile } from '/@/types/wayline'
 import { DevicesCmdExecuteInfo } from '/@/types/device-cmd'
 import { FlightAreaStatus } from '../api/flight-area'
+import { isOsdOffline, mergeOsd } from './osd'
 
 const initStateFunc = () => ({
   Layers: [
@@ -158,7 +159,7 @@ const mutations: MutationTree<RootStateType> = {
     state.Imgs = info
   },
   SET_DEVICE_INFO (state, info) {
-    state.deviceState.deviceInfo[info.sn] = info.host
+    state.deviceState.deviceInfo[info.sn] = mergeOsd(state.deviceState.deviceInfo[info.sn], info.host)
     state.deviceState.currentSn = info.sn
     state.deviceState.currentType = EDeviceTypeName.Aircraft
   },
@@ -178,15 +179,19 @@ const mutations: MutationTree<RootStateType> = {
     state.deviceState.currentType = EDeviceTypeName.Dock
     const dock = state.deviceState.dockInfo[info.sn]
     if (info.host.mode_code !== undefined) {
-      dock.basic_osd = info.host
+      dock.basic_osd = mergeOsd(dock.basic_osd, info.host)
+      const subDevice = dock.basic_osd.sub_device
+      if (subDevice?.device_sn && isOsdOffline(subDevice.device_online_status)) {
+        delete state.deviceState.deviceInfo[subDevice.device_sn]
+      }
       return
     }
     if (info.host.wireless_link) {
-      dock.link_osd = info.host
+      dock.link_osd = mergeOsd(dock.link_osd, info.host)
       return
     }
     if (info.host.job_number !== undefined) {
-      dock.work_osd = info.host
+      dock.work_osd = mergeOsd(dock.work_osd, info.host)
     }
   },
   SET_DRAW_VISIBLE_INFO (state, bool) {
@@ -212,6 +217,10 @@ const mutations: MutationTree<RootStateType> = {
   },
   SET_DEVICE_OFFLINE (state, info) {
     state.deviceStatusEvent.deviceOffline = info
+    const droneSn = state.deviceState.dockInfo[info.sn]?.basic_osd?.sub_device?.device_sn
+    if (droneSn) {
+      delete state.deviceState.deviceInfo[droneSn]
+    }
     delete state.deviceState.gatewayInfo[info.sn]
     delete state.deviceState.deviceInfo[info.sn]
     delete state.deviceState.dockInfo[info.sn]

@@ -71,41 +71,41 @@
         <div class="right">
           <div class="items">
               <div class="item">
-                <span >{{ deviceInfo.device && deviceInfo.device.battery.capacity_percent !== str ? deviceInfo.device?.battery.capacity_percent + ' %' : str }}</span>
+                <span>{{ deviceInfo.device?.battery?.capacity_percent != null ? deviceInfo.device.battery.capacity_percent + ' %' : str }}</span>
                 <span style="color: #717EE2;">无人机剩余电量</span>
               </div>
               <div class="item">
-                <span >{{ deviceInfo.device ? deviceInfo.device.position_state.rtk_number : str }}</span>
+                <span>{{ deviceInfo.device?.position_state?.rtk_number ?? str }}</span>
                 <span style="color: #717EE2;">RTK 搜星数量</span>
               </div>
           </div>
           <div class="items">
             <div class="item">
-                <span> {{ !deviceInfo.device || deviceInfo.device.height === str ? str : deviceInfo.device?.height.toFixed(2) + ' m'}}</span>
+                <span>{{ formatTelemetry(deviceInfo.device?.height, ' m') }}</span>
                 <span style="color: #717EE2;">海拔高度</span>
             </div>
             <div class="item">
-                <span >{{ !deviceInfo.device || deviceInfo.device.elevation === str ? str : deviceInfo.device?.elevation.toFixed(2) + ' m' }}</span>
+                <span>{{ formatTelemetry(deviceInfo.device?.elevation, ' m') }}</span>
                 <span style="color: #717EE2;">相对高度</span>
               </div>
           </div>
           <div class="items">
               <div class="item">
-                <span class="ml10">{{ !deviceInfo.device || deviceInfo.device.wind_speed === str ? str : (deviceInfo.device?.wind_speed / 10).toFixed(2) + ' m/s'}}</span>
+                <span class="ml10">{{ formatTelemetry(deviceInfo.device?.wind_speed, ' m/s', 10) }}</span>
                 <span style="color: #717EE2;">风速</span>
               </div>
               <div class="item">
-                <span class="ml10">{{ !deviceInfo.device || deviceInfo.device.home_distance === str ? str : deviceInfo.device?.home_distance.toFixed(2) + ' m' }}</span>
+                <span class="ml10">{{ formatTelemetry(deviceInfo.device?.home_distance, ' m') }}</span>
                 <span style="color: #717EE2;">离起飞点的距离</span>
               </div>
           </div>
           <div class="items">
               <div class="item">
-                <span class="ml10">{{ !deviceInfo.device || deviceInfo.device?.horizontal_speed === str ? str : deviceInfo.device?.horizontal_speed.toFixed(2) + ' m/s'}}</span>
+                <span class="ml10">{{ formatTelemetry(deviceInfo.device?.horizontal_speed, ' m/s') }}</span>
                 <span style="color: #717EE2;">水平速度</span>
               </div>
               <div class="item">
-                <span class="ml10">{{ !deviceInfo.device || deviceInfo.device.vertical_speed === str ? str : deviceInfo.device?.vertical_speed.toFixed(2) + ' m/s'}}</span>
+                <span class="ml10">{{ formatTelemetry(deviceInfo.device?.vertical_speed, ' m/s') }}</span>
                 <span style="color: #717EE2;">垂直速度</span>
               </div>
           </div>
@@ -143,6 +143,9 @@ const osdVisible = computed(() => {
   return store.state.osdVisible
 })
 const str: string = '--'
+function formatTelemetry (value: unknown, unit: string, divisor = 1): string {
+  return typeof value === 'number' && Number.isFinite(value) ? (value / divisor).toFixed(2) + unit : str
+}
 const dockModeMap: Record<string, string> = {
   Disconnected: '已断开',
   Idle: '空闲',

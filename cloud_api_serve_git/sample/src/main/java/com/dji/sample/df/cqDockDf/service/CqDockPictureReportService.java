@@ -24,7 +24,6 @@ import com.dji.sample.df.cqDockDf.model.dto.CqApiResponse;
 import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskPictureEntity;
 import com.dji.sample.df.cqDockDf.model.entity.CqDockTaskRecordEntity;
 import com.dji.sample.df.substationDf.dao.UniPointMapper2;
-import com.dji.sample.df.temperatureMeasurementDF.modol.TemParamEntity;
 import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
 import com.dji.sample.df.temperatureMeasurementDF.service.TemMeasureService;
 import com.dji.sample.df.windDf.config.FjFileConfig;
@@ -537,7 +536,7 @@ public class CqDockPictureReportService {
                 }
                 if (row.getPointType() != null && row.getPointType() == POINT_TYPE_INFRARED) {
 //                  红外图片测温
-                    measureInfrared(row, uniPoint, reportToPatrol);
+                    measureInfrared(row, reportToPatrol);
                 } else {
 //                  可见光图片对接分析
                     row.setAnalysisReportToPatrol(reportToPatrol ? 1 : 0);
@@ -586,25 +585,14 @@ public class CqDockPictureReportService {
     }
 
     /**
-     * 红外：大疆测温SDK同步测温（需要点位红外坐标，前期可以手动先填入测试）。
+     * 红外：复用测温服务的全图测温，支持SDK和CLI，不依赖点位红外坐标。
      */
-    private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint) {
-        measureInfrared(row, uniPoint, true);
-    }
-
-    private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint, boolean reportToPatrol) {
-        String coordinate = uniPoint.getInfraredImageCoordinate();
-        TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
-        if (temParamEntity == null) {
-            markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
-            throw new IllegalStateException("红外图片坐标无效");
-        }
-        log.info("CQ红外调用正常测温服务，无预设温度：taskCode={}, pointCode={}, imagePath={}",
+    private void measureInfrared(CqDockTaskPictureEntity row, boolean reportToPatrol) {
+        log.info("CQ红外调用全图测温服务，无预设温度、不读取点位坐标：taskCode={}, pointCode={}, imagePath={}",
                 row.getBusinessId(), row.getPointId(), row.getLocalPath());
-        TemResultEntity temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
+        TemResultEntity temResult = temMeasureService.measureWholeImage(row.getLocalPath());
         if (temResult.getError() != null) {
-            markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
-            throw new IllegalStateException("红外测温失败");
+            throw new IllegalStateException("红外测温失败：" + temResult.getError());
         }
         row.setPointVal("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
         row.setPointValUnit("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
@@ -626,30 +614,6 @@ public class CqDockPictureReportService {
                 && !Objects.equals(record.getReportToPatrol(), 0);
     }
 
-    private TemParamEntity parseInfraredCoordinate(String coordinate) {
-        if (coordinate == null || coordinate.isEmpty()) {
-            return null;
-        }
-        String trimmed = coordinate.trim();
-        if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) {
-            return null;
-        }
-        String[] parts = trimmed.substring(1, trimmed.length() - 1).split(",");
-        if (parts.length != 4) {
-            return null;
-        }
-        try {
-            TemParamEntity temParamEntity = new TemParamEntity();
-            temParamEntity.setLeft_top_x(Integer.parseInt(parts[0].trim()));
-            temParamEntity.setLeft_top_y(Integer.parseInt(parts[1].trim()));
-            temParamEntity.setRight_bottom_x(Integer.parseInt(parts[2].trim()));
-            temParamEntity.setRight_bottom_y(Integer.parseInt(parts[3].trim()));
-            return temParamEntity;
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
     /**
      * 可见光：提交智能分析服务，等 /picAnalyseRetNotify 回调。
      */
@@ -659,10 +623,9 @@ public class CqDockPictureReportService {
             throw new IllegalStateException("本地图片不存在");
         }
         String requestId = UUID.randomUUID().toString();
-        // 与 handleUavResult 一致：唯一编码=点位编码+图片类型，objectId 后缀 _2 表示无人机
-        String regId = uniPoint.getPointCode() + "V";
+        // EUA使用点位编码，objectId 后缀 _2 表示无人机；回调按requestId关联图片。
         AnalyseParamsReq analyseParamsReq = new AnalyseParamsReq();
-        analyseParamsReq.setObjectId(regId + "_2");
+        analyseParamsReq.setObjectId(uniPoint.getPointCode() + "_2");
         // 分析服务按 FTP 根目录的相对路径读取图片，需去掉 /ftpdir/admin_files 前缀（与 electricInspection 一致）
         analyseParamsReq.setImagePathListByStandard(Lists.newArrayList(toAnalysisRelativePath(row.getLocalPath())), analyseStandardConfig.isDocument57());
         String pointAnalyseType = uniPoint.getPointAnalyseType();
