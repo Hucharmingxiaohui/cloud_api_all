@@ -54,6 +54,24 @@ public class ConstructionTowerChecks {
         // 排序键：A2 < A10；档标签拼接
         check(ConstructionLineGeometry.sortKey("A2").compareTo(ConstructionLineGeometry.sortKey("A10"))<0);
         check("A2-A3".equals(ConstructionLineGeometry.spanLabel("A2","A3")));
+        try {
+            JdbcTemplate chainDb=new JdbcTemplate(){
+                @Override public List<Map<String,Object>> queryForList(String sql,Object... a) {
+                    return List.of(Map.of("id","a","tower_no","A12","lng",103.01,"lat",24.0),
+                            Map.of("id","c","tower_no","C2","lng",103.02,"lat",24.0),
+                            Map.of("id","b","tower_no","A11","lng",103.03,"lat",24.0));
+                }
+            };
+            ConstructionLineService service=new ConstructionLineService(null,null,chainDb);
+            java.lang.reflect.Method method=ConstructionLineService.class.getDeclaredMethod("towerChain",String.class,List.class);
+            method.setAccessible(true);
+            Object chain=method.invoke(service,"w",List.of("c","b","a"));
+            java.lang.reflect.Field nos=chain.getClass().getDeclaredField("nos");nos.setAccessible(true);
+            check(nos.get(chain).equals(List.of("C2","A11","A12")));
+            java.lang.reflect.Field points=chain.getClass().getDeclaredField("points");points.setAccessible(true);
+            List<ConstructionAreaGeometry.Point> ordered=(List<ConstructionAreaGeometry.Point>)points.get(chain);
+            check(ordered.get(0).lng==103.02&&ordered.get(1).lng==103.03&&ordered.get(2).lng==103.01);
+        } catch(ReflectiveOperationException e) {throw new AssertionError(e);}
 
         // 投影：航点落在折线中部偏 A2 一侧 → 最近段为 A1-A2(index0)
         List<ConstructionAreaGeometry.Point> line=List.of(new ConstructionAreaGeometry.Point(103,24),new ConstructionAreaGeometry.Point(103.02,24),new ConstructionAreaGeometry.Point(103.04,24));

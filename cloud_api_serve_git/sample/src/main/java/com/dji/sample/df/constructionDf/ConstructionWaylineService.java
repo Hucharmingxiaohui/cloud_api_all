@@ -43,8 +43,8 @@ public class ConstructionWaylineService {
         return targetDetail(workspace,id);
     }
     private void writable(Map<String,Object> area,int version) {
-        if(Boolean.TRUE.equals(area.get("archived"))||!Boolean.TRUE.equals(area.get("enabled"))) throw bad("区域已归档或暂停，不能创建或校验航线");
-        if(((Number)area.get("version")).intValue()!=version) throw new RuleException(409,"区域边界已更新，请返回区域页面刷新后重试");
+        if(Boolean.TRUE.equals(area.get("archived"))||!Boolean.TRUE.equals(area.get("enabled"))) throw bad((area.get("target_type")!=null?"对象":"区域")+"已归档或暂停，不能创建或校验航线");
+        if(((Number)area.get("version")).intValue()!=version) throw new RuleException(409,(area.get("target_type")!=null?"线路":"区域边界")+"已更新，请返回页面刷新后重试");
     }
     @SuppressWarnings("unchecked") private List<Point> boundary(Map<String,Object> area) {
         List<Point> result=new ArrayList<>();
@@ -82,13 +82,22 @@ public class ConstructionWaylineService {
         String digest=requestHash(body.get("wayline"));
         Map<String,Object> old=retry(w,a,request,digest); if(old!=null) return old;
         writable(area,version);
+        Map<String,Object> rawWayline;
+        try { rawWayline=json.convertValue(body.get("wayline"),Map.class);
+            Map<String,Object> rawFolder=(Map<String,Object>)rawWayline.get("folder");
+            for(Object item:(List<?>)rawFolder.get("placeMarks")) {
+                Map<?,?> point=(Map<?,?>)item;
+                if(!Integer.valueOf(1).equals(point.get("useGlobalHeight")) && !(point.get("height") instanceof Number)) throw bad("每个独立高度航点必须提供数值椭球高");
+            }
+        } catch(RuleException e) { throw e; } catch(Exception e) { throw bad("航线参数不完整"); }
         Wayline wayline;
         try { wayline=json.convertValue(body.get("wayline"),Wayline.class); } catch(Exception e) { throw bad("航线参数无效"); }
         if(wayline==null||wayline.getMissionConfig()==null||wayline.getFolder()==null||wayline.getFolder().getPlaceMarks()==null) throw bad("航线参数不完整");
-        if(!"WGS84".equals(wayline.getFolder().getExecuteHeightMode())) throw bad("S 型航线必须使用 WGS84 椭球高模式");
-        if(wayline.getFolder().getWaylineCoordinateSysParam()==null||!"WGS84".equals(wayline.getFolder().getWaylineCoordinateSysParam().getHeightMode())) throw bad("S 型航线模板必须使用 WGS84 椭球高模式");
+        boolean line="line".equals(area.get("target_type"));
+        if(!"WGS84".equals(wayline.getFolder().getExecuteHeightMode())) throw bad(line?"线路航线必须使用 WGS84 椭球高模式":"S 型航线必须使用 WGS84 椭球高模式");
+        if(wayline.getFolder().getWaylineCoordinateSysParam()==null||!"WGS84".equals(wayline.getFolder().getWaylineCoordinateSysParam().getHeightMode())) throw bad(line?"线路航线模板必须使用 WGS84 椭球高模式":"S 型航线模板必须使用 WGS84 椭球高模式");
         if(!Float.isFinite(wayline.getFolder().getGlobalHeight())) throw bad("WGS84 椭球高必须是有限数值");
-        if(wayline.getFolder().getPlaceMarks().stream().anyMatch(point->point.getUseGlobalHeight()!=1)) throw bad("S 型航线所有航点必须使用全局 WGS84 航高");
+        if(wayline.getFolder().getPlaceMarks().stream().anyMatch(point->point.getUseGlobalHeight()!=1 && !Float.isFinite(point.getHeight()))) throw bad("航点 WGS84 椭球高必须是有限数值");
         if(wayline.getFolder().getPlaceMarks().size()<2||wayline.getFolder().getPlaceMarks().size()>2000) throw bad("航线需包含 2–2000 个航点");
         String name=wayline.getMissionConfig().getFileName();
         wayline.getMissionConfig().setFileName("route");

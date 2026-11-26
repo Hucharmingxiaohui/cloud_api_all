@@ -18,7 +18,7 @@ export function useGMapManage () {
   // }
 
   const fanData = config.markerList
-  async function initMap (container: string, app:App) {
+  async function initMap (container: string, app:App, showOrigin = false) {
     // 清理现有的地图实例和相关资源
     if (state.map) {
       state.map.destroy() // 销毁旧的地图实例
@@ -56,6 +56,29 @@ export function useGMapManage () {
         dragEnable: true, // 初始时禁用拖拽
         zoomEnable: false, // 初始时禁用缩放
       })
+    }
+
+    // droneLocation is already GCJ-02, matching the initial center. Do not convert twice.
+    const origin = config.droneLocation
+    if (showOrigin && Array.isArray(origin) && origin.length === 2 &&
+      origin.every(value => typeof value === 'number' && Number.isFinite(value)) &&
+      Math.abs(origin[0]) <= 180 && Math.abs(origin[1]) <= 90) {
+      state.map.add(new AMap.Marker({
+        position: origin,
+        offset: new AMap.Pixel(-16, -16),
+        zIndex: 110,
+        bubble: true,
+        draggable: false,
+        title: `地图初始中心（GCJ-02）：${origin[0].toFixed(6)}, ${origin[1].toFixed(6)}`,
+        content: `<div style="position:relative;width:32px;height:32px;pointer-events:none;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true">
+            <circle cx="16" cy="16" r="10" fill="#071e36" fill-opacity="0.75" stroke="#ffd166" stroke-width="2"/>
+            <path d="M16 1v9M16 22v9M1 16h9M22 16h9" stroke="#ffd166" stroke-width="2"/>
+            <circle cx="16" cy="16" r="3" fill="#ffd166"/>
+          </svg>
+          <span style="position:absolute;left:16px;bottom:38px;transform:translateX(-50%);white-space:nowrap;padding:5px 10px;border:1px solid #ffd166;border-radius:4px;background:rgba(7,30,54,0.94);color:#ffe3a1;font-size:13px;font-weight:600;box-shadow:0 2px 8px #0008;">地图原点</span>
+        </div>`
+      }))
     }
 
     const markerIcon = new AMap.Icon({
@@ -146,8 +169,8 @@ export function useGMapManage () {
   //   })
   // }
 
-  function globalPropertiesConfig (app: App) {
-    initMap('g-container', app)
+  function globalPropertiesConfig (app: App, showOrigin = false) {
+    initMap('g-container', app, showOrigin)
   }
 
   return {

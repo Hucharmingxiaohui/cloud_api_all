@@ -28,6 +28,7 @@ public class ConstructionLineWaylineController {
         });
     }
     @GetMapping("/{id}") public HttpResultResponse<Object> detail(HttpServletRequest req,@PathVariable String line,@PathVariable String id) throws Exception { return run(req,c->service.detail(c.getWorkspaceId(),ConstructionLineTarget.key(line),id)); }
+    @PostMapping public HttpResultResponse<Object> create(HttpServletRequest req,@PathVariable String line,@RequestBody Map<String,Object> body) throws Exception { return run(req,c->service.create(c.getWorkspaceId(),ConstructionLineTarget.key(line),body,c.getUsername())); }
     @PostMapping("/upload") public HttpResultResponse<Object> upload(HttpServletRequest req,@PathVariable String line,@RequestParam("expected_version") int version,@RequestParam("request_id") String request,@RequestParam("file") MultipartFile file) throws Exception {
         return run(req,c->{
             String name=file.getOriginalFilename();

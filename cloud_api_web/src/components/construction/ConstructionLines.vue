@@ -52,7 +52,7 @@
             <el-button type="primary" :disabled="routeBusy || draft.archived" @click="analysisVisible = true">线路检测配置</el-button>
             <el-button :disabled="routeBusy" @click="router.push({ path: '/taskManage/construction', query: { area: 'line:' + draft.line_id } })">巡检计划</el-button>
             <el-radio-group v-model="inspectionTab" :disabled="routeBusy"><el-radio-button label="routes">巡检航线</el-radio-button><el-radio-button label="details">线路详情</el-radio-button></el-radio-group>
-            <ConstructionLineWaylines v-if="inspectionTab === 'routes'" :area-id="'line:' + draft.line_id" :version="draft.version" :enabled="draft.enabled && !draft.archived" @preview="emit('preview', $event)" @busy="routeBusy = $event" />
+            <ConstructionLineWaylines v-if="inspectionTab === 'routes'" :area-id="'line:' + draft.line_id" :version="draft.version" :enabled="draft.enabled && !draft.archived" :initial-wayline="initialWayline" @preview="emit('preview', $event)" @busy="routeBusy = $event" />
           </template>
           <div v-show="editing || historical || inspectionTab === 'details'">
           <el-form label-position="top" :disabled="!editing || saving" @submit.prevent>
@@ -66,10 +66,17 @@
             </el-form-item>
           </el-form>
           <template v-if="lineMode === 'tower'">
-            <p>杆塔链按编号自然排序生成折线（同一前缀，如 A1–A10）。</p>
+            <p>可跨编号前缀选择杆塔，按下方连接顺序生成折线；新勾选的杆塔追加到末尾。</p>
             <div class="tower-chain-list">
               <label v-for="tower in towers" :key="tower.id" class="tower-chain-item"><input type="checkbox" :checked="towerChain.includes(tower.id)" :disabled="!editing || saving" @change="toggleChainTower(tower.id)" /> {{ tower.tower_no }}</label>
             </div>
+            <ol class="tower-chain-order">
+              <li v-for="(id, index) in towerChain" :key="id">
+                <span>{{ towers.find(tower => tower.id === id)?.tower_no || draft.tower_nos?.[index] || id }}</span>
+                <el-button size="small" :disabled="!editing || saving || index === 0" @click="moveChainTower(index, -1)">上移</el-button>
+                <el-button size="small" :disabled="!editing || saving || index === towerChain.length - 1" @click="moveChainTower(index, 1)">下移</el-button>
+              </li>
+            </ol>
             <p v-if="!towers.length">杆塔列表为空，请先在“杆塔”台账中标定杆塔。</p>
           </template>
           <template v-else>
@@ -96,14 +103,15 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ConstructionLine, ConstructionPoint, ConstructionTower } from '/@/api/construction'
 import { archiveConstructionLine, constructionLineHistory, createConstructionLine, getConstructionLine, listConstructionLines, updateConstructionLine, ConstructionAreaConflictError, listConstructionTowers, createConstructionTower, updateConstructionTower, deleteConstructionTower } from '/@/api/construction'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import ConstructionLineWaylines from './ConstructionLineWaylines.vue'
 import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
 import { lineLengthMeters, validateLine } from './constructionLineModel'
 /* global defineProps, defineEmits, defineExpose */
 defineProps<{ active: boolean; ledgerTarget: HTMLElement | null; propertiesTarget: HTMLElement | null }>()
 const emit = defineEmits(['map-state', 'preview'])
-const router = useRouter()
+const router = useRouter(); const route = useRoute()
+const initialWayline = typeof route.query.wayline === 'string' ? route.query.wayline : ''
 const routeBusy = ref(false); const analysisVisible = ref(false)
 const inspectionTab = ref('routes')
 const types = ['输电线路', '道路', '管线', '其他']
@@ -120,7 +128,7 @@ const towerPicking = ref(false); const towerSaving = ref(false); const towerErro
 const lineMode = ref<'draw' | 'tower'>('draw')
 const towerChain = ref<string[]>([])
 let baseline = ''; let sequence = 0; let disposed = false
-const dirty = computed(() => drawing.value || (editing.value && JSON.stringify(draft.value) !== baseline))
+const dirty = computed(() => drawing.value || (editing.value && (JSON.stringify(draft.value) !== baseline || JSON.stringify(towerChain.value) !== JSON.stringify(draft.value?.tower_ids || []))))
 const historyVisible = ref(false); const historyLoading = ref(false); const historyError = ref(''); const historyRows = ref<ConstructionLine[]>([])
 const message = (error: unknown) => error instanceof Error ? error.message : '线路操作失败'
 function formatLength (value: number) { return value >= 1000 ? `${(value / 1000).toFixed(2)} km` : `${value.toFixed(1)} m` }
@@ -134,8 +142,8 @@ async function confirmDiscard () {
 const mapState = computed(() => ({
   lines: mapLines.value,
   selectedLineId: draft.value?.line_id || null,
-  linePoints: draft.value?.points || [],
-  lineEditable: editing.value,
+  linePoints: editing.value && lineMode.value === 'tower' ? towerChain.value.flatMap(id => { const tower = towers.value.find(t => t.id === id); return tower ? [{ lng: tower.lng, lat: tower.lat }] : [] }) : draft.value?.points || [],
+  lineEditable: editing.value && lineMode.value === 'draw',
   lineColor: draft.value?.color,
   lineName: draft.value?.name,
   towers: towers.value,
@@ -209,9 +217,17 @@ async function removeTower (tower: { id: string; tower_no: string }) {
   try { await deleteConstructionTower(tower.id); if (towerDraft.value?.id === tower.id) towerDraft.value = null; await loadTowers(); ElMessage.success('杆塔已删除') } catch (error) { towerError.value = message(error) } finally { towerSaving.value = false }
 }
 function toggleChainTower (id: string) {
+  if (!editing.value || saving.value) return
   const index = towerChain.value.indexOf(id)
   if (index >= 0) towerChain.value.splice(index, 1)
   else towerChain.value.push(id)
+}
+function moveChainTower (index: number, direction: number) {
+  const next = index + direction
+  if (!editing.value || saving.value || index < 0 || next < 0 || next >= towerChain.value.length) return
+  const ids = [...towerChain.value]
+  ;[ids[index], ids[next]] = [ids[next], ids[index]]
+  towerChain.value = ids
 }
 async function newLine () {
   if (!await confirmDiscard()) return

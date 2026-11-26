@@ -168,7 +168,7 @@ public class ConstructionLineService {
         TowerChain(List<Point> points, List<String> nos) { this.points = points; this.nos = nos; }
     }
 
-    /** 按杆塔编号自然排序（同前缀按数字后缀），从数据库读取杆塔并生成折点。 */
+    /** 按用户提交的连接顺序生成折点，允许跨编号前缀。 */
     private TowerChain towerChain(String workspace, List<String> towerIds) {
         if (db == null) throw new RuleException(500, "内部错误：杆塔存储不可用");
         String placeholders = String.join(",", java.util.Collections.nCopies(towerIds.size(), "?"));
@@ -179,13 +179,6 @@ public class ConstructionLineService {
         }
         if (towers.size() != towerIds.size()) throw new RuleException(404, "部分杆塔不存在或已删除，请刷新杆塔列表");
         List<String> ordered = new ArrayList<>(towerIds);
-        ordered.sort(Comparator.comparing(id -> ConstructionLineGeometry.sortKey(towers.get(id)[0])));
-        String prefix = null;
-        for (String id : ordered) {
-            String no = towers.get(id)[0]; String key = no.replaceAll("[0-9]+$", "");
-            if (prefix == null) prefix = key;
-            else if (!prefix.equals(key)) throw new RuleException(400, "杆塔链必须为同一前缀的连续杆塔（如 A1–A10）");
-        }
         List<Point> points = new ArrayList<>();
         List<String> nos = new ArrayList<>();
         for (String id : ordered) {

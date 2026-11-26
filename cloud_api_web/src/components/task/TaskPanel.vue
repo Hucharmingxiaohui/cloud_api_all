@@ -105,8 +105,12 @@
       </el-form>
     </div>
     <div ref="taskContent" class="content">
-      <div ref="transferBar" class="transfer-bar">
-        <el-button :aria-expanded="showTransfers" aria-controls="construction-transfers" @click="showTransfers = !showTransfers">{{ showTransfers ? '收起离线接收' : '离线接收工地巡检结果' }}</el-button>
+      <div v-if="CURRENT_CONFIG.constructionOnly === true" ref="transferBar" class="transfer-bar">
+        <el-button class="construction-transfer-button" :class="{ 'is-expanded': showTransfers }" :aria-expanded="showTransfers" aria-controls="construction-transfers" @click="showTransfers = !showTransfers">
+          <el-icon class="transfer-icon"><Download /></el-icon>
+          <span>离线接收工地巡检结果</span>
+          <el-icon class="transfer-chevron"><ArrowDown /></el-icon>
+        </el-button>
         <div v-show="showTransfers" id="construction-transfers">
           <ConstructionTransfers ref="transfers" />
         </div>
@@ -381,7 +385,8 @@ import { getDeviceTopo, getUnreadDeviceHms, updateDeviceHms, getPlatformInfo, is
 import { Device } from '/@/types/device'
 import CustomTree from '/@/components/substationTree.vue'
 import { getRoot } from '/@/root'
-import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Download, ArrowDown } from '@element-plus/icons-vue'
+import { CURRENT_CONFIG } from '/@/api/http/config'
 const router = useRouter()
 const transfers = ref<InstanceType<typeof ConstructionTransfers>>()
 const showTransfers = ref(false)
@@ -1054,6 +1059,28 @@ function toTaskVideo (val: any) {
 </script>
 
 <style lang="scss" scoped>
+.construction-transfer-button.el-button {
+  height: 34px;
+  max-width: 100%;
+  padding: 0 14px;
+  border: 1px solid #2879a6;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #123e62, #0b2a49);
+  color: #d8f3ff;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .18s, border-color .18s;
+
+  &:hover, &.is-expanded {
+    background: #15466c;
+    border-color: #4bbbea;
+    color: #fff;
+  }
+  &:focus-visible { outline: 2px solid #69d1ff; outline-offset: 3px; }
+  .transfer-icon { margin-right: 8px; color: #65d4f5; font-size: 16px; }
+  .transfer-chevron { margin-left: 12px; transition: transform .18s; }
+  &.is-expanded .transfer-chevron { transform: rotate(180deg); }
+}
 .container {
   height: 100%;
   width: 100%;

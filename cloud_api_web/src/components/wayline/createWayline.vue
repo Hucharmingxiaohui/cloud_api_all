@@ -1,16 +1,27 @@
 <template>
-    <div class="container" :class="{ 'construction-editor': !!constructionAreaId }">
+    <div class="container" :class="{ 'construction-editor': !!constructionTargetId }">
         <div class="left-sidebar">
             <!-- 左侧内容 -->
             <div style="height: 50px; line-height: 50px; border-bottom: 1px solid #4f4f4f; font-weight: 450;">
                 <a-row>
                     <a-col :span="1"></a-col>
-                    <a-col :span="22">{{ constructionAreaId ? '区域内航点标注' : '航点标注' }}</a-col>
+                    <a-col :span="22">{{ constructionAreaId ? '区域内航点标注' : constructionLineId ? '线路航点标注' : '航点标注' }}</a-col>
                     <a-col :span="1"></a-col>
                 </a-row>
             </div>
             <div class="scrollbar" :style="{ height: scorllHeight + 'px'}">
-                    <div v-if="constructionAreaId" class="sweep-entry"><el-select v-model="constructionDockSn" placeholder="请选择参考机巢" :disabled="constructionSaving" filterable><el-option v-for="dock in constructionDocks" :key="dock.sn" :label="`${dock.name}${dock.height == null ? '（等待椭球高）' : ''}`" :value="dock.sn" :disabled="dock.height == null" /></el-select><el-button type="primary" :disabled="!constructionArea || constructionSaving || !constructionDock" @click="sweepVisible = true">自动生成 S 型航线</el-button><small>参考机巢用于计算 WGS84 航高；航线保存后高度固定</small></div>
+                    <div v-if="constructionTargetId" class="sweep-entry">
+                      <label>离地高度（米）<el-input-number v-model="lineRelativeHeight" :min="1" :max="1500" :disabled="constructionSaving" /></label>
+                      <el-button :disabled="constructionSaving" @click="applyLineHeight">计算航点高度 / 复核航段</el-button>
+                      <el-button v-if="constructionAreaId" type="primary" :disabled="!constructionArea || constructionSaving" @click="sweepVisible = true">自动生成 S 型航线</el-button>
+                      <small>按地表高程计算各航点高度，保存前重新复核。起飞、返航高度单独设置。</small>
+                      <p v-if="terrainReview" role="status">{{ terrainReview }}</p>
+                      <template v-if="constructionLineId">
+                        <label>新航点拍照镜头<el-select v-model="constructionCaptureLens" :disabled="constructionSaving"><el-option label="可见光（广角）" value="wide" /><el-option label="红外" value="ir" /><el-option label="可见光＋红外" value="wide,ir" /></el-select></label>
+                        <small>新增航点默认到点拍照并带航点编号；转场点可在动作中删除拍照。</small>
+                        <el-button :disabled="constructionSaving" @click="repairConstructionCapture">为未拍照航点补拍照</el-button>
+                      </template>
+                    </div>
                 <LayersTree
                 :layer-data="mapLayers"
                 class="project-layer-content"
@@ -54,7 +65,8 @@
                     <div class="latitude element-item" v-if="layerState.currentType === ''" style="margin-top: 10px">
                         <div style="display: flex; justify-content:left;align-items: center; color: aliceblue;">
                           <span class="title">无人机机型:</span>
-                          <span class="title" style="margin-left: 10px" v-if="lineState.droneEnumValue === 77">M3E/M3T/M3M</span>
+                          <span class="title" style="margin-left: 10px" v-if="constructionTargetId">M4TD</span>
+                          <span class="title" style="margin-left: 10px" v-else-if="lineState.droneEnumValue === 77">M3E/M3T/M3M</span>
                           <span class="title" style="margin-left: 10px" v-else-if="lineState.droneEnumValue === 91">M3D/M3TD</span>
                           <span class="title" style="margin-left: 10px" v-else-if="lineState.droneEnumValue === 100">M4D/M4TD</span>
                           <span class="title" style="margin-left: 10px" v-else>M30/M30T</span>
@@ -68,9 +80,9 @@
                     <div class="operation-card__title">执行高度</div>
                     <div class="latitude element-item" style="margin-top: 10px">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">{{ constructionAbsoluteHeight ? '全局航点高度 (WGS84 椭球高, m):' : '全局航点高度 (相对起飞点, m):' }}</span>
+                          <span class="title">{{ constructionTargetId ? '航点高度：相对地表' : '全局航点高度 (相对起飞点, m):' }}</span>
                         </div>
-                        <div v-if="constructionAbsoluteHeight" style="color:#7de5ff;padding:12px 0">{{ Number(lineState.globalHeight).toFixed(2) }} m（机巢椭球高 + 相对航高）</div>
+                        <div v-if="constructionTargetId" style="color:#7de5ff;padding:12px 0">离地 {{ lineRelativeHeight }} m，各航点椭球高独立计算</div>
                         <el-slider v-else v-model="lineState.globalHeight" show-input :min="2" :max="1500" @change="updateLine" class="custom-el-slider"/>
                     </div>
                     <div class="latitude element-item" style="margin-top: 10px">
@@ -169,10 +181,10 @@
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
                     <div v-if="layerState.currentType != ''" style="margin-top: 30px;">
                         <div style="display: flex; justify-content: space-between;color: aliceblue;">
-                          <span class="title">{{ constructionAbsoluteHeight ? 'WGS84 椭球高 (m):' : '相对起飞点高度 (m):' }}</span>
-                          <el-checkbox v-if="!constructionAbsoluteHeight" v-model="boolState.checked2" @change="changeLayer">跟随航线</el-checkbox>
+                          <span class="title">{{ constructionTargetId ? '航点高度：相对地表' : '相对起飞点高度 (m):' }}</span>
+                          <el-checkbox v-if="!constructionTargetId" v-model="boolState.checked2" @change="changeLayer">跟随航线</el-checkbox>
                         </div>
-                        <div v-if="constructionAbsoluteHeight" style="color:#7de5ff;padding:12px 0">{{ Number(lineState.globalHeight).toFixed(2) }} m（跟随航线）</div>
+                        <div v-if="constructionTargetId" style="color:#7de5ff;padding:12px 0">地表高程 + 离地 {{ lineRelativeHeight }} m，保存前重算</div>
                         <el-input-number v-else class="custom-input-number" :disabled="boolState.checked2" v-model="pointState.flightHeight" :min="1" :max="1500" @change="changeLayer"/>
                     </div>
                     <el-divider class="divider-color" v-if="layerState.currentType != ''"></el-divider>
@@ -350,11 +362,12 @@
                   </div>
               </a-drawer> -->
         </div>
-        <div class="main-content" :class="{ 'construction-height-layout': !!constructionAreaId }">
+        <div class="main-content" :class="{ 'construction-height-layout': !!constructionTargetId }">
             <!-- 右侧内容 -->
             <div v-if="constructionAreaId" class="construction-editor-banner">{{ constructionArea ? `${constructionArea.name} · v${constructionArea.version}：巡检航点和航段须在蓝色边界内` : constructionError || '正在加载区域边界…' }}<button @click="router.push({ path: '/variableMgt/constructionAreas', query: { area: constructionAreaId } })">返回区域</button></div>
-            <ConstructionElevationProfile v-if="constructionAreaId" :points="elevationPoints" :mode="store.state.Points[0]?.folder?.executeHeightMode" />
-            <showMap ref="myMap" :construction-mode="!!constructionAreaId" :construction-boundary="constructionArea?.boundary || []" :draft-storage-key="draftStorageKey" />
+            <div v-if="constructionLineId" class="construction-editor-banner">{{ constructionLine ? `${constructionLine.name} · v${constructionLine.version}：沿线路标注航点，不限多边形范围` : constructionError || '正在加载线路…' }}<button @click="router.push({ path: '/variableMgt/constructionAreas', query: { line: constructionLineId } })">返回线路</button></div>
+            <ConstructionElevationProfile v-if="constructionTargetId" :points="elevationPoints" :mode="store.state.Points[0]?.folder?.executeHeightMode" />
+            <showMap ref="myMap" :construction-mode="!!constructionAreaId" :default-construction-capture="!!constructionLineId" :construction-capture-lens="constructionCaptureLens" :construction-boundary="constructionArea?.boundary || []" :construction-line="constructionLine?.points || []" :draft-storage-key="draftStorageKey" />
         </div>
     </div>
     <ConstructionSweepDialog v-if="sweepVisible && constructionArea" :boundary="constructionArea.boundary" @close="sweepVisible = false" @apply="applySweep" />
@@ -369,12 +382,15 @@ import { MapDoodleColor, MapElementEnum } from '/@/constants/map'
 import { generatePoint } from '/@/utils/genjson'
 import { useGMapCover } from '/@/hooks/use-g-map-cover'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getConstructionArea, createConstructionWayline } from '/@/api/construction'
+import { getConstructionArea, getConstructionLine, createConstructionWayline } from '/@/api/construction'
 import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
+import { validateLine } from '/@/components/construction/constructionLineModel'
 import ConstructionSweepDialog from '/@/components/construction/ConstructionSweepDialog.vue'
 import ConstructionElevationProfile from '/@/components/construction/ConstructionElevationProfile.vue'
-import { useConstructionDocks } from '/@/components/construction/useConstructionDocks'
-import { resolveSweepAbsoluteHeight } from '/@/components/construction/constructionSweep'
+import { loadElevation } from '/@/utils/terrain-elevation'
+import { terrainRoute } from '/@/utils/terrain-route'
+import { addMissingConstructionCapture } from '/@/components/construction/constructionCapture'
+
 import { uuidv4 } from '/@/utils/uuid'
 import { commitWaylineFile, commitWaylineFile1, deleteWaylineFile } from '/@/api/wayline'
 import { ELocalStorageKey, ERouterName, ELiveStatusValue, EStatusValue } from '/@/types'
@@ -387,15 +403,29 @@ import pin19be6b from '/@/assets/icons/pin-19be6b.svg'
 const router = useRouter()
 const editorRoute = useRoute()
 const constructionAreaId = typeof editorRoute.query.construction_area === 'string' ? editorRoute.query.construction_area : ''
-const draftStorageKey = constructionAreaId ? `construction_wayline_draft_${constructionAreaId}` : 'wayline'
+const constructionLineId = typeof editorRoute.query.construction_line === 'string' ? editorRoute.query.construction_line : ''
+const constructionTargetId = constructionAreaId || (constructionLineId ? `line:${constructionLineId}` : '')
+const draftStorageKey = constructionTargetId ? `construction_wayline_draft_${constructionTargetId}` : 'wayline'
 const constructionArea = ref(null)
+const constructionLine = ref(null)
 const constructionError = ref('')
 const constructionSaving = ref(false)
 const sweepVisible = ref(false)
-const constructionDockSn = ref('')
-const { docks: constructionDocks, refresh: refreshConstructionDocks } = useConstructionDocks()
-const constructionDock = computed(() => constructionDocks.value.find(dock => dock.sn === constructionDockSn.value) || null)
-const constructionAbsoluteHeight = computed(() => constructionAreaId && store.state.Points[0]?.folder?.executeHeightMode === 'WGS84')
+const terrainReview = ref('')
+const constructionCaptureLens = ref('wide')
+async function repairConstructionCapture () {
+  if (!constructionLineId || constructionSaving.value) return
+  if (!store.state.Points[0]?.elements?.length) { ElMessage.info('请先添加航点'); return }
+  try { await ElMessageBox.confirm('将为当前所有没有拍照动作的航点添加到点拍照，包括转场点。已有拍照动作及镜头保持不变，是否继续？', '补齐拍照动作') } catch { return }
+  const layers = JSON.parse(JSON.stringify(store.state.Points))
+  const added = addMissingConstructionCapture(layers[0].elements, constructionCaptureLens.value)
+  selectedKeys.value = []; checkedKeys.value = []; closeDrawer()
+  store.commit('SET_POINTS', layers); mapLayers.value = layers
+  localStorage.setItem(draftStorageKey, JSON.stringify(layers[0]))
+  ElMessage.success(`已为 ${added} 个航点补充拍照动作，请保存航线后重新绑定`)
+}
+const lineRelativeHeight = ref(100)
+const constructionAbsoluteHeight = computed(() => constructionTargetId && store.state.Points[0]?.folder?.executeHeightMode === 'WGS84')
 const elevationPoints = computed(() => {
   const route = store.state.Points[0]
   return (route?.elements || []).map(p => {
@@ -403,18 +433,44 @@ const elevationPoints = computed(() => {
     return { lng: Number(coordinates[0]), lat: Number(coordinates[1]), height: p.Placemark?.useGlobalHeight === 1 ? route.folder?.globalHeight : p.Placemark?.height }
   })
 })
+async function calculateTerrain (route, height) {
+  const snapshot = JSON.stringify(route.elements)
+  const grid = await loadElevation()
+  const result = terrainRoute(route.elements.map(p => ({ lng: Number(p.resource.content.geometry.coordinates[0]), lat: Number(p.resource.content.geometry.coordinates[1]) })), height, grid)
+  terrainReview.value = result.warnings.length ? result.warnings.join('；') : '航段每10米采样复核完成；仍需核对现场障碍物及高程误差'
+  if (result.warnings.length) {
+    try { await ElMessageBox.confirm(terrainReview.value + '。请复核剖面；是否保留当前规划？', '地形净空告警', { confirmButtonText: '确认保留', cancelButtonText: '返回调整', type: 'warning' }) } catch { return false }
+  }
+  if (snapshot !== JSON.stringify(route.elements)) throw Error('航点已变化，请重新计算')
+  route.folder.executeHeightMode = 'WGS84'
+  route.folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }
+  route.folder.globalHeight = result.heights[0]
+  route.terrainClearance = height
+  route.elements.forEach((p, i) => { p.Placemark.useGlobalHeight = 0; p.Placemark.height = result.heights[i] })
+  return true
+}
+async function applyLineHeight () {
+  if (constructionSaving.value) return
+  constructionSaving.value = true
+  try {
+    const layers = JSON.parse(JSON.stringify(store.state.Points))
+    const before = JSON.stringify(store.state.Points)
+    if (!await calculateTerrain(layers[0], lineRelativeHeight.value)) return
+    if (before !== JSON.stringify(store.state.Points)) throw Error('航点已变化，请重新计算')
+    store.commit('SET_POINTS', layers); mapLayers.value = layers
+    localStorage.setItem(draftStorageKey, JSON.stringify(layers[0]))
+  } catch (error) { terrainReview.value = error.message; ElMessage.error(error.message) } finally { constructionSaving.value = false }
+}
 async function applySweep ({ result, settings }) {
   if (constructionSaving.value || !constructionArea.value) return
-  if (!constructionDock.value) { ElMessage.error('请选择具有有效 WGS84 椭球高遥测的执行机巢'); return }
-  let absoluteHeight
-  try { absoluteHeight = resolveSweepAbsoluteHeight(constructionDock.value.height, settings.height) } catch (error) { ElMessage.error(error instanceof Error ? error.message : '无法计算 WGS84 航高'); return }
   if (store.state.Points[0]?.elements?.length) {
     try { await ElMessageBox.confirm('生成结果将替换当前编辑器内的航点和动作，是否继续？已保存的航线不受影响。', '替换当前草稿') } catch { return }
   }
   const issue = routeBoundaryError(result.points, constructionArea.value.boundary)
   if (issue) { ElMessage.error(issue); return }
+  const beforeSweep = JSON.stringify(store.state.Points)
   const layers = JSON.parse(JSON.stringify(store.state.Points)); const route = layers[0]
-  route.elements.forEach(p => { if (store.state.coverMap[p.id]?.length) useGMapCoverHook.removeCoverFromMap(p.id) })
+  const previousElements = route.elements
   route.elements = result.points.map((p, i) => ({
     id: uuidv4(),
     name: `航点${i + 1}${p.capture ? '' : '（转场）'}`,
@@ -434,29 +490,41 @@ async function applySweep ({ result, settings }) {
       }
     }
   }))
-  route.folder.executeHeightMode = 'WGS84'; route.folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }; route.folder.globalHeight = absoluteHeight; route.folder.autoFlightSpeed = settings.speed
+  route.folder.executeHeightMode = 'WGS84'; route.folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }; route.folder.globalHeight = 0; route.folder.autoFlightSpeed = settings.speed
   route.folder.globalWaypointHeadingParam = { waypointHeadingMode: 'followWayline' }
   route.folder.gimbalPitchMode = 'usePointSetting'; route.folder.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
-  lineState.globalHeight = absoluteHeight; lineState.autoFlightSpeed = settings.speed; lineState.globalWaypointHeadingMode = 'followWayline'
+  lineState.autoFlightSpeed = settings.speed; lineState.globalWaypointHeadingMode = 'followWayline'
   lineState.gimbalPitchMode = 'usePointSetting'; lineState.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
+  constructionSaving.value = true
+  try {
+    if (!await calculateTerrain(route, settings.height)) return
+    if (beforeSweep !== JSON.stringify(store.state.Points)) throw Error('航点已变化，请重新生成')
+  } catch (error) { terrainReview.value = error.message; ElMessage.error(error.message); return } finally { constructionSaving.value = false }
+  lineRelativeHeight.value = settings.height
+  previousElements.forEach(p => { if (store.state.coverMap[p.id]?.length) useGMapCoverHook.removeCoverFromMap(p.id) })
   selectedKeys.value = []; checkedKeys.value = []; closeDrawer()
   store.commit('SET_POINTS', layers); mapLayers.value = layers; localStorage.setItem(draftStorageKey, JSON.stringify(route))
   await nextTick(); myMap.value?.drawWayline(); sweepVisible.value = false
-  ElMessage.success(`已生成 ${result.points.length} 个航点，WGS84 航高 ${absoluteHeight.toFixed(1)} 米，请检查地图后提交保存`)
+  ElMessage.success(`已生成 ${result.points.length} 个航点，离地高度 ${settings.height} 米，请检查剖面后保存`)
 }
 let constructionSaved = false
 let constructionRequest = ''
 let constructionPayload = ''
 if (constructionAreaId) {
-  refreshConstructionDocks()
   getConstructionArea(constructionAreaId).then(area => {
     if (area.archived || !area.enabled) throw new Error('区域已归档或暂停')
     if (String(area.version) !== String(editorRoute.query.area_version)) throw new Error('区域已更新，请返回区域页面刷新后创建')
     constructionArea.value = area
   }).catch(error => { constructionError.value = error.message; ElMessage.error(error.message) })
+} else if (constructionLineId) {
+  getConstructionLine(constructionLineId).then(line => {
+    if (line.archived || !line.enabled) throw new Error('线路已归档或暂停')
+    if (String(line.version) !== String(editorRoute.query.line_version)) throw new Error('线路已更新，请返回线路页面刷新后创建')
+    constructionLine.value = line
+  }).catch(error => { constructionError.value = error.message; ElMessage.error(error.message) })
 }
 onBeforeRouteLeave(async () => {
-  if (!constructionAreaId || constructionSaved) return true
+  if (!constructionTargetId || constructionSaved) return true
   if (constructionSaving.value) { ElMessage.info('航线正在保存，请稍候'); return false }
   if (!store.state.Points[0]?.elements?.length) return true
   try { await ElMessageBox.confirm('航线尚未保存，是否放弃编辑？', '离开航线编辑'); return true } catch { return false }
@@ -731,6 +799,14 @@ const payloadMap = {
 }
 async function commitWayline () {
   if (constructionSaving.value) return
+  if (constructionTargetId) {
+    constructionSaving.value = true
+    const currentRoute = store.state.Points[0]
+    try {
+      if (!await calculateTerrain(currentRoute, lineRelativeHeight.value)) return
+      if (currentRoute !== store.state.Points[0]) throw Error('航线已变化，请重新保存')
+    } catch (error) { terrainReview.value = error.message; ElMessage.error(error.message); return } finally { constructionSaving.value = false }
+  }
   const points = store.state.Points
   const workspaceId = localStorage.getItem(ELocalStorageKey.WorkspaceId)
   const myPlacemark = []
@@ -746,8 +822,14 @@ async function commitWayline () {
     if (elements.length < 2) { ElMessage.error('请至少添加两个航点'); return }
     const issue = routeBoundaryError(elements.map(item => ({ lng: Number(item.resource.content.geometry.coordinates[0]), lat: Number(item.resource.content.geometry.coordinates[1]) })), constructionArea.value.boundary || [])
     if (issue) { ElMessage.error(issue); return }
+  } else if (constructionLineId) {
+    if (!constructionLine.value) { ElMessage.error(constructionError.value || '请等待线路加载'); return }
+    if (elements.length < 2) { ElMessage.error('请至少添加两个航点'); return }
+    const issue = validateLine(elements.map(item => ({ lng: Number(item.resource.content.geometry.coordinates[0]), lat: Number(item.resource.content.geometry.coordinates[1]) })))
+    if (issue) { ElMessage.error(issue); return }
   }
   const missionConfig = point.missionConfig
+  if (constructionTargetId) configureConstructionAircraft(point)
   const folder = point.folder
 
   elements.forEach((item, index) => {
@@ -786,7 +868,7 @@ async function commitWayline () {
     missionConfig.payloadInfo.payloadEnumValue = payloadMap[droneEnumValue][droneSubEnumValue]
   }
   folder.placeMarks = myPlacemark
-  if (constructionAreaId) folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }
+  if (constructionTargetId) folder.waylineCoordinateSysParam = { coordinateMode: 'WGS84', heightMode: 'WGS84', positioningType: 'GPS' }
   else folder.waylineCoordinateSysParam = {}
   folder.payloadParam = {
     payloadPositionIndex: 0,
@@ -800,12 +882,27 @@ async function commitWayline () {
 
   console.log('提交的数据', data)
 
+  if (constructionLineId) {
+    const payload = JSON.stringify(data)
+    if (payload !== constructionPayload) { constructionPayload = payload; constructionRequest = uuidv4() }
+    constructionSaving.value = true
+    try {
+      if (!constructionLine.value) throw new Error(constructionError.value || '请等待线路加载')
+      if (data.folder.executeHeightMode !== 'WGS84') throw new Error('请先计算地表航点高度')
+      const saved = await createConstructionWayline(constructionTargetId, constructionLine.value.version, data, constructionRequest)
+      constructionSaved = true
+      ElMessage.success('航线已保存并关联当前线路')
+      await router.push({ path: '/variableMgt/constructionAreas', query: { line: constructionLineId, wayline: saved.wayline_id } })
+    } catch (error) { ElMessage.error(error instanceof Error ? error.message : '航线保存失败，请重试') } finally { constructionSaving.value = false }
+    return
+  }
+
   if (constructionAreaId) {
     const payload = JSON.stringify(data)
     if (payload !== constructionPayload) { constructionPayload = payload; constructionRequest = uuidv4() }
     constructionSaving.value = true
     try {
-      if (data.folder.executeHeightMode !== 'WGS84') throw new Error('请先选择参考机巢并生成 S 型航线')
+      if (data.folder.executeHeightMode !== 'WGS84') throw new Error('请先计算地表航点高度')
       const saved = await createConstructionWayline(constructionAreaId, constructionArea.value.version, data, constructionRequest)
       constructionSaved = true
       ElMessage.success('航线已保存并关联当前区域')
@@ -878,6 +975,12 @@ function deleteAction (val) {
   changeLayer()
 }
 // 初始化,在仓库中添加航线参数
+function configureConstructionAircraft (route) {
+  route.missionConfig.droneInfo = { droneEnumValue: 100, droneSubEnumValue: 1 }
+  route.missionConfig.payloadInfo = { payloadEnumValue: 99, payloadSubEnumValue: 0, payloadPositionIndex: 0 }
+  lineState.droneEnumValue = 100
+  lineState.droneSubEnumValue = 1
+}
 function init () {
   // 判断是否能是页面刷新，刷新时，从浏览器内存中获取数据
   const waylineData = localStorage.getItem(draftStorageKey)
@@ -889,13 +992,15 @@ function init () {
     if (parsedData && typeof parsedData === 'object') {
       // 更新 Layers 的第一个元素
       Layers[0] = { ...Layers[0], ...parsedData }// 合并数据
+      if (constructionTargetId) configureConstructionAircraft(Layers[0])
+      if (constructionTargetId && Number.isFinite(parsedData.terrainClearance)) lineRelativeHeight.value = parsedData.terrainClearance
       // 编辑态：回填全局偏航角模式（提交时无条件取 lineState 该字段）
       const headingMode = Layers[0].folder?.globalWaypointHeadingParam?.waypointHeadingMode
       if (headingMode) {
         lineState.globalWaypointHeadingMode = headingMode
       }
       // 读取编辑元信息（编辑已有航线时由航线列表页写入）
-      const editMetaRaw = constructionAreaId ? null : localStorage.getItem('wayline_edit_meta')
+      const editMetaRaw = constructionTargetId ? null : localStorage.getItem('wayline_edit_meta')
       if (editMetaRaw) {
         try {
           const meta = JSON.parse(editMetaRaw)
@@ -928,9 +1033,16 @@ function init () {
       store.commit('SET_POINTS', Layers)
     }
   } else {
-    if (constructionAreaId) {
+    if (constructionTargetId) {
       const fresh = JSON.parse(JSON.stringify(store.state.Points))
       fresh[0].elements = []; fresh[0].name = '工地巡检航线'
+      configureConstructionAircraft(fresh[0])
+      if (constructionLineId) {
+        fresh[0].folder.executeHeightMode = 'relativeToStartPoint'
+        fresh[0].folder.waylineCoordinateSysParam = {}
+        fresh[0].folder.globalHeight = lineRelativeHeight.value
+        lineState.globalHeight = lineRelativeHeight.value
+      }
       fresh[0].folder.globalWaypointTurnMode = 'toPointAndStopWithDiscontinuityCurvature'
       store.commit('SET_POINTS', fresh)
     }
@@ -1282,14 +1394,14 @@ function updateLayer (id) {
                 const node = {
                   actionActuatorFunc: item.value,
                   actionActuatorFuncParam: {
-                    [item.value]: constructionAreaId ? JSON.parse(JSON.stringify(existingActions.find(a => a.actionActuatorFunc === item.value)?.actionActuatorFuncParam?.[item.value] || {})) : {}
+                    [item.value]: constructionTargetId ? JSON.parse(JSON.stringify(existingActions.find(a => a.actionActuatorFunc === item.value)?.actionActuatorFuncParam?.[item.value] || {})) : {}
                   }
                 }
                 localActionGroup.push(node)
               }
             })
             item.Placemark.actionGroup = { ...(item.Placemark.actionGroup || {}), actionList: localActionGroup }
-          } else if (constructionAreaId) {
+          } else if (constructionTargetId) {
             delete item.Placemark.actionGroup
           }
         }

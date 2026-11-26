@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS construction_area_wayline (
   id varchar(36) NOT NULL PRIMARY KEY,
   workspace_id varchar(64) NOT NULL,
-  area_id varchar(36) NOT NULL,
+  area_id varchar(64) NOT NULL,
   wayline_id varchar(64) NOT NULL,
   area_version int NOT NULL,
   file_sign varchar(64) NOT NULL,

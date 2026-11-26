@@ -4,7 +4,7 @@
       <el-form-item label="航线方向"><el-input-number v-model="settings.direction" :min="0" :max="179" :precision="0" /><span>°，0为南北向，90为东西向</span></el-form-item>
       <el-form-item label="扫描行间距"><el-input-number v-model="settings.rowSpacing" :min="1" :max="1000" /> 米</el-form-item>
       <el-form-item label="沿线拍照点间距"><el-input-number v-model="settings.pointSpacing" :min="1" :max="1000" /> 米</el-form-item>
-      <el-form-item label="相对起飞点高度"><el-input-number v-model="settings.height" :min="1" :max="1500" /> 米</el-form-item>
+      <el-form-item label="离地高度"><el-input-number v-model="settings.height" :min="1" :max="1500" /> 米</el-form-item>
       <el-form-item label="飞行速度"><el-input-number v-model="settings.speed" :min="1" :max="15" /> 米/秒</el-form-item>
       <el-form-item label="云台俯仰角"><el-input-number v-model="settings.pitch" :min="-90" :max="0" /> °</el-form-item>
       <el-form-item label="拍照镜头"><el-select v-model="settings.lens"><el-option label="可见光（广角）" value="wide" /><el-option label="红外" value="ir" /><el-option label="可见光 + 红外" value="wide,ir" /></el-select></el-form-item>

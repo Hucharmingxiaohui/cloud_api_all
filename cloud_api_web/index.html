@@ -13,6 +13,22 @@
       console.log(CURRENT_CONFIG.baseURL); // 测试输出
   </script> -->
   <body>
+    <script>
+      // The bundled map SDK excludes desktop Linux from its WebGL renderer by default.
+      if (/Linux/i.test(navigator.platform) &&
+          !/Android/i.test(navigator.userAgent)) {
+        try {
+          var mapProbe = document.createElement('canvas');
+          var mapGL = mapProbe.getContext('webgl') ||
+                      mapProbe.getContext('experimental-webgl');
+          if (mapGL) {
+            window.forceWebGL = true;
+            var loseContext = mapGL.getExtension('WEBGL_lose_context');
+            if (loseContext) loseContext.loseContext();
+          }
+        } catch (e) {}
+      }
+    </script>
     <script src="/amap/AMap3.js"></script>
     <div id="demo-app"></div>
     <script src="/config.js"></script>

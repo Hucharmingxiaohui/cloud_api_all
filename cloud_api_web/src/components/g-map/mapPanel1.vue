@@ -838,7 +838,7 @@ export default defineComponent({
       const store = useMyStore()
       const app = getApp()
       // console.log('设备的所有信息22222222222222222222222222222222222222')
-      useGMapManageHook.globalPropertiesConfig(app)
+      useGMapManageHook.globalPropertiesConfig(app, true)
       setTimeout(() => {
         // showWayline()
         // console.log('设备的所有信息', store?.state.deviceState)

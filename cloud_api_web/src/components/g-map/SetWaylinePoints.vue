@@ -22,6 +22,7 @@ import { computed, defineComponent, onMounted, onBeforeUnmount, reactive, ref, w
 import { ElMessage } from 'element-plus'
 import type { ConstructionPoint } from '/@/api/construction'
 import { routeBoundaryError } from '/@/components/construction/constructionWaylineGeometry'
+import { constructionCaptureActions } from '/@/components/construction/constructionCapture'
 import { resolveWaypointHeadings } from '/@/components/construction/constructionHeading'
 import {
   generateLineContent,
@@ -88,13 +89,37 @@ export default defineComponent({
     FlightAreaActionIcon,
   },
   name: 'GMap',
-  props: { constructionMode: Boolean, constructionBoundary: { type: Array as PropType<ConstructionPoint[]>, default: () => [] }, draftStorageKey: { type: String, default: 'wayline' } },
+  props: { constructionMode: Boolean, defaultConstructionCapture: Boolean, constructionCaptureLens: { type: String, default: 'wide' }, constructionBoundary: { type: Array as PropType<ConstructionPoint[]>, default: () => [] }, constructionLine: { type: Array as PropType<ConstructionPoint[]>, default: () => [] }, draftStorageKey: { type: String, default: 'wayline' } },
   setup (props) {
     const useMouseToolHook = useMouseTool()
     const useGMapManageHook = useGMapManage()
     const deviceTsaUpdateHook = deviceTsaUpdate()
     const root = getRoot()
     let constructionPolygon: any = null
+    let constructionReferenceLine: any = null
+    function renderConstructionReferenceLine () {
+      if (!root.$map || !root.$aMap) return
+      if (constructionReferenceLine) {
+        root.$map.remove(constructionReferenceLine)
+        constructionReferenceLine = null
+      }
+      if (props.constructionLine.length < 2) return
+      constructionReferenceLine = new root.$aMap.Polyline({
+        path: props.constructionLine.map(p => wgs84togcj02(p.lng, p.lat)),
+        strokeColor: '#ffb347',
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+        isOutline: true,
+        outlineColor: '#493214',
+        borderWeight: 1,
+        bubble: true,
+        zIndex: 25
+      })
+      root.$map.add(constructionReferenceLine)
+      root.$map.setFitView([constructionReferenceLine], false, [70, 70, 70, 70])
+    }
+    watch(() => props.constructionLine, renderConstructionReferenceLine, { deep: true })
+    onBeforeUnmount(() => { if (constructionReferenceLine) root.$map?.remove(constructionReferenceLine) })
     function renderConstructionBoundary () {
       if (!root.$map || !props.constructionMode) return
       if (constructionPolygon) root.$map.remove(constructionPolygon)
@@ -520,6 +545,7 @@ export default defineComponent({
       useGMapCoverHook = useGMapCover()
       if (props.constructionMode) root.$map.setStatus({ doubleClickZoom: false })
       renderConstructionBoundary()
+      renderConstructionReferenceLine()
       // console.log('初始化')
     })
 
@@ -640,10 +666,10 @@ export default defineComponent({
         const Placemark = {
           useGlobalHeight: 1,
           useGlobalHeadingParam: 1,
-          gimbalPitchAngle: -37,
+          gimbalPitchAngle: (props.constructionMode || props.defaultConstructionCapture) ? -90 : -37,
           useGlobalSpeed: 1,
           useGlobalTurnParam: 1,
-          actionGroup: {}
+          actionGroup: props.defaultConstructionCapture ? { actionGroupMode: 'sequence', actionList: constructionCaptureActions(props.constructionCaptureLens) } : {}
         }
         resource.Placemark = Placemark
         resource.name = '航点' + (points1[0].elements.length + 1)

@@ -1,11 +1,12 @@
 <template>
   <section class="area-waylines">
     <div class="route-actions">
+      <el-button type="primary" size="small" :disabled="busy || !enabled" @click="create">二维新建</el-button>
       <el-button size="small" :disabled="busy || !enabled" @click="fileInput?.click()">上传 KMZ</el-button>
       <el-button size="small" :disabled="busy || !enabled" @click="openLibrary">关联已有航线</el-button>
       <input ref="fileInput" type="file" accept=".kmz" hidden @change="upload" />
     </div>
-    <p class="route-hint">关联已有航线或上传 KMZ，不限制多边形范围。创建及下发计划仍检查机巢覆盖范围。</p>
+    <p class="route-hint">沿线路标注航点或关联已有航线，不限制多边形范围。创建及下发计划仍检查机巢覆盖范围。</p>
     <p v-if="busy">处理中…</p>
     <p v-if="error" class="route-error" role="alert">{{ error }}</p>
     <el-button v-if="error" size="small" @click="load">刷新列表</el-button>
@@ -37,6 +38,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { useRouter, useRoute } from 'vue-router'
 import ConstructionAnalysisConfig from './ConstructionAnalysisConfig.vue'
 import { bindConstructionWayline, getConstructionWayline, listConstructionWaylines, unlinkConstructionWayline, uploadConstructionWayline, validateConstructionWayline } from '/@/api/construction'
 import { getWaylineFiles } from '/@/api/wayline'
@@ -49,6 +51,7 @@ const analysisFile = ref('')
 const rows = ref<ConstructionWayline[]>([])
 const busy = ref(false); const error = ref(''); const selected = ref(''); const selectedHeight = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const router = useRouter(); const route = useRoute()
 let epoch = 0
 const libraryVisible = ref(false); const libraryRows = ref<Array<{ id: string; name: string }>>([])
 const libraryKeyword = ref(''); const libraryPage = ref(1); const libraryTotal = ref(0)
@@ -110,6 +113,12 @@ async function select (row: ConstructionWayline) {
 }
 async function openAnalysis (row: ConstructionWayline) {
   if (await select(row)) analysisFile.value = row.wayline_id
+}
+function create () {
+  if (!props.areaId.startsWith('line:')) return
+  const lineId = props.areaId.slice(5)
+  localStorage.removeItem(`construction_wayline_draft_${props.areaId}`)
+  router.push({ path: '/wayline/createWayline', query: { construction_line: lineId, line_version: props.version } })
 }
 async function upload (event: Event) {
   const input = event.target as HTMLInputElement; const file = input.files?.[0]; input.value = ''

@@ -1,6 +1,7 @@
 import request from './http/request'
 
 export interface ConstructionPoint { lng: number; lat: number }
+// segments: 新绑定为航点序号→单座杆塔编号；历史快照仍可能保存 A1-A2 档段标签。
 export interface ConstructionOverallBinding { area_id: string; area_version: number; area_name?: string; waypoints: number[]; segments?: Record<string, string> }
 export interface ConstructionDetectionPolicy {
   visible_checks: string[]

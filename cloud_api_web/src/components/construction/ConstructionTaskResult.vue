@@ -160,9 +160,9 @@ const areaGroups = computed<PhotoGroup[]>(() => {
     const photos = d.photos.filter(p => !p.excluded && p.area_id === b.area_id)
     const spans = b.segments ? [...new Set(Object.values(b.segments))] : []
     if (spans.length) {
-      for (const span of spans) groups.push({ key: `${b.area_id}#${span}`, name: `${b.area_name || b.area_id} · ${span}`, waypoints: b.waypoints || [], photos: photos.filter(p => p.segment === span) })
+      for (const span of spans) groups.push({ key: `${b.area_id}#${span}`, name: `${b.area_name || b.area_id} · ${span}`, waypoints: (b.waypoints || []).filter(index => b.segments?.[String(index)] === span), photos: photos.filter(p => p.segment === span) })
       const unassigned = photos.filter(p => !p.segment || !spans.includes(p.segment))
-      if (unassigned.length) groups.push({ key: `${b.area_id}#__unassigned`, name: `${b.area_name || b.area_id} · 未标定档位`, waypoints: [], photos: unassigned })
+      if (unassigned.length) groups.push({ key: `${b.area_id}#__unassigned`, name: `${b.area_name || b.area_id} · 未标定杆塔 / 历史档段`, waypoints: [], photos: unassigned })
     } else {
       groups.push({ key: b.area_id, name: b.area_name || b.area_id, waypoints: b.waypoints || [], photos })
     }

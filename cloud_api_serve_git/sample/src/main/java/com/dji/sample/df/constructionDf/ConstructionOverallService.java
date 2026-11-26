@@ -41,6 +41,7 @@ public class ConstructionOverallService {
         double n=((Number)value).doubleValue();if(!Double.isFinite(n)||n!=Math.rint(n)||n<min||n>max) throw bad("数字超出范围");return (int)n;
     }
     private Map<String,Object> coverage(String w,String sn) {
+        if(sn==null||sn.isBlank()) throw bad("配置草稿未绑定机巢，请选择机巢并重新校验保存后创建计划");
         if(!docks.isWorkspaceDock(w,sn)) throw bad("机巢不属于当前工作空间");
         List<Map<String,Object>> rows=db.queryForList("SELECT radius_m FROM construction_dock_coverage WHERE workspace_id=? AND dock_sn=?",w,sn);
         if(rows.isEmpty()) throw bad("请先保存机巢覆盖范围");
@@ -63,7 +64,8 @@ public class ConstructionOverallService {
         if(!Boolean.TRUE.equals(area.get("enabled"))||Boolean.TRUE.equals(area.get("archived"))) throw bad("绑定区域已暂停或归档："+area.get("name"));
         if(integer(binding.get("area_version"),1,Integer.MAX_VALUE)!=((Number)area.get("version")).intValue()) throw new RuleException(409,"区域版本变化，请重新确认航点绑定");
         List<Map<String,Object>> polygon=(List<Map<String,Object>>)area.get("boundary");
-        if(polygon==null||polygon.size()<(ConstructionLineTarget.isLine((String)binding.get("area_id"))?2:3)||polygon.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖区域："+area.get("name"));
+        if(polygon==null||polygon.size()<(ConstructionLineTarget.isLine((String)binding.get("area_id"))?2:3)) throw bad("绑定对象坐标无效："+area.get("name"));
+        if(center!=null&&polygon.stream().anyMatch(p->!inside(center,p))) throw bad("机巢未完全覆盖区域："+area.get("name"));
         binding.put("area_name",area.get("name"));
         binding.put("boundary",polygon);
         if(ConstructionLineTarget.isLine((String)binding.get("area_id"))) binding.put("target_type","line");
@@ -77,6 +79,7 @@ public class ConstructionOverallService {
         if(flightPoints==null||flightPoints.size()<2||flightPoints.stream().anyMatch(p->!inside(center,p))) throw bad("巡检航线超出机巢当前覆盖范围");
     }
     public Map<String,Object> inspect(String w,String sn,String file) {
+        sn=sn==null?"":sn.trim();
         var stored=files.getWaylineByWaylineId(w,file).orElseThrow(()->bad("当前工作空间未找到航线"));
         ConstructionKmz kmz; byte[] raw;
         try {
@@ -84,8 +87,8 @@ public class ConstructionOverallService {
             try(InputStream in=c.getInputStream()){raw=ConstructionKmz.readBounded(in);kmz=ConstructionKmz.parse(raw);}
         } catch(RuleException e){throw e;}catch(Exception e){throw bad("航线文件读取失败，请检查本地存储");}
         if(!kmz.pointPhotoOnly) throw bad("总体航点绑定暂不支持等时、等距或跨航点拍照，请改为到点拍照后再关联");
-        Map<String,Object> center=coverage(w,sn);
-        if(kmz.preview.stream().anyMatch(p->!inside(center,p))) throw bad("总体航线存在超出当前机巢覆盖范围的航点");
+        Map<String,Object> center=sn.isEmpty()?null:coverage(w,sn);
+        if(center!=null&&kmz.preview.stream().anyMatch(p->!inside(center,p))) throw bad("总体航线存在超出当前机巢覆盖范围的航点");
         List<Map<String,Object>> points=new ArrayList<>();
         for(int i=0;i<kmz.preview.size();i++) {
             Map<String,Object> p=new LinkedHashMap<>(kmz.preview.get(i));p.put("index",i+1);p.put("photo_suffixes",kmz.photoSuffixes.get(i+1));points.add(p);
@@ -130,7 +133,9 @@ public class ConstructionOverallService {
     @Transactional(rollbackFor=Exception.class)
     @SuppressWarnings("unchecked")
     public Map<String,Object> save(String w,Map<String,Object> body) {
-        String sn=String.valueOf(body.get("dock_sn")),file=String.valueOf(body.get("wayline_id"));
+        Object rawSn=body.get("dock_sn");
+        if(rawSn!=null&&!(rawSn instanceof String)) throw bad("机巢编号无效");
+        String sn=rawSn==null?"":((String)rawSn).trim(),file=String.valueOf(body.get("wayline_id"));
         int expected=integer(body.get("expected_version"),0,Integer.MAX_VALUE);
         Map<String,Object> snapshot=inspect(w,sn,file);
         if(!Objects.equals(body.get("file_sign"),snapshot.get("file_sign"))) throw new RuleException(409,"航线文件已变化，请重新加载后绑定");
@@ -149,7 +154,7 @@ public class ConstructionOverallService {
         snapshot.put("overall_id",id);snapshot.put("version",version+1);snapshot.put("bindings",links);
         if(old.isEmpty()) db.update("INSERT INTO construction_overall_route (id,workspace_id,dock_sn,wayline_id,version,snapshot_json) VALUES (?,?,?,?,?,?)",id,w,sn,file,version+1,encode(snapshot));
         else db.update("UPDATE construction_overall_route SET version=?,snapshot_json=? WHERE workspace_id=? AND id=?",version+1,encode(snapshot),w,id);
-        snapshot.put("status","VALID");snapshot.put("message","绑定已保存");return snapshot;
+        snapshot.put("status",sn.isEmpty()?"DRAFT":"VALID");snapshot.put("message",sn.isEmpty()?"配置草稿已保存，未绑定机巢，不可创建或下发计划":"绑定已保存");return snapshot;
     }
     public Map<String,Object> stored(String w,String id) {
         List<Map<String,Object>> rows=db.queryForList("SELECT * FROM construction_overall_route WHERE workspace_id=? AND id=?",w,id);
@@ -172,10 +177,12 @@ public class ConstructionOverallService {
         }
     }
     public List<Map<String,Object>> list(String w,String sn) {
-        if(!docks.isWorkspaceDock(w,sn)) throw bad("机巢不属于当前工作空间");
+        sn=sn==null?"":sn.trim();
+        if(!sn.isEmpty()&&!docks.isWorkspaceDock(w,sn)) throw bad("机巢不属于当前工作空间");
         List<Map<String,Object>> out=new ArrayList<>();
         for(Map<String,Object> row:db.queryForList("SELECT snapshot_json FROM construction_overall_route WHERE workspace_id=? AND dock_sn=? ORDER BY updated_at DESC",w,sn)) {
             Map<String,Object> s=decode(row.get("snapshot_json"));s.put("status","VALID");s.put("message","可创建总体计划");
+            if(sn.isEmpty()) {s.put("status","DRAFT");s.put("message","配置草稿，未绑定机巢；执行前需重新校验");out.add(s);continue;}
             try{validate(w,s,false);}catch(RuleException e){s.put("status","STALE");s.put("message",e.getMessage());}out.add(s);
         }return out;
     }
@@ -192,7 +199,7 @@ public class ConstructionOverallService {
         }
         return Map.of();
     }
-    /** 档位绑定：航点→线路 后再落到相邻杆塔档（如 A2-A3）。手动指定优先，未指定的按位置投影预填；仅对线路绑定的航点生效。 */
+    /** 新绑定明确选择单座杆塔。保留 segments 存储键以兼容旧快照，不重写历史档段。 */
     @SuppressWarnings("unchecked")
     private void applySegments(String w,Object raw,List<Map<String,Object>> links,List<Map<String,Object>> points) {
         Map<String,String> manual=new HashMap<>();
@@ -207,29 +214,18 @@ public class ConstructionOverallService {
             Map<String,Object> line=lineTargets.detail(w,target);
             Object nosRaw=line.get("tower_nos");
             List<String> nos=nosRaw instanceof List ? (List<String>)nosRaw : List.of();
-            Object linePointsRaw=line.get("boundary");
-            List<Map<String,Object>> linePoints=linePointsRaw instanceof List ? (List<Map<String,Object>>)linePointsRaw : List.of();
-            if(nos.size()<2||linePoints.size()<2) continue;
+            if(nos.isEmpty()) continue;
             Map<String,Object> segments=new LinkedHashMap<>();
             for(Object waypointIndexObj:(List<Object>)b.get("waypoints")) {
                 int waypointIndex=((Number)waypointIndexObj).intValue();
                 String label=manual.remove(String.valueOf(waypointIndex));
-                if(label==null) {
-                    Map<String,Object> waypoint=points.get(waypointIndex-1);
-                    int span=ConstructionLineGeometry.nearestSpanIndex(
-                            linePoints.stream().map(p->new ConstructionAreaGeometry.Point(((Number)p.get("lng")).doubleValue(),((Number)p.get("lat")).doubleValue())).collect(java.util.stream.Collectors.toList()),
-                            new ConstructionAreaGeometry.Point(((Number)waypoint.get("lng")).doubleValue(),((Number)waypoint.get("lat")).doubleValue()));
-                    label=nos.get(span)+"-"+nos.get(span+1);
-                } else {
-                    boolean known=false;
-                    for(int i=0;i+1<nos.size();i++) if((nos.get(i)+"-"+nos.get(i+1)).equals(label)) { known=true; break; }
-                    if(!known) throw bad("档位 "+label+" 不在线路 "+line.get("name")+" 的杆塔链中");
-                }
+                if(label==null) throw bad("请为航点 "+waypointIndex+" 选择具体杆塔");
+                if(!nos.contains(label)) throw bad("杆塔 "+label+" 不在线路 "+line.get("name")+" 的杆塔链中；旧档段绑定请重新选择具体杆塔");
                 segments.put(String.valueOf(waypointIndex),label);
             }
             b.put("segments",segments);
         }
-        if(!manual.isEmpty()) throw bad("档位绑定只能用于线路对象上的航点");
+        if(!manual.isEmpty()) throw bad("杆塔绑定只能用于具有杆塔链的线路航点");
     }
 
     @SuppressWarnings("unchecked")

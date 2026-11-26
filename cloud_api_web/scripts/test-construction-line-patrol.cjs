@@ -26,6 +26,9 @@ async function checks () {
   for (const id of ['same-id', 'line:same-id']) {
     const base = id.startsWith('line:') ? '/api/construction/lines/same-id' : '/api/construction/areas/same-id'
     await api.listConstructionWaylines(id); assert.equal(requests.at(-1).url, base + '/waylines')
+    await api.createConstructionWayline(id, 3, { folder: { executeHeightMode: 'WGS84', globalHeight: 2129.7882 } }, 'request')
+    assert.equal(requests.at(-1).url, base + '/waylines')
+    assert.equal(requests.at(-1).body.wayline.folder.globalHeight, 2129.7882)
     await api.bindConstructionWayline(id, 3, 'file'); assert.equal(requests.at(-1).url, base + '/waylines/bind'); assert.equal(requests.at(-1).body.expected_version, 3)
     await api.listConstructionPlans(id); assert.equal(requests.at(-1).url, base + '/plans')
     await api.createConstructionPlan(id, { name: 'test' }); assert.equal(requests.at(-1).url, base + '/plans')

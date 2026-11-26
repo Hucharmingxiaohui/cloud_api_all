@@ -80,7 +80,33 @@ public class ConstructionOverallChecks {
         body.put("expected_version",1);body.put("bindings",List.of(binding("b",1,2)));service.save("w",body);
         reject(()->service.validate("w",snapshot,false));
         check("a".equals(ConstructionOverallService.matchPhoto(service.jobSnapshot("w","job"),"DJI_test_V_航点1.jpg").get("area_id")),"historical job frozen despite reassignment");
-        System.out.println("Overall route checks passed: actual suffix parsing, multiple points per region, duplicate/invalid binding rejection, scope, version/sign, dock movement, photo ambiguity and frozen execution snapshot. In-memory collaborators.");
+        java.nio.file.Path offlineFile=java.nio.file.Files.createTempFile("overall-offline-", ".kmz");
+        try {
+            java.nio.file.Files.write(offlineFile,fixture("reachPoint"));
+            IWaylineFileService offlineFiles=(IWaylineFileService)Proxy.newProxyInstance(ConstructionOverallChecks.class.getClassLoader(),new Class[]{IWaylineFileService.class},(p,m,a)-> {
+                if(!"w".equals(a[0])) return Optional.empty();
+                return m.getName().equals("getObjectUrl") ? offlineFile.toUri().toURL() : Optional.of(file);
+            });
+            // Null dock/telemetry collaborators prove configuration does not access devices.
+            ConstructionOverallService offline=new ConstructionOverallService(db,areas,offlineFiles,null,null);
+            Map<String,Object> draftBody=new HashMap<>(body);draftBody.put("dock_sn","");draftBody.put("expected_version",0);
+            Map<String,Object> draft=offline.save("w",draftBody);
+            check("DRAFT".equals(draft.get("status")),"no-dock save is a draft");
+            check(draft.get("coverage")==null,"draft has no fabricated coverage");
+            check(offline.list("w","").size()==1,"draft reload without device access");
+            check(offline.list("foreign","").isEmpty(),"draft list workspace isolation");
+            reject(()->offline.validate("w",draft,true));
+            reject(()->offline.save("w",draftBody));
+            area.put("enabled",false);draftBody.put("expected_version",1);reject(()->offline.save("w",draftBody));area.put("enabled",true);
+            ConstructionOverallService online=new ConstructionOverallService(db,areas,offlineFiles,docks,redis);
+            Map<String,Object> promoted=new HashMap<>(draftBody);promoted.put("dock_sn","dock");promoted.put("expected_version",2);
+            osd.setLongitude(121.0f);reject(()->online.save("w",promoted));osd.setLongitude(120.0f);
+            Map<String,Object> configured=online.save("w",promoted);
+            check("VALID".equals(configured.get("status")),"dock-bound configuration validated");
+            check(offline.list("w","").size()==1,"original reusable draft retained");
+            reject(()->offline.validate("w",draft,false));
+        } finally { java.nio.file.Files.deleteIfExists(offlineFile); }
+        System.out.println("Overall route checks passed, including offline draft save/reload/isolation, stale and disabled rejection, execution gate and dock coverage promotion.");
     }
     static void generatedSuffixes() throws Exception {
         Map<String,Object> mission=Map.of("fileName","suffix-test","finishAction","goHome","takeOffSecurityHeight",20,"globalTransitionalSpeed",4,"droneInfo",Map.of("droneEnumValue",77,"droneSubEnumValue",0),"payloadInfo",Map.of("payloadEnumValue",66,"payloadSubEnumValue",0,"payloadPositionIndex",0));
