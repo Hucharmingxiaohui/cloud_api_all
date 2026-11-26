@@ -38,6 +38,12 @@ public class CqDockMockController {
             "YIXIA-15026048", "YIXIA-84256716", "YIXIA-25246010", "YIXIA-16345084"
     };
     private final Map<String, Scenario> scenarios = new ConcurrentHashMap<>();
+
+    public boolean isMissingInternalTask(String taskId) {
+        return properties.isMockEnabled() && taskId != null
+                && taskId.matches("mock-task-(eight-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+                && !scenarios.containsKey(taskId);
+    }
     @Autowired
     private CqDockProperties properties;
     @Autowired

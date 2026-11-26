@@ -21,6 +21,9 @@ public interface CenterOrdinaryTaskMapper extends BaseMapper<CenterOrdinaryTaskE
 
     @Update("UPDATE df_center_ordinary_task SET status=#{status},message=#{message} WHERE plan_type=5 AND eua_record_id=#{record} AND eua_task_id=#{task} AND status='DISPATCHED'")
     int euaTerminal(@Param("record") long record, @Param("task") String task, @Param("status") String status, @Param("message") String message);
+
+    @Update("UPDATE df_center_ordinary_task SET status='FAILED',message=#{message} WHERE plan_type=5 AND eua_record_id=#{record} AND eua_task_id=#{task} AND status IN ('DISPATCHED','COMPLETED','FAILED')")
+    int euaPictureFailure(@Param("record") long record, @Param("task") String task, @Param("message") String message);
     @Select("SELECT * FROM df_center_ordinary_task WHERE status IN ('COMPLETED','FAILED','CANCELLED','EXPIRED','UNKNOWN','INCOMPLETE','REPORT_UNKNOWN') AND (status_report_key IS NULL OR status_report_key<>status) ORDER BY COALESCE(status_report_time,0),id LIMIT 100")
     List<CenterOrdinaryTaskEntity> pendingStatusReports();
 

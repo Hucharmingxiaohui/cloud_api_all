@@ -50,6 +50,8 @@ public class CqDockTaskStatusHandler {
     private CqDockTaskRecordMapper cqDockTaskRecordMapper;
     @Autowired
     private com.dji.sample.df.centerOrdinary.dao.CenterOrdinaryTaskMapper centerPatrolTasks;
+    @Autowired
+    private org.springframework.beans.factory.ObjectProvider<com.dji.sample.df.cqDockDf.controller.CqDockMockController> mockController;
 
     public String syncResults(Long recordId) {
         CqDockTaskRecordEntity record = recordId == null ? null : cqDockTaskRecordMapper.selectById(recordId);
@@ -167,6 +169,13 @@ public class CqDockTaskStatusHandler {
         }
         try {
             redisUtils.expire(MONITOR_HASH + ":" + taskCode, 2 * 60 * 60L);
+            com.dji.sample.df.cqDockDf.controller.CqDockMockController mock = mockController == null ? null : mockController.getIfAvailable();
+            if (mock != null && mock.isMissingInternalTask(euaTaskId)) {
+                redisUtils.remove(MONITOR_SET, taskCode);
+                redisUtils.delete(MONITOR_HASH + ":" + taskCode);
+                log.warn("EUA内部mock任务重启后已失效，停止状态监控，不重新下发：taskCode={}, euaTaskId={}", taskCode, euaTaskId);
+                return;
+            }
             log.info("准备查询EUA任务状态: taskCode={}, euaTaskId={}, lastState={}, lastProgress={}",
                     taskCode, euaTaskId, detail.get("lastState"), detail.get("lastProgress"));
             CqApiResponse response = cqDockApiService.taskStatus(euaTaskId);
@@ -231,10 +240,13 @@ public class CqDockTaskStatusHandler {
                     processed = cqDockPictureReportService.fetchSaveAndAnalyseOnly(taskCode, detail.get("taskName"), euaTaskId);
                 }
                 if (!processed) return;
+                String analysis = cqDockPictureReportService.analysisSummary(taskCode, euaTaskId);
+                boolean success = "1".equals(euaStatus) && !cqDockPictureReportService.hasAnalysisFailures(taskCode, euaTaskId);
+                String message = "EUA执行终态=" + euaStatus + "；" + analysis;
                 centerPatrolTasks.euaTerminal(record.getId(), euaTaskId,
-                        "1".equals(euaStatus) ? "COMPLETED" : "FAILED", "EUA原状态结果链路处理完成，状态=" + euaStatus);
+                        success ? "COMPLETED" : "FAILED", message);
                 if (!reportToPatrol || record.getPlanId() != null) {
-                    updateEuaPlanExecuteStatus(record, "1".equals(euaStatus), "EUA任务结束，状态=" + euaStatus);
+                    updateEuaPlanExecuteStatus(record, success, message);
                 }
                 redisUtils.remove(MONITOR_SET, taskCode);
                 redisUtils.delete(MONITOR_HASH + ":" + taskCode);

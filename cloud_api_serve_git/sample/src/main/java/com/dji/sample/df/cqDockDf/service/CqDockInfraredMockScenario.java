@@ -5,7 +5,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.dji.sample.center.entity.UniPoint;
 import com.dji.sample.df.cqDockDf.config.CqDockProperties;
-import com.dji.sample.df.temperatureMeasurementDF.modol.TemResultEntity;
 import com.dji.sample.df.substationDf.dao.UniPointMapper2;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -23,7 +22,7 @@ import java.util.stream.Stream;
 // 本机点位id
 //  "32e5360075f5469d", "10dcd05424414053", "3302465292ae465f", "a8afbe1d1ad846e9",
 //          "eaa9e4b43df34aac", "ed53f8667661488a", "92a8738f5f4b4838", "fb11995c69424381",
-/** Internal opt-in fixture state; presets are not SDK measurements. */
+/** 仅模拟下级EUA任务和图片列表，分析与测温使用正常业务服务。 */
 @Slf4j
 @Component
 public class CqDockInfraredMockScenario {
@@ -34,10 +33,6 @@ public class CqDockInfraredMockScenario {
     private static final List<String> CODES = Collections.unmodifiableList(Arrays.asList(
           "490745d1fef949c1", "834396ba69804447","5f1ae18a16f34fe6","e9f3a0966cd14ce9",
             "3b3f56b0a5d242a7","58121cbaff5f4278", "9c12d377327c4e14","e859abb10a824687"));
-    // Screenshot point order matches CODES and 图片1..8, never the mapper's row order.
-    private static final double[][] TEMPERATURES = {{6.5, 10.2, 18.5}, {7.1, 11.5, 19.2},
-            {5.8, 9.5, 17.8}, {6.2, 8.8, 15.4}, {5.5, 7.6, 12.1}, {6.0, 8.2, 13.5},
-            {4.8, 5.9, 8.5}, {5.1, 6.3, 9.2}};
     private final CqDockProperties properties;
     private final UniPointMapper2 pointMapper;
     private final Map<String, List<Fixture>> tasks = new ConcurrentHashMap<>();
@@ -71,12 +66,19 @@ public class CqDockInfraredMockScenario {
             pictures.put(fixture.id, fixture);
         }
         tasks.put(task, fixtures);
-        log.info("[cq-dock] internal mock eight-photo scenario registered: taskId={}, route={}, presets=true", task, route);
+        log.info("[cq-dock] 八图下级EUA模拟任务已注册：taskId={}, route={}, 前4张可见光、后4张红外，仅模拟下级接口和本地素材，不模拟分析及温度，测温走真实服务", task, route);
         return task;
     }
 
     private List<Fixture> loadFixtures() {
-        Path root = Paths.get(properties.getMockScenario().getSourcePath()).toAbsolutePath().normalize();
+        String sourcePath = properties.getMockScenario().getSourcePath();
+        if (sourcePath == null || sourcePath.trim().isEmpty()) {
+            throw new IllegalStateException("八图素材目录不能为空：cq-dock.mock-scenario.source-path");
+        }
+        Path root = Paths.get(sourcePath).toAbsolutePath().normalize();
+        if (!Files.isDirectory(root) || !Files.isReadable(root)) {
+            throw new IllegalStateException("八图素材目录不存在或不可读，请设置cq-dock.mock-scenario.source-path为当前系统实际目录：" + root);
+        }
         List<Fixture> result = new ArrayList<>();
         try (Stream<Path> stream = Files.list(root)) {
             List<Path> files = stream.filter(Files::isRegularFile).collect(Collectors.toList());
@@ -138,7 +140,8 @@ public class CqDockInfraredMockScenario {
         for (Fixture fixture : tasks.get(task)) {
             JSONObject picture = new JSONObject();
             picture.put("id", fixture.id); picture.put("pictureName", fixture.file.getFileName().toString());
-            picture.put("pointId", fixture.code); picture.put("pointName", fixture.name); picture.put("photoStorage", "2");
+            picture.put("pointId", fixture.code); picture.put("pointName", fixture.name);
+            picture.put("photoStorage", fixture.index < 4 ? "1" : "2");
             picture.put("shootTime", "2026-11-15 09:54:00");
             result.add(picture);
         }
@@ -155,27 +158,19 @@ public class CqDockInfraredMockScenario {
     public String download(String id, OutputStream output) throws IOException {
         if (!ownsPicture(id)) throw new IllegalArgumentException("Unknown scenario picture");
         Fixture fixture = pictures.get(id);
+        Path root = Paths.get(properties.getMockScenario().getSourcePath()).toRealPath();
+        if (!Files.isRegularFile(fixture.file) || !Files.isReadable(fixture.file)
+                || !fixture.file.toRealPath().startsWith(root) || Files.size(fixture.file) == 0
+                || Files.size(fixture.file) > CqDockApiService.MAX_DOWNLOAD_BYTES) {
+            throw new IOException("八图素材不存在、不可读或超出配置目录：" + fixture.file);
+        }
         Files.copy(fixture.file, output);
+        log.info("[cq-dock] 八图素材按原字节复制，不转码：pointCode={}, file={}", fixture.code, fixture.file);
         return fixture.file.getFileName().toString();
     }
 
-    public TemResultEntity temperature(String task, String picture, String point) {
-        if (!ownsTask(task)) {
-            if (picture != null && picture.startsWith(PICTURE_PREFIX)) throw unavailable();
-            return null;
-        }
-        Fixture fixture = pictures.get(picture);
-        if (fixture == null || !task.equals(fixture.task) || !fixture.code.equals(point)) throw unavailable();
-        TemResultEntity result = new TemResultEntity();
-        result.setMin_tem(TEMPERATURES[fixture.index][0]);
-        result.setAverage_tem(TEMPERATURES[fixture.index][1]);
-        result.setMax_tem(TEMPERATURES[fixture.index][2]);
-        log.info("[cq-dock] internal mock temperature preset: taskId={}, pointCode={}, SDK=false", task, point);
-        return result;
-    }
-
     private IllegalStateException unavailable() {
-        return new IllegalStateException("本地场景状态不可用或开关已关闭；重启后请重新下发任务，不调用真实测温服务");
+        return new IllegalStateException("本地场景状态不可用或开关已关闭；重启后请重新下发任务");
     }
 
     private static class Fixture {

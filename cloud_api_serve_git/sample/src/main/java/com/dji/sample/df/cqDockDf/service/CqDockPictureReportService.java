@@ -78,6 +78,9 @@ public class CqDockPictureReportService {
             } else {
                 fetchSaveAndReport(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
             }
+            if (hasAnalysisFailures(record.getBusinessId(), record.getEuaTaskId())) {
+                throw new IllegalStateException("人工同步已逐张尝试，" + analysisSummary(record.getBusinessId(), record.getEuaTaskId()));
+            }
             reportCompleted.run();
         } finally {
             lock.unlock();
@@ -131,6 +134,10 @@ public class CqDockPictureReportService {
     private HttpUtils httpUtils;
     @Autowired
     private FjFileConfig fjFileConfig;
+    @Autowired
+    private com.dji.sample.df.centerOrdinary.dao.CenterOrdinaryTaskMapper centerPatrolTasks;
+    @Autowired
+    private com.dji.sample.df.cqDockDf.dao.CqEuaPlanMapper cqEuaPlanMapper;
     @Value("${server.port}")
     private String serverPort;
 
@@ -242,6 +249,10 @@ public class CqDockPictureReportService {
         row = cqDockTaskPictureMapper.selectOne(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
                 .eq(CqDockTaskPictureEntity::getRequestId, requestId).last("LIMIT 1"));
         if (row == null) return;
+        if (!Objects.equals(row.getAnalysisStatus(), ANALYSIS_PENDING)) {
+            log.info("CQ分析回调图片已有终态，忽略重复回调，不自动重试：requestId={}, status={}", requestId, row.getAnalysisStatus());
+            return;
+        }
 
         String code = "2002";
         String pointValUnit = "算法分析失败（没有分析结果）";
@@ -277,6 +288,7 @@ public class CqDockPictureReportService {
                 resImageUrl = valueResultMap.get("resImageUrl");
             } catch (Exception e) {
                 log.error("CQ可见光分析结果解析失败: requestId={}", requestId, e);
+                code = "2002";
                 pointValUnit = "分析结果解析失败（" + e.getMessage() + "）";
             }
         }
@@ -309,7 +321,42 @@ public class CqDockPictureReportService {
         } else if (!shouldReportToPatrol(row)) {
             log.info("CQ平台内EUA任务可见光分析完成，不上报巡视: taskCode={}, pictureName={}", row.getBusinessId(), row.getPictureName());
         }
-        } finally { lock.unlock(); }
+        } finally {
+            try {
+                if (row != null && Objects.equals(row.getAnalysisStatus(), ANALYSIS_FAILED)) recordCallbackFailure(row);
+            } finally { lock.unlock(); }
+        }
+    }
+
+    private void recordCallbackFailure(CqDockTaskPictureEntity row) {
+        CqDockTaskRecordEntity record = findTaskRecord(row.getEuaTaskId());
+        if (record == null || !Objects.equals(record.getBusinessId(), row.getBusinessId())) return;
+        String message = "EUA可见光回调处理失败，不自动重试、不重新下发；" + analysisSummary(row.getBusinessId(), row.getEuaTaskId());
+        centerPatrolTasks.euaPictureFailure(record.getId(), row.getEuaTaskId(), message);
+        cqEuaPlanMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity>()
+                .eq(com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity::getLastTaskCode, row.getBusinessId())
+                .set(com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity::getLastExecuteStatus, 0)
+                .set(com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity::getLastExecuteMsg, message)
+                .set(com.dji.sample.df.cqDockDf.model.entity.CqEuaPlanEntity::getUpdateTime, new Date()));
+        log.warn("CQ可见光回调失败已记录，保留图片失败状态供人工同步重试：taskCode={}, euaTaskId={}", row.getBusinessId(), row.getEuaTaskId());
+    }
+
+    public boolean hasAnalysisFailures(String taskCode, String euaTaskId) {
+        return analysisRows(taskCode, euaTaskId).stream()
+                .anyMatch(row -> Objects.equals(row.getAnalysisStatus(), ANALYSIS_FAILED));
+    }
+
+    private List<CqDockTaskPictureEntity> analysisRows(String taskCode, String euaTaskId) {
+        return cqDockTaskPictureMapper.selectList(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
+                .eq(CqDockTaskPictureEntity::getBusinessId, taskCode).eq(CqDockTaskPictureEntity::getEuaTaskId, euaTaskId));
+    }
+
+    public String analysisSummary(String taskCode, String euaTaskId) {
+        List<CqDockTaskPictureEntity> rows = analysisRows(taskCode, euaTaskId);
+        long failed = rows.stream().filter(r -> Objects.equals(r.getAnalysisStatus(), ANALYSIS_FAILED)).count();
+        long pending = rows.stream().filter(r -> Objects.equals(r.getAnalysisStatus(), ANALYSIS_PENDING) && StringUtils.hasText(r.getRequestId())).count();
+        return (failed > 0 ? "图片处理失败数量=" + failed + "；" : "图片处理未记录失败；")
+                + "等待可见光回调数量=" + pending + "（提交不代表分析成功）";
     }
 
     private int fetchAndSavePictures(String taskCode, String taskName, String euaTaskId) {
@@ -472,9 +519,12 @@ public class CqDockPictureReportService {
             return;
         }
         int pendingCallback = 0;
+        int failedCount = 0;
+        List<String> failedNames = new ArrayList<>();
         for (CqDockTaskPictureEntity row : rows) {
             // 已有终态的行（重复触发/断点续跑）跳过
             if (Objects.equals(row.getAnalysisStatus(), ANALYSIS_DONE)
+                    || Objects.equals(row.getAnalysisStatus(), ANALYSIS_FAILED)
                     || Objects.equals(row.getAnalysisStatus(), ANALYSIS_INFRARED_DONE)
                     || (Objects.equals(row.getAnalysisStatus(), ANALYSIS_PENDING) && StringUtils.hasText(row.getRequestId()))) {
                 continue;
@@ -498,8 +548,19 @@ public class CqDockPictureReportService {
             } catch (Exception e) {
                 markAnalysisFailed(row, e.getMessage());
                 log.error("CQ图片分析调度失败: taskCode={}, pictureName={}", taskCode, row.getPictureName(), e);
-                throw new IllegalStateException("EUA图片分析调度失败", e);
+                failedCount++;
+                if (failedNames.size() < 5) {
+                    String name = String.valueOf(row.getPictureName());
+                    failedNames.add(name.length() > 80 ? name.substring(0, 80) + "…" : name);
+                }
             }
+        }
+        if (failedCount > 0) {
+            String summary = "EUA图片分析调度失败：失败数量=" + failedCount + "，图片=" + failedNames
+                    + (failedCount > failedNames.size() ? "（仅列前5张）" : "");
+            log.error("CQ图片分析批次处理完成，存在失败: taskCode={}, euaTaskId={}, 待回调数量={}, {}",
+                    taskCode, euaTaskId, pendingCallback, summary);
+            log.warn("CQ图片已逐张尝试，失败项不自动重试，批次不再抛异常触发轮询重做：taskCode={}", taskCode);
         }
         if (pendingCallback == 0) {
             log.info("CQ无待回调可见光图片，原图已先行上报，分析成功项已按张增量上报: taskCode={}, euaTaskId={}", taskCode, euaTaskId);
@@ -532,19 +593,18 @@ public class CqDockPictureReportService {
     }
 
     private void measureInfrared(CqDockTaskPictureEntity row, UniPoint uniPoint, boolean reportToPatrol) {
-        TemResultEntity temResult = infraredMockScenario.temperature(row.getEuaTaskId(), row.getPictureId(), row.getPointId());
-        if (temResult == null) {
-            String coordinate = uniPoint.getInfraredImageCoordinate();
-            TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
-            if (temParamEntity == null) {
-                markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
-                throw new IllegalStateException("红外图片坐标无效");
-            }
-            temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
-            if (temResult.getError() != null) {
-                markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
-                throw new IllegalStateException("红外测温失败");
-            }
+        String coordinate = uniPoint.getInfraredImageCoordinate();
+        TemParamEntity temParamEntity = parseInfraredCoordinate(coordinate);
+        if (temParamEntity == null) {
+            markAnalysisFailed(row, "红外图片坐标无效: " + coordinate);
+            throw new IllegalStateException("红外图片坐标无效");
+        }
+        log.info("CQ红外调用正常测温服务，无预设温度：taskCode={}, pointCode={}, imagePath={}",
+                row.getBusinessId(), row.getPointId(), row.getLocalPath());
+        TemResultEntity temResult = temMeasureService.getTemByLocalImagePath(row.getLocalPath(), temParamEntity);
+        if (temResult.getError() != null) {
+            markAnalysisFailed(row, "红外测温失败：" + temResult.getError());
+            throw new IllegalStateException("红外测温失败");
         }
         row.setPointVal("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
         row.setPointValUnit("最高温度：" + temResult.getMax_tem() + ",最低温度：" + temResult.getMin_tem() + ",平均温度：" + temResult.getAverage_tem());
@@ -615,13 +675,12 @@ public class CqDockPictureReportService {
         analyseImageInfo.setRequestId(requestId);
         analyseImageInfo.setAnalyseParamsReqList(analyseParamsReqList);
         analyseImageInfo.setTaskInfo(new TaskInfo(uniPoint.getSubCode(), euaTaskId, taskName, null, null));
-        sendAnalyse(analyseImageInfo);
-
         row.setRequestId(requestId);
 //      开始图片表都设置为待分析状态
         row.setAnalysisStatus(ANALYSIS_PENDING);
         row.setUpdateTime(new Date());
         cqDockTaskPictureMapper.updateById(row);
+        sendAnalyse(analyseImageInfo);
         return true;
     }
 
