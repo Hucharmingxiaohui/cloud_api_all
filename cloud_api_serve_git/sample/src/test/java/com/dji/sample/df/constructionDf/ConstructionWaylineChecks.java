@@ -42,6 +42,12 @@ public class ConstructionWaylineChecks {
             check(parsed.points.size()==2,"execution points"); check(parsed.heightMode.equals("relativeToStartPoint"),"height mode preserved");
             ConstructionWaylineGeometry.validate(parsed.points,polygon);
             ConstructionWaylineServiceChecks.run(valid);
+            // The service accepts routes outside an area's polygon; geometric helpers remain reusable.
+            var service=new ConstructionWaylineService(null,null,null,null,null);
+            var geometry=ConstructionWaylineService.class.getDeclaredMethod("validateGeometry",ConstructionKmz.class,Map.class);
+            geometry.setAccessible(true);
+            Map<String,Object> distantArea=Map.of("boundary",List.of(Map.of("lng",100d,"lat",20d),Map.of("lng",100.01,"lat",20d),Map.of("lng",100d,"lat",20.01)));
+            geometry.invoke(service,parsed,distantArea);
             String sub="<wpml:payloadSubEnumValue>0</wpml:payloadSubEnumValue>";
             byte[] missingTemplate=replace(valid,"wpmz/template.kml",sub,"");
             byte[] missingExecution=replace(valid,"wpmz/waylines.wpml",sub,"");

@@ -53,7 +53,7 @@ public class ConstructionWaylineService {
     }
     private void validateGeometry(ConstructionKmz parsed,Map<String,Object> target) {
         if("line".equals(target.get("target_type"))) ConstructionLineTarget.validateWaypoints(parsed.points);
-        else ConstructionWaylineGeometry.validate(parsed.points,boundary(target));
+        else ConstructionLineTarget.validateWaypoints(parsed.points);
     }
     private String encode(Object value) { try { return json.writeValueAsString(value); } catch(Exception e) { throw bad("航线数据序列化失败"); } }
     private String hash(byte[] bytes) { return DigestUtils.md5DigestAsHex(bytes); }
@@ -163,7 +163,7 @@ public class ConstructionWaylineService {
     public Map<String,Object> detail(String w,String a,String id) { return present(w,targetDetail(w,a),require(w,a,id),true); }
     private Map<String,Object> present(String w,Map<String,Object> area,Map<String,Object> row,boolean points) {
         Optional<GetWaylineListResponse> file=files.getWaylineByWaylineId(w,(String)row.get("wayline_id"));
-        String status="VALID",message="line".equals(area.get("target_type"))?"线路航线文件校验通过（不限制多边形范围）":"区域边界校验通过";
+        String status="VALID",message="line".equals(area.get("target_type"))?"线路航线文件校验通过（不限制多边形范围）":"区域航线文件校验通过（不限制多边形范围）";
         if(file.isEmpty()) { status="MISSING";message="航线已从航线库删除"; }
         else if(((Number)area.get("version")).intValue()!=((Number)row.get("area_version")).intValue()||!Objects.equals(file.get().getSign(),row.get("file_sign"))) { status="STALE";message="区域或航线已变化，请重新校验"; }
         else if(Boolean.TRUE.equals(area.get("archived"))||!Boolean.TRUE.equals(area.get("enabled"))) { status="DISABLED";message="区域已归档或暂停"; }

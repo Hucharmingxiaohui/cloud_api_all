@@ -20,7 +20,7 @@
       </div>
       <div class="route-actions" @click.stop><el-button v-if="row.status === 'STALE'" size="small" :disabled="busy || !enabled" @click="revalidate(row)">重新校验</el-button><el-button size="small" :disabled="busy" @click="unlink(row)">解除关联</el-button></div>
     </article>
-    <p v-if="selectedHeight" class="route-hint">预览高度：{{ selectedHeight === 'WGS84' ? 'WGS84 椭球高' : '相对起飞点高度' }}。进场、返航路径不包含在区域边界校验中。</p>
+    <p v-if="selectedHeight" class="route-hint">预览高度：{{ selectedHeight === 'WGS84' ? 'WGS84 椭球高' : '相对起飞点高度' }}。航点和航段不限制在施工区域边界内，请按现场实际范围规划。</p>
     <ConstructionAnalysisConfig v-if="analysisFile" :context="{ area_id: areaId, wayline_id: analysisFile }" @close="analysisFile = ''" />
     <el-dialog v-model="libraryVisible" title="关联航线管理中的已有航线" width="680px" append-to-body :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy">
       <p>选择已有航线，区域校验通过后建立关联，原航线文件保持不变。</p>

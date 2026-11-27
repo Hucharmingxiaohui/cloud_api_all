@@ -89,7 +89,8 @@ public class ConstructionWaylineServiceChecks {
             area.put("enabled",true);
             try { service.bind("other","a","real-wayline-id",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==404); }
             area.put("boundary",List.of(Map.of("lng",121d,"lat",36d),Map.of("lng",121.01,"lat",36d),Map.of("lng",121.01,"lat",36.01),Map.of("lng",121d,"lat",36.01)));
-            try { service.bind("w","a","real-wayline-id",2);throw new AssertionError(); } catch(RuleException e) { check(e.getCode()==400); }
+            check("VALID".equals(service.bind("w","a","real-wayline-id",2).get("status")));
+            check("VALID".equals(service.validate("w","a","real-wayline-id").get("status")));
             check(rows.size()==1&&objects.size()==1);
             for(org.springframework.transaction.support.TransactionSynchronization sync:TransactionSynchronizationManager.getSynchronizations()) sync.afterCompletion(org.springframework.transaction.support.TransactionSynchronization.STATUS_ROLLED_BACK);
             check(objects.isEmpty());
