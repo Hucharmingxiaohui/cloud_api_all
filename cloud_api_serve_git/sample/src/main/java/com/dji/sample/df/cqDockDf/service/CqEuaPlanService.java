@@ -71,6 +71,19 @@ public class CqEuaPlanService {
     @Resource
     private CqEuaRoutePointService cqEuaRoutePointService;
 
+    @Resource
+    private CqDockPictureReportService pictureReportService;
+
+    static String beijingTime(Date date, String pattern) {
+        SimpleDateFormat format = new SimpleDateFormat(pattern);
+        format.setTimeZone(java.util.TimeZone.getTimeZone("Asia/Shanghai"));
+        return format.format(date);
+    }
+
+    static String platformTaskCode(Long planId, Date now) {
+        return "EUA_PLAN_" + planId + "_" + beijingTime(now, "yyyyMMddHHmmssSSS") + "_" + java.util.UUID.randomUUID();
+    }
+
     public List<com.dji.sample.df.cqDockDf.model.dto.CqEuaPointOption> pointOptions() {
         return cqEuaRoutePointService.pointOptions();
     }
@@ -164,10 +177,10 @@ public class CqEuaPlanService {
         }
         CqEuaRoutePointService.Selection selection = cqEuaRoutePointService.resolveSnapshot(
                 plan.getPointCodes(), plan.getSubCode(), plan.getRouteId(), plan.getRouteName());
-        long timestamp = System.currentTimeMillis();
-        String taskCode = "EUA_PLAN_" + plan.getId() + "_" + timestamp;
-        String taskName = plan.getPlanName() + "_" + timestamp;
-        String fixedStartTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        Date now = new Date();
+        String taskCode = platformTaskCode(plan.getId(), now);
+        String taskName = plan.getPlanName() + "_" + beijingTime(now, "yyyyMMddHHmm");
+        String fixedStartTime = beijingTime(now, "yyyy-MM-dd HH:mm:ss");
         return executeLinkedPlan(plan, selection.getPointCodes(), taskCode, taskName, fixedStartTime, false);
     }
 
@@ -220,6 +233,10 @@ public class CqEuaPlanService {
 
     private CqDockTaskDispatchResult executeLinkedPlan(CqEuaPlanEntity plan, String snapshot, String taskCode,
             String taskName, String fixedStartTime, boolean patrol, CqDockTaskRecordEntity prepared) {
+        java.util.concurrent.locks.Lock lock = pictureReportService.taskLock(null, taskCode);
+        lock.lock();
+        try {
+        Date initiatedAt = prepared == null ? new Date() : prepared.getCreateTime();
         CqDockTaskDispatchResult result;
         try {
             result = prepared != null ? cqDockTaskDispatchService.assignPreparedRecord(prepared, fixedStartTime)
@@ -231,7 +248,7 @@ public class CqEuaPlanService {
         }
         plan.setLastTaskCode(taskCode);
         plan.setLastEuaTaskId(result.getEuaTaskId());
-        plan.setLastExecuteTime(new Date());
+        plan.setLastExecuteTime(initiatedAt);
         plan.setLastExecuteStatus(result.isSuccess() ? 2 : 0);
         plan.setLastExecuteMsg(result.getResponseMsg());
         plan.setUpdateTime(new Date());
@@ -246,6 +263,7 @@ public class CqEuaPlanService {
                 .set(CqEuaPlanEntity::getUpdateTime, plan.getUpdateTime()));
         if (updated != 1) throw new IllegalStateException("EUA计划执行结果保存失败，请核实飞行任务记录，勿重复下发");
         return result;
+        } finally { lock.unlock(); }
     }
 
     private void requirePlatformPlan(CqEuaPlanEntity plan) {
@@ -297,7 +315,7 @@ public class CqEuaPlanService {
                 continue;
             }
             String code = record.getBusinessId();
-            if (code != null && code.matches("EUA_PLAN_[0-9]+_[0-9]+")) {
+            if (code != null && code.matches("EUA_PLAN_[0-9]+_[0-9]+(?:_[0-9a-fA-F-]{36})?")) {
                 try {
                     Long planId = Long.valueOf(code.split("_")[2]);
                     byPlan.computeIfAbsent(planId, key -> new ArrayList<>()).add(record);

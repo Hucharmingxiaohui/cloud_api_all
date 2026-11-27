@@ -68,6 +68,7 @@ public class CqEuaPlanEntity {
     private String lastEuaTaskId;
 
     @TableField("last_execute_time")
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date lastExecuteTime;
 
     @TableField("last_execute_status")
@@ -77,8 +78,10 @@ public class CqEuaPlanEntity {
     private String lastExecuteMsg;
 
     @TableField("create_time")
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date createTime;
 
     @TableField("update_time")
+    @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
     private Date updateTime;
 }

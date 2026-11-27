@@ -64,6 +64,10 @@ public class CqDockPictureReportService {
     // Shared by manual sync, polling and MQTT; bounded instance-owned locks, not task state.
     private final Striped<Lock> taskLocks = Striped.lock(256);
 
+    public Lock taskLock(String euaTaskId, String businessId) {
+        return taskLocks.get(StringUtils.hasText(euaTaskId) ? euaTaskId : "business:" + businessId);
+    }
+
     public void syncResults(CqDockTaskRecordEntity record, Runnable reportCompleted) {
         syncResults(record, !Objects.equals(record.getReportToPatrol(), 0), reportCompleted);
     }
@@ -72,6 +76,7 @@ public class CqDockPictureReportService {
         Lock lock = taskLocks.get(record.getEuaTaskId());
         if (!lock.tryLock()) throw new IllegalStateException("此任务正在同步图片，请稍后重试");
         try {
+            requireReportRecord(record.getBusinessId(), record.getEuaTaskId());
             if (!reportToPatrol) {
                 fetchSaveAndAnalyseOnly(record.getBusinessId(), record.getTaskName(), record.getEuaTaskId(), true);
             } else {
@@ -176,6 +181,7 @@ public class CqDockPictureReportService {
         Lock lock = taskLocks.get(euaTaskId);
         lock.lock();
         try {
+        requireReportRecord(taskCode, euaTaskId);
         if (fetchAndSavePictures(taskCode, taskName, euaTaskId, manual) < 0) return false;
         startAnalysisOnly(taskCode, euaTaskId);
         return true;
@@ -247,7 +253,7 @@ public class CqDockPictureReportService {
         // A manual resubmission may have replaced requestId while this callback waited.
         row = cqDockTaskPictureMapper.selectOne(new LambdaQueryWrapper<CqDockTaskPictureEntity>()
                 .eq(CqDockTaskPictureEntity::getRequestId, requestId).last("LIMIT 1"));
-        if (row == null) return;
+        if (row == null || findTaskRecord(row.getEuaTaskId()) == null) return;
         if (!Objects.equals(row.getAnalysisStatus(), ANALYSIS_PENDING)) {
             log.info("CQ分析回调图片已有终态，忽略重复回调，不自动重试：requestId={}, status={}", requestId, row.getAnalysisStatus());
             return;
@@ -1035,6 +1041,8 @@ public class CqDockPictureReportService {
                 euaTaskId.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString()).normalize();
         Files.createDirectories(dir);
         if (!dir.toRealPath().startsWith(root.toRealPath())) throw new IllegalArgumentException("EUA任务路径无效");
+        setFtpAccess(dir.getParent(), 02770);
+        setFtpAccess(dir, 02770);
         Path part = Files.createTempFile(dir, ".eua-", ".part");
         try {
             String headerName;
@@ -1055,6 +1063,7 @@ public class CqDockPictureReportService {
                 }
             }
             validateImage(part);
+            setFtpAccess(part, 0640);
             String name = StringUtils.hasText(pictureName) ? pictureName : headerName;
             if (!StringUtils.hasText(name)) name = UUID.randomUUID() + ".jpg";
             // A real picture ID, not pointId or a shared camera filename, owns the file.
@@ -1063,8 +1072,18 @@ public class CqDockPictureReportService {
             Path target = dir.resolve(prefix + safePictureName(name));
             Files.move(part, target, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            log.info("EUA图片已保存并完成适用的FTPS权限处理: taskCode={}, pictureId={}, path={}",
+                    taskCode, pictureId, target);
             return target.toAbsolutePath().toString();
         } finally { Files.deleteIfExists(part); }
+    }
+
+    private void setFtpAccess(Path path, int mode) throws java.io.IOException {
+        if (path.getFileSystem().supportedFileAttributeViews().contains("unix")) {
+            // 与已确认的FTPS容器GID一致；目录setgid使分析图继承共享组。
+            Files.setAttribute(path, "unix:gid", 1000, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+            Files.setAttribute(path, "unix:mode", mode, java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        }
     }
 
     private String safePictureName(String name) {

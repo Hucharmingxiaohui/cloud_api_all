@@ -156,6 +156,7 @@ public class CqEuaTaskReportService implements AutoCloseable {
             Path root = Paths.get(config.getReportLocalPath()).toAbsolutePath().normalize();
             if (Files.isSymbolicLink(root)) throw new IOException("Report directory is a symbolic link");
             Files.createDirectories(root);
+            if (!root.equals(root.toRealPath())) throw new IOException("Report directory contains a link");
             return root.toRealPath();
         } catch (IOException | InvalidPathException e) {
             log.error("Cannot access EUA report storage", e);
@@ -209,7 +210,11 @@ public class CqEuaTaskReportService implements AutoCloseable {
         Files.move(from, to, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     }
 
-    private void generateFile(Path root, String key, CqDockTaskRecordEntity record, String fileName) {
+    private synchronized void generateFile(Path root, String key, CqDockTaskRecordEntity record, String fileName) {
+        if (!active.contains(key) || records.selectById(record.getId()) == null) {
+            active.remove(key);
+            return;
+        }
         Path temp = null;
         try {
             CqEuaTaskPictureListRequest canonical = new CqEuaTaskPictureListRequest();
@@ -260,7 +265,7 @@ public class CqEuaTaskReportService implements AutoCloseable {
             cover.setSpacingBefore(1440);
             cover.setSpacingAfter(960);
             paragraph(doc, "东方电子股份有限公司", 18, true, ParagraphAlignment.CENTER);
-            paragraph(doc, new java.text.SimpleDateFormat("yyyy年MM月dd日").format(new Date()),
+            paragraph(doc, CqEuaPlanService.beijingTime(new Date(), "yyyy年MM月dd日"),
                     14, false, ParagraphAlignment.CENTER).setSpacingAfter(720);
             XWPFTable coverInfo = table(doc, "项目", "信息");
             metadata(coverInfo, "任务名称", task.getTaskName());
@@ -432,7 +437,7 @@ public class CqEuaTaskReportService implements AutoCloseable {
 
     private void metadata(XWPFTable table, String name, Object value) {
         tableRow(table.createRow(), name, value instanceof Date
-                ? new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format((Date) value) : text(value));
+                ? CqEuaPlanService.beijingTime((Date) value, "yyyy-MM-dd HH:mm:ss") : text(value));
     }
 
     private XWPFTable table(XWPFDocument doc, String... headers) {
@@ -469,6 +474,25 @@ public class CqEuaTaskReportService implements AutoCloseable {
     private String fileName(CqDockTaskRecordEntity record) {
         String name = text(record.getTaskName()).replaceAll("[^\\p{L}\\p{N}_-]", "_");
         return name.substring(0, Math.min(60, name.length())) + "_巡检报告.docx";
+    }
+
+    public synchronized void deleteTaskFiles(CqDockTaskRecordEntity record) {
+        String key = key(record);
+        Path root = storage();
+        try {
+            Files.deleteIfExists(root.resolve(key + ".docx"));
+            Files.deleteIfExists(root.resolve(key + ".json"));
+            try (java.util.stream.Stream<Path> files = Files.list(root)) {
+                for (Path file : files.filter(path -> path.getFileName().toString().startsWith(key + "-")
+                        && path.getFileName().toString().endsWith(".tmp")).collect(Collectors.toList())) {
+                    Files.deleteIfExists(file);
+                }
+            }
+            active.remove(key);
+            log.info("EUA任务报告及排队生成状态已清理：recordId={}", record.getId());
+        } catch (IOException e) {
+            throw new IllegalStateException("任务报告清理失败，请重试删除", e);
+        }
     }
 
     private void deleteTemp(Path path) {

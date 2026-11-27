@@ -341,6 +341,10 @@ public class ResultServiceImpl implements ResultService {
 
         log.info("【收到智能分析结果】 ：{}", JSONObject.toJSONString(analyseParamsRecReq));
         String requestId = analyseParamsRecReq.getRequestId();
+        if (requestId == null || requestId.trim().isEmpty()) {
+            log.warn("智能分析回调缺少requestId，安全忽略");
+            return;
+        }
 
 //      重庆EUA图片分析回调：按 requestId 路由到 CQ 处理（更新分析结果、检查全部完成后统一上报），不走本类 recg 流程
         if (cqDockPictureReportService.isCqAnalyseRequest(requestId)) {
@@ -350,7 +354,15 @@ public class ResultServiceImpl implements ResultService {
 
         RecgFileEntity recgFileEntity = recgFileEntityMapper.selectOne(new LambdaQueryWrapper<RecgFileEntity>().eq(RecgFileEntity::getRequestId, requestId));
         RecgPointsEntity recgPointsEntity = recgPointsEntityMapper.selectOne(new LambdaQueryWrapper<RecgPointsEntity>().eq(RecgPointsEntity::getRequestId, requestId));
+        if (recgFileEntity == null || recgPointsEntity == null) {
+            log.info("智能分析回调没有匹配的本地记录，忽略未知或已删除请求：requestId={}", requestId);
+            return;
+        }
         WaylineJobEntity waylineJobEntity = waylineJobMapper.selectOne(new LambdaQueryWrapper<WaylineJobEntity>().eq(WaylineJobEntity::getJobId, recgPointsEntity.getTaskPatrolledId()));
+        if (waylineJobEntity == null) {
+            log.warn("智能分析回调任务已不存在，安全忽略：requestId={}", requestId);
+            return;
+        }
         Integer analyzedNum = waylineJobEntity.getAnalyzedNum();
         if(analyzedNum==null){
             List<UniPoint> uniPoints = uniPointMapper2.selectList(new LambdaQueryWrapper<UniPoint>()

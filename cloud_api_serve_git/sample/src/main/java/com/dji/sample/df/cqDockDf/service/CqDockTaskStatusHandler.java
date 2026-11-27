@@ -64,6 +64,12 @@ public class CqDockTaskStatusHandler {
                 || !StringUtils.hasText(record.getBusinessId()) || !StringUtils.hasText(record.getEuaTaskId())) {
             throw new IllegalArgumentException("任务记录不存在或未成功下发，不能同步结果");
         }
+        java.util.concurrent.locks.Lock lock = cqDockPictureReportService.taskLock(record.getEuaTaskId(), record.getBusinessId());
+        lock.lock();
+        try {
+        if (cqDockTaskRecordMapper.selectById(record.getId()) == null) {
+            throw new IllegalArgumentException("任务已删除，不能同步结果");
+        }
         if (reportToPatrol && !StringUtils.hasText(record.getSubCode())) {
             throw new IllegalStateException("任务缺少原始站点Code，请核实原报文后补录，不能同步结果");
         }
@@ -94,6 +100,7 @@ public class CqDockTaskStatusHandler {
         if (legacy) cqDockPictureReportService.syncResults(record, completed);
         else cqDockPictureReportService.syncResults(record, reportToPatrol, completed);
         return "已提交同步，已有图片记录和本地原图复用，重新分析；可见光分析结果等待回调";
+        } finally { lock.unlock(); }
     }
 
     public String syncResultsAndReport(Long recordId) {
@@ -167,7 +174,16 @@ public class CqDockTaskStatusHandler {
             log.warn("EUA任务状态监控缺少euaTaskId，跳过本轮查询: taskCode={}, detail={}", taskCode, detail);
             return;
         }
+        java.util.concurrent.locks.Lock lock = cqDockPictureReportService.taskLock(euaTaskId, taskCode);
+        lock.lock();
         try {
+            if (cqDockTaskRecordMapper.selectCount(new LambdaQueryWrapper<CqDockTaskRecordEntity>()
+                    .eq(CqDockTaskRecordEntity::getBusinessId, taskCode)
+                    .eq(CqDockTaskRecordEntity::getEuaTaskId, euaTaskId)) != 1) {
+                removeMonitoring(taskCode);
+                log.info("EUA监控任务记录不存在或不唯一，忽略旧监控：taskCode={}", taskCode);
+                return;
+            }
             redisUtils.expire(MONITOR_HASH + ":" + taskCode, 2 * 60 * 60L);
             com.dji.sample.df.cqDockDf.controller.CqDockMockController mock = mockController == null ? null : mockController.getIfAvailable();
             if (mock != null && mock.isMissingInternalTask(euaTaskId)) {
@@ -255,6 +271,16 @@ public class CqDockTaskStatusHandler {
             }
         } catch (Exception e) {
             log.error("处理EUA任务状态失败: taskCode={}, euaTaskId={}", taskCode, euaTaskId, e);
+        } finally { lock.unlock(); }
+    }
+
+    public void removeMonitoring(String taskCode) {
+        redisUtils.remove(MONITOR_SET, taskCode);
+        redisUtils.delete(MONITOR_HASH + ":" + taskCode);
+        Set<Object> members = redisUtils.members(MONITOR_SET);
+        Map<Object, Object> detail = redisUtils.getHashEntries(MONITOR_HASH + ":" + taskCode);
+        if ((members != null && members.contains(taskCode)) || (detail != null && !detail.isEmpty())) {
+            throw new IllegalStateException("监控清理未确认，请重试删除");
         }
     }
 

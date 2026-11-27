@@ -44,6 +44,24 @@ public class CqEuaPlanController {
     @Resource
     private CqDockTaskStatusHandler cqDockTaskStatusHandler;
 
+    @Resource
+    private com.dji.sample.df.cqDockDf.service.CqEuaTaskDeleteService taskDeleteService;
+
+    @PostMapping("/task-record/delete")
+    public Result deleteTaskRecord(@RequestParam Long id, javax.servlet.http.HttpServletRequest request) {
+        com.dji.sample.common.model.CustomClaim claim = (com.dji.sample.common.model.CustomClaim)
+                request.getAttribute(com.dji.sample.component.AuthInterceptor.TOKEN_CLAIM);
+        if (claim == null || !org.springframework.util.StringUtils.hasText(claim.getWorkspaceId())) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.UNAUTHORIZED, "请先登录工作空间");
+        }
+        try {
+            taskDeleteService.delete(id, claim.getWorkspaceId());
+            return Result.success("本次执行及关联本地数据已删除；未停止下级任务");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
     @PostMapping("/task-record/sync-results")
     public Result syncResults(@RequestParam Long id) {
         try {

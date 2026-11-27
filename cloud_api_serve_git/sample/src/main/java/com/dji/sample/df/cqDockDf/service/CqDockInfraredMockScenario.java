@@ -83,7 +83,7 @@ public class CqDockInfraredMockScenario {
         try (Stream<Path> stream = Files.list(root)) {
             List<Path> files = stream.filter(Files::isRegularFile).collect(Collectors.toList());
             for (int i = 0; i < CODES.size(); i++) {
-                String base = "图片" + (i + 1);
+                String base = "image" + (i + 1);
                 List<Path> candidates = files.stream().filter(path -> path.getFileName().toString()
                         .matches(java.util.regex.Pattern.quote(base) + "(?i:\\.(png|jpg|jpeg))")).collect(Collectors.toList());
                 if (candidates.size() != 1) throw new IllegalStateException("照片必须唯一且完整：" + root.resolve(base) + ".png/.jpg/.jpeg");
@@ -132,6 +132,12 @@ public class CqDockInfraredMockScenario {
         if (task == null || !task.startsWith(TASK_PREFIX)) return false;
         if (!enabled() || !tasks.containsKey(task)) throw unavailable();
         return true;
+    }
+
+    public void forgetTask(String task) {
+        if (task == null) return;
+        List<Fixture> removed = tasks.remove(task);
+        if (removed != null) removed.forEach(fixture -> pictures.remove(fixture.id, fixture));
     }
 
     public JSONArray pictures(String task) {
