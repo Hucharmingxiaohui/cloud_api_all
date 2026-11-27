@@ -27,6 +27,8 @@ import java.util.List;
  */
 public enum EventsMethodEnum {
 
+    RTK_CALIBRATION("rtk_calibration", "inbound_events_rtk_calibration", new TypeReference<java.util.Map<String,Object>>() {}),
+
     FLIGHTTASK_PROGRESS("flighttask_progress", ChannelName.INBOUND_EVENTS_FLIGHTTASK_PROGRESS, new TypeReference<EventsDataRequest<FlighttaskProgress>>() {}),
 //  空中航线
     INFLIGHTTASK_PROGRESS("in_flight_wayline_progress", ChannelName.INBOUND_EVENTS_INFLIGHTTASK_PROGRESS, new TypeReference<InFlighttaskProgress>() {}),

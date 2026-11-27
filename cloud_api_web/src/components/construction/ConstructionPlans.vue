@@ -1,6 +1,19 @@
 <template>
   <main class="construction-plans">
     <header><div><h2>工地巡检计划</h2><p>选择机巢，仅查看其完全覆盖区域 / 线路的巡检计划。</p></div><div class="actions"><el-button :disabled="busy" @click="router.push('/taskManage/construction/overall')">总体航线与计划</el-button><el-button @click="router.push('/task/TaskPanel')">飞行任务</el-button><el-button :disabled="busy" @click="refresh">刷新</el-button></div></header>
+    <div class="calibration-entry"><el-button :disabled="busy || formVisible" @click="toggleCalibration">{{ calibrationVisible ? '收起车载机巢标定' : '车载机巢标定' }}</el-button></div>
+    <section v-if="calibrationVisible" class="calibration-panel">
+      <div class="actions calibration-selection">
+        <label for="plan-calibration-dock">标定机巢</label>
+        <el-select id="plan-calibration-dock" v-model="calibrationDock" filterable placeholder="请选择需要标定的机巢" :loading="docksLoading">
+          <el-option v-for="dock in devices" :key="dock.device_sn" :value="dock.device_sn" :label="`${deviceName(dock.device_sn)}（${dock.device_sn}）`" />
+        </el-select>
+        <el-button :loading="docksLoading" @click="refreshDocks">刷新机巢列表</el-button>
+      </div>
+      <p v-if="dockError" class="error" role="alert">{{ dockError }}</p>
+      <p v-if="!calibrationDock">请选择机巢后查看标定状态；暂无地图定位的已绑定机巢也可选择。</p>
+      <MobileDockCalibration v-if="calibrationDock" :sn="calibrationDock" />
+    </section>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <div class="plans-layout">
       <aside class="region-panel">
@@ -41,6 +54,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConstructionAreaMap from './ConstructionAreaMap.vue'
 import ConstructionPlanForm from './ConstructionPlanForm.vue'
+import MobileDockCalibration from '../g-map/MobileDockCalibration.vue'
 import { useConstructionDocks } from './useConstructionDocks'
 import { archiveConstructionPlan, dispatchConstructionPlan, getConstructionWayline, listConstructionAreas, listConstructionLines, listConstructionPlans, listConstructionWaylines, refreshConstructionDispatch } from '/@/api/construction'
 import type { ConstructionPlan, ConstructionWayline } from '/@/api/construction'
@@ -57,6 +71,15 @@ let epoch = 0; let areaEpoch = 0; let previewEpoch = 0
 const dispatchRequests = new Map<string, string>()
 const selectedPlanId = ref('')
 const coverage = ref<{ sn: string; radius: number | null; loading: boolean; error: string }>({ sn: '', radius: null, loading: false, error: '' })
+const calibrationVisible = ref(false)
+const calibrationDock = ref('')
+function toggleCalibration () {
+  calibrationVisible.value = !calibrationVisible.value
+  if (calibrationVisible.value) {
+    calibrationDock.value = coverage.value.sn || activeDock.value || ''
+    refreshDocks()
+  }
+}
 const coverageDock = computed(() => docks.value.find(d => d.sn === coverage.value.sn))
 const coverageHint = computed(() => {
   if (!coverage.value.sn) return '请在地图上选择机巢，查看其完全覆盖区域的计划'
@@ -172,6 +195,10 @@ h2,h3,p { margin: 0; } h2 { font-size: 20px; color: #e7f0ff; } h3 { font-size: 1
 .plan-area-card span { display: block; margin-top: 8px; font-size: 12px; color: #9eb6d6; }.plan-area-card.selected { border-color: #39d9ff; background: #17406a; }
 .plans-content { display: grid; grid-template-rows: minmax(520px, 1.6fr) minmax(300px, 1fr); gap: 12px; min-width: 0; min-height: 832px; }
 .plan-map { min-width: 0; min-height: 0; }
+.calibration-entry { display: flex; justify-content: flex-end; }
+.calibration-panel { padding: 14px; border: 1px solid #29476d; border-radius: 5px; background: #0d294f; }
+.calibration-selection { justify-content: flex-start; margin-bottom: 12px; }
+.calibration-selection .el-select { width: 360px; max-width: 100%; }
 .plan-list { display: flex; flex-direction: column; padding: 14px; gap: 12px; min-height: 0; }.plan-list :deep(.el-table) { flex: 1; min-height: 100px; }
 .plan-list :deep(.el-table) { --el-table-current-row-bg-color: #17406a; --el-table-row-hover-bg-color: #17365c; }
 .plan-filters { justify-content: flex-start; }.plan-filters .el-input { max-width: 240px; }.error { color: #ffad8e; }.actions { flex-wrap: wrap; }

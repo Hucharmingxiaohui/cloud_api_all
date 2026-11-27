@@ -36,6 +36,9 @@ public class DeviceRedisServiceImpl implements IDeviceRedisService, IRawStateCac
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private com.dji.sample.control.service.impl.MobileDockCalibrationTelemetry calibrationTelemetry;
+
     @Override
     public Boolean checkDeviceOnline(String sn) {
         String key = RedisConst.DEVICE_ONLINE_PREFIX + sn;
@@ -69,6 +72,7 @@ public class DeviceRedisServiceImpl implements IDeviceRedisService, IRawStateCac
 
     @Override
     public void setDeviceRawOsd(String sn, Object data) {
+        calibrationTelemetry.record(sn, data);
         mergeAndSetRawCache(RedisConst.RAW_OSD_PREFIX + sn, data);
     }
 

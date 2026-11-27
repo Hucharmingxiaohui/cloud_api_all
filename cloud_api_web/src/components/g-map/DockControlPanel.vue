@@ -9,6 +9,7 @@
   </div>
   <!-- setting -->
   <DeviceSettingBox :sn="props.sn" :deviceInfo="props.deviceInfo"></DeviceSettingBox>
+  <MobileDockCalibration :sn="props.sn" />
   <!-- cmd -->
   <div class="control-cmd-wrapper">
     <div class="control-cmd-header">
@@ -44,6 +45,7 @@ import { cmdList as baseCmdList, DeviceCmdItem } from '/@/types/device-cmd'
 import { useMyStore } from '/@/store'
 import { updateDeviceCmdInfoByOsd, updateDeviceCmdInfoByExecuteInfo } from '/@/utils/device-cmd'
 import DeviceSettingBox from './DeviceSettingBox.vue'
+import MobileDockCalibration from './MobileDockCalibration.vue'
 
 const props = defineProps<{
   sn: string,

@@ -9,6 +9,7 @@
     <!-- setting -->
     <!-- <DeviceSettingBox :sn="props.sn" :deviceInfo="props.deviceInfo"></DeviceSettingBox> -->
     <!-- cmd -->
+    <MobileDockCalibration :sn="props.sn" />
     <div class="content_title">
             <span style="margin-right: 10px;">设备调试:</span>
             <a-switch class="debug-btn" checked-children="开" un-checked-children="关" v-model:checked="debugStatus" @change="onDeviceStatusChange"/>
@@ -32,6 +33,7 @@
 </template>
 <script setup lang="ts">
 import { defineProps, defineEmits, ref, watch } from 'vue'
+import MobileDockCalibration from '/@/components/g-map/MobileDockCalibration.vue'
 import {
   CloseOutlined
 } from '@ant-design/icons-vue'
