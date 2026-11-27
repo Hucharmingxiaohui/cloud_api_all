@@ -98,7 +98,7 @@ public class CqEuaPlanController {
         org.springframework.core.io.Resource file = cqEuaTaskReportService.download(reportRequest(businessId, euaTaskId));
         String fileName = file.getFilename();
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .contentType(MediaType.parseMediaType("application/vnd.ms-excel"))
                 .header("Content-Disposition", org.springframework.http.ContentDisposition.attachment()
                         .filename(fileName, java.nio.charset.StandardCharsets.UTF_8).build().toString())
                 .header("Cache-Control", "private, no-store")

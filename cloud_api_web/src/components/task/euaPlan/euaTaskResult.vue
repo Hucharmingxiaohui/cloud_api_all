@@ -20,7 +20,7 @@
 
     <div v-if="reportStatus.status !== 'NOT_GENERATED' || reportError" class="report-status" role="status">
       {{ reportError || reportStatus.message || reportStatusText }}
-      <span v-if="reportStatus.status === 'COMPLETED' && !reportError"> · 点击“导出报告”下载 Word，图片更新后可重新生成。</span>
+      <span v-if="reportStatus.status === 'COMPLETED' && !reportError"> · 点击“导出报告”下载 Excel，图片更新后可重新生成。</span>
     </div>
 
     <div class="result-toolbar">
@@ -151,7 +151,7 @@ async function exportReport () {
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = (reportStatus.value.fileName || `${route.query.taskName || 'EUA巡视报告'}.docx`).replace(/[\\/:*?"<>|]/g, '_')
+    anchor.download = (reportStatus.value.fileName || `${route.query.taskName || 'EUA巡视报告'}.xls`).replace(/[\\/:*?"<>|]/g, '_')
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
