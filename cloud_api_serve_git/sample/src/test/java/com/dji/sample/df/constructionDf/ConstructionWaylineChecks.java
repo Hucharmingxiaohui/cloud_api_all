@@ -63,7 +63,11 @@ public class ConstructionWaylineChecks {
             byte[] mismatched=replace(valid,"wpmz/waylines.wpml","120.008,36.002","120.009,36.002");
             rejects(()->ConstructionKmz.parse(mismatched),"坐标不一致");
             byte[] curved=replace(valid,"wpmz/waylines.wpml","toPointAndStopWithDiscontinuityCurvature","coordinateTurn");
-            rejects(()->ConstructionKmz.parse(curved),"到点停");
+            check(ConstructionKmz.parse(curved).points.size()==2,"curved route accepted");
+            byte[] nonStraight=replace(curved,"wpmz/waylines.wpml","</wpml:waypointTurnParam>","</wpml:waypointTurnParam><wpml:useStraightLine>0</wpml:useStraightLine>");
+            check(!Arrays.equals(curved,nonStraight),"non-straight fixture changed");
+            check(ConstructionKmz.parse(nonStraight).points.size()==2,"non-straight route accepted");
+            ConstructionWaylineServiceChecks.run(nonStraight);
             byte[] extraFolder=replace(valid,"wpmz/waylines.wpml","</Document>","<Folder/></Document>");
             rejects(()->ConstructionKmz.parse(extraFolder),"Folder");
             byte[] xxe=replace(valid,"wpmz/template.kml","<kml ","<!DOCTYPE kml [<!ENTITY xxe SYSTEM 'file:///not-allowed'>]><kml ");

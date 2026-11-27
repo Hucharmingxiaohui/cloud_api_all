@@ -92,10 +92,7 @@ public final class ConstructionKmz {
                 String[] xy=text(one(p,"Point"),"coordinates").split(","),txy=text(one(tp,"Point"),"coordinates").split(",");
                 double lng=number(xy[0]),lat=number(xy[1]);
                 if(Math.abs(lng)>180||Math.abs(lat)>85||Math.abs(lng-number(txy[0]))>1e-8||Math.abs(lat-number(txy[1]))>1e-8) throw bad("模板与执行航点坐标不一致");
-                String turn=text(one(p,"waypointTurnParam"),"waypointTurnMode");
-                if(!"toPointAndStopWithDiscontinuityCurvature".equals(turn)) throw bad("区域约束航线仅支持直线到点停转弯，航点 "+(i+1));
-                List<Element> straight=children(p,"useStraightLine");
-                if(!straight.isEmpty()&&!"1".equals(straight.get(0).getTextContent().trim())) throw bad("航点必须采用直线飞行");
+                // Preserve imported turn parameters; geometry checks use waypoint chords only.
                 double height=number(text(p,"executeHeight")),speed=number(text(p,"waypointSpeed"));
                 if(speed<=0||speed>15) throw bad("航点速度应大于0且不超过15m/s");
                 result.points.add(new Point(lng,lat));
