@@ -39,6 +39,12 @@ public class CqDockMockController {
     };
     private final Map<String, Scenario> scenarios = new ConcurrentHashMap<>();
 
+    public void forgetTask(String taskId) {
+        if (taskId == null) return;
+        scenarios.remove(taskId);
+        infraredMockScenario.forgetTask(taskId);
+    }
+
     public boolean isMissingInternalTask(String taskId) {
         return properties.isMockEnabled() && taskId != null
                 && taskId.matches("mock-task-(eight-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")

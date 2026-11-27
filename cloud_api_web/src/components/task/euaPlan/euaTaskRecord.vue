@@ -41,11 +41,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="180" show-overflow-tooltip />
-        <el-table-column label="操作" width="290" fixed="right" align="center">
+        <el-table-column label="操作" width="340" fixed="right" align="center">
           <template #default="scope">
             <el-button link type="primary" @click="openTaskResult(scope.row)">任务结果</el-button>
             <el-button link type="primary" :loading="syncLoading[scope.row.id]" :disabled="reportSyncLoading[scope.row.id]" @click="syncResults(scope.row)">结果同步</el-button>
             <el-button v-if="scope.row.taskSource === 'PATROL'" link type="primary" :loading="reportSyncLoading[scope.row.id]" :disabled="syncLoading[scope.row.id]" @click="syncResultsAndReport(scope.row)">结果同步上报</el-button>
+            <el-button v-if="scope.row.taskSource === 'PLATFORM'" link type="danger" :loading="deleteLoading[scope.row.id]" :disabled="syncLoading[scope.row.id] || reportSyncLoading[scope.row.id]" @click="deleteRecord(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -71,7 +72,7 @@ import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getEuaTaskExecutionStatus, getEuaTaskRecordPage, syncEuaTaskResults, syncEuaTaskResultsAndReport } from '/@/api/cq-eua-plan'
+import { deleteEuaTaskRecord, getEuaTaskExecutionStatus, getEuaTaskRecordPage, syncEuaTaskResults, syncEuaTaskResultsAndReport } from '/@/api/cq-eua-plan'
 import { createTaskStatusLoader } from './euaTaskStatus'
 
 const recordLoading = ref(false)
@@ -81,6 +82,27 @@ const executionStatuses = ref<Record<string, string>>({})
 const statusLoader = createTaskStatusLoader(getEuaTaskExecutionStatus)
 const syncLoading = reactive<Record<string, boolean>>({})
 const reportSyncLoading = reactive<Record<string, boolean>>({})
+const deleteLoading = reactive<Record<string, boolean>>({})
+
+async function deleteRecord (row: any) {
+  if (row.taskSource !== 'PLATFORM' || !row.id || deleteLoading[row.id] || syncLoading[row.id] || reportSyncLoading[row.id]) return
+  deleteLoading[row.id] = true
+  try {
+    try {
+      await ElMessageBox.confirm('删除本次执行及其图片、分析、报告和本地文件，保留计划和素材。不停止真实下级任务，删除后不再同步该任务。是否继续？', '删除执行记录', { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' })
+    } catch { return }
+    const res = await deleteEuaTaskRecord(row.id)
+    if (res.code !== 0) {
+      await ElMessageBox.alert(res.msg || '删除失败', '删除执行记录')
+      return
+    }
+    ElMessage.success('本次执行及关联本地数据已删除')
+    if (taskRecordData.value.length === 1 && recordPagination.current > 1) recordPagination.current--
+    await getTaskRecords()
+  } catch (error: any) {
+    await ElMessageBox.alert(error?.response?.data?.msg || error?.message || '删除失败', '删除执行记录')
+  } finally { deleteLoading[row.id] = false }
+}
 
 function executionStatus (row: any) {
   if ((row.success !== 1 && row.success !== '1') || !row.euaTaskId?.trim()) return '—'
@@ -143,7 +165,7 @@ function openTaskResult (row: any) {
 
 async function syncResults (row: any) {
   const id = row.id
-  if (!id || syncLoading[id] || reportSyncLoading[id]) return
+  if (!id || syncLoading[id] || reportSyncLoading[id] || deleteLoading[id]) return
   syncLoading[id] = true
   try {
     const res = await syncEuaTaskResults(id)
@@ -160,7 +182,7 @@ function normalizeTaskRecordRow (item: any) {
   return {
     ...item,
     id: item.id,
-    taskSource: item.taskSource || item.task_source || 'PLATFORM',
+    taskSource: item.taskSource || item.task_source || '',
     planId: item.planId || item.plan_id,
     businessId: item.businessId || item.business_id || item.taskCode || item.task_code || '',
     taskCode: item.taskCode || item.task_code || item.businessId || item.business_id || '',

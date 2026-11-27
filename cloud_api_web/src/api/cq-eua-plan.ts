@@ -82,6 +82,11 @@ export const syncEuaTaskResults = async function (recordId: number | string): Pr
   return result.data
 }
 
+export const deleteEuaTaskRecord = async function (id: number | string): Promise<IWorkspaceResponse<any>> {
+  const result = await request.post(`${HTTP_PREFIX}/task-record/delete`, undefined, { params: { id }, timeout: 60000 })
+  return result.data
+}
+
 export const syncEuaTaskResultsAndReport = async function (recordId: number | string): Promise<IWorkspaceResponse<any>> {
   const result = await request.post(`${HTTP_PREFIX}/task-record/sync-results-and-report`, undefined, { params: { id: recordId }, timeout: 30000 })
   return result.data

@@ -133,47 +133,7 @@ public class CollectionXlsReportService {
         Path temp = null;
         try (InputStream input = Files.newInputStream(template); HSSFWorkbook book = new HSSFWorkbook(input)) {
             HSSFSheet sheet = book.getSheetAt(0);
-            if (sheet.getRow(7) == null || sheet.getRow(0) == null || sheet.getRow(6) == null)
-                throw new IllegalArgumentException("普通报告模板结构不符合约定的前7行表头和第8行明细");
-            boolean hasPictureType = "图片类型".equals(new DataFormatter().formatCellValue(sheet.getRow(6).getCell(8)));
-            HSSFCellStyle[] styles = new HSSFCellStyle[12];
-            HSSFCellStyle[] headerStyles = new HSSFCellStyle[12];
-            int[] widths = new int[12];
-            for (int c = 0; c < 12; c++) {
-                int source = hasPictureType || c < 8 ? c : c == 8 ? 7 : c - 1;
-                styles[c] = sheet.getRow(7).getCell(source, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).getCellStyle();
-                headerStyles[c] = sheet.getRow(6).getCell(source, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).getCellStyle();
-                widths[c] = sheet.getColumnWidth(source);
-            }
-            for (int r = sheet.getLastRowNum(); r >= 7; r--) if (sheet.getRow(r) != null) sheet.removeRow(sheet.getRow(r));
-            for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
-                CellRangeAddress region = sheet.getMergedRegion(i);
-                if (region.getLastRow() >= 6) sheet.removeMergedRegion(i);
-                else if (region.getLastColumn() > 11 || (region.getFirstRow() == 5 && region.getFirstColumn() == 0)) {
-                    sheet.removeMergedRegion(i);
-                    int lastColumn = 11;
-                    if (region.getFirstColumn() <= lastColumn && (region.getFirstColumn() < lastColumn || region.getFirstRow() < region.getLastRow())) {
-                        sheet.addMergedRegion(new CellRangeAddress(region.getFirstRow(), region.getLastRow(), region.getFirstColumn(), lastColumn));
-                    }
-                }
-            }
-            for (int r = 0; r <= 6; r++) {
-                HSSFRow row = sheet.getRow(r);
-                if (row == null) continue;
-                for (int c = row.getLastCellNum() - 1; c >= (r == 6 ? 0 : 12); c--) {
-                    if (row.getCell(c) != null) row.removeCell(row.getCell(c));
-                }
-            }
-            String[] headers = {"序号", "区域", "间隔", "设备", "部件", "点位", "重要等级", "数据来源", "图片类型", "采集时间", "巡视结果", "巡视图像"};
-            for (int c = 0; c < headers.length; c++) {
-                HSSFCell cell = sheet.getRow(6).createCell(c);
-                cell.setCellValue(headers[c]); cell.setCellStyle(headerStyles[c]);
-                sheet.setColumnWidth(c, widths[c]);
-            }
-            sheet.setColumnWidth(7, Math.max(widths[7], 24 * 256));
-            sheet.setColumnWidth(8, Math.max(widths[8], 10 * 256));
-            sheet.setColumnWidth(9, Math.max(widths[9], 22 * 256));
-            sheet.setColumnWidth(11, Math.max(widths[11], 24 * 256));
+            PatrolXlsRenderer renderer = new PatrolXlsRenderer(book);
             put(sheet, 0, 4, text(job.getName())); put(sheet, 0, 11, environment(job.getDockSn()));
             put(sheet, 1, 4, text(operator) + "（生成操作人）"); put(sheet, 1, 11, time(System.currentTimeMillis()) + "（生成时间）");
             put(sheet, 2, 4, time(job.getExecuteTime())); put(sheet, 2, 11, time(job.getCompletedTime()));
@@ -185,10 +145,6 @@ public class CollectionXlsReportService {
                 directory = base.resolve(job.getJobId()).toRealPath();
                 if (!directory.startsWith(base)) throw new IllegalArgumentException("原图目录无效");
             }
-            HSSFPatriarch drawing = sheet.createDrawingPatriarch();
-            HSSFCellStyle resultStyle = book.createCellStyle(); resultStyle.cloneStyleFrom(styles[10]);
-            resultStyle.setWrapText(true); resultStyle.setVerticalAlignment(VerticalAlignment.TOP);
-            sheet.setColumnWidth(10, Math.max(sheet.getColumnWidth(10), 24 * 256));
             for (int i = 0; i < photos.size(); i++) {
                 MediaFileEntity photo = photos.get(i); UniPoint point = matched.get(i);
                 String name = photo.getFileName();
@@ -224,21 +180,11 @@ public class CollectionXlsReportService {
                     }
                 }
                 int rowNumber = 7 + i;
-                HSSFRow row = sheet.createRow(rowNumber); row.setHeightInPoints(160);
                 String[] values = {String.valueOf(i + 1), text(point.getAreaName()), text(point.getBayName()), text(point.getDeviceName()),
                         text(point.getComponentName()), text(point.getPointName()), text(point.getLevel()),
                         "无人机采集：" + name, Integer.valueOf(0).equals(point.getPicType()) ? "可见光" : Integer.valueOf(1).equals(point.getPicType()) ? "红外" : "未提供",
                         time(photo.getCreateTime()), result, ""};
-                for (int c = 0; c < values.length; c++) { HSSFCell cell = row.createCell(c); cell.setCellStyle(styles[c]); cell.setCellValue(values[c]); }
-                row.getCell(10).setCellStyle(resultStyle);
-                double width = sheet.getColumnWidthInPixels(11);
-                double height = 160 * 96.0 / 72;
-                double scale = Math.min((width - 4) / image.getWidth(), (height - 4) / image.getHeight());
-                int dx = Math.max(1, Math.min(1022, (int) (image.getWidth() * scale / width * 1024)));
-                int dy = Math.max(1, Math.min(254, (int) (image.getHeight() * scale / height * 256)));
-                HSSFClientAnchor anchor = new HSSFClientAnchor(1, 1, dx, dy, (short) 11, rowNumber, (short) 11, rowNumber);
-                anchor.setAnchorType(ClientAnchor.AnchorType.MOVE_DONT_RESIZE);
-                drawing.createPicture(anchor, book.addPicture(bytes, Workbook.PICTURE_TYPE_JPEG));
+                renderer.row(rowNumber, values, bytes, image, Workbook.PICTURE_TYPE_JPEG);
             }
             int thermalCount = thermalMeasured + thermalIssues.size();
             String summary = "总照片" + totalPhotos + "张，匹配" + photos.size() + "张，跳过" + (sequenceMatchingEnabled ? totalPhotos-photos.size() : issues.size()) + "张，匹配点位" + unique + "个。";
@@ -254,7 +200,7 @@ public class CollectionXlsReportService {
             extraRows += thermalIssues.isEmpty() ? 0 : 1 + thermalIssues.size();
             if (7L + photos.size() + extraRows > 65536) throw new IllegalArgumentException("报告明细及异常说明超出 XLS 行数上限");
             if (!issues.isEmpty() || !thermalIssues.isEmpty()) {
-                HSSFCellStyle issueStyle = book.createCellStyle(); issueStyle.cloneStyleFrom(styles[0]);
+                HSSFCellStyle issueStyle = book.createCellStyle(); issueStyle.cloneStyleFrom(renderer.detailStyle(0));
                 issueStyle.setWrapText(true); issueStyle.setVerticalAlignment(VerticalAlignment.TOP);
                 issueStyle.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex()); issueStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
                 int next = 7 + photos.size();
@@ -268,15 +214,7 @@ public class CollectionXlsReportService {
                     for (String issue : thermalIssues) appendIssue(sheet, next++, issue, issueStyle);
                 }
             }
-            for (Sheet s : book) for (Row r : s) for (Cell c : r) {
-                if (c.getCellType() == CellType.STRING && (c.getStringCellValue().contains("{{") || c.getStringCellValue().contains("}}")))
-                    throw new IllegalArgumentException("模板存在未绑定占位符：" + s.getSheetName() + "!" + c.getAddress());
-            }
-            sheet.getPrintSetup().setPaperSize(PrintSetup.A4_PAPERSIZE);
-            sheet.getPrintSetup().setFitWidth((short) 1); sheet.getPrintSetup().setFitHeight((short) 0);
-            sheet.setFitToPage(true); sheet.setAutobreaks(true);
-            sheet.setRepeatingRows(new CellRangeAddress(0, 6, -1, -1));
-            book.setPrintArea(0, 0, 11, 0, 6 + photos.size() + extraRows);
+            renderer.finish(6 + photos.size() + extraRows);
             Files.createDirectories(output.getParent());
             temp = Files.createTempFile(output.getParent(), "collection-", ".tmp");
             try (OutputStream stream = Files.newOutputStream(temp)) { book.write(stream); }
@@ -349,7 +287,7 @@ public class CollectionXlsReportService {
         row.getCell(0).setCellValue(value);
         sheet.addMergedRegion(new CellRangeAddress(index, index, 0, 11));
     }
-    private static void put(HSSFSheet sheet, int r, int c, String value) { sheet.getRow(r).getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK).setCellValue(value); }
+    private static void put(HSSFSheet sheet, int r, int c, String value) { PatrolXlsRenderer.put(sheet, r, c, value); }
     private static String text(Object value) { return value == null || value.toString().isBlank() ? "未提供" : value.toString(); }
     private static String time(Long value) { return value == null ? "未提供" : new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date(value)); }
     private static String escape(String value) { return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;"); }
